@@ -13,7 +13,9 @@ RUN git clone https://github.com/brendangregg/FlameGraph.git
 
 COPY init_repo.sh /package/
 COPY listen_fs.sh /package/
+COPY build_pmccabe_xml.sh /package/
+COPY build_pmccabe_flamegraph.sh /package/
 
-ENTRYPOINT ["/package/init_repo.sh", "/package/", "/mnt/"]
+ENTRYPOINT ["/package/init_repo.sh", "/package", "/mnt"]
 #CMD["repo for git????"]
 
