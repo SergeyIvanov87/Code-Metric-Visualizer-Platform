@@ -9,13 +9,8 @@ RUN pacman -Sy --noconfirm python python-pip git inotify-tools
 RUN git clone https://gitlab.com/pmccabe/pmccabe.git && cd pmccabe && make -e DESTDIR=/ install
 RUN git clone https://github.com/SergeyIvanov87/pmccabe_visualizer.git
 RUN git clone https://github.com/brendangregg/FlameGraph.git
-#RUN --mount=type=tmpfs
 
-COPY init_repo.sh /package/
-COPY listen_fs.sh /package/
-COPY build_pmccabe_xml.sh /package/
-COPY build_pmccabe_flamegraph.sh /package/
+COPY *.sh /package/
 
 ENTRYPOINT ["/package/init_repo.sh", "/package", "/mnt"]
-#CMD["repo for git????"]
 
