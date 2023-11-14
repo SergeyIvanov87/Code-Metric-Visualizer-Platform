@@ -9,4 +9,4 @@ To build the image please use the following command:
 
 # Launch a container from the image
 
-`sudo docker run -it --mount type=bind,src=/tmp,target=/mnt pmccabe_vis:latest <Git repo address>`
+`sudo docker run -it --mount type=bind,src=/tmp,target=/mnt pmccabe_vis:latest <Git repo address> <branch>`
