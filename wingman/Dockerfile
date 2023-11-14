@@ -11,6 +11,6 @@ RUN git clone https://github.com/SergeyIvanov87/pmccabe_visualizer.git
 RUN git clone https://github.com/brendangregg/FlameGraph.git
 
 COPY *.sh /package/
+COPY ../API /package/
 
 ENTRYPOINT ["/package/init.sh", "/package", "/mnt"]
-
