@@ -5,10 +5,15 @@ shopt -s extglob
 
 inotifywait -m ${1} -e create -e moved_to -e delete -e moved_from --include '(\.patch)|(\.xml)|(\.svg)' |
     while read dir action file; do
+        echo "file: ${file}, action; ${action}, dir: ${dir}"
         case "$action" in
-            CREATE|MOVED_TO )
+            CREATE|MOVED_TO|MODIFY )
                 case "$file" in
                     @(*.patch) )
+                        ${WORK_DIR}/apply_patch_in_repo.sh ${file}
+                        ${WORK_DIR}/build_pmccabe_xml.sh "${file}.xml"
+                        ${WORK_DIR}/build_pmccabe_flamegraph.sh "${file}.xml" "${file}.svg"
+                        ${WORK_DIR}/reset_existing_repo.sh ${REPO_BRANCH}
                         ;;
                     *)
                         ;;
