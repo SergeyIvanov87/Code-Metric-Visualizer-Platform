@@ -12,5 +12,5 @@ RUN git clone https://github.com/brendangregg/FlameGraph.git
 
 COPY *.sh /package/
 
-ENTRYPOINT ["/package/init_repo.sh", "/package", "/mnt"]
+ENTRYPOINT ["/package/init.sh", "/package", "/mnt"]
 
