@@ -11,6 +11,10 @@ RUN git clone https://github.com/SergeyIvanov87/pmccabe_visualizer.git
 RUN git clone https://github.com/brendangregg/FlameGraph.git
 
 COPY *.sh /package/
-COPY ../API /package/
+COPY *.py /package/
+COPY API.fs /package/API.replicated.fs
+
+RUN ["python", "./build_local_api.py", "build", "API.replicated.fs", "/mnt"]
+COPY services/*.sh /package/
 
 ENTRYPOINT ["/package/init.sh", "/package", "/mnt"]
