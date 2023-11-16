@@ -26,12 +26,25 @@ def create_api_fs_node(api_root, req, req_type):
 def compose_script_for_dev_name(script_name):
     return f"{script_name}_exec.sh"
 
+EMPTY_DEV_SCRIPT_MARK="<TODO: THE SCRIPT IS EMPTY>"
 def create_script_for_dev(path, script_name):
     script_name_generated = compose_script_for_dev_name(script_name)
     script_generated_path = os.path.join(path, script_name_generated)
-    with open(script_generated_path, "w") as script:
+
+    with open(script_generated_path, "x") as script:
         make_file_executable(script_generated_path)
-        script.write("#!/usr/bin/bash\n\n. ${1}/setenv.sh\n<TODO>")
+        script.write(f"#!/usr/bin/bash\n\n. ${1}/setenv.sh\n{EMPTY_DEV_SCRIPT_MARK}")
+
+    return script_name_generated
+
+def check_script_valid(path, script_name):
+    script_name_generated = compose_script_for_dev_name(script_name)
+    script_generated_path = os.path.join(path, script_name_generated)
+
+    with open(script_generated_path, "r") as script:
+        for l in script:
+            if l == EMPTY_DEV_SCRIPT_MARK:
+                raise NotImplementedError(f"Script \"{script_name_generated}\" must be implemented, path: {script_generated_path}")
 
     return script_name_generated
 
@@ -62,7 +75,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 if args.mode not in EXEC_MODE:
-    raise Exception("Invalid execution mode: {}. Supported values: {}".format(args.mode, EXEC_MODE))
+    raise Exception('Invalid execution mode: {}. Supported values: {}'.format(args.mode, EXEC_MODE))
 
 api_schema = [". ${1}/setenv.sh\n",
 "shopt -s extglob\n",
@@ -82,6 +95,7 @@ api_schema = [". ${1}/setenv.sh\n",
 generated_api_server_scripts_path = "services"
 os.makedirs(generated_api_server_scripts_path, exist_ok=True);
 
+errors_detected=[]
 with open(args.api_file, 'r') as api_file:
      for request_line in api_file:
             request_params = request_line.split();
@@ -101,10 +115,17 @@ with open(args.api_file, 'r') as api_file:
             '''in 'devel' mode this builder must generate stub files for API request to implement'''
             '''must be done BEFORE docker image crafted'''
             if args.mode == EXEC_MODE[EXEC_MODE_DEV]:
-                req_executor_name = create_script_for_dev(generated_api_server_scripts_path, req_name)
+                try:
+                    req_executor_name = create_script_for_dev(generated_api_server_scripts_path, req_name)
+                except FileExistsError as e:
+                    print(f"Skipping the script \"{req_name}\" creation in \"{EXEC_MODE[EXEC_MODE_DEV]}\":\n\t\"{e}\"")
+                    continue
             else:
-                req_executor_name = compose_script_for_dev_name(req_name)
-
+                try:
+                    req_executor_name = check_script_valid(generated_api_server_scripts_path, req_name)
+                except NotImplementedError as e:
+                    errors_detected.append(str(e))
+                    continue
 
             '''must not generate served listeners scripts in 'run' mode'''
             api_server_script_file_name = f"{req_name}_listener.sh"
@@ -123,3 +144,6 @@ with open(args.api_file, 'r') as api_file:
                 listener_file.writelines(api_schema_concrete)
 
             make_file_executable(api_server_script_file_path)
+
+if len(errors_detected) != 0:
+    raise Exception("Erros detected:\n{}".format('\n'.join(errors_detected)))
