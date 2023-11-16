@@ -7,8 +7,8 @@ The service implementation is still in progress and it has the very limited func
 The service is available as a `copilot`-based feature which has named `pmccabe_collector`. Only `pmccabe_collector` local-machine (Linux tested only) docker image is shipping at the moment.
 The purpose of `pmccabe_collector` is to reach a similar functionality as it enhanced by the `sidecar` pattern which goal here is to extend software developing experience.
 Launching `pmccabe_collector` and binding docker shared folder into your existing C/C++ project directory, allow this container to populate filesystem API entrypoints, which are served for communicating with the `pmccabe_collector` docker service.
-Please check on existing API:
-![alt text](https://github.com/SergeyIvanov87/pmccabe_visualizer_docker/blob/main/local/API.fs?raw=true)
+Please check on existing:
+[API](local/API.fs)
 
 According to REST ideology, the request could represent a particular hierarcy structure, thus `pmccabe_collector` leverages this idea and maps those API requests as nodes mapped to a filesystem hierarchy like as directory and files inside `api.pmccabe_collector.restapi.org` populated API entrypoint inside your project directory.
 Each `GET` request can be executed as simple ACCESS-operation on a file named `get` in the bottom of relevant filesystem hierarchy in the same way as `/proc` filesystem employed in order to read (and/or store) some system settings.
