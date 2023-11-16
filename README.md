@@ -11,13 +11,17 @@ Please check on existing:
 [API](local/API.fs)
 
 According to REST ideology, the request could represent a particular hierarcy structure, thus `pmccabe_collector` leverages this idea and maps those API requests as nodes mapped to a filesystem hierarchy like as directory and files inside `api.pmccabe_collector.restapi.org` populated API entrypoint inside your project directory.
-Each `GET` request can be executed as simple ACCESS-operation on a file named `get` in the bottom of relevant filesystem hierarchy in the same way as `/proc` filesystem employed in order to read (and/or store) some system settings.
+Each `GET` request can be executed as simple ACCESS-operation on a file named `GET` in the bottom of relevant filesystem hierarchy in the same way as `/proc` filesystem employed in order to read (and/or store) some system settings.
 
 For example:
 
-The request `GET     api.pmccabe_collector.restapi.org/main/xml` can be triggered in the filesystem API mapped notation as:
+The request
 
-`cat api.pmccabe_collector.restapi.org/main/xml/get`
+`GET     api.pmccabe_collector.restapi.org/main/xml`
+
+can be triggered in the filesystem API mapped notation as:
+
+`cat api.pmccabe_collector.restapi.org/main/xml/GET`
 
 This file-based interface is only API supported at the moment.
 
