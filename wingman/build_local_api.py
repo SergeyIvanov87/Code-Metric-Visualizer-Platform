@@ -2,8 +2,15 @@
 
 import argparse
 import os
+import pathlib
 import sys
 import stat
+
+
+EXEC_MODE = ["devel", "build", "run"]
+EXEC_MODE_DEV=0
+EXEC_MODE_HOST=1
+EXEC_MODE_IMAGE=2
 
 def make_file_executable(file):
     st = os.stat(file)
@@ -16,7 +23,7 @@ def compose_api_fs_node_name(api_root, req):
 def create_api_fs_node(api_root, req, req_type):
     api_node = compose_api_fs_node_name(api_root, req)
     os.makedirs(api_node, exist_ok=True);
-    api_node_leaf = os.path.join(api_node, req_type.lower())
+    api_node_leaf = os.path.join(api_node, req_type)
 
     with open(api_node_leaf, "w") as api_leaf_file:
         make_file_executable(api_node_leaf)
@@ -27,13 +34,33 @@ def compose_script_for_dev_name(script_name):
     return f"{script_name}_exec.sh"
 
 EMPTY_DEV_SCRIPT_MARK="<TODO: THE SCRIPT IS EMPTY>"
+def make_script_generate_xml(script):
+    script.write("#!/usr/bin/bash\n\n. $1/setenv.sh\n\nRESULT_FILE=${2}_result\n\n")
+    script.write("find ${REPO_PATH} -regex \".*\.\(hpp\|cpp\|c\|h\)\" | grep -v \"buil\" | grep -v \"3pp\" | grep -v \"thirdpart\" | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py > ${SHARED_API_DIR}/${RESULT_FILE}.xml")
+
+def make_script_generate_fgraph(script):
+    script.write("#!/usr/bin/bash\n\n. $1/setenv.sh\n\n")
+    script.write("RESULT_FILE=${2}_result\n\n")
+    script_name_generated = compose_script_for_dev_name("generate_xml")
+    script.write("${WORK_DIR}/" + script_name_generated +  " ${1} ${2}\n")
+    script.write("cat ${SHARED_API_DIR}/${RESULT_FILE}.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py mmcc,tmcc,sif,lif | ${WORK_DIR}/FlameGraph/flamegraph.pl > ${SHARED_API_DIR}/${RESULT_FILE}.svg\n")
+
+def make_default_script(script):
+    script.write(f"#!/usr/bin/bash\n\n. ${1}/setenv.sh\n\nRESULT_FILE=${2}_result\n\n{EMPTY_DEV_SCRIPT_MARK}")
+
+scripts_generator = {"generate_xml": make_script_generate_xml,
+                     "generate_fgraph" : make_script_generate_fgraph}
+
 def create_script_for_dev(path, script_name):
     script_name_generated = compose_script_for_dev_name(script_name)
     script_generated_path = os.path.join(path, script_name_generated)
 
     with open(script_generated_path, "x") as script:
         make_file_executable(script_generated_path)
-        script.write(f"#!/usr/bin/bash\n\n. ${1}/setenv.sh\n{EMPTY_DEV_SCRIPT_MARK}")
+        if script_name in scripts_generator.keys():
+            scripts_generator[script_name](script)
+        else:
+            make_default_script(script)
 
     return script_name_generated
 
@@ -48,14 +75,11 @@ def check_script_valid(path, script_name):
 
     return script_name_generated
 
+
+
 parser = argparse.ArgumentParser(
     prog="Build file-system API nodes based on pseudo-REST API from cfg file"
 )
-
-EXEC_MODE = ["devel", "build", "run"]
-EXEC_MODE_DEV=0
-EXEC_MODE_HOST=1
-EXEC_MODE_IMAGE=2
 
 parser.add_argument(
     "mode",
@@ -79,12 +103,12 @@ if args.mode not in EXEC_MODE:
 
 api_schema = [". ${1}/setenv.sh\n",
 "shopt -s extglob\n",
-"inotifywait -m {0} -e access --include 'get' |\n",
+"inotifywait -m {0} -e access --include '{1}' |\n",
 "\twhile read dir action file; do\n",
 "\t\techo \"file: ${file}, action; ${action}, dir: ${dir}\"\n",
 "\t\tcase \"$action\" in\n",
 "\t\t\tACCESS|ATTRIB )\n",
-"\t\t\t\t\"${0}/{1}\" ${2}\n",
+"\t\t\t\t\"${0}/{1}\" ${2} ${3}\n",
 "\t\t\t;;\n",
 "\t\t\t*)\n",
 "\t\t\t\t;;\n",
@@ -120,10 +144,13 @@ with open(args.api_file, 'r') as api_file:
                 except FileExistsError as e:
                     print(f"Skipping the script \"{req_name}\" creation in \"{EXEC_MODE[EXEC_MODE_DEV]}\":\n\t\"{e}\"")
                     continue
+                except Exception as e:
+                    errors_detected.append(str(e))
+                    continue
             else:
                 try:
-                    req_executor_name = check_script_valid(generated_api_server_scripts_path, req_name)
-                except NotImplementedError as e:
+                    req_executor_name = check_script_valid("", req_name)
+                except Exception as e:
                     errors_detected.append(str(e))
                     continue
 
@@ -137,8 +164,8 @@ with open(args.api_file, 'r') as api_file:
 
             with open(api_server_script_file_path, "w") as listener_file:
                 api_schema_concrete = api_schema.copy()
-                api_schema_concrete[2] = api_schema_concrete[2].format(api_node)
-                api_schema_concrete[7] = api_schema_concrete[7].format("{WORK_DIR}", req_executor_name, "{WORK_DIR}")
+                api_schema_concrete[2] = api_schema_concrete[2].format(api_node, req_type)
+                api_schema_concrete[7] = api_schema_concrete[7].format("{WORK_DIR}", req_executor_name, "{WORK_DIR}", "{file}")
 
                 listener_file.write("#!/usr/bin/bash\n\n")
                 listener_file.writelines(api_schema_concrete)
@@ -146,4 +173,4 @@ with open(args.api_file, 'r') as api_file:
             make_file_executable(api_server_script_file_path)
 
 if len(errors_detected) != 0:
-    raise Exception("Erros detected:\n{}".format('\n'.join(errors_detected)))
+    raise Exception("Erros detected:\n{}\nScript execdir: {}".format('\n'.join(errors_detected), pathlib.Path(__file__).parent.resolve()))

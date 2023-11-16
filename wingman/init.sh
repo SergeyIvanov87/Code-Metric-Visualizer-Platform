@@ -20,7 +20,7 @@ ${WORK_DIR}/build_pmccabe_flamegraph.sh "${SHARED_API_DIR}/init.xml" "${SHARED_A
 
 # run listener for events
 for s in ${WORK_DIR}/services/*.sh; do
-    ${s} ${WORK_DIR} ${SHARED_DIR} &
+    ${s} ${WORK_DIR} ${SHARED_API_DIR} &
 done
 
 sleep infinity
