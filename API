@@ -1,2 +1,2 @@
-generate_xml        GET     wingman.org/main/xml
-generate_fgraph     GET     wingman.org/main/flamegraph
+generate_xml        GET     api.pmccabe_collector.restapi.org/main/xml
+generate_fgraph     GET     api.pmccabe_collector.restapi.org/main/flamegraph

@@ -3,11 +3,11 @@
 WORK_DIR=${1}
 REPO_PATH=${2}
 SHARED_DIR=${2}
-SHARED_API_DIR=${2}/wingman.org
+SHARED_API_DIR=${2}/api.pmccabe_collector.restapi.org
 
 echo -e "#!/usr/bin/bash\n\nexport WORK_DIR=${WORK_DIR} \nexport SHARED_DIR=${SHARED_DIR} \nexport SHARED_API_DIR=${SHARED_API_DIR} \nexport REPO_PATH=${REPO_PATH}" > ${WORK_DIR}/setenv.sh
 
-# allow wingman to access reposiroty
+# allow pmccabe_collector to access reposiroty
 git config --global --add safe.directory ${REPO_PATH}
 
 # create API directory and initialize API nodes
