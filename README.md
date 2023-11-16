@@ -4,7 +4,7 @@ Docker image for `pmccabe_visualizer` https://github.com/SergeyIvanov87/pmccabe_
 The service is supposed to monitor cyclomatic complexity of a C/C++ project
 
 The service implementation is still in progress and it has the very limited functionality.
-The service is available as a `copilot`-based feature which has named `pmccabe_collector`. Only `pmccabe_collector` docker image is shipping at the moment.
+The service is available as a `copilot`-based feature which has named `pmccabe_collector`. Only `pmccabe_collector` local-machine (Linux tested only) docker image is shipping at the moment.
 The purpose of `pmccabe_collector` is to reach a similar functionality as it enhanced by the `sidecar` pattern which goal here is to extend software developing experience.
 Launching `pmccabe_collector` and binding docker shared folder into your existing C/C++ project directory, allow this container to populate filesystem API entrypoints, which are served for communicating with the `pmccabe_collector` docker service.
 Please check on existing API:
@@ -24,17 +24,19 @@ This file-based interface is only API supported at the moment.
 To build the image please use must follow the steps:
 
 - At first you need to generate API request handlers as a simple self-generated bash scripts. Using this generator is important for developing process only to make sure that changes of API file would not be forgotten
-`cd wingman`
+`cd local`
 `./build_local_api.py devel API.fs /mnt`
 
 Don't worry, the directory `/mnt` is supposed to be a part of container filesystem
 
-- Next you need to generate the image by itself. To do that, execute the next cmd in `api.pmccabe_collector.restapi.org` directory:
+- Next you need to generate the image by itself. To do that, execute the next cmd in the same `local` directory:
 `sudo docker build -t pmccabe_vis:latest .`
 
 # Launch a container from the image
 
-- Go to your C/C++ project direcotory and run
+- Go to your C/C++ project direcotory:
+`cd <your project directory>`
+ and run
 `mkdir api.pmccabe_collector.restapi.org`
 `chmod 777 api.pmccabe_collector.restapi.org`
 
