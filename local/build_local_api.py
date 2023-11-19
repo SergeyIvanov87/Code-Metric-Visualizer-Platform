@@ -12,15 +12,18 @@ EXEC_MODE_DEV=0
 EXEC_MODE_HOST=1
 EXEC_MODE_IMAGE=2
 
-def make_file_executable(file):
+def append_file_mode(file, append_modes):
     st = os.stat(file)
-    os.chmod(file, st.st_mode | stat.S_IEXEC)
+    os.chmod(file, st.st_mode | append_modes)
+
+def make_file_executable(file):
+    append_file_mode(file, stat.S_IEXEC)
 
 def compose_api_fs_node_name(api_root, req):
     api_node = os.path.join(api_root, req)
     return api_node
 
-def create_api_fs_node(api_root, req, req_type):
+def create_api_fs_node(api_root, req, req_type, req_params):
     api_node = compose_api_fs_node_name(api_root, req)
     os.makedirs(api_node, exist_ok=True);
     api_node_leaf = os.path.join(api_node, req_type)
@@ -28,6 +31,15 @@ def create_api_fs_node(api_root, req, req_type):
     with open(api_node_leaf, "w") as api_leaf_file:
         make_file_executable(api_node_leaf)
         api_leaf_file.write("0\n")    # event `access` in notify can't be trigger on empty file
+
+    #create params as files
+    for param in req_params:
+        param_name, param_value = param.split("=")
+        param_name_path = os.path.join(api_node,param_name)
+        with open(param_name_path, "w") as api_file_param:
+            api_file_param.write(param_value)
+            append_file_mode(param_name_path, stat.S_IWUSR | stat.S_IRUSR | stat.S_IWGRP | stat.S_IRGRP | stat.S_IWOTH | stat.S_IROTH)
+
     return api_node
 
 def compose_script_for_dev_name(script_name):
@@ -122,16 +134,15 @@ os.makedirs(generated_api_server_scripts_path, exist_ok=True);
 errors_detected=[]
 with open(args.api_file, 'r') as api_file:
      for request_line in api_file:
-            request_params = request_line.split();
-            if len(request_params) != 3:
+            request_params = [s.strip() for s in request_line.split('\t')];
+            if len(request_params) < 3:
                 continue
 
-            (req_name, req_type, req_api) = request_params
-
+            (req_name, req_type, req_api, *req_params) = request_params
             '''re-create filesystem directory structure based on API query'''
             '''must be done in 'run' mode only'''
             if args.mode == EXEC_MODE[EXEC_MODE_IMAGE]:
-                api_node = create_api_fs_node(args.mount_point, req_api, req_type)
+                api_node = create_api_fs_node(args.mount_point, req_api, req_type, req_params)
                 continue
             else:
                 api_node = compose_api_fs_node_name(args.mount_point, req_api)
