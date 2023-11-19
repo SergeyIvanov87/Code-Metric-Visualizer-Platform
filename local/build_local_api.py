@@ -33,9 +33,12 @@ def create_api_fs_node(api_root, req, req_type, req_params):
         api_leaf_file.write("0\n")    # event `access` in notify can't be trigger on empty file
 
     #create params as files
+    counter = 0
     for param in req_params:
         param_name, param_value = param.split("=")
-        param_name_path = os.path.join(api_node,param_name)
+        param_name_path = os.path.join(api_node,str(counter) + "." + param_name)
+        counter += 1
+
         with open(param_name_path, "w") as api_file_param:
             api_file_param.write(param_value)
             append_file_mode(param_name_path, stat.S_IWUSR | stat.S_IRUSR | stat.S_IWGRP | stat.S_IRGRP | stat.S_IWOTH | stat.S_IROTH)
@@ -60,7 +63,30 @@ def make_script_generate_fgraph(script):
 def make_default_script(script):
     script.write(f"#!/usr/bin/bash\n\n. ${1}/setenv.sh\n\nRESULT_FILE=${2}_result\n\n{EMPTY_DEV_SCRIPT_MARK}")
 
-scripts_generator = {"generate_xml": make_script_generate_xml,
+
+def make_script_watch_list(script):
+    script.write("#!/usr/bin/bash\n\nAPI_NODE=${1}\n\n. $2/setenv.sh\n\nRESULT_FILE=${3}_result\n\n")
+    script.write("CMD_ARGS=\"\"\n")
+    script.write("for entry in \"${API_NODE}\"/*.*\n")
+    script.write("do\n")
+    script.write("\tfile_basename=${entry##*/}\n")
+    script.write("\tparam_name=${file_basename#*.}\n")
+    script.write("\treadarray -t arr < ${entry}\n")
+    script.write("\tbrr+=(${param_name})\n")
+    script.write("\tfor a in ${arr[@]}\n")
+    script.write("\tdo\n")
+    script.write("\t\tif [[ ${a} == \\\"* ]];\n")
+    script.write("\t\tthen\n")
+    script.write("\t\t\tbrr+=(\"${a}\")\n")
+    script.write("\t\telse\n")
+    script.write("\t\t\tbrr+=(${a})\n")
+    script.write("\t\tfi\n")
+    script.write("\tdone\n")
+    script.write("done\n")
+    script.write("echo \"${brr[@]}\" | xargs find ${REPO_PATH} > ${SHARED_API_DIR}/${RESULT_FILE}.txt\n ")
+
+
+scripts_generator = {"watch_list": make_script_watch_list,
                      "generate_fgraph" : make_script_generate_fgraph}
 
 def create_script_for_dev(path, script_name):
@@ -120,7 +146,7 @@ api_schema = [". ${1}/setenv.sh\n",
 "\t\techo \"file: ${file}, action; ${action}, dir: ${dir}\"\n",
 "\t\tcase \"$action\" in\n",
 "\t\t\tACCESS|ATTRIB )\n",
-"\t\t\t\t\"${0}/{1}\" ${2} ${3}\n",
+"\t\t\t\t\"${0}/{1}\" ${2} ${3} ${4}\n",
 "\t\t\t;;\n",
 "\t\t\t*)\n",
 "\t\t\t\t;;\n",
@@ -176,7 +202,7 @@ with open(args.api_file, 'r') as api_file:
             with open(api_server_script_file_path, "w") as listener_file:
                 api_schema_concrete = api_schema.copy()
                 api_schema_concrete[2] = api_schema_concrete[2].format(api_node, req_type)
-                api_schema_concrete[7] = api_schema_concrete[7].format("{WORK_DIR}", req_executor_name, "{WORK_DIR}", "{file}")
+                api_schema_concrete[7] = api_schema_concrete[7].format("{WORK_DIR}", req_executor_name, api_node, "{WORK_DIR}", "{file}")
 
                 listener_file.write("#!/usr/bin/bash\n\n")
                 listener_file.writelines(api_schema_concrete)
