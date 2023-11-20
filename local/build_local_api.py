@@ -65,26 +65,31 @@ def make_default_script(script):
 
 
 def make_script_watch_list(script):
-    script.write("#!/usr/bin/bash\n\nAPI_NODE=${1}\n\n. $2/setenv.sh\n\nRESULT_FILE=${3}_result\n\n")
-    script.write("CMD_ARGS=\"\"\n")
-    script.write("for entry in \"${API_NODE}\"/*.*\n")
-    script.write("do\n")
-    script.write("\tfile_basename=${entry##*/}\n")
-    script.write("\tparam_name=${file_basename#*.}\n")
-    script.write("\treadarray -t arr < ${entry}\n")
-    script.write("\tbrr+=(${param_name})\n")
-    script.write("\tfor a in ${arr[@]}\n")
-    script.write("\tdo\n")
-    script.write("\t\tif [[ ${a} == \\\"* ]];\n")
-    script.write("\t\tthen\n")
-    script.write("\t\t\tbrr+=(\"${a}\")\n")
-    script.write("\t\telse\n")
-    script.write("\t\t\tbrr+=(${a})\n")
-    script.write("\t\tfi\n")
-    script.write("\tdone\n")
-    script.write("done\n")
-    script.write("echo \"${brr[@]}\" | xargs find ${REPO_PATH} > ${SHARED_API_DIR}/${RESULT_FILE}.txt\n ")
-
+    body =(r'#!/usr/bin/bash',
+           r'',
+           r'API_NODE=${1}',
+           r'. $2/setenv.sh',
+           r'RESULT_FILE=${3}_result',
+           r'CMD_ARGS=""',
+           r'for entry in "${API_NODE}"/*.*',
+           r'do',
+           r'    file_basename=${entry##*/}',
+           r'    param_name=${file_basename#*.}',
+           r'    readarray -t arr < ${entry}',
+           r'    brr+=(${param_name})',
+           r'    for a in ${arr[@]}',
+           r'    do',
+           r'        if [[ ${a} == \"* ]];',
+           r'        then',
+           r'            brr+=("${a}")',
+           r'        else',
+           r'            brr+=(${a})',
+           r'        fi',
+           r'    done',
+           r'done',
+           r'echo "${brr[@]}" | xargs find ${REPO_PATH} > ${SHARED_API_DIR}/${RESULT_FILE}.txt'
+          )
+    script.writelines(line + '\n' for line in body)
 
 scripts_generator = {"watch_list": make_script_watch_list,
                      "generate_fgraph" : make_script_generate_fgraph}
