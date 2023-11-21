@@ -29,7 +29,11 @@ def create_api_fs_node(api_root, req, req_type, req_params):
     api_node_leaf = os.path.join(api_node, req_type)
 
     with open(api_node_leaf, "w") as api_leaf_file:
-        make_file_executable(api_node_leaf)
+        if req_type == "GET":
+            make_file_executable(api_node_leaf)
+        else:
+            append_file_mode(api_node_leaf, stat.S_IWUSR | stat.S_IRUSR | stat.S_IWGRP | stat.S_IRGRP | stat.S_IWOTH | stat.S_IROTH)
+
         api_leaf_file.write("0\n")    # event `access` in notify can't be trigger on empty file
 
     #create params as files
@@ -87,11 +91,69 @@ def make_script_watch_list(script):
            r'        fi',
            r'    done',
            r'done',
-           r'echo "${brr[@]}" | xargs find ${REPO_PATH} > ${SHARED_API_DIR}/${RESULT_FILE}.txt'
+           r'echo "${brr[@]}" | xargs find ${REPO_PATH} > ${RESULT_FILE}.txt'
+          )
+    script.writelines(line + '\n' for line in body)
+
+def make_script_statistic(script):
+    body =(r'#!/usr/bin/bash',
+           r'',
+           r'API_NODE=${1}',
+           r'. $2/setenv.sh',
+           r'RESULT_FILE=${3}_result',
+           r'CMD_ARGS=""',
+           r'for entry in "${API_NODE}"/*.*',
+           r'do',
+           r'    file_basename=${entry##*/}',
+           r'    param_name=${file_basename#*.}',
+           r'    readarray -t arr < ${entry}',
+           r'    brr+=(${param_name})',
+           r'    for a in ${arr[@]}',
+           r'    do',
+           r'        if [[ ${a} == \"* ]];',
+           r'        then',
+           r'            brr+=("${a}")',
+           r'        else',
+           r'            brr+=(${a})',
+           r'        fi',
+           r'    done',
+           r'done',
+           r'echo "${brr[@]}"'
+          )
+    script.writelines(line + '\n' for line in body)
+
+def make_script_view(script):
+    body =(r'#!/usr/bin/bash',
+           r'',
+           r'API_NODE=${1}',
+           r'. $2/setenv.sh',
+           r'RESULT_FILE=${3}_result',
+           r'CMD_ARGS=""',
+           r'for entry in "${API_NODE}"/*.*',
+           r'do',
+           r'    file_basename=${entry##*/}',
+           r'    param_name=${file_basename#*.}',
+           r'    readarray -t arr < ${entry}',
+           r'    brr+=(${param_name})',
+           r'    for a in ${arr[@]}',
+           r'    do',
+           r'        if [[ ${a} == \"* ]];',
+           r'        then',
+           r'            brr+=("${a}")',
+           r'        else',
+           r'            brr+=(${a})',
+           r'        fi',
+           r'    done',
+           r'done',
+           r'${WORK_DIR}/watch_list_exec.sh ${SHARED_API_DIR}/project/{uuid} ${WORK_DIR} ${API_NODE}/.watch_list',
+           r'cat ${API_NODE}/.watch_list_result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic ${WORK_DIR} stst` > ${API_NODE}/.${RESULT_FILE}.xml',
+           r'cat ${API_NODE}/.${RESULT_FILE}.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]} > ${API_NODE}/.${RESULT_FILE}.data',
           )
     script.writelines(line + '\n' for line in body)
 
 scripts_generator = {"watch_list": make_script_watch_list,
+                     "statistic" : make_script_statistic,
+                     "view" : make_script_view,
                      "generate_fgraph" : make_script_generate_fgraph}
 
 def create_script_for_dev(path, script_name):
@@ -118,7 +180,11 @@ def check_script_valid(path, script_name):
 
     return script_name_generated
 
-
+def get_fs_watch_event_for_request_type(req_type):
+    events = {"GET": "-e access", "PUT" : "-e modify"}
+    if req_type not in events.keys():
+        raise Exception(f"Request type is not supported: {req_type}. Available types are: {events.keys()}")
+    return events[req_type]
 
 parser = argparse.ArgumentParser(
     prog="Build file-system API nodes based on pseudo-REST API from cfg file"
@@ -146,12 +212,12 @@ if args.mode not in EXEC_MODE:
 
 api_schema = [". ${1}/setenv.sh\n",
 "shopt -s extglob\n",
-"inotifywait -m {0} -e access --include '{1}' |\n",
+"inotifywait -m {0} {1} --include '{2}' |\n",
 "\twhile read dir action file; do\n",
 "\t\techo \"file: ${file}, action; ${action}, dir: ${dir}\"\n",
 "\t\tcase \"$action\" in\n",
 "\t\t\tACCESS|ATTRIB )\n",
-"\t\t\t\t\"${0}/{1}\" ${2} ${3} ${4}\n",
+"\t\t\t\t\"${0}/{1}\" {2} ${3} ${4}\n",
 "\t\t\t;;\n",
 "\t\t\t*)\n",
 "\t\t\t\t;;\n",
@@ -206,8 +272,8 @@ with open(args.api_file, 'r') as api_file:
 
             with open(api_server_script_file_path, "w") as listener_file:
                 api_schema_concrete = api_schema.copy()
-                api_schema_concrete[2] = api_schema_concrete[2].format(api_node, req_type)
-                api_schema_concrete[7] = api_schema_concrete[7].format("{WORK_DIR}", req_executor_name, api_node, "{WORK_DIR}", "{file}")
+                api_schema_concrete[2] = api_schema_concrete[2].format(api_node, get_fs_watch_event_for_request_type(req_type), req_type)
+                api_schema_concrete[7] = api_schema_concrete[7].format("{WORK_DIR}", req_executor_name, api_node, "{WORK_DIR}", "{API_NODE}/${file}")
 
                 listener_file.write("#!/usr/bin/bash\n\n")
                 listener_file.writelines(api_schema_concrete)

@@ -1,14 +1,14 @@
 {
-    "Method" : "GET",
+    "Method" : "PUT",
     "Query": "api.pmccabe_collector.restapi.org/project/{uuid}/statistic",
     "Params": {
         "watch_list" : {
             "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
             "-prune": "! -path \"*buil*\" ! -path \"*thirdpart*\""
         },
-        "-mmcc_range" : "1,999999",
-        "-tmcc_range" : "1,999999",
-        "-sif_range" : "1,999999",
-        "-lif_range" : "1,999999"
+        "-mmcc" : "1,999999",
+        "-tmcc" : "1,999999",
+        "-sif" : "1,999999",
+        "-lif" : "1,999999"
     }
 }

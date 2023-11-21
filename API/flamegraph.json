@@ -8,12 +8,12 @@
                     "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
                     "-prune": "! -path \"*buil*\" ! -path \"*thirdpart*\""
                 },
-                "-mmcc_range" : "1,999999",
-                "-tmcc_range" : "1,999999",
-                "-sif_range" : "1,999999",
-                "-lif_range" : "1,999999"
+                "-mmcc" : "1,999999",
+                "-tmcc" : "1,999999",
+                "-sif" : "1,999999",
+                "-lif" : "1,999999"
             },
-            "attributes" : "mmcc,tmcc,sif,lif"
+            "-attr" : "mmcc,tmcc,sif,lif"
         },
         "--width": "1200",
         "--height" : "16"
