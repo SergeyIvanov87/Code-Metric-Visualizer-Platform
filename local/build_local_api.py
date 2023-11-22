@@ -19,14 +19,15 @@ def append_file_mode(file, append_modes):
 def make_file_executable(file):
     append_file_mode(file, stat.S_IEXEC)
 
-def compose_api_fs_node_name(api_root, req):
+def compose_api_fs_node_name(api_root, req, req_type):
     api_node = os.path.join(api_root, req)
-    return api_node
+    api_req_node = os.path.join(api_node, req_type)
+    return api_node, api_req_node
 
 def create_api_fs_node(api_root, req, req_type, req_params):
-    api_node = compose_api_fs_node_name(api_root, req)
-    os.makedirs(api_node, exist_ok=True);
-    api_node_leaf = os.path.join(api_node, req_type)
+    api_node, api_req_node = compose_api_fs_node_name(api_root, req, req_type)
+    os.makedirs(api_req_node, exist_ok=True);
+    api_node_leaf = os.path.join(api_req_node, "exec")
 
     with open(api_node_leaf, "w") as api_leaf_file:
         if req_type == "GET":
@@ -47,7 +48,7 @@ def create_api_fs_node(api_root, req, req_type, req_params):
             api_file_param.write(param_value)
             append_file_mode(param_name_path, stat.S_IWUSR | stat.S_IRUSR | stat.S_IWGRP | stat.S_IRGRP | stat.S_IWOTH | stat.S_IROTH)
 
-    return api_node
+    return api_node, api_req_node
 
 def compose_script_for_dev_name(script_name):
     return f"{script_name}_exec.sh"
@@ -145,8 +146,8 @@ def make_script_view(script):
            r'        fi',
            r'    done',
            r'done',
-           r'${WORK_DIR}/watch_list_exec.sh ${SHARED_API_DIR}/project/{uuid} ${WORK_DIR} ${API_NODE}/.watch_list',
-           r'cat ${API_NODE}/.watch_list_result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic ${WORK_DIR} stst` > ${RESULT_FILE}.xml',
+           r'${WORK_DIR}/watch_list_exec.sh ${SHARED_API_DIR}/project/{uuid} ${WORK_DIR} ${API_NODE}/GET/.watch_list',
+           r'cat ${API_NODE}/GET/.watch_list_result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic ${WORK_DIR} stst` > GET/${RESULT_FILE}.xml',
            r'cat ${RESULT_FILE}.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]} > ${RESULT_FILE}.data',
           )
     script.writelines(line + '\n' for line in body)
@@ -174,8 +175,8 @@ def make_script_flamegraph(script):
            r'        fi',
            r'    done',
            r'done',
-           r'${WORK_DIR}/view_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic/view ${WORK_DIR} ${API_NODE}/.collapsed',
-           r'cat ${API_NODE}/.collapsed_result.data | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]} > ${RESULT_FILE}.svg',
+           r'${WORK_DIR}/view_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic/view ${WORK_DIR} ${API_NODE}/GET/.collapsed',
+           r'cat ${API_NODE}/GET/.collapsed_result.data | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]} > ${RESULT_FILE}.svg',
           )
     script.writelines(line + '\n' for line in body)
 
@@ -247,7 +248,7 @@ api_schema = [". ${1}/setenv.sh\n",
 "\t\techo \"file: ${file}, action; ${action}, dir: ${dir}\"\n",
 "\t\tcase \"$action\" in\n",
 "\t\t\tACCESS|ATTRIB )\n",
-"\t\t\t\t\"${0}/{1}\" {2} ${3} ${4}\n",
+"\t\t\t\t\"${0}/{1}\" {2} ${3} {4}/{5}\n",
 "\t\t\t;;\n",
 "\t\t\t*)\n",
 "\t\t\t\t;;\n",
@@ -269,10 +270,10 @@ with open(args.api_file, 'r') as api_file:
             '''re-create filesystem directory structure based on API query'''
             '''must be done in 'run' mode only'''
             if args.mode == EXEC_MODE[EXEC_MODE_IMAGE]:
-                api_node = create_api_fs_node(args.mount_point, req_api, req_type, req_params)
+                api_node, api_req_node = create_api_fs_node(args.mount_point, req_api, req_type, req_params)
                 continue
             else:
-                api_node = compose_api_fs_node_name(args.mount_point, req_api)
+                api_node, api_req_node = compose_api_fs_node_name(args.mount_point, req_api, req_type)
 
             '''in 'devel' mode this builder must generate stub files for API request to implement'''
             '''must be done BEFORE docker image crafted'''
@@ -302,9 +303,8 @@ with open(args.api_file, 'r') as api_file:
 
             with open(api_server_script_file_path, "w") as listener_file:
                 api_schema_concrete = api_schema.copy()
-                api_schema_concrete[2] = api_schema_concrete[2].format(api_node, get_fs_watch_event_for_request_type(req_type), req_type)
-                api_schema_concrete[7] = api_schema_concrete[7].format("{WORK_DIR}", req_executor_name, api_node, "{WORK_DIR}", "{API_NODE}/${file}")
-
+                api_schema_concrete[2] = api_schema_concrete[2].format(api_req_node, get_fs_watch_event_for_request_type(req_type), "exec$")
+                api_schema_concrete[7] = api_schema_concrete[7].format("{WORK_DIR}", req_executor_name, api_node, "{WORK_DIR}", api_req_node, "${file}")
                 listener_file.write("#!/usr/bin/bash\n\n")
                 listener_file.writelines(api_schema_concrete)
 
