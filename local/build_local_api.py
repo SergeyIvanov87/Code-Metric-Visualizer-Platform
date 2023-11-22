@@ -146,14 +146,44 @@ def make_script_view(script):
            r'    done',
            r'done',
            r'${WORK_DIR}/watch_list_exec.sh ${SHARED_API_DIR}/project/{uuid} ${WORK_DIR} ${API_NODE}/.watch_list',
-           r'cat ${API_NODE}/.watch_list_result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic ${WORK_DIR} stst` > ${API_NODE}/.${RESULT_FILE}.xml',
-           r'cat ${API_NODE}/.${RESULT_FILE}.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]} > ${API_NODE}/.${RESULT_FILE}.data',
+           r'cat ${API_NODE}/.watch_list_result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic ${WORK_DIR} stst` > ${RESULT_FILE}.xml',
+           r'cat ${RESULT_FILE}.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]} > ${RESULT_FILE}.data',
           )
     script.writelines(line + '\n' for line in body)
+
+def make_script_flamegraph(script):
+    body =(r'#!/usr/bin/bash',
+           r'',
+           r'API_NODE=${1}',
+           r'. $2/setenv.sh',
+           r'RESULT_FILE=${3}_result',
+           r'CMD_ARGS=""',
+           r'for entry in "${API_NODE}"/*.*',
+           r'do',
+           r'    file_basename=${entry##*/}',
+           r'    param_name=${file_basename#*.}',
+           r'    readarray -t arr < ${entry}',
+           r'    brr+=(${param_name})',
+           r'    for a in ${arr[@]}',
+           r'    do',
+           r'        if [[ ${a} == \"* ]];',
+           r'        then',
+           r'            brr+=("${a}")',
+           r'        else',
+           r'            brr+=(${a})',
+           r'        fi',
+           r'    done',
+           r'done',
+           r'${WORK_DIR}/view_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic/view ${WORK_DIR} ${API_NODE}/.collapsed',
+           r'cat ${API_NODE}/.collapsed_result.data | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]} > ${RESULT_FILE}.svg',
+          )
+    script.writelines(line + '\n' for line in body)
+
 
 scripts_generator = {"watch_list": make_script_watch_list,
                      "statistic" : make_script_statistic,
                      "view" : make_script_view,
+                     "flamegraph" : make_script_flamegraph,
                      "generate_fgraph" : make_script_generate_fgraph}
 
 def create_script_for_dev(path, script_name):
