@@ -1,0 +1,21 @@
+{
+    "Method" : "GET",
+    "Query": "api.pmccabe_collector.restapi.org/project/{uuid}/statistic/view/flamegraph",
+    "Params": {
+        "view" : {
+            "statistic" : {
+                "watch_list" : {
+                    "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
+                    "-prune": "! -path \"*buil*\" ! -path \"*thirdpart*\""
+                },
+                "-mmcc" : "1,999999",
+                "-tmcc" : "1,999999",
+                "-sif" : "1,999999",
+                "-lif" : "1,999999"
+            },
+            "-attr" : "mmcc,tmcc,sif,lif"
+        },
+        "--width": "1200",
+        "--height" : "16"
+    }
+}

@@ -1,0 +1,8 @@
+{
+    "Method" : "GET",
+    "Query": "api.pmccabe_collector.restapi.org/project/{uuid}",
+    "Params": {
+        "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
+        "-prune": "! -path \"*buil*\" ! -path \"*thirdpart*\""
+    }
+}
