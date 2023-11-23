@@ -8,10 +8,10 @@
                     "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
                     "-prune": "! -path \"*buil*\" ! -path \"*thirdpart*\""
                 },
-                "-mmcc" : "1,999999",
-                "-tmcc" : "1,999999",
-                "-sif" : "1,999999",
-                "-lif" : "1,999999"
+                "-mmcc" : "1,",
+                "-tmcc" : "1,",
+                "-sif" : "1,",
+                "-lif" : "1,"
             },
             "-attr" : "mmcc,tmcc,sif,lif"
         },
