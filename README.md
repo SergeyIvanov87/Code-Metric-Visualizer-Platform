@@ -2,7 +2,7 @@
 
 The docker image for `pmccabe_visualizer` https://github.com/SergeyIvanov87/pmccabe_visualizer
 
-The service is supposed to monitor cyclomatic complexity of a C/C++ project
+The service is supposed to monitor cyclomatic complexity of a C/C++ project.
 
 The service implementation is still in progress and it has the very limited functionality.
 The service is available as a `copilot`-based feature which has named `pmccabe_collector`. Only `pmccabe_collector` local-machine (Linux tested only) docker image is shipping at the moment.
