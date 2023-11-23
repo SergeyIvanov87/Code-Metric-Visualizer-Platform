@@ -74,7 +74,7 @@ Next you need to generate the image by itself. To do that, execute the next cmd 
 
 `chmod 777 api.pmccabe_collector.restapi.org`
 
-The `777` allows docker `pmccabe_collector` service to access this mount point which belong to the host filesystem which would have become unavailable otherwise
+The `777` allows docker `pmccabe_collector` service to access this mount point which belong to the host filesystem which would have become unavailable otherwise.
 
 ### Run the container in your project directory
   
@@ -84,4 +84,4 @@ The service will build two files:
 - `init.xml`(which contains "database" of `pmccabe` metric for a project components/files/functions - see `man pmccabe`)
 - `init.svg` (an interactive flamegraph simplifies such metric representation; to study more about "flamegraph", please elaborate on https://github.com/brendangregg/FlameGraph#3-flamegraphpl)
 
-In none of those file are appeared, then other different failures have taken place. I'd very appreciate for any documented issues. In my own experience the essential utility `pmccabe` crashed when I was tried to estimate complexity of a Linux kernel project
+In none of those file are appeared, then other different failures have taken place. I'd very appreciate for any documented issues. In my own experience the essential utility `pmccabe` crashed when I was tried to estimate complexity of a Linux kernel project.
