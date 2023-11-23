@@ -64,7 +64,7 @@ Next you need to generate the image by itself. To do that, execute the next cmd 
 
 # Launch a container from the image
 
-### Go to your C/C++ project direcotory:
+### Go to your C/C++ project directory:
   
 `cd <your project directory>`
 
