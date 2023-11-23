@@ -81,7 +81,7 @@ The `777` allows docker `pmccabe_collector` service to access this mount point w
 `sudo docker run -it --mount type=bind,src=./,target=/mnt pmccabe_vis:latest`
 
 The service will build two files: 
-- `init.xml`(which contains "database" of `pmccabe` metric for a project components/files/functions - see `man pmccabe`)
+- `init.xml`(which contains "database" of `pmccabe` metric for a project components/files/functions, please check on `man pmccabe`)
 - `init.svg` (an interactive flamegraph simplifies such metric representation; to study more about "flamegraph", please elaborate on https://github.com/brendangregg/FlameGraph#3-flamegraphpl)
 
 In none of those file are appeared, then other different failures have taken place. I'd very appreciate for any documented issues. In my own experience the essential utility `pmccabe` crashed when I was tried to estimate complexity of a Linux kernel project.
