@@ -16,7 +16,7 @@ ${WORK_DIR}/build_local_api.py "run" ${WORK_DIR}/API.replicated.fs ${SHARED_DIR}
 
 # create pivot metrics
 ${WORK_DIR}/build_pmccabe_xml.sh "${SHARED_API_DIR}/init.xml"
-${WORK_DIR}/build_pmccabe_flamegraph.sh "${SHARED_API_DIR}/init.xml" "${SHARED_API_DIR}/init.svg"
+${WORK_DIR}/build_pmccabe_flamegraph.sh "${SHARED_API_DIR}/init.xml" "${SHARED_API_DIR}/init"
 
 # run listener for events
 for s in ${WORK_DIR}/services/*.sh; do

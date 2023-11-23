@@ -101,24 +101,6 @@ def compose_script_for_dev_name(script_name):
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
-
-def make_script_generate_xml(script):
-    script.write("#!/usr/bin/bash\n\n. $1/setenv.sh\n\nRESULT_FILE=${2}_result\n\n")
-    script.write(
-        'find ${REPO_PATH} -regex ".*\.\(hpp\|cpp\|c\|h\)" | grep -v "buil" | grep -v "3pp" | grep -v "thirdpart" | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py > ${SHARED_API_DIR}/${RESULT_FILE}.xml'
-    )
-
-
-def make_script_generate_fgraph(script):
-    script.write("#!/usr/bin/bash\n\n. $1/setenv.sh\n\n")
-    script.write("RESULT_FILE=${2}_result\n\n")
-    script_name_generated = compose_script_for_dev_name("generate_xml")
-    script.write("${WORK_DIR}/" + script_name_generated + " ${1} ${2}\n")
-    script.write(
-        "cat ${SHARED_API_DIR}/${RESULT_FILE}.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py mmcc,tmcc,sif,lif | ${WORK_DIR}/FlameGraph/flamegraph.pl > ${SHARED_API_DIR}/${RESULT_FILE}.svg\n"
-    )
-
-
 def make_default_script(script):
     script.write(
         f"#!/usr/bin/bash\n\n. ${1}/setenv.sh\n\nRESULT_FILE=${2}_result\n\n{EMPTY_DEV_SCRIPT_MARK}"
@@ -153,6 +135,8 @@ def make_script_watch_list(script):
     )
     script.writelines(line + "\n" for line in body)
 
+def generate_script_watch_list_help():
+    return "find --help"
 
 def make_script_statistic(script):
     body = (
@@ -182,6 +166,8 @@ def make_script_statistic(script):
     )
     script.writelines(line + "\n" for line in body)
 
+def generate_script_statistic_help():
+    return "${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py --help"
 
 def make_script_view(script):
     body = (
@@ -208,11 +194,13 @@ def make_script_view(script):
         r"    done",
         r"done",
         r"${WORK_DIR}/watch_list_exec.sh ${SHARED_API_DIR}/project/{uuid} ${WORK_DIR} ${API_NODE}/GET/.watch_list",
-        r"cat ${API_NODE}/GET/.watch_list_result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic ${WORK_DIR} stst` > GET/${RESULT_FILE}.xml",
+        r"cat ${API_NODE}/GET/.watch_list_result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic ${WORK_DIR} stst` > ${RESULT_FILE}.xml",
         r"cat ${RESULT_FILE}.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]} > ${RESULT_FILE}.data",
     )
     script.writelines(line + "\n" for line in body)
 
+def generate_script_view_help():
+    return "${WORK_DIR}/pmccabe_visualizer/collapse.py --help"
 
 def make_script_flamegraph(script):
     body = (
@@ -243,13 +231,21 @@ def make_script_flamegraph(script):
     )
     script.writelines(line + "\n" for line in body)
 
+def generate_script_flamegraph_help():
+    return "${WORK_DIR}/FlameGraph/flamegraph.pl --help"
 
 scripts_generator = {
     "watch_list": make_script_watch_list,
     "statistic": make_script_statistic,
     "view": make_script_view,
     "flamegraph": make_script_flamegraph,
-    "generate_fgraph": make_script_generate_fgraph,
+}
+
+scripts_help_generator = {
+    "watch_list": generate_script_watch_list_help,
+    "statistic": generate_script_statistic_help,
+    "view": generate_script_view_help,
+    "flamegraph": generate_script_flamegraph_help,
 }
 
 
@@ -309,6 +305,7 @@ if args.mode not in EXEC_MODE:
 
 api_schema = [
     ". ${1}/setenv.sh\n",
+    "{} > {}/help 2>&1\n",
     "shopt -s extglob\n",
     "inotifywait -m {0} {1} --include '{2}' |\n",
     "\twhile read dir action file; do\n",
@@ -378,10 +375,13 @@ with open(args.api_file, "r") as api_file:
 
         with open(api_server_script_file_path, "w") as listener_file:
             api_schema_concrete = api_schema.copy()
-            api_schema_concrete[2] = api_schema_concrete[2].format(
+            api_schema_concrete[1] = api_schema_concrete[1].format(
+                scripts_help_generator[req_name](), api_node
+            )
+            api_schema_concrete[3] = api_schema_concrete[3].format(
                 api_req_node, get_fs_watch_event_for_request_type(req_type), "exec$"
             )
-            api_schema_concrete[7] = api_schema_concrete[7].format(
+            api_schema_concrete[8] = api_schema_concrete[8].format(
                 "{WORK_DIR}",
                 req_executor_name,
                 api_node,
