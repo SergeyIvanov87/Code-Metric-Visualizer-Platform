@@ -270,13 +270,48 @@ def make_script_analytic(script):
 def generate_script_analytic_help():
     return "rrdtool -h"
 
+def make_script_rrd():
+    body = (
+        r"#!/usr/bin/bash",
+        r"",
+        r"API_NODE=${1}",
+        r". $2/setenv.sh",
+        r"RESULT_FILE=${3}_result",
+        r'CMD_ARGS=""',
+        r'for entry in "${API_NODE}"/*.*',
+        r"do",
+        r"    file_basename=${entry##*/}",
+        r"    param_name=${file_basename#*.}",
+        r"    readarray -t arr < ${entry}",
+        r"    special_kind_param_name=${param_name%.*}",
+        r"    if [[ ${special_kind_param_name} != 'NO_NAME_PARAM' ]];",
+        r"    then",
+        r"        brr+=(${param_name})",
+        r"    fi",
+        r"    for a in ${arr[@]}",
+        r"    do",
+        r"        if [[ ${a} == \"* ]];",
+        r"        then",
+        r'            brr+=("${a}")',
+        r"        else",
+        r"            brr+=(${a})",
+        r"        fi",
+        r"    done",
+        r"done",
+        r"cat ${SHARED_API_DIR}/init.xml | ${WORK_DIR}/build_rrd.py ${brr[@]} `${WORK_DIR}/analytic_exec.sh ${SHARED_API_DIR}/project/{uuid}/analytic ${WORK_DIR} stst`",
+    )
+    script.writelines(line + "\n" for line in body)
+
+def generate_script_rrd_help():
+    return "rrdtool -h"
 
 scripts_generator = {
     "watch_list": make_script_watch_list,
     "statistic": make_script_statistic,
     "view": make_script_view,
     "flamegraph": make_script_flamegraph,
-    "analytic": make_script_analytic
+    "analytic": make_script_analytic,
+    "rrd": make_script_rrd
 }
 
 scripts_help_generator = {
@@ -284,7 +319,8 @@ scripts_help_generator = {
     "statistic": generate_script_statistic_help,
     "view": generate_script_view_help,
     "flamegraph": generate_script_flamegraph_help,
-    "analytic": generate_script_analytic_help
+    "analytic": generate_script_analytic_help,
+    "rrd": generate_script_rrd_help
 }
 
 
