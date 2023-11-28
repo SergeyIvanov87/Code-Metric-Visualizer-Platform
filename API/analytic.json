@@ -1,0 +1,11 @@
+{
+    "Method" : "PUT",
+    "Query": "api.pmccabe_collector.restapi.org/project/{uuid}/analytic",
+    "Params": {
+        "-TODO": "rrdtool create counter.rrd --start 1701154260  --step 1           DS:mmcc:GAUGE:1y:U:U    RRA:LAST:0.1:1:100000",
+        "-TODO": "rrdtool fetch counter.rrd -s 1701154250 -e 1701154280 LAST",
+        "-TODO": "rrdtool fetch counter.rrd -s 1701154250 -e 1701154280 FIRST",
+        "-TODO": "rdtool update counter.rrd             1701154263:1                1701154264:3   1701154265:5             1701154270:3 1701154271:4 1701154275:9",
+        "-TODO": "rrdtool graph /mnt/api.pmccabe_collector.restapi.org/counter.svg -a SVG -x none -s 1701154263 -e 1701154276  DEF:lineb=counter.rrd:mmcc:AVERAGE LINE1:lineb#00FF00:"Line B""
+    }
+}
