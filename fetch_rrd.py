@@ -5,6 +5,7 @@ The purpose of this module is to fetch data from hierarchical RRD databases
 """
 
 import argparse
+import csv
 import os
 import re
 import subprocess
@@ -35,16 +36,17 @@ def fetch_db_records(db_path, fetch_args):
         raise Exception("Unexpected process output, requires 2 record lines at least");
 
     stdout_lines = rrd_update_result.stdout.split('\n')
-    head = stdout_lines[0].split()
+    head = list(db_path + "/" + h for h in stdout_lines[0].split())
     line_size = 0;
     body =[]
     for l in stdout_lines[1:-1]:
         if len(l)==0:
             continue
-        splitted_line = l.split()
+        splitted_line = list(v.strip(' :') for v in l.split() if len(v) > 0)
         body.append(splitted_line)
         line_size = len(splitted_line)
 
+    # first row with headers is shorter than data row,thus insert missed field descriptor
     if len(head) == line_size - 1:
         head.insert(0, "TIME")
     return head, body
@@ -93,8 +95,10 @@ for f in rrd_files:
         aggregated_head.extend(h[1:-1]) #remove TIME
         body_iter = iter(b)
         for aggregated_body_row in aggregated_body:
-            aggregated_body_row.extend(next(body_iter)[1:-1])   # remoe TIME value
+            aggregated_body_row.extend(next(body_iter)[1:-1])   # remove TIME value
     index += 1
 
-print(aggregated_head)
-print(aggregated_body)
+# write to stddout to use redirection later
+writer = csv.writer(sys.stdout)
+writer.writerow(aggregated_head)
+writer.writerows(aggregated_body)
