@@ -18,6 +18,9 @@ ${WORK_DIR}/build_local_api.py "run" ${WORK_DIR}/API.replicated.fs ${SHARED_DIR}
 ${WORK_DIR}/build_pmccabe_xml.sh "${SHARED_API_DIR}/init.xml"
 ${WORK_DIR}/build_pmccabe_flamegraph.sh "${SHARED_API_DIR}/init.xml" "${SHARED_API_DIR}/init"
 
+# build RRD analytics
+cat ${SHARED_API_DIR}/init.xml | ${WORK_DIR}/build_rrd.py  `${WORK_DIR}/analytic_exec.sh ${SHARED_API_DIR}/project/{uuid}/analytic ${WORK_DIR} anlt` ${SHARED_API_DIR} -method init
+
 # run listener for events
 for s in ${WORK_DIR}/services/*.sh; do
     ${s} ${WORK_DIR} ${SHARED_API_DIR} &

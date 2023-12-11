@@ -4,6 +4,8 @@
     "Params": {
         "--start": "1701154260",
         "--step": "1",
+
+        TODO-THINK about move to RRD
         "NO_NAME_PARAM.0": "DS:mmcc:GAUGE:1y:U:U",
         "NO_NAME_PARAM.1": "DS:tmcc:GAUGE:1y:U:U",
         "NO_NAME_PARAM.2": "DS:sif:GAUGE:1y:U:U",
