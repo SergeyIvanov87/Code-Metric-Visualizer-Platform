@@ -23,6 +23,7 @@ Just unpacks scripts and pseudo-filesystem in docker image space
 """
 
 import argparse
+from math import log10
 import os
 import pathlib
 import sys
@@ -75,9 +76,12 @@ def create_api_fs_node(api_root, req, rtype, rparams):
 
     # create params as files
     counter = 0
+    params_count = len(rparams)
+    params_10based = int(log10(params_count)) + 1
+    param_digit_format = "{:0" + str(params_10based) + "d}"
     for param in rparams:
         param_name, param_value = param.split("=")
-        param_name_path = os.path.join(api_node, str(counter) + "." + param_name)
+        param_name_path = os.path.join(api_node, param_digit_format.format(counter) + "." + param_name)
         counter += 1
 
         with open(param_name_path, "w") as api_file_param:
@@ -270,7 +274,7 @@ def make_script_analytic(script):
 def generate_script_analytic_help():
     return "rrdtool -h"
 
-def make_script_rrd():
+def make_script_rrd(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
@@ -298,11 +302,69 @@ def make_script_rrd():
         r"        fi",
         r"    done",
         r"done",
-        r"cat ${SHARED_API_DIR}/init.xml | ${WORK_DIR}/build_rrd.py ${brr[@]} `${WORK_DIR}/analytic_exec.sh ${SHARED_API_DIR}/project/{uuid}/analytic ${WORK_DIR} stst`",
+        r'cat ${SHARED_API_DIR}/init.xml | ${WORK_DIR}/build_rrd.py ${brr[@]} "`${WORK_DIR}/analytic_exec.sh ${SHARED_API_DIR}/project/{uuid}/analytic ${WORK_DIR} stst`" ${SHARED_API_DIR}',
     )
     script.writelines(line + "\n" for line in body)
 
 def generate_script_rrd_help():
+    return "rrdtool -h"
+
+def make_script_rrd_view_put(script):
+    body = (
+        r"#!/usr/bin/bash",
+        r"",
+        r"API_NODE=${1}",
+        r". $2/setenv.sh",
+        r"RESULT_FILE=${3}_result",
+        r'CMD_ARGS=""',
+        r'for entry in "${API_NODE}"/*.*',
+        r"do",
+        r"    file_basename=${entry##*/}",
+        r"    param_name=${file_basename#*.}",
+        r"    readarray -t arr < ${entry}",
+        r"    brr+=(${param_name})",
+        r"    for a in ${arr[@]}",
+        r"    do",
+        r"        if [[ ${a} == \"* ]];",
+        r"        then",
+        r'            brr+=("${a}")',
+        r"        else",
+        r"            brr+=(${a})",
+        r"        fi",
+        r"    done",
+        r"done",
+        r'echo "${brr[@]}"',
+    )
+    script.writelines(line + "\n" for line in body)
+
+def make_script_rrd_view_put_help():
+    return "rrdtool -h"
+
+def make_script_rrd_view_get(script):
+    body = (
+        r"#!/usr/bin/bash",
+        r"",
+        r"API_NODE=${1}",
+        r". $2/setenv.sh",
+        r"RESULT_FILE=${3}_result",
+        r"`${WORK_DIR}/rrd_view_put.sh` | xargs find ${RRD_ROOT} | ${WORK_DIR}/fetch_rrd.py ${SHARED_API_DIR}/project/{uuid}/analytic/rrd/view > ${RESULT_FILE}.csv"
+    )
+    script.writelines(line + "\n" for line in body)
+
+def make_script_rrd_view_get_help():
+    return "rrdtool -h"
+
+def make_script_rrd_view_graph(script):
+    body = (
+        r"#!/usr/bin/bash",
+        r"",
+        r"API_NODE=${1}",
+        r". $2/setenv.sh",
+        r"RESULT_FILE=${3}_result",
+    )
+    script.writelines(line + "\n" for line in body)
+
+def make_script_rrd_view_graph_help():
     return "rrdtool -h"
 
 scripts_generator = {
@@ -311,7 +373,10 @@ scripts_generator = {
     "view": make_script_view,
     "flamegraph": make_script_flamegraph,
     "analytic": make_script_analytic,
-    "rrd": make_script_rrd
+    "rrd": make_script_rrd,
+    "rrd_view_get": make_script_rrd_view_get,
+    "rrd_view_put": make_script_rrd_view_put,
+    "rrd_view_graph": make_script_rrd_view_graph
 }
 
 scripts_help_generator = {
@@ -320,7 +385,10 @@ scripts_help_generator = {
     "view": generate_script_view_help,
     "flamegraph": generate_script_flamegraph_help,
     "analytic": generate_script_analytic_help,
-    "rrd": generate_script_rrd_help
+    "rrd": generate_script_rrd_help,
+    "rrd_view_get": make_script_rrd_view_get_help,
+    "rrd_view_put": make_script_rrd_view_put_help,
+    "rrd_view_graph": make_script_rrd_view_graph_help
 }
 
 
@@ -353,7 +421,7 @@ def check_script_valid(path, script_name):
 
 
 def get_fs_watch_event_for_request_type(req_type):
-    events = {"GET": "-e access", "PUT": "-e modify"}
+    events = {"GET": "-e access", "PUT": "-e modify", "POST": "-e access"}
     if req_type not in events.keys():
         raise Exception(
             f"Request type is not supported: {req_type}. Available types are: {events.keys()}"

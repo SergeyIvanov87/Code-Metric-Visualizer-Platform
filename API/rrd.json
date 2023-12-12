@@ -16,8 +16,9 @@
             "NO_NAME_PARAM.8": "DS:mmcc_deviation:GAUGE:1y:U:U",
             "NO_NAME_PARAM.9": "DS:tmcc_deviation:GAUGE:1y:U:U",
             "NO_NAME_PARAM.10": "DS:sif_deviation:GAUGE:1y:U:U",
-            "NO_NAME_PARAM.11": "DS:lif_deviation:GAUGE:1y:U:U",
+            "NO_NAME_PARAM.11": "DS:lif_deviation:GAUGE:1y:U:U"
         },
-        "--no-overwrite": ""
+        "--no-overwrite": "",
+        "-method": "update"
     }
 }

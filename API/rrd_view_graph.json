@@ -4,8 +4,8 @@
     "Params": {
         "rrd_view_get":{
             "-s": "1131141",
-            "-e": "None"
-            "package_counters": "mmcc_mean,mmcc_median,mmcc_deviation,tmcc_mean,tmcc_median,tmcc_deviation,sif_mean,sif_median,sif_deviation,if_mean,lif_median,lif_deviation"
+            "-e": "None",
+            "package_counters": "mmcc_mean,mmcc_median,mmcc_deviation,tmcc_mean,tmcc_median,tmcc_deviation,sif_mean,sif_median,sif_deviation,if_mean,lif_median,lif_deviation",
             "leaf_counters": "mmcc,tmcc,sif,lif"
         },
         "?colors?":""

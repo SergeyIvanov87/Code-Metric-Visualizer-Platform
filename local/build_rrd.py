@@ -185,7 +185,7 @@ parser.add_argument(
 parser.add_argument(
     "-method",
     "--method",
-    default=supported_methods[0]
+    default=supported_methods[1]
 )
 
 args = parser.parse_args()
