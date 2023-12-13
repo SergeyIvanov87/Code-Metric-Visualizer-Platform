@@ -13,6 +13,24 @@ import sys
 
 import read_api_fs_args
 
+def get_last_timestamp(db_path, default_timestamp="1701154261"):
+    timestamp=default_timestamp
+    rrd_ask_result = subprocess.run(
+                [
+                    "rrdtool",
+                    "last",
+                    db_path,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                universal_newlines=True
+            )
+    if rrd_ask_result.returncode != 0:
+        raise subprocess.CalledProcessError(rrd_ask_result.returncode, rrd_ask_result.args)
+    if len(rrd_ask_result.stdout):
+        timestamp = rrd_ask_result.stdout.split()[0]
+    return timestamp
+
 def fetch_db_records(db_path, fetch_args):
     rrd_update_result = subprocess.run(
         [
@@ -57,9 +75,8 @@ def read_db_files_from_path(path, file_match_regex='.*\.rrd'):
     if os.path.isfile(path) and p.match(file_match_regex):
         return [path]
 
-    files = [f for f in os.listdir(path) if os.path.isfile(f)]
-    p = re.compile('[0-9]\..*')
-    rrd_db_files = [ f for f in files if p.match(f) ]
+    files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path,f))]
+    rrd_db_files = [ os.path.join(path,f) for f in files if p.match(f) ]
 
     return rrd_db_files
 
@@ -75,7 +92,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 components_2_fetch = sys.stdin.read().split()
-cmd_args_list = read_api_fs_args.read_args(args.api_arg_dir)
+cmd_args_list, filtering_args_list = read_api_fs_args.read_n_separate_args(args.api_arg_dir, ["package_counters", "leaf_counters"])
 
 rrd_files = []
 for component in components_2_fetch:
@@ -83,6 +100,14 @@ for component in components_2_fetch:
 
 aggregated_body = []
 aggregated_head = []
+
+
+end_arg_index = cmd_args_list.index("-e")
+end_arg_index += 1
+end_arg_value = cmd_args_list[end_arg_index].lower()
+if end_arg_value == "none" or end_arg_value == "" or end_arg_value == "last":
+    if len(rrd_files) > 0:
+        cmd_args_list[end_arg_index] = get_last_timestamp(rrd_files[0])
 
 index = 0
 for f in rrd_files:

@@ -19,11 +19,14 @@ ${WORK_DIR}/build_pmccabe_xml.sh "${SHARED_API_DIR}/init.xml"
 ${WORK_DIR}/build_pmccabe_flamegraph.sh "${SHARED_API_DIR}/init.xml" "${SHARED_API_DIR}/init"
 
 echo "build RRD analytics"
-cat ${SHARED_API_DIR}/init.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/analytic_exec.sh ${SHARED_API_DIR}/project/{uuid}/analytic ${WORK_DIR} anlt`" ${SHARED_API_DIR} -method init
+BUILD_RRD_ARGS=`cd ${WORK_DIR} && python -c 'from read_api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/project/{uuid}/analytic/")))'`
+echo ${BUILD_RRD_ARGS}
+cat ${SHARED_API_DIR}/init.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${SHARED_API_DIR}/project/{uuid}/analytic/rrd ${WORK_DIR} anlt`" ${SHARED_API_DIR} -method init
 
-echo "run API listeners"
+echo "run API listeners:"
 for s in ${WORK_DIR}/services/*.sh; do
     ${s} ${WORK_DIR} ${SHARED_API_DIR} &
+    echo "${s} has been started"
 done
 
 sleep infinity
