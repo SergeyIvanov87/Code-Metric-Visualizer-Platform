@@ -2,7 +2,7 @@ flamegraph	GET	api.pmccabe_collector.restapi.org/project/{uuid}/statistic/view/f
 rrd_collect	POST	api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/collect	-method=update
 rrd_view_graph	GET	api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select/view/graph	?colors?=
 watch_list	GET	api.pmccabe_collector.restapi.org/project/{uuid}	-regex=".*\.\(hpp\|cpp\|c\|h\)"	-prune=! -path "*buil*" ! -path "*thirdpart*"
-rrd_select	PUT	api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select	-path="*" -type d
+rrd_select	PUT	api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select	-path="*api.pmccabe_collector.restapi.org/mnt*"	-name="*"	-type=d -prune
 statistic	PUT	api.pmccabe_collector.restapi.org/project/{uuid}/statistic	-mmcc=1,	-tmcc=1,	-sif=1,	-lif=1,
 rrd_view	GET	api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select/view	-s=1701154260	-e=None	NO_NAME_PARAM.0=AVERAGE	package_counters=mmcc_mean,mmcc_median,mmcc_deviation,tmcc_mean,tmcc_median,tmcc_deviation,sif_mean,sif_median,sif_deviation,if_mean,lif_median,lif_deviation	leaf_counters=mmcc,tmcc,sif,lif
 analytic	PUT	api.pmccabe_collector.restapi.org/project/{uuid}/analytic

@@ -4,7 +4,9 @@
     "Params": {
         "rrd_view" : {
             "rrd_select" : {
-                "-prune": "-path \"*\" -type d"
+                "-path" : "\"*api.pmccabe_collector.restapi.org/mnt*\"",
+                "-name" : "\"*\"",
+                "-type" :"d -prune"
             },
             "-s": "1701154260",
             "-e": "None",
