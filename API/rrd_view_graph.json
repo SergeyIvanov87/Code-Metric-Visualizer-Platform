@@ -10,9 +10,14 @@
             },
             "-s": "1701154260",
             "-e": "None",
-            "package_counters": "mmcc_mean,mmcc_median,mmcc_deviation,tmcc_mean,tmcc_median,tmcc_deviation,sif_mean,sif_median,sif_deviation,if_mean,lif_median,lif_deviation",
+            "package_counters": "mmcc_mean,mmcc_median,mmcc_deviation,tmcc_mean,tmcc_median,tmcc_deviation,sif_mean,sif_median,sif_deviation,lif_mean,lif_median,lif_deviation",
             "leaf_counters": "mmcc,tmcc,sif,lif"
         },
-        "?colors?":""
+        "-a": "SVG",
+        "-x": "none"
+        "-s": "1701154260",
+        "-e": "None",
+        "package_counters": "mmcc_mean,mmcc_median,mmcc_deviation,tmcc_mean,tmcc_median,tmcc_deviation,sif_mean,sif_median,sif_deviation,lif_mean,lif_median,lif_deviation",
+        "leaf_counters": "mmcc,tmcc,sif,lif"
     }
 }
