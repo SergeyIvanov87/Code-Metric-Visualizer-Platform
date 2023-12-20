@@ -11,6 +11,9 @@ import re
 import subprocess
 import sys
 
+from collections import defaultdict
+from math import sqrt
+
 import read_api_fs_args
 
 def get_last_timestamp(db_path, default_timestamp="1701154261"):
@@ -41,12 +44,19 @@ class RRDRecognizer:
     def is_leaf(self, filepath):
         return os.path.isfile(filepath) and self.leaf_pattern.match(filepath)
 
+def translate_counter_name(name):
+    translation_map = {"mmcc_mean" : "mmcc", "tmcc_mean" : "tmcc", "sif_mean" : "sif", "lif_mean" : "lif"}
+    if name in translation_map.keys():
+        return translation_map[name]
+    return name
+
 def transform_counters_into_rrd_def(counters_list):
     abc_iter = iter(range(ord('a'),ord('z')+1))
     line_num = 1
     outputs = []
     for c in counters_list:
         line_name = chr(next(abc_iter))
+        c = translate_counter_name(c)
         outputs.append(f"DEF:line{line_name}" + "={0}" + f":{c}:AVERAGE LINE{line_num}:line{line_name}#00FF00")
         line_num += 1
     return outputs
@@ -54,9 +64,14 @@ def transform_counters_into_rrd_def(counters_list):
 def graph_db_records(db_path, rrd_recognizer, graph_args, metrics_to_collect):
     filename = os.path.basename(db_path)
     dirname = os.path.dirname(db_path)
-    output_graph_path = filename + ".img"
+
+    # extract format and form file extension based on that
+    graph_ext = graph_args[graph_args.index("-a") + 1].lower()
+
+    output_graph_path = os.path.join(dirname,filename + "." + graph_ext)
     graph_title = filename
 
+    # ask for a proper metrics depending on DB type
     if rrd_recognizer.is_package(db_path):
         metric = metrics_to_collect[0].copy()
     elif rrd_recognizer.is_leaf(db_path):
@@ -64,9 +79,10 @@ def graph_db_records(db_path, rrd_recognizer, graph_args, metrics_to_collect):
     else:
         raise Exception(f"Unrecognized RRD DB: {db_path}")
 
+
     formatted_metric=[]
     for m in metric:
-        formatted_metric.append(m.format(db_path))
+        formatted_metric.extend(m.format(db_path).split())
 
     rrd_update_result = subprocess.run(
         [
@@ -89,11 +105,9 @@ def graph_db_records(db_path, rrd_recognizer, graph_args, metrics_to_collect):
     if rrd_update_result.returncode != 0:
         raise subprocess.CalledProcessError(rrd_update_result.returncode, rrd_update_result.args)
 
-    if len(rrd_update_result.stdout) != 1:
-        raise Exception("Unexpected process output, requires one-liner result");
-    return rrd_update_result.stdout.split('x')
+    return output_graph_path, rrd_update_result.stdout.split('x')
 
-def read_db_files_from_path(path, file_match_regex='.*\.rrd'):
+def read_db_files_from_path(path, file_match_regex='.*\.rrd$'):
     p = re.compile(file_match_regex)
     if os.path.isfile(path) and p.match(path):
         return [path]
@@ -112,6 +126,9 @@ parser.add_argument(
     "api_arg_dir"
 )
 
+parser.add_argument(
+    "output"
+)
 args = parser.parse_args()
 
 components_2_fetch = sys.stdin.read().split()
@@ -132,5 +149,32 @@ graph_counters_template = []
 graph_counters_template.append(transform_counters_into_rrd_def(filtering_args_list["package_counters"].split(',')))
 graph_counters_template.append(transform_counters_into_rrd_def(filtering_args_list["leaf_counters"].split(',')))
 recognizer = RRDRecognizer()
+
+plotted_graphs_wit_res = defaultdict(list)
 for f in rrd_files:
-    graph_db_records(f, recognizer, cmd_args_list, graph_counters_template)
+    plot_path, resolution = graph_db_records(f, recognizer, cmd_args_list, graph_counters_template)
+    plotted_graphs_wit_res[plot_path] = resolution
+
+# unify images into single one
+grid_row = int(sqrt(len(plotted_graphs_wit_res)))
+grid_column = int(len(plotted_graphs_wit_res) / grid_row)
+
+image_montage_result = subprocess.run(
+        [
+            "magick",
+            "montage",
+            *plotted_graphs_wit_res.keys(),
+            "-geometry",
+            f"+{grid_row}+{grid_column}",
+            args.output+".png"
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True
+    )
+
+if len(image_montage_result.stderr):
+    print(f"Cannot build graph from DB records. {image_montage_result.stderr}")
+
+if image_montage_result.returncode != 0:
+    raise subprocess.CalledProcessError(image_montage_result.returncode, image_montage_result.args)

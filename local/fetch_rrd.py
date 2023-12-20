@@ -70,7 +70,7 @@ def fetch_db_records(db_path, fetch_args):
     return head, body
 
 
-def read_db_files_from_path(path, file_match_regex='.*\.rrd'):
+def read_db_files_from_path(path, file_match_regex='.*\.rrd$'):
     p = re.compile(file_match_regex)
     if os.path.isfile(path) and p.match(path):
         return [path]
