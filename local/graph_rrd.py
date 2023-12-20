@@ -50,14 +50,15 @@ def translate_counter_name(name):
         return translation_map[name]
     return name
 
-def transform_counters_into_rrd_def(counters_list):
+def transform_counters_into_rrd_def(counters_color_list):
     abc_iter = iter(range(ord('a'),ord('z')+1))
     line_num = 1
     outputs = []
-    for c in counters_list:
+    for cc_pair in counters_color_list:
         line_name = chr(next(abc_iter))
-        c = translate_counter_name(c)
-        outputs.append(f"DEF:line{line_name}" + "={0}" + f":{c}:AVERAGE LINE{line_num}:line{line_name}#00FF00")
+        counter, colour = cc_pair.split(':')
+        counter = translate_counter_name(counter)
+        outputs.append(f"DEF:line{line_name}" + "={0}" + f":{counter}:AVERAGE LINE{line_num}:line{line_name}#{colour}")
         line_num += 1
     return outputs
 
@@ -132,7 +133,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 components_2_fetch = sys.stdin.read().split()
-cmd_args_list, filtering_args_list = read_api_fs_args.read_n_separate_args(args.api_arg_dir, ["package_counters", "leaf_counters"])
+cmd_args_list, filtering_args_list = read_api_fs_args.read_n_separate_args(args.api_arg_dir, ["package_counters", "leaf_counters", "colors"])
 
 rrd_files = []
 for component in components_2_fetch:
