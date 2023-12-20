@@ -48,7 +48,9 @@ class rrd:
         for node_type_index in range(0, len(xml_node_types)):
             item_name=xml_node.get(xml_node_types[node_type_index])
             if item_name is not None:
-                return item_name, node_type_index
+                # symbol ':' is forbidden in rrd-file names, because rrdtool graph uses it as a DEF args separator
+                # replace it with ';'
+                return item_name.replace(':',';'), node_type_index
         raise Exception(f"Unsupported node type in XML node {tostring(xml_node)}. Available types: {','.join(xml_node_types)}");
 
     @staticmethod

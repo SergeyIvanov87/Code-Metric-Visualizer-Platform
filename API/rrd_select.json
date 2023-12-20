@@ -2,8 +2,8 @@
     "Method" : "PUT",
     "Query": "api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select",
     "Params": {
-        "-path" : "\"*api.pmccabe_collector.restapi.org/mnt*\"",
-        "-name" : "\"*\"",
-        "-type" :"d -prune"
+        "-path" : "\"*api.pmccabe_collector.restapi.org/*\" -prune",
+        "-name" : "\"*rrd\"",
+        "-type" :"f"
     }
 }

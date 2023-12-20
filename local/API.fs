@@ -1,8 +1,8 @@
 flamegraph	GET	api.pmccabe_collector.restapi.org/project/{uuid}/statistic/view/flamegraph	--width=1200	--height=16
 rrd_collect	POST	api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/collect	-method=update
-rrd_view_graph	GET	api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select/view/graph	-a=SVG	-x=none	-s=1701154260	-e=None	package_counters=mmcc_mean:FF0000,mmcc_median:6E0000,mmcc_deviation:2D0000,tmcc_mean:00FF00,tmcc_median:006E00,tmcc_deviation:002D00,sif_mean:0000FF,sif_median:00006E,sif_deviation:00002D,lif_mean:FFFF00,,lif_median:6E6E00,lif_deviation:2D2D00	leaf_counters=mmcc:FF0000,tmcc:FFFF00,sif:00FF00,lif:0000FF
+rrd_view_graph	GET	api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select/view/graph	-a=SVG	-x=none	-s=1701154260	-e=None	package_counters=mmcc_mean:FF0000,mmcc_median:6E0000,mmcc_deviation:2D0000,tmcc_mean:00FF00,tmcc_median:006E00,tmcc_deviation:002D00,sif_mean:0000FF,sif_median:00006E,sif_deviation:00002D,lif_mean:FFFF00,lif_median:6E6E00,lif_deviation:2D2D00	leaf_counters=mmcc:FF0000,tmcc:FFFF00,sif:00FF00,lif:0000FF
 watch_list	GET	api.pmccabe_collector.restapi.org/project/{uuid}	-regex=".*\.\(hpp\|cpp\|c\|h\)"	-prune=! -path "*buil*" ! -path "*thirdpart*"
-rrd_select	PUT	api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select	-path="*api.pmccabe_collector.restapi.org/mnt*"	-name="*"	-type=d -prune
+rrd_select	PUT	api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select	-path="*api.pmccabe_collector.restapi.org/*" -prune	-name="*rrd"	-type=f
 statistic	PUT	api.pmccabe_collector.restapi.org/project/{uuid}/statistic	-mmcc=1,	-tmcc=1,	-sif=1,	-lif=1,
 rrd_view	GET	api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select/view	-s=1701154260	-e=None	NO_NAME_PARAM.0=AVERAGE	package_counters=mmcc_mean,mmcc_median,mmcc_deviation,tmcc_mean,tmcc_median,tmcc_deviation,sif_mean,sif_median,sif_deviation,lif_mean,lif_median,lif_deviation	leaf_counters=mmcc,tmcc,sif,lif
 analytic	PUT	api.pmccabe_collector.restapi.org/project/{uuid}/analytic
