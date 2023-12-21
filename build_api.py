@@ -40,9 +40,13 @@ for file in os.listdir(directory):
     if not request_filename.endswith(".json"):
         continue
 
-    with open(os.path.join(os.fsdecode(directory), request_filename), "r") as file:
-        request = json.load(file)
-        plain_request = transform_json_request_to_plain_request(
-            request_filename.split(".")[0], request
-        )
-        print(plain_request)
+    api_file_path = os.path.join(os.fsdecode(directory), request_filename)
+    with open(api_file_path, "r") as file:
+        try:
+            request = json.load(file)
+            plain_request = transform_json_request_to_plain_request(
+                request_filename.split(".")[0], request
+            )
+            print(plain_request)
+        except json.decoder.JSONDecodeError as e:
+            raise Exception(f"Error: {str(e)} in file: {api_file_path}")
