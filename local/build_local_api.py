@@ -79,6 +79,7 @@ def create_api_fs_node(api_root, req, rtype, rparams):
     params_count = len(rparams)
     if params_count != 0:
         params_10based = int(log10(params_count)) + 1
+        # put a leading zero as we need to get ordered params list
         param_digit_format = "{:0" + str(params_10based) + "d}"
         for param in rparams:
             param_name, param_value = param.split("=")
