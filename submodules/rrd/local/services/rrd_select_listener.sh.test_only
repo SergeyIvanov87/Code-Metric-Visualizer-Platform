@@ -1,0 +1,16 @@
+#!/usr/bin/bash
+
+. ${1}/setenv.sh
+rrdtool -h > /mnt/api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select/help 2>&1
+shopt -s extglob
+inotifywait -m /mnt/api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select/PUT -e modify --include 'exec$' |
+	while read dir action file; do
+		echo "file: ${file}, action; ${action}, dir: ${dir}"
+		case "$action" in
+			ACCESS|ATTRIB )
+				"${WORK_DIR}/rrd_select_exec.sh" /mnt/api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select ${WORK_DIR} /mnt/api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select/PUT/${file}
+			;;
+			*)
+				;;
+		esac
+	done
