@@ -1,6 +1,6 @@
 {
     "Method" : "PUT",
-    "Query": "api.pmccabe_collector.restapi.org/project/{uuid}/analytic",
+    "Query": "api.pmccabe_collector.restapi.org/analytic",
     "Params": {
     }
 }

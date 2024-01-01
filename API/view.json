@@ -1,6 +1,6 @@
 {
     "Method" : "GET",
-    "Query": "api.pmccabe_collector.restapi.org/project/{uuid}/statistic/view",
+    "Query": "api.pmccabe_collector.restapi.org/main/statistic/view",
     "Params": {
         "statistic" : {
             "watch_list" : {

@@ -16,6 +16,6 @@ COPY API.fs /package/API.replicated.fs
 
 COPY services/*.sh /package/
 
-RUN ["python", "./build_local_api.py", "build", "API.replicated.fs", "/mnt"]
+RUN ["python", "./build_api_services.py", "API.replicated.fs"]
 
 ENTRYPOINT ["/package/init.sh", "/package", "/mnt"]
