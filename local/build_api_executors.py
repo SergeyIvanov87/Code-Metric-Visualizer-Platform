@@ -13,6 +13,7 @@ import stat
 
 from api_gen_utils import compose_api_exec_script_name
 from api_gen_utils import compose_api_fs_node_name
+from api_gen_utils import get_generated_scripts_path
 from api_gen_utils import make_file_executable
 from api_gen_utils import append_file_mode
 
@@ -53,7 +54,7 @@ sys.path.append(args.api_exec_generator)
 import api_generator
 scripts_generator, _ = api_generator.get()
 
-generated_api_server_scripts_path = "services"
+generated_api_server_scripts_path = get_generated_scripts_path()
 os.makedirs(generated_api_server_scripts_path, exist_ok=True)
 
 errors_detected = []

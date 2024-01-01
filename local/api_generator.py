@@ -1,15 +1,15 @@
 #!/usr/bin/python
 
 """
-Provides a functions set which manage to generate API executor scripts
+Provides a functions set which manages to generate API executor scripts
 """
 
 def make_script_watch_list(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
-        r"API_NODE=${1}",
-        r". $2/setenv.sh",
+        r"API_NODE=${2}",
+        r". ${1}/setenv.sh",
         r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
@@ -28,7 +28,7 @@ def make_script_watch_list(script):
         r"        fi",
         r"    done",
         r"done",
-        r'echo "${brr[@]}" | xargs find ${REPO_PATH} > ${RESULT_FILE}.txt',
+        r'echo "${brr[@]}" | xargs find ${INITIAL_PROJECT_LOCATION} > ${RESULT_FILE}.txt',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -39,8 +39,8 @@ def make_script_statistic(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
-        r"API_NODE=${1}",
-        r". $2/setenv.sh",
+        r"API_NODE=${2}",
+        r". ${1}/setenv.sh",
         r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
@@ -70,8 +70,8 @@ def make_script_view(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
-        r"API_NODE=${1}",
-        r". $2/setenv.sh",
+        r"API_NODE=${2}",
+        r". ${1}/setenv.sh",
         r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
@@ -90,8 +90,8 @@ def make_script_view(script):
         r"        fi",
         r"    done",
         r"done",
-        r"${WORK_DIR}/watch_list_exec.sh ${SHARED_API_DIR}/project/{uuid} ${WORK_DIR} ${API_NODE}/GET/.watch_list",
-        r"cat ${API_NODE}/GET/.watch_list_result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic ${WORK_DIR} stst` > ${RESULT_FILE}.xml",
+        r"${WORK_DIR}/watch_list_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main ${API_NODE}/GET/.watch_list",
+        r"cat ${API_NODE}/GET/.watch_list_result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic stst` > ${RESULT_FILE}.xml",
         r"cat ${RESULT_FILE}.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]} > ${RESULT_FILE}.data",
     )
     script.writelines(line + "\n" for line in body)
@@ -103,8 +103,8 @@ def make_script_flamegraph(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
-        r"API_NODE=${1}",
-        r". $2/setenv.sh",
+        r"API_NODE=${2}",
+        r". ${1}/setenv.sh",
         r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
@@ -123,7 +123,7 @@ def make_script_flamegraph(script):
         r"        fi",
         r"    done",
         r"done",
-        r"${WORK_DIR}/view_exec.sh ${SHARED_API_DIR}/project/{uuid}/statistic/view ${WORK_DIR} ${API_NODE}/GET/.collapsed",
+        r"${WORK_DIR}/view_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic/view ${API_NODE}/GET/.collapsed",
         r"cat ${API_NODE}/GET/.collapsed_result.data | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]} > ${RESULT_FILE}.svg",
     )
     script.writelines(line + "\n" for line in body)
@@ -136,8 +136,8 @@ def make_script_analytic(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
-        r"API_NODE=${1}",
-        r". $2/setenv.sh",
+        r"API_NODE=${2}",
+        r". ${1}/setenv.sh",
         r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
@@ -171,8 +171,8 @@ def make_script_rrd(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
-        r"API_NODE=${1}",
-        r". $2/setenv.sh",
+        r"API_NODE=${2}",
+        r". ${1}/setenv.sh",
         r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
@@ -206,8 +206,8 @@ def make_script_rrd_collect(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
-        r"API_NODE=${1}",
-        r". $2/setenv.sh",
+        r"API_NODE=${2}",
+        r". ${1}/setenv.sh",
         r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
@@ -230,7 +230,7 @@ def make_script_rrd_collect(script):
         r"        fi",
         r"    done",
         r"done",
-        r'cat ${SHARED_API_DIR}/init.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${SHARED_API_DIR}/project/{uuid}/analytic/rrd ${WORK_DIR} rd`" ${SHARED_API_DIR} ${brr[@]}',
+        r'cat ${SHARED_API_DIR}/init.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/analytic/rrd rd`" ${SHARED_API_DIR} ${brr[@]}',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -241,8 +241,8 @@ def make_script_rrd_select(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
-        r"API_NODE=${1}",
-        r". $2/setenv.sh",
+        r"API_NODE=${2}",
+        r". ${1}/setenv.sh",
         r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
@@ -276,10 +276,10 @@ def make_script_rrd_view(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
-        r"API_NODE=${1}",
-        r". $2/setenv.sh",
+        r"API_NODE=${2}",
+        r". ${1}/setenv.sh",
         r"RESULT_FILE=${3}_result",
-        r'echo "`${WORK_DIR}/rrd_select_exec.sh ${SHARED_API_DIR}/project/{uuid}/analytic/rrd/select ${WORK_DIR} se`" | xargs find ${RRD_ROOT} | ${WORK_DIR}/fetch_rrd.py ${SHARED_API_DIR}/project/{uuid}/analytic/rrd/select/view > ${RESULT_FILE}_csv_in_progress',
+        r'echo "`${WORK_DIR}/rrd_select_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/analytic/rrd/select se`" | xargs find ${RRD_ROOT} | ${WORK_DIR}/fetch_rrd.py ${SHARED_API_DIR}/analytic/rrd/select/view > ${RESULT_FILE}_csv_in_progress',
         r'mv ${RESULT_FILE}_csv_in_progress ${RESULT_FILE}.csv'
     )
     script.writelines(line + "\n" for line in body)
@@ -291,10 +291,10 @@ def make_script_rrd_view_graph(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
-        r"API_NODE=${1}",
-        r". $2/setenv.sh",
+        r"API_NODE=${2}",
+        r". ${1}/setenv.sh",
         r"RESULT_FILE=${3}_result",
-        r'echo "`${WORK_DIR}/rrd_select_exec.sh ${SHARED_API_DIR}/project/{uuid}/analytic/rrd/select ${WORK_DIR} se`" | xargs find ${RRD_ROOT} | ${WORK_DIR}/graph_rrd.py ${SHARED_API_DIR}/project/{uuid}/analytic/rrd/select/view/graph ${RESULT_FILE}',
+        r'echo "`${WORK_DIR}/rrd_select_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/analytic/rrd/select se`" | xargs find ${RRD_ROOT} | ${WORK_DIR}/graph_rrd.py ${SHARED_API_DIR}/analytic/rrd/select/view/graph ${RESULT_FILE}',
     )
 
     script.writelines(line + "\n" for line in body)

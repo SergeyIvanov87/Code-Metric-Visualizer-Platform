@@ -18,14 +18,14 @@ Each request can be executed as simple ACCESS-operation on a file named `exec` i
 
 The request
 
-`GET api.pmccabe_collector.restapi.org/project/{uuid}/statistic/view/flamegraph`
+`GET api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph`
 
 can be triggered in the filesystem API mapped notation as:
 
-`cat api.pmccabe_collector.restapi.org/project/{uuid}/statistic/view/flamegraph/GET/exec`
+`cat api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph/GET/exec`
 
-If you prefer to use GUI rather than CLI, then just open a path `api.pmccabe_collector.restapi.org/project/{uuid}/statistic/view/flamegraph` in your favorite File Manager. It is realy simple as it sounds! Regardless an approach you use, nevertheless you'll find the outcome of your query execution, usually meant a file, in the same directory where the original `exec` API-file located. Feeling curiosity or discovering any other ways to alter the result of query execution, it's possible to wander through such API filesystem content and play with a different kind of file nodes called parameters. Changing a value in these parameter-files you can affect the result (or view) of a request outcome.
-Typical use-case is add filtering `thirdparty` directories as `watch_list`. You can acrhive that by changing values of the parameters `0.-regex` and `1.-prune` resided by path `api.pmccabe_collector.restapi.org/project/{uuid}`, which actually represent parameters for the  well-known command `find` from the general command manual `man find`.
+If you prefer to use GUI rather than CLI, then just open a path `api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph` in your favorite File Manager. It is realy simple as it sounds! Regardless an approach you use, nevertheless you'll find the outcome of your query execution, usually meant a file, in the same directory where the original `exec` API-file located. Feeling curiosity or discovering any other ways to alter the result of query execution, it's possible to wander through such API filesystem content and play with a different kind of file nodes called parameters. Changing a value in these parameter-files you can affect the result (or view) of a request outcome.
+Typical use-case is add filtering `thirdparty` directories as `watch_list`. You can acrhive that by changing values of the parameters `0.-regex` and `1.-prune` resided by path `api.pmccabe_collector.restapi.org/main`, which actually represent parameters for the  well-known command `find` from the general command manual `man find`.
 
 This file-based interface is only container API supported at the moment.
 
@@ -45,8 +45,6 @@ As a first step, you need to generate API request handlers in a form of simple s
 
 `python ./build_api_executors.py API.fs ./`
 
-`python ./build_api_services.py API.fs`
-
 Next you need to generate the image by itself. To do that, execute the next cmd in the same `local` directory:
 
 `sudo docker build -t pmccabe_vis:latest .`
@@ -58,8 +56,6 @@ Next you need to generate the image by itself. To do that, execute the next cmd 
  `cd local`
 
  `python ./build_api_executors.py API.fs ./`
-
- `python ./build_api_services.py API.fs`
 
  `sudo docker build -t pmccabe_vis:latest .`
 

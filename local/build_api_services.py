@@ -63,7 +63,7 @@ api_schema = [
     '\t\techo "file: ${file}, action; ${action}, dir: ${dir}"\n',
     '\t\tcase "$action" in\n',
     "\t\t\tACCESS|ATTRIB )\n",
-    '\t\t\t\t"${0}/{1}" {2} ${3} {4}/{5}\n',
+    '\t\t\t\t"${0}/{1}" ${2} {3} {4}/{5}\n',
     "\t\t\t;;\n",
     "\t\t\t*)\n",
     "\t\t\t\t;;\n",
@@ -82,7 +82,7 @@ with open(args.api_file, "r") as api_file:
 
         (req_name, req_type, req_api, *req_params) = request_params
         api_node, api_req_node = compose_api_fs_node_name(
-                "${SHARED_DIR}", req_api, req_type
+                "${INITIAL_PROJECT_LOCATION}", req_api, req_type
             )
 
         try:
@@ -103,8 +103,8 @@ with open(args.api_file, "r") as api_file:
             api_schema_concrete[8] = api_schema_concrete[8].format(
                 "{WORK_DIR}",
                 req_executor_name,
+                "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
                 api_node,
-                "{WORK_DIR}",
                 api_req_node,
                 "${file}",
             )

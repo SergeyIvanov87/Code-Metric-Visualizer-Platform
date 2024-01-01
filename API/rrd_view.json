@@ -1,6 +1,6 @@
 {
     "Method" : "GET",
-    "Query": "api.pmccabe_collector.restapi.org/project/{uuid}/analytic/rrd/select/view",
+    "Query": "api.pmccabe_collector.restapi.org/analytic/rrd/select/view",
     "Params": {
         "rrd_select": {
             "-prune": "-path \"*\" -type d"
