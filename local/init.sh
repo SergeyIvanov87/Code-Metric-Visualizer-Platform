@@ -4,6 +4,7 @@ WORK_DIR=${1}
 REPO_PATH=${2}
 SHARED_DIR=${2}
 SHARED_API_DIR=${2}/api.pmccabe_collector.restapi.org
+COMMON_UTIL_PATH=${WORK_DIR}
 
 echo -e "#!/usr/bin/bash\n\nexport WORK_DIR=${WORK_DIR} \nexport SHARED_DIR=${SHARED_DIR} \nexport SHARED_API_DIR=${SHARED_API_DIR} \nexport REPO_PATH=${REPO_PATH} \nexport RRD_ROOT=${SHARED_API_DIR}" > ${WORK_DIR}/setenv.sh
 
@@ -12,7 +13,7 @@ git config --global --add safe.directory ${REPO_PATH}
 
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
-${WORK_DIR}/build_local_api.py "run" ${WORK_DIR}/API.replicated.fs ${SHARED_DIR}
+${COMMON_UTIL_PATH}/build_api_pseudo_fs.py ${WORK_DIR}/API.replicated.fs ${SHARED_DIR}
 
 echo "create pivot metrics"
 ${WORK_DIR}/build_pmccabe_xml.sh "${SHARED_API_DIR}/init.xml"

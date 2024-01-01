@@ -36,40 +36,42 @@ To build the image please follow the steps:
 #### The-Container-Developer:
 
 As a first step, you need to generate API request handlers in a form of simple self-generated bash scripts. This script production phase is important step for developing process only, because it reassure that any changes in the basic API-file would not be forgotten.
-       
-`cd <this repo>`
- 
-`python ./build_api.py API > local/API.fs`
-  
-`cd local`
- 
-`python ./build_local_api.py devel API.fs /mnt`
 
-Don't worry, the directory `/mnt` is supposed to be a part of container filesystem
+`cd <this repo>`
+
+`python ./build_api.py API > local/API.fs`
+
+`cd local`
+
+`python ./build_api_executors.py API.fs ./`
+
+`python ./build_api_services.py API.fs`
 
 Next you need to generate the image by itself. To do that, execute the next cmd in the same `local` directory:
-  
+
 `sudo docker build -t pmccabe_vis:latest .`
 
 #### The-Container-User:
-   
+
  `cd <this repo>`
- 
+
  `cd local`
- 
- `python ./build_local_api.py devel API.fs /mnt`
- 
+
+ `python ./build_api_executors.py API.fs ./`
+
+ `python ./build_api_services.py API.fs`
+
  `sudo docker build -t pmccabe_vis:latest .`
-   
+
 
 # Launch a container from the image
 
 ### Go to your C/C++ project directory:
-  
+
 `cd <your project directory>`
 
  and run
- 
+
 `mkdir api.pmccabe_collector.restapi.org`
 
 `chmod 777 api.pmccabe_collector.restapi.org`
@@ -77,10 +79,10 @@ Next you need to generate the image by itself. To do that, execute the next cmd 
 The `777` allows docker `pmccabe_collector` service to access this mount point which belong to the host filesystem which would have become unavailable otherwise.
 
 ### Run the container in your project directory
-  
+
 `sudo docker run -it --mount type=bind,src=./,target=/mnt pmccabe_vis:latest`
 
-The service will build two files: 
+The service will build two files:
 - `init.xml`(which contains "database" of `pmccabe` metric for a project components/files/functions, please check on `man pmccabe`)
 - `init.svg` (an interactive flamegraph simplifies such metric representation; to study more about "flamegraph", please elaborate on https://github.com/brendangregg/FlameGraph#3-flamegraphpl)
 
