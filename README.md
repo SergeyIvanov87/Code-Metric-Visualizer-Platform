@@ -47,7 +47,7 @@ Modify `local/api_generator.py` in order to generate a proper serving script for
 
 `python local/build_api_executors.py local/API.fs local -o local/services`
 
-Thats almost done! Next you need to generate the image by itself. To do that, execute the next cmd:
+Thats almost done! Next important step you need is to generate the image by itself. To do that, execute the next cmd:
 
 `DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest local`
 
