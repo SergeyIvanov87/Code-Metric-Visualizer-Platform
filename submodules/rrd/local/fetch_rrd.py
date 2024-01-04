@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 
+sys.path.append(os.environ['MAIN_IMAGE_ENV_SHARED_LOCATION_ENV'])
 import read_api_fs_args
 
 def get_last_timestamp(db_path, default_timestamp="1701154261"):

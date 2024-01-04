@@ -38,7 +38,7 @@ def check_script_valid(path, script_name):
 
 
 def get_fs_watch_event_for_request_type(req_type):
-    events = {"GET": "-e access", "PUT": "-e modify", "POST": "-e modify"}
+    events = {"GET": "access", "PUT": "modify", "POST": "modify"}
     if req_type not in events.keys():
         raise Exception(
             f"Request type is not supported: {req_type}. Available types are: {events.keys()}"
@@ -58,7 +58,7 @@ api_schema = [
     ". ${1}/setenv.sh\n",
     "{} > {}/help 2>&1\n",
     "shopt -s extglob\n",
-    "inotifywait -m {0} {1} --include '{2}' |\n",
+    "inotifywait -m {0} -e {1} --include '{2}' |\n",
     "\twhile read dir action file; do\n",
     '\t\techo "file: ${file}, action; ${action}, dir: ${dir}"\n',
     '\t\tcase "$action" in\n',
