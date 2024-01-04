@@ -5,6 +5,7 @@ Generates `executor` script for API request serving
 """
 
 import argparse
+from argparse import RawTextHelpFormatter
 from math import log10
 import os
 import pathlib
@@ -25,11 +26,15 @@ def make_default_script(script):
     )
 
 parser = argparse.ArgumentParser(
-    prog="Build file-system API nodes based on pseudo-REST API from cfg file"
+    prog="Build file-system API nodes based on pseudo-REST API from cfg file",
+    formatter_class=RawTextHelpFormatter,
 )
 
-parser.add_argument("api_file", help="Path to a file with API description")
-parser.add_argument("api_exec_generator", help="Path to a file with API generators")
+parser.add_argument("api_file", help="Path to a file desrcibed a particular API-subset")
+parser.add_argument("api_exec_generator", help="Path to a location of `api_generator.py`, which is responsible to generate the API-subset processing scripts")
+parser.add_argument("-o", "--output_dir",
+                    help='Output directory where the generated scripts will be placed. Default=\"./{}\"'.format(get_generated_scripts_path()),
+                    default=get_generated_scripts_path())
 args = parser.parse_args()
 
 api_schema = [
@@ -55,7 +60,7 @@ sys.path.insert(0, args.api_exec_generator)
 import api_generator
 scripts_generator, _ = api_generator.get()
 
-generated_api_server_scripts_path = get_generated_scripts_path()
+generated_api_server_scripts_path = args.output_dir
 os.makedirs(generated_api_server_scripts_path, exist_ok=True)
 
 errors_detected = []

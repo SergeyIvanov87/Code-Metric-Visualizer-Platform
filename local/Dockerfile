@@ -2,6 +2,7 @@
 
 FROM archlinux:base-devel
 WORKDIR package
+ARG SCRIPT_GEN_LOC=services
 
 # install app dependencies
 RUN pacman -Sy --noconfirm python python-pip git inotify-tools
@@ -14,9 +15,7 @@ COPY *.sh /package/
 COPY *.py /package/
 COPY API.fs /package/API.replicated.fs
 
-COPY services/*.sh /package/
-
-RUN ["python", "./build_api_services.py", "API.replicated.fs"]
+COPY $SCRIPT_GEN_LOC/*.sh /package/
 
 RUN mkdir /main_image_env
 VOLUME /main_image_env

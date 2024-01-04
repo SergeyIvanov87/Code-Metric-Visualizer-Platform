@@ -13,7 +13,7 @@ ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API.replica
 echo "build RRD analytics"
 BUILD_RRD_ARGS=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'from read_api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/analytic/")))'`
 echo ${BUILD_RRD_ARGS}
-cat ${SHARED_API_DIR}/main/statistic/view/GET/exec
+cat ${SHARED_API_DIR}/main/statistic/view/GET/exec && while [ ! -f ${SHARED_API_DIR}/main/statistic/view/GET/exec_result.xml ]; do sleep 1; done
 cat ${SHARED_API_DIR}/main/statistic/view/GET/exec_result.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/analytic/rrd anlt`" ${SHARED_API_DIR} -method init
 
 echo "run API listeners:"
