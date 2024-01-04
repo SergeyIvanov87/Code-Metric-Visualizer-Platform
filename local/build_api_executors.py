@@ -49,8 +49,9 @@ api_schema = [
     "\tdone\n",
 ]
 
-# Load api generator module
-sys.path.append(args.api_exec_generator)
+# Load api generator module: put particular `api_exec_generator` at beginning
+# to prevent loading `api_generator` from main image dir
+sys.path.insert(0, args.api_exec_generator)
 import api_generator
 scripts_generator, _ = api_generator.get()
 
