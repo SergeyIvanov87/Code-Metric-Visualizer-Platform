@@ -39,25 +39,25 @@ As a first step, you need to generate API request handlers in a form of simple s
 
 `cd <this repo>`
 
+Modify API queries adding or changing JSON schemas in `API/*.json` and execute the cmd:
+
 `python ./build_api.py API > local/API.fs`
 
-`cd local`
+Modify `local/api_generator.py` in order to generate a proper serving script for particulat API query which was published in `API/*.json`
 
-`python ./build_api_executors.py API.fs ./`
+`python local/build_api_executors.py local/API.fs local -o local/services`
 
-Next you need to generate the image by itself. To do that, execute the next cmd in the same `local` directory:
+Thats almost done! Next you need to generate the image by itself. To do that, execute the next cmd:
 
-`sudo docker build -t pmccabe_vis:latest .`
+`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest local`
 
 #### The-Container-User:
 
- `cd <this repo>`
+`cd <this repo>`
 
- `cd local`
+`python local/build_api_executors.py local/API.fs local -o local/services`
 
- `python ./build_api_executors.py API.fs ./`
-
- `sudo docker build -t pmccabe_vis:latest .`
+`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest local`
 
 
 # Launch a container from the image
@@ -83,3 +83,7 @@ The service will build two files:
 - `init.svg` (an interactive flamegraph simplifies such metric representation; to study more about "flamegraph", please elaborate on https://github.com/brendangregg/FlameGraph#3-flamegraphpl)
 
 In none of those file are appeared, then other different failures have taken place. I'd very appreciate for any documented issues. In my own experience the essential utility `pmccabe` crashed when I was tried to estimate complexity of a Linux kernel project.
+
+# Submodules
+
+It's possible to enhance the main functionality by employing additional dependent containers. Please refer to a README.md file in the `submodules` directory
