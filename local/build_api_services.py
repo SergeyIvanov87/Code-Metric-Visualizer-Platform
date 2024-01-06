@@ -59,12 +59,13 @@ api_schema = [
     ". ${1}/setenv.sh\n",
     "{} > {}/help 2>&1\n",
     "shopt -s extglob\n",
+    "EXT=`${0}/{1} --result_type`\n",
     "inotifywait -m {0} -e {1} --include '{2}' |\n",
     "\twhile read dir action file; do\n",
     '\t\techo "file: ${file}, action; ${action}, dir: ${dir}"\n',
     '\t\tcase "$action" in\n',
     "\t\t\tACCESS|ATTRIB )\n",
-    '\t\t\t\t"${0}/{1}" ${2} {3} > {4}{5}\n',
+    '\t\t\t\t"${0}/{1}" ${2} {3} > {4}${5}\n',
     "\t\t\t;;\n",
     "\t\t\t*)\n",
     "\t\t\t\t;;\n",
@@ -98,16 +99,17 @@ with open(args.api_file, "r") as api_file:
             api_schema_concrete[1] = api_schema_concrete[1].format(
                 "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_node
             )
-            api_schema_concrete[3] = api_schema_concrete[3].format(
+            api_schema_concrete[3] = api_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+            api_schema_concrete[4] = api_schema_concrete[4].format(
                 api_req_node, get_fs_watch_event_for_request_type(req_type), get_api_hidden_node_name() + "$"
             )
-            api_schema_concrete[8] = api_schema_concrete[8].format(
+            api_schema_concrete[9] = api_schema_concrete[9].format(
                 "{WORK_DIR}",
                 req_executor_name,
                 "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
                 api_node,
                 os.path.join(api_req_node, "result"),
-                ".txt"
+                "{EXT}"
             )
             listener_file.write("#!/usr/bin/bash\n\n")
             listener_file.writelines(api_schema_concrete)

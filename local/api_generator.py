@@ -8,6 +8,12 @@ def make_script_watch_list(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
+        r'if [[ ${1} == "--result_type" ]];',
+        r"then",
+        r'    echo ".txt"',
+        r"    exit 0",
+        r"fi",
+        r"",
         r"API_NODE=${2}",
         r". ${1}/setenv.sh",
         r'CMD_ARGS=""',
@@ -37,6 +43,12 @@ def generate_script_watch_list_help():
 def make_script_statistic(script):
     body = (
         r"#!/usr/bin/bash",
+        r"",
+        r'if [[ ${1} == "--result_type" ]];',
+        r"then",
+        r'    echo ""',
+        r"    exit 0",
+        r"fi",
         r"",
         r"API_NODE=${2}",
         r". ${1}/setenv.sh",
@@ -68,6 +80,12 @@ def make_script_view(script):
     body = (
         r"#!/usr/bin/bash",
         r"",
+        r'if [[ ${1} == "--result_type" ]];',
+        r"then",
+        r'    echo ".collapsed"',
+        r"    exit 0",
+        r"fi",
+        r"",
         r"API_NODE=${2}",
         r". ${1}/setenv.sh",
         r'CMD_ARGS=""',
@@ -97,6 +115,12 @@ def generate_script_view_help():
 def make_script_flamegraph(script):
     body = (
         r"#!/usr/bin/bash",
+        r"",
+        r'if [[ ${1} == "--result_type" ]];',
+        r"then",
+        r'    echo ".svg"',
+        r"    exit 0",
+        r"fi",
         r"",
         r"API_NODE=${2}",
         r". ${1}/setenv.sh",
