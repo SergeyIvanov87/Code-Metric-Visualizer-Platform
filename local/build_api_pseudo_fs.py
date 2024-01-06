@@ -25,11 +25,22 @@ from math import log10
 from api_gen_utils import compose_api_fs_node_name
 from api_gen_utils import make_file_executable
 from api_gen_utils import append_file_mode
+from api_gen_utils import append_file_list_mode
 from api_gen_utils import get_api_hidden_node_name
 
 def create_api_fs_node(api_root, req, rtype, rparams):
     api_node, api_req_node = compose_api_fs_node_name(api_root, req, rtype)
     os.makedirs(api_req_node, exist_ok=True)
+    append_file_list_mode(
+                [api_node, api_req_node],
+                stat.S_IWUSR
+                | stat.S_IRUSR
+                | stat.S_IWGRP
+                | stat.S_IRGRP
+                | stat.S_IWOTH
+                | stat.S_IROTH
+    )
+
     api_node_leaf = os.path.join(api_req_node, get_api_hidden_node_name())
 
     with open(api_node_leaf, "w") as api_leaf_file:

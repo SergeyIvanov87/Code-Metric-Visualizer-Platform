@@ -65,7 +65,9 @@ api_schema = [
     '\t\techo "file: ${file}, action; ${action}, dir: ${dir}"\n',
     '\t\tcase "$action" in\n',
     "\t\t\tACCESS|ATTRIB )\n",
+    "\t\t\t\tdate=`date +%Y-%m-%dT%H:%M:%S`\n",
     '\t\t\t\t"${0}/{1}" ${2} {3} > {4}${5}\n',
+    '\t\t\t\tchmod +rw {0}${1}\n',
     "\t\t\t;;\n",
     "\t\t\t*)\n",
     "\t\t\t\t;;\n",
@@ -103,12 +105,17 @@ with open(args.api_file, "r") as api_file:
             api_schema_concrete[4] = api_schema_concrete[4].format(
                 api_req_node, get_fs_watch_event_for_request_type(req_type), get_api_hidden_node_name() + "$"
             )
-            api_schema_concrete[9] = api_schema_concrete[9].format(
+            api_schema_concrete[10] = api_schema_concrete[10].format(
                 "{WORK_DIR}",
                 req_executor_name,
                 "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
                 api_node,
-                os.path.join(api_req_node, "result"),
+                os.path.join(api_req_node, "result_${date}"),
+                "{EXT}"
+            )
+
+            api_schema_concrete[11] = api_schema_concrete[11].format(
+                os.path.join(api_req_node, "result_${date}"),
                 "{EXT}"
             )
             listener_file.write("#!/usr/bin/bash\n\n")
