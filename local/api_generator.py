@@ -10,7 +10,6 @@ def make_script_watch_list(script):
         r"",
         r"API_NODE=${2}",
         r". ${1}/setenv.sh",
-        r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
         r"do",
@@ -28,7 +27,7 @@ def make_script_watch_list(script):
         r"        fi",
         r"    done",
         r"done",
-        r'echo "${brr[@]}" | xargs find ${INITIAL_PROJECT_LOCATION} > ${RESULT_FILE}.txt',
+        r'echo "${brr[@]}" | xargs find ${INITIAL_PROJECT_LOCATION}',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -41,7 +40,6 @@ def make_script_statistic(script):
         r"",
         r"API_NODE=${2}",
         r". ${1}/setenv.sh",
-        r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
         r"do",
@@ -72,7 +70,6 @@ def make_script_view(script):
         r"",
         r"API_NODE=${2}",
         r". ${1}/setenv.sh",
-        r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
         r"do",
@@ -90,9 +87,7 @@ def make_script_view(script):
         r"        fi",
         r"    done",
         r"done",
-        r"${WORK_DIR}/watch_list_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main ${API_NODE}/GET/.watch_list",
-        r"cat ${API_NODE}/GET/.watch_list_result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic stst` > ${RESULT_FILE}.xml",
-        r"cat ${RESULT_FILE}.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]} > ${RESULT_FILE}.data",
+        r"${WORK_DIR}/watch_list_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic` | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 
@@ -105,7 +100,6 @@ def make_script_flamegraph(script):
         r"",
         r"API_NODE=${2}",
         r". ${1}/setenv.sh",
-        r"RESULT_FILE=${3}_result",
         r'CMD_ARGS=""',
         r'for entry in "${API_NODE}"/*.*',
         r"do",
@@ -123,8 +117,7 @@ def make_script_flamegraph(script):
         r"        fi",
         r"    done",
         r"done",
-        r"${WORK_DIR}/view_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic/view ${API_NODE}/GET/.collapsed",
-        r"cat ${API_NODE}/GET/.collapsed_result.data | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]} > ${RESULT_FILE}.svg",
+        r"${WORK_DIR}/view_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic/view ${API_NODE}/GET/.collapsed | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 

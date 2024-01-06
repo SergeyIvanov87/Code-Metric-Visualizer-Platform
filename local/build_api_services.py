@@ -21,6 +21,7 @@ from api_gen_utils import get_api_service_script_path
 from api_gen_utils import get_generated_scripts_path
 from api_gen_utils import make_file_executable
 from api_gen_utils import append_file_mode
+from api_gen_utils import get_api_hidden_node_name
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -63,7 +64,7 @@ api_schema = [
     '\t\techo "file: ${file}, action; ${action}, dir: ${dir}"\n',
     '\t\tcase "$action" in\n',
     "\t\t\tACCESS|ATTRIB )\n",
-    '\t\t\t\t"${0}/{1}" ${2} {3} {4}/{5}\n',
+    '\t\t\t\t"${0}/{1}" ${2} {3} > {4}{5}\n',
     "\t\t\t;;\n",
     "\t\t\t*)\n",
     "\t\t\t\t;;\n",
@@ -98,15 +99,15 @@ with open(args.api_file, "r") as api_file:
                 "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_node
             )
             api_schema_concrete[3] = api_schema_concrete[3].format(
-                api_req_node, get_fs_watch_event_for_request_type(req_type), "exec$"
+                api_req_node, get_fs_watch_event_for_request_type(req_type), get_api_hidden_node_name() + "$"
             )
             api_schema_concrete[8] = api_schema_concrete[8].format(
                 "{WORK_DIR}",
                 req_executor_name,
                 "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
                 api_node,
-                api_req_node,
-                "${file}",
+                os.path.join(api_req_node, "result"),
+                ".txt"
             )
             listener_file.write("#!/usr/bin/bash\n\n")
             listener_file.writelines(api_schema_concrete)
@@ -119,3 +120,36 @@ if len(errors_detected) != 0:
             "\n".join(errors_detected), pathlib.Path(__file__).parent.resolve()
         )
     )
+
+
+
+
+'''
+exit(0)
+
+#!/usr/bin/bash
+
+. ${1}/setenv.sh
+
+pipe_out=${INITIAL_PROJECT_LOCATION}/api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph/GET_test/fresult.svg
+trap "rm -f $pipe_out" EXIT
+if [[ ! -p $pipe_out ]]; then
+    mkfifo $pipe_out
+fi
+
+pipe_in=${INITIAL_PROJECT_LOCATION}/api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph/GET_test/rexec
+trap "rm -f $pipe_in" EXIT
+if [[ ! -p $pipe_in ]]; then
+    mkfifo $pipe_in
+fi
+
+while true
+do
+   echo 0 >$pipe_in
+   echo "get request"
+   "${WORK_DIR}/flamegraph_exec.sh" ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${INITIAL_PROJECT_LOCATION}/api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph ${INITIAL_PROJECT_LOCATION>
+   echo "write pipe"
+   cat ${INITIAL_PROJECT_LOCATION}/api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph/GET_test/exec_result.svg>$pipe_out
+done
+exit 0
+'''

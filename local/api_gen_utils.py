@@ -7,6 +7,10 @@ def get_generated_scripts_path():
     return "services"
 
 
+def get_api_hidden_node_name():
+    return ".hid"
+
+
 def compose_api_service_script_name(req_name):
     return f"{req_name}_listener.sh"
 
