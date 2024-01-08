@@ -11,14 +11,21 @@ def get_api_hidden_node_name():
     return ".hid"
 
 
-def compose_api_service_script_name(req_name):
+def compose_api_gui_service_script_name(req_name):
     return f"{req_name}_listener.sh"
 
-def get_api_service_script_path(req_name):
+def compose_api_cli_service_script_name(req_name):
+    return f"{req_name}_server.sh"
+
+def get_api_gui_service_script_path(req_name):
         return os.path.join(
-            get_generated_scripts_path(), compose_api_service_script_name(req_name)
+            get_generated_scripts_path(), compose_api_gui_service_script_name(req_name)
         )
 
+def get_api_cli_service_script_path(req_name):
+        return os.path.join(
+            get_generated_scripts_path(), compose_api_cli_service_script_name(req_name)
+        )
 
 def compose_api_exec_script_name(script_name):
     return f"{script_name}_exec.sh"
