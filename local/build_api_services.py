@@ -87,22 +87,36 @@ api_cli_schema = [
     "if [[ -p $pipe_request ]]; then\n",
     "\trm -f $pipe_request\n",
     "fi\n",
+    "if [[ -p $pipe_result ]]; then\n",
+    "\trm -f $pipe_result\n",
+    "fi\n",
     "mkfifo $pipe_request\n",
     'trap "rm -f $pipe_request" ${SIGNALS}\n',
+    "mkfifo $pipe_result\n",
+    'trap "rm -f $pipe_result" ${SIGNALS}\n',
+    'WATCH_PID=0\n',
     "while true\n",
     "do\n",
     "\techo 0 >$pipe_request\n",
-    '\tRESULT_OUT=`${0}/{1} ${2} {3}`\n',
-    "\tif [[ -p $pipe_result ]]; then\n",
-    "\t\trm -f $pipe_result\n",
+    '\t echo "START: ${api_req_node}"\n',
+    "\tif [ ${WATCH_PID} != 0 ]; then\n",
+    "\t\t# check WATCHDOG alive\n",
+    "\t\tkill -s 0 ${WATCH_PID} > /dev/null 2>&1\n",
+    "\t\tWATCHDOG_RESULT=$?\n",
+    "\t\tif [ $WATCHDOG_RESULT == 0 ]; then\n",
+    "\t\t\t# its alive: nobody has read $pipe_result yet. Initiate reading intentionally\n",
+    "\t\t\ttimeout 2 cat ${pipe_result} > /dev/null 2>&1\n",
+    "\t\tfi\n",
+    "\t\t# avoid zombie\n",
+    "\t\twait ${WATCH_PID}\n",
     "\tfi\n",
-    "\tmkfifo $pipe_result\n",
-    '\ttrap "rm -f $pipe_result" ${SIGNALS}\n',
-    "\t(echo ${RESULT_OUT}>$pipe_result && rm -f $pipe_result) > /dev/null 2>&1 &\n",
-    'trap "rm -f $pipe_request" ${SIGNALS} # as resets after subshell invocation\n',
+    '\tRESULT_OUT=`${0}/{1} ${2} {3}`\n',
+    '\t(echo ${RESULT_OUT}>$pipe_result && echo "CONSUMED: ${api_req_node}") &\n',
+    "\tWATCH_PID=$!\n",
+    '\ttrap "rm -f $pipe_request" ${SIGNALS} # as resets after subshell invocation\n',
+    '\ttrap "rm -f $pipe_result" ${SIGNALS} # as resets after subshell invocation\n',
     "done\n",
 ]
-
 os.makedirs(get_generated_scripts_path(), exist_ok=True)
 
 errors_detected = []
@@ -160,7 +174,7 @@ with open(args.api_file, "r") as api_file:
             )
             api_cli_schema_concrete[3] = api_cli_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
 
-            api_cli_schema_concrete[15] = api_cli_schema_concrete[15].format(
+            api_cli_schema_concrete[33] = api_cli_schema_concrete[33].format(
                 "{WORK_DIR}",
                 req_executor_name,
                 "{MAIN_IMAGE_ENV_SHARED_LOCATION}",

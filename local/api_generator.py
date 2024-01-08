@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import api_generator_utils
+
 """
 Provides a functions set which manages to generate API executor scripts
 """
@@ -21,10 +22,10 @@ def generate_script_watch_list_help():
 def make_script_statistic(script):
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(""), r"",
+        *api_generator_utils.generate_get_result_type(".xml"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
-        r'echo "${brr[@]}"',
+        r"${WORK_DIR}/watch_list_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 
@@ -37,7 +38,7 @@ def make_script_view(script):
         *api_generator_utils.generate_get_result_type(".collapsed"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
-        r"${WORK_DIR}/watch_list_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic` | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]}",
+        r"${WORK_DIR}/statistic_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 
@@ -50,7 +51,7 @@ def make_script_flamegraph(script):
         *api_generator_utils.generate_get_result_type(".svg"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
-        r"${WORK_DIR}/view_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic/view ${API_NODE}/GET/.collapsed | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
+        r"${WORK_DIR}/view_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic/view | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 
