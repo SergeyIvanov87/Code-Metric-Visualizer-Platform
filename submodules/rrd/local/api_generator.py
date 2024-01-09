@@ -34,7 +34,7 @@ def make_script_rrd_collect(script):
         *api_generator_utils.generate_get_result_type(""), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
-        r'cat ${SHARED_API_DIR}/main/statistic/GET/exec',
+        r'echo 0 > ${SHARED_API_DIR}/main/statistic/GET/exec',
         r'cat ${SHARED_API_DIR}/main/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/analytic/rrd`" ${SHARED_API_DIR} ${brr[@]}',
     )
     script.writelines(line + "\n" for line in body)

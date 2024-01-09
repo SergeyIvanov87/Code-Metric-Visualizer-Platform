@@ -22,7 +22,7 @@ The request
 
 can be triggered in the filesystem API mapped notation as:
 
-`cat api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph/GET/exec`
+`echo 0 > api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph/GET/exec`
 
 If you prefer to use GUI rather than CLI, then just open a path `api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph` in your favorite File Manager. It is realy simple as it sounds! Regardless an approach you use, nevertheless you'll find the outcome of your query execution, usually meant a file, in the same directory where the original `exec` API-file located. Feeling curiosity or discovering any other ways to alter the result of query execution, it's possible to wander through such API filesystem content and play with a different kind of file nodes called parameters. Changing a value in these parameter-files you can affect the result (or view) of a request outcome.
 Typical use-case is add filtering `thirdparty` directories as `watch_list`. You can acrhive that by changing values of the parameters `0.-regex` and `1.-prune` resided by path `api.pmccabe_collector.restapi.org/main`, which actually represent parameters for the  well-known command `find` from the general command manual `man find`.

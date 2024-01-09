@@ -10,7 +10,7 @@ just open the file representing the parameter and change related value. Do not f
 API request will be executed when designated `inotify` event is recognized by
 an appropriate API `service` script. Speaking about a simple GET query, it is
 a read-operation of a file `exec` resided by relevant API path. Such operation may be
-triggered by a simple `cat` command or (!) by just opening GET directory in your
+triggered by a simple `echo` command or (!) by just opening GET directory in your
 favourable File Manager.
 """
 
