@@ -51,7 +51,8 @@ def make_script_flamegraph(script):
         *api_generator_utils.generate_get_result_type(".svg"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
-        r"${WORK_DIR}/view_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic/view | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
+        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/main/statistic/view/GET/exec',
+        r"cat ${SHARED_API_DIR}/main/statistic/view/GET/result.collapsed | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 

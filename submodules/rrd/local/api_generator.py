@@ -34,8 +34,10 @@ def make_script_rrd_collect(script):
         *api_generator_utils.generate_get_result_type(""), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
-        r'echo 0 > ${SHARED_API_DIR}/main/statistic/GET/exec',
-        r'cat ${SHARED_API_DIR}/main/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/analytic/rrd`" ${SHARED_API_DIR} ${brr[@]}',
+        r'echo 0 > ${SHARED_API_DIR}/analytic/rrd/PUT/exec',
+        r'RRD_DB_PARAMS=`cat ${SHARED_API_DIR}/analytic/rrd/PUT/result`',
+        r'echo "-mmcc=1 -tmcc=1 -sif=1 -lif=1" > ${SHARED_API_DIR}/main/statistic/GET/exec',
+        r'cat ${SHARED_API_DIR}/main/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "${RRD_DB_PARAMS}" ${SHARED_API_DIR} ${brr[@]}',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -60,7 +62,8 @@ def make_script_rrd_view(script):
         *api_generator_utils.generate_exec_header(), r"",
         *api_generator_utils.generate_get_result_type(".csv"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
-        r'echo "`${WORK_DIR}/rrd_select_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/analytic/rrd/select`" | xargs find ${RRD_ROOT} | ${WORK_DIR}/fetch_rrd.py ${SHARED_API_DIR}/analytic/rrd/select/view',
+        r'echo 0 > ${SHARED_API_DIR}/analytic/rrd/select/PUT/exec',
+        r'cat ${SHARED_API_DIR}/analytic/rrd/select/PUT/result | xargs find ${RRD_ROOT} | ${WORK_DIR}/fetch_rrd.py ${SHARED_API_DIR}/analytic/rrd/select/view',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -73,7 +76,8 @@ def make_script_rrd_view_graph(script):
         *api_generator_utils.generate_get_result_type(".png"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         r"RESULT_FILE=`mktemp -u`",
-        r'echo "`${WORK_DIR}/rrd_select_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/analytic/rrd/select`" | xargs find ${RRD_ROOT} | ${WORK_DIR}/graph_rrd.py ${SHARED_API_DIR}/analytic/rrd/select/view/graph ${RESULT_FILE}',
+        r'echo 0 > ${SHARED_API_DIR}/analytic/rrd/select/PUT/exec',
+        r'cat ${SHARED_API_DIR}/analytic/rrd/select/PUT/result | xargs find ${RRD_ROOT} | ${WORK_DIR}/graph_rrd.py ${SHARED_API_DIR}/analytic/rrd/select/view/graph ${RESULT_FILE}',
         r'cat ${RESULT_FILE}.png',
         r'rm -f ${RESULT_FILE}.png'
     )
