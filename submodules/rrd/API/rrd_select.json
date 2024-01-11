@@ -1,5 +1,5 @@
 {
-    "Method" : "PUT",
+    "Method" : "GET",
     "Query": "api.pmccabe_collector.restapi.org/analytic/rrd/select",
     "Params": {
         "-path" : "\"*api.pmccabe_collector.restapi.org/*\" -prune",
