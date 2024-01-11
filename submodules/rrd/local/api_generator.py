@@ -36,6 +36,7 @@ def make_script_rrd_collect(script):
         *api_generator_utils.generate_read_api_fs_args(), r"",
         r'echo ${IN_ARGS[@]} > ${SHARED_API_DIR}/analytic/rrd/PUT/exec',
         r'RRD_DB_PARAMS=`cat ${SHARED_API_DIR}/analytic/rrd/PUT/result`',
+        #TODO read  ${SHARED_API_DIR}/analytic/PUT/exec instead ???
         r'echo "-mmcc=1 -tmcc=1 -sif=1 -lif=1" > ${SHARED_API_DIR}/main/statistic/GET/exec',
         r'cat ${SHARED_API_DIR}/main/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "${RRD_DB_PARAMS}" ${SHARED_API_DIR} ${brr[@]}',
     )
@@ -47,10 +48,10 @@ def generate_script_rrd_collect_help():
 def make_script_rrd_select(script):
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(""), r"",
+        *api_generator_utils.generate_get_result_type(".txt"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
-        r'echo "${brr[@]}"',
+        r'echo "${brr[@]}" | xargs find ${RRD_ROOT}',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -62,29 +63,29 @@ def make_script_rrd_view(script):
         *api_generator_utils.generate_exec_header(), r"",
         *api_generator_utils.generate_get_result_type(".csv"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
-        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/analytic/rrd/select/PUT/exec',
-        r'cat ${SHARED_API_DIR}/analytic/rrd/select/PUT/result | xargs find ${RRD_ROOT} | ${WORK_DIR}/fetch_rrd.py ${SHARED_API_DIR}/analytic/rrd/select/view',
+        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/analytic/rrd/select/GET/exec',
+        r'cat ${SHARED_API_DIR}/analytic/rrd/select/GET/result.txt | ${WORK_DIR}/fetch_rrd.py ${SHARED_API_DIR}/analytic/rrd/select/view',
     )
     script.writelines(line + "\n" for line in body)
 
 def generate_script_rrd_view_help():
     return "rrdtool -h"
 
-def make_script_rrd_view_graph(script):
+def make_script_rrd_plot_view(script):
     body = (
         *api_generator_utils.generate_exec_header(), r"",
         *api_generator_utils.generate_get_result_type(".png"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         r"RESULT_FILE=`mktemp -u`",
-        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/analytic/rrd/select/PUT/exec',
-        r'cat ${SHARED_API_DIR}/analytic/rrd/select/PUT/result | xargs find ${RRD_ROOT} | ${WORK_DIR}/graph_rrd.py ${SHARED_API_DIR}/analytic/rrd/select/plot_view ${RESULT_FILE}',
+        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/analytic/rrd/select/GET/exec',
+        r'cat ${SHARED_API_DIR}/analytic/rrd/select/GET/result.txt | ${WORK_DIR}/graph_rrd.py ${SHARED_API_DIR}/analytic/rrd/select/plot_view ${RESULT_FILE}',
         r'cat ${RESULT_FILE}.png',
         r'rm -f ${RESULT_FILE}.png'
     )
 
     script.writelines(line + "\n" for line in body)
 
-def generate_script_rrd_view_graph_help():
+def generate_script_rrd_plot_view_help():
     return "rrdtool -h"
 
 
@@ -96,7 +97,7 @@ def get():
         "rrd_collect": make_script_rrd_collect,
         "rrd_select": make_script_rrd_select,
         "rrd_view": make_script_rrd_view,
-        "rrd_plot_view": make_script_rrd_view_graph
+        "rrd_plot_view": make_script_rrd_plot_view
     }
 
     scripts_help_generator = {
@@ -105,6 +106,6 @@ def get():
         "rrd_collect": generate_script_rrd_collect_help,
         "rrd_select": generate_script_rrd_select_help,
         "rrd_view": generate_script_rrd_view_help,
-        "rrd_plot_view": generate_script_rrd_view_graph_help
+        "rrd_plot_view": generate_script_rrd_plot_view_help
     }
     return scripts_generator, scripts_help_generator
