@@ -1,5 +1,5 @@
 {
-    "Method" : "PUT",
+    "Method" : "GET",
     "Query": "api.pmccabe_collector.restapi.org/main/statistic",
     "Params": {
         "watch_list" : {

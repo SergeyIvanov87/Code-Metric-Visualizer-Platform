@@ -2,5 +2,13 @@
     "Method" : "PUT",
     "Query": "api.pmccabe_collector.restapi.org/analytic",
     "Params": {
+        "watch_list" : {
+            "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
+            "-prune": "! -path \"*build*\" ! -path \"*thirdparty*\" ! -path \"*submodule*\""
+        },
+        "-mmcc" : "1,",
+        "-tmcc" : "1,",
+        "-sif" : "1,",
+        "-lif" : "1,"
     }
 }

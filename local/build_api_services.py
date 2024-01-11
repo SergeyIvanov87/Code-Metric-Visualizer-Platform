@@ -17,10 +17,12 @@ import stat
 from api_gen_utils import compose_api_fs_node_name
 from api_gen_utils import compose_api_exec_script_name
 from api_gen_utils import compose_api_help_script_name
-from api_gen_utils import get_api_service_script_path
+from api_gen_utils import get_api_cli_service_script_path
+from api_gen_utils import get_api_gui_service_script_path
 from api_gen_utils import get_generated_scripts_path
 from api_gen_utils import make_file_executable
 from api_gen_utils import append_file_mode
+from api_gen_utils import get_api_hidden_node_name
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -54,16 +56,19 @@ parser.add_argument("api_file", help="Path to file with API description")
 
 args = parser.parse_args()
 
-api_schema = [
+api_gui_schema = [
     ". ${1}/setenv.sh\n",
     "{} > {}/help 2>&1\n",
     "shopt -s extglob\n",
+    "EXT=`${0}/{1} --result_type`\n",
     "inotifywait -m {0} -e {1} --include '{2}' |\n",
     "\twhile read dir action file; do\n",
     '\t\techo "file: ${file}, action; ${action}, dir: ${dir}"\n',
     '\t\tcase "$action" in\n',
     "\t\t\tACCESS|ATTRIB )\n",
-    '\t\t\t\t"${0}/{1}" ${2} {3} {4}/{5}\n',
+    "\t\t\t\tdate=`date +%Y-%m-%dT%H:%M:%S`\n",
+    '\t\t\t\t"${0}/{1}" ${2} {3} 0 > {4}${5}\n',
+    '\t\t\t\tchmod +rw {0}${1}\n',
     "\t\t\t;;\n",
     "\t\t\t*)\n",
     "\t\t\t\t;;\n",
@@ -71,6 +76,47 @@ api_schema = [
     "\tdone\n",
 ]
 
+api_cli_schema = [
+    ". ${1}/setenv.sh\n",
+    "api_req_node={}\n",
+    "shopt -s extglob\n",
+    "EXT=`${0}/{1} --result_type`\n",
+    "pipe_result=${api_req_node}/result${EXT}\n",
+    "pipe_request=${api_req_node}/exec\n",
+    'SIGNALS="HUP QUIT ABRT KILL EXIT TERM"\n',
+    "if [[ -p $pipe_request ]]; then\n",
+    "\trm -f $pipe_request\n",
+    "fi\n",
+    "if [[ -p $pipe_result ]]; then\n",
+    "\trm -f $pipe_result\n",
+    "fi\n",
+    "mkfifo -m 622 $pipe_request\n",
+    'trap "rm -f $pipe_request" ${SIGNALS}\n',
+    "mkfifo -m 644 $pipe_result\n",
+    'trap "rm -f $pipe_result" ${SIGNALS}\n',
+    'WATCH_PID=0\n',
+    "while true\n",
+    "do\n",
+    "\tCMD_READ=`cat $pipe_request`\n",
+    '\t echo "START: ${api_req_node}"\n',
+    "\tif [ ${WATCH_PID} != 0 ]; then\n",
+    "\t\t# check WATCHDOG alive\n",
+    "\t\tkill -s 0 ${WATCH_PID} > /dev/null 2>&1\n",
+    "\t\tWATCHDOG_RESULT=$?\n",
+    "\t\tif [ $WATCHDOG_RESULT == 0 ]; then\n",
+    "\t\t\t# its alive: nobody has read $pipe_result yet. Initiate reading intentionally\n",
+    "\t\t\ttimeout 2 cat ${pipe_result} > /dev/null 2>&1\n",
+    "\t\tfi\n",
+    "\t\t# avoid zombie\n",
+    "\t\twait ${WATCH_PID}\n",
+    "\tfi\n",
+    '\tRESULT_OUT=$(${0}/{1} ${2} {3} ', '"${CMD_READ}" | base64)\n',
+    '\t(echo "${RESULT_OUT}" | base64 -d >$pipe_result && echo "CONSUMED: ${api_req_node}") &\n',
+    "\tWATCH_PID=$!\n",
+    '\ttrap "rm -f $pipe_request" ${SIGNALS} # as resets after subshell invocation\n',
+    '\ttrap "rm -f $pipe_result" ${SIGNALS} # as resets after subshell invocation\n',
+    "done\n",
+]
 os.makedirs(get_generated_scripts_path(), exist_ok=True)
 
 errors_detected = []
@@ -91,25 +137,52 @@ with open(args.api_file, "r") as api_file:
             errors_detected.append(str(e))
             continue
 
-        api_server_script_file_path = get_api_service_script_path(req_name)
+        # generate GUI API listener
+        api_server_script_file_path = get_api_gui_service_script_path(req_name)
         with open(api_server_script_file_path, "w") as listener_file:
-            api_schema_concrete = api_schema.copy()
-            api_schema_concrete[1] = api_schema_concrete[1].format(
+            api_gui_schema_concrete = api_gui_schema.copy()
+            api_gui_schema_concrete[1] = api_gui_schema_concrete[1].format(
                 "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_node
             )
-            api_schema_concrete[3] = api_schema_concrete[3].format(
-                api_req_node, get_fs_watch_event_for_request_type(req_type), "exec$"
+            api_gui_schema_concrete[3] = api_gui_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+            api_gui_schema_concrete[4] = api_gui_schema_concrete[4].format(
+                api_req_node, get_fs_watch_event_for_request_type(req_type), get_api_hidden_node_name() + "$"
             )
-            api_schema_concrete[8] = api_schema_concrete[8].format(
+            api_gui_schema_concrete[10] = api_gui_schema_concrete[10].format(
                 "{WORK_DIR}",
                 req_executor_name,
                 "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
                 api_node,
-                api_req_node,
-                "${file}",
+                os.path.join(api_req_node, "result_${date}"),
+                "{EXT}"
+            )
+
+            api_gui_schema_concrete[11] = api_gui_schema_concrete[11].format(
+                os.path.join(api_req_node, "result_${date}"),
+                "{EXT}"
             )
             listener_file.write("#!/usr/bin/bash\n\n")
-            listener_file.writelines(api_schema_concrete)
+            listener_file.writelines(api_gui_schema_concrete)
+
+        make_file_executable(api_server_script_file_path)
+
+        #generate CLI API server
+        api_server_script_file_path = get_api_cli_service_script_path(req_name)
+        with open(api_server_script_file_path, "w") as server_file:
+            api_cli_schema_concrete = api_cli_schema.copy()
+            api_cli_schema_concrete[1] = api_cli_schema_concrete[1].format(api_req_node
+            )
+            api_cli_schema_concrete[3] = api_cli_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+
+            api_cli_schema_concrete[33] = api_cli_schema_concrete[33].format(
+                "{WORK_DIR}",
+                req_executor_name,
+                "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
+                api_node
+            )
+
+            server_file.write("#!/usr/bin/bash\n\n")
+            server_file.writelines(api_cli_schema_concrete)
 
         make_file_executable(api_server_script_file_path)
 

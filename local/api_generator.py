@@ -1,34 +1,18 @@
 #!/usr/bin/python
 
+import api_generator_utils
+
 """
 Provides a functions set which manages to generate API executor scripts
 """
 
 def make_script_watch_list(script):
     body = (
-        r"#!/usr/bin/bash",
-        r"",
-        r"API_NODE=${2}",
-        r". ${1}/setenv.sh",
-        r"RESULT_FILE=${3}_result",
-        r'CMD_ARGS=""',
-        r'for entry in "${API_NODE}"/*.*',
-        r"do",
-        r"    file_basename=${entry##*/}",
-        r"    param_name=${file_basename#*.}",
-        r"    readarray -t arr < ${entry}",
-        r"    brr+=(${param_name})",
-        r"    for a in ${arr[@]}",
-        r"    do",
-        r"        if [[ ${a} == \"* ]];",
-        r"        then",
-        r'            brr+=("${a}")',
-        r"        else",
-        r"            brr+=(${a})",
-        r"        fi",
-        r"    done",
-        r"done",
-        r'echo "${brr[@]}" | xargs find ${INITIAL_PROJECT_LOCATION} > ${RESULT_FILE}.txt',
+        *api_generator_utils.generate_exec_header(), r"",
+        *api_generator_utils.generate_get_result_type(".txt"), r"",
+        *api_generator_utils.generate_api_node_env_init(), r"",
+        *api_generator_utils.generate_read_api_fs_args(), r"",
+        r'echo "${brr[@]}" | xargs find ${INITIAL_PROJECT_LOCATION}',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -37,29 +21,12 @@ def generate_script_watch_list_help():
 
 def make_script_statistic(script):
     body = (
-        r"#!/usr/bin/bash",
-        r"",
-        r"API_NODE=${2}",
-        r". ${1}/setenv.sh",
-        r"RESULT_FILE=${3}_result",
-        r'CMD_ARGS=""',
-        r'for entry in "${API_NODE}"/*.*',
-        r"do",
-        r"    file_basename=${entry##*/}",
-        r"    param_name=${file_basename#*.}",
-        r"    readarray -t arr < ${entry}",
-        r"    brr+=(${param_name})",
-        r"    for a in ${arr[@]}",
-        r"    do",
-        r"        if [[ ${a} == \"* ]];",
-        r"        then",
-        r'            brr+=("${a}")',
-        r"        else",
-        r"            brr+=(${a})",
-        r"        fi",
-        r"    done",
-        r"done",
-        r'echo "${brr[@]}"',
+        *api_generator_utils.generate_exec_header(), r"",
+        *api_generator_utils.generate_get_result_type(".xml"), r"",
+        *api_generator_utils.generate_api_node_env_init(), r"",
+        *api_generator_utils.generate_read_api_fs_args(), r"",
+        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/main/GET/exec',
+        r"cat ${SHARED_API_DIR}/main/GET/result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 
@@ -68,31 +35,12 @@ def generate_script_statistic_help():
 
 def make_script_view(script):
     body = (
-        r"#!/usr/bin/bash",
-        r"",
-        r"API_NODE=${2}",
-        r". ${1}/setenv.sh",
-        r"RESULT_FILE=${3}_result",
-        r'CMD_ARGS=""',
-        r'for entry in "${API_NODE}"/*.*',
-        r"do",
-        r"    file_basename=${entry##*/}",
-        r"    param_name=${file_basename#*.}",
-        r"    readarray -t arr < ${entry}",
-        r"    brr+=(${param_name})",
-        r"    for a in ${arr[@]}",
-        r"    do",
-        r"        if [[ ${a} == \"* ]];",
-        r"        then",
-        r'            brr+=("${a}")',
-        r"        else",
-        r"            brr+=(${a})",
-        r"        fi",
-        r"    done",
-        r"done",
-        r"${WORK_DIR}/watch_list_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main ${API_NODE}/GET/.watch_list",
-        r"cat ${API_NODE}/GET/.watch_list_result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py `${WORK_DIR}/statistic_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic stst` > ${RESULT_FILE}.xml",
-        r"cat ${RESULT_FILE}.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]} > ${RESULT_FILE}.data",
+        *api_generator_utils.generate_exec_header(), r"",
+        *api_generator_utils.generate_get_result_type(".collapsed"), r"",
+        *api_generator_utils.generate_api_node_env_init(), r"",
+        *api_generator_utils.generate_read_api_fs_args(), r"",
+        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/main/statistic/GET/exec',
+        r"cat ${SHARED_API_DIR}/main/statistic/GET/result.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 
@@ -101,30 +49,12 @@ def generate_script_view_help():
 
 def make_script_flamegraph(script):
     body = (
-        r"#!/usr/bin/bash",
-        r"",
-        r"API_NODE=${2}",
-        r". ${1}/setenv.sh",
-        r"RESULT_FILE=${3}_result",
-        r'CMD_ARGS=""',
-        r'for entry in "${API_NODE}"/*.*',
-        r"do",
-        r"    file_basename=${entry##*/}",
-        r"    param_name=${file_basename#*.}",
-        r"    readarray -t arr < ${entry}",
-        r"    brr+=(${param_name})",
-        r"    for a in ${arr[@]}",
-        r"    do",
-        r"        if [[ ${a} == \"* ]];",
-        r"        then",
-        r'            brr+=("${a}")',
-        r"        else",
-        r"            brr+=(${a})",
-        r"        fi",
-        r"    done",
-        r"done",
-        r"${WORK_DIR}/view_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/main/statistic/view ${API_NODE}/GET/.collapsed",
-        r"cat ${API_NODE}/GET/.collapsed_result.data | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]} > ${RESULT_FILE}.svg",
+        *api_generator_utils.generate_exec_header(), r"",
+        *api_generator_utils.generate_get_result_type(".svg"), r"",
+        *api_generator_utils.generate_api_node_env_init(), r"",
+        *api_generator_utils.generate_read_api_fs_args(), r"",
+        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/main/statistic/view/GET/exec',
+        r"cat ${SHARED_API_DIR}/main/statistic/view/GET/result.collapsed | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 
