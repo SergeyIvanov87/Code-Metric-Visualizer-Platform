@@ -33,11 +33,13 @@ def make_script_rrd_collect(script):
         *api_generator_utils.generate_exec_header(), r"",
         *api_generator_utils.generate_get_result_type(""), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
+        *api_generator_utils.generate_bypassed_params_formatting(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
         r'echo ${IN_ARGS[@]} > ${SHARED_API_DIR}/analytic/rrd/PUT/exec',
         r'RRD_DB_PARAMS=`cat ${SHARED_API_DIR}/analytic/rrd/PUT/result`',
-        #TODO read  ${SHARED_API_DIR}/analytic/PUT/exec instead ???
-        r'echo "-mmcc=1 -tmcc=1 -sif=1 -lif=1" > ${SHARED_API_DIR}/main/statistic/GET/exec',
+        r'echo 0 > ${SHARED_API_DIR}/analytic/PUT/exec',
+        r'ONLY_METRICS_IN_RANGE=`cat ${SHARED_API_DIR}/analytic/PUT/result`',
+        r'echo $(replace_space_in_even_position "${ONLY_METRICS_IN_RANGE}") > ${SHARED_API_DIR}/main/statistic/GET/exec',
         r'cat ${SHARED_API_DIR}/main/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "${RRD_DB_PARAMS}" ${SHARED_API_DIR} ${brr[@]}',
     )
     script.writelines(line + "\n" for line in body)
