@@ -7,6 +7,7 @@ The purpose of this module is to generate hierarchical RRD databases
 import argparse
 import os
 import subprocess
+import stat
 import sys
 
 from argparse import RawTextHelpFormatter
@@ -14,8 +15,8 @@ from collections import defaultdict
 from xml.etree.ElementTree import ElementTree, tostring
 from xml.etree import ElementTree
 
-#sys.path.insert(1, 'pmccabe_visualizer')
-#import package_tree
+sys.path.append(os.getenv('MAIN_IMAGE_ENV_SHARED_LOCATION_ENV', ''))
+from filesystem_utils import append_file_mode
 
 supported_methods = ["init", "update"]
 xml_node_types = ["package", "file", "item"]
@@ -106,6 +107,14 @@ class rrd:
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
+            )
+            append_file_mode(statistic_node_db_name,
+                             stat.S_IWUSR
+                             | stat.S_IRUSR
+                             | stat.S_IWGRP
+                             | stat.S_IRGRP
+                             | stat.S_IWOTH
+                             | stat.S_IROTH
             )
 
         counters_snapshot = []

@@ -14,15 +14,15 @@ import pathlib
 import sys
 import stat
 
+import filesystem_utils
+
 from api_gen_utils import compose_api_fs_node_name
 from api_gen_utils import compose_api_exec_script_name
 from api_gen_utils import compose_api_help_script_name
 from api_gen_utils import get_api_cli_service_script_path
 from api_gen_utils import get_api_gui_service_script_path
 from api_gen_utils import get_generated_scripts_path
-from api_gen_utils import make_file_executable
-from api_gen_utils import append_file_mode
-from api_gen_utils import get_api_hidden_node_name
+from api_gen_utils import get_api_leaf_node_name
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -65,10 +65,12 @@ api_gui_schema = [
     "\twhile read dir action file; do\n",
     '\t\techo "file: ${file}, action; ${action}, dir: ${dir}"\n',
     '\t\tcase "$action" in\n',
-    "\t\t\tACCESS|ATTRIB )\n",
+    "\t\t\tACCESS|ATTRIB|MODIFY )\n",
     "\t\t\t\tdate=`date +%Y-%m-%dT%H:%M:%S`\n",
+    "\t\t\t\ttouch {0}/in_progress\n",
     '\t\t\t\t"${0}/{1}" ${2} {3} 0 > {4}${5}\n',
     '\t\t\t\tchmod +rw {0}${1}\n',
+    "\t\t\t\trm -f {0}/in_progress\n",
     "\t\t\t;;\n",
     "\t\t\t*)\n",
     "\t\t\t\t;;\n",
@@ -97,6 +99,9 @@ api_cli_schema = [
     'WATCH_PID=0\n',
     "while true\n",
     "do\n",
+    '\tif [[ -f "${api_req_node}/in_progress" ]]; then\n',
+    '\t\trm -f "${api_req_node}/in_progress"\n',
+    "\tfi\n",
     "\tCMD_READ=`cat $pipe_request`\n",
     '\t echo "START: ${api_req_node}"\n',
     "\tif [ ${WATCH_PID} != 0 ]; then\n",
@@ -110,8 +115,10 @@ api_cli_schema = [
     "\t\t# avoid zombie\n",
     "\t\twait ${WATCH_PID}\n",
     "\tfi\n",
+    '\ttouch "${api_req_node}/in_progress"\n',
     '\tRESULT_OUT=$(${0}/{1} ${2} {3} ', '"${CMD_READ}" | base64)\n',
-    '\t(echo "${RESULT_OUT}" | base64 -d >$pipe_result && echo "CONSUMED: ${api_req_node}") &\n',
+    '\trm -f ${api_req_node}/in_progress\n',
+    '\t(touch ${api_req_node}/ready && echo "${RESULT_OUT}" | base64 -d >$pipe_result && rm -rf ${api_req_node}/ready && echo "CONSUMED: ${api_req_node}") &\n',
     "\tWATCH_PID=$!\n",
     '\ttrap "rm -f $pipe_request" ${SIGNALS} # as resets after subshell invocation\n',
     '\ttrap "rm -f $pipe_result" ${SIGNALS} # as resets after subshell invocation\n',
@@ -146,9 +153,12 @@ with open(args.api_file, "r") as api_file:
             )
             api_gui_schema_concrete[3] = api_gui_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
             api_gui_schema_concrete[4] = api_gui_schema_concrete[4].format(
-                api_req_node, get_fs_watch_event_for_request_type(req_type), get_api_hidden_node_name() + "$"
+                api_req_node, get_fs_watch_event_for_request_type(req_type), get_api_leaf_node_name(req_type) + "$"
             )
             api_gui_schema_concrete[10] = api_gui_schema_concrete[10].format(
+                api_req_node)
+
+            api_gui_schema_concrete[11] = api_gui_schema_concrete[11].format(
                 "{WORK_DIR}",
                 req_executor_name,
                 "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
@@ -157,14 +167,17 @@ with open(args.api_file, "r") as api_file:
                 "{EXT}"
             )
 
-            api_gui_schema_concrete[11] = api_gui_schema_concrete[11].format(
+            api_gui_schema_concrete[12] = api_gui_schema_concrete[12].format(
                 os.path.join(api_req_node, "result_${date}"),
                 "{EXT}"
             )
+            api_gui_schema_concrete[13] = api_gui_schema_concrete[13].format(
+                api_req_node)
+
             listener_file.write("#!/usr/bin/bash\n\n")
             listener_file.writelines(api_gui_schema_concrete)
 
-        make_file_executable(api_server_script_file_path)
+        filesystem_utils.make_file_executable(api_server_script_file_path)
 
         #generate CLI API server
         api_server_script_file_path = get_api_cli_service_script_path(req_name)
@@ -174,7 +187,7 @@ with open(args.api_file, "r") as api_file:
             )
             api_cli_schema_concrete[3] = api_cli_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
 
-            api_cli_schema_concrete[33] = api_cli_schema_concrete[33].format(
+            api_cli_schema_concrete[37] = api_cli_schema_concrete[37].format(
                 "{WORK_DIR}",
                 req_executor_name,
                 "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
@@ -184,7 +197,7 @@ with open(args.api_file, "r") as api_file:
             server_file.write("#!/usr/bin/bash\n\n")
             server_file.writelines(api_cli_schema_concrete)
 
-        make_file_executable(api_server_script_file_path)
+        filesystem_utils.make_file_executable(api_server_script_file_path)
 
 if len(errors_detected) != 0:
     raise Exception(

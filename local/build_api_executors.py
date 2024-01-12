@@ -12,11 +12,11 @@ import pathlib
 import sys
 import stat
 
+import filesystem_utils
+
 from api_gen_utils import compose_api_exec_script_name
 from api_gen_utils import compose_api_fs_node_name
 from api_gen_utils import get_generated_scripts_path
-from api_gen_utils import make_file_executable
-from api_gen_utils import append_file_mode
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -79,7 +79,7 @@ with open(args.api_file, "r") as api_file:
             script_generated_path = os.path.join(generated_api_server_scripts_path, script_name_generated)
 
             with open(script_generated_path, "x") as script:
-                make_file_executable(script_generated_path)
+                filesystem_utils.make_file_executable(script_generated_path)
                 if req_name in scripts_generator.keys():
                     scripts_generator[req_name](script)
                 else:
