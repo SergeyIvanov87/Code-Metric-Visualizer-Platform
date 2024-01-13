@@ -12,6 +12,7 @@ git config --global --add safe.directory ${INITIAL_PROJECT_LOCATION}
 
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
+${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_executors.py ${WORK_DIR}/API.replicated.fs ${MAIN_IMAGE_ENV_SHARED_LOCATION} -o ${WORK_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_services.py ${WORK_DIR}/API.replicated.fs
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API.replicated.fs ${INITIAL_PROJECT_LOCATION}
 
