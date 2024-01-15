@@ -1,6 +1,6 @@
 {
     "Method" : "GET",
-    "Query": "api.pmccabe_collector.restapi.org/main/statistic",
+    "Query": "api.pmccabe_collector.restapi.org/cc/statistic",
     "Params": {
         "watch_list" : {
             "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
@@ -10,5 +10,8 @@
         "-tmcc" : "1,",
         "-sif" : "1,",
         "-lif" : "1,"
+    },
+    "Description": {
+        "README-CC-API-MANUAL.md": ""
     }
 }

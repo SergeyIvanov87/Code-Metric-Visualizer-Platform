@@ -39,8 +39,8 @@ def make_script_rrd_collect(script):
         r'RRD_DB_PARAMS=`cat ${SHARED_API_DIR}/analytic/rrd/PUT/result`',
         r'echo 0 > ${SHARED_API_DIR}/analytic/PUT/exec',
         r'ONLY_METRICS_IN_RANGE=`cat ${SHARED_API_DIR}/analytic/PUT/result`',
-        r'echo $(replace_space_in_even_position "${ONLY_METRICS_IN_RANGE}") > ${SHARED_API_DIR}/main/statistic/GET/exec',
-        r'cat ${SHARED_API_DIR}/main/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "${RRD_DB_PARAMS}" ${SHARED_API_DIR} ${brr[@]}',
+        r'echo $(replace_space_in_even_position "${ONLY_METRICS_IN_RANGE}") > ${SHARED_API_DIR}/cc/statistic/GET/exec',
+        r'cat ${SHARED_API_DIR}/cc/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "${RRD_DB_PARAMS}" ${SHARED_API_DIR} ${brr[@]}',
     )
     script.writelines(line + "\n" for line in body)
 

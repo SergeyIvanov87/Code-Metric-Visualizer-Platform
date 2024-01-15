@@ -1,6 +1,6 @@
 {
     "Method" : "GET",
-    "Query": "api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph",
+    "Query": "api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph",
     "Params": {
         "view" : {
             "statistic" : {
@@ -17,5 +17,8 @@
         },
         "--width": "1200",
         "--height" : "16"
+    },
+    "Description": {
+        "README-CC-API-MANUAL.md": ""
     }
 }

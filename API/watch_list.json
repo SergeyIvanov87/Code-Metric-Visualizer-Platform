@@ -1,8 +1,11 @@
 {
     "Method" : "GET",
-    "Query": "api.pmccabe_collector.restapi.org/main",
+    "Query": "api.pmccabe_collector.restapi.org/cc",
     "Params": {
         "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
         "-prune": "! -path \"*buil*\" ! -path \"*thirdpart*\""
+    },
+    "Description": {
+        "README-CC-API-MANUAL.md": ""
     }
 }

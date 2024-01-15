@@ -25,8 +25,8 @@ def make_script_statistic(script):
         *api_generator_utils.generate_get_result_type(".xml"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
-        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/main/GET/exec',
-        r"cat ${SHARED_API_DIR}/main/GET/result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py ${brr[@]}",
+        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/cc/GET/exec',
+        r"cat ${SHARED_API_DIR}/cc/GET/result.txt | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 
@@ -39,8 +39,8 @@ def make_script_view(script):
         *api_generator_utils.generate_get_result_type(".collapsed"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
-        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/main/statistic/GET/exec',
-        r"cat ${SHARED_API_DIR}/main/statistic/GET/result.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]}",
+        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/cc/statistic/GET/exec',
+        r"cat ${SHARED_API_DIR}/cc/statistic/GET/result.xml | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 
@@ -53,8 +53,8 @@ def make_script_flamegraph(script):
         *api_generator_utils.generate_get_result_type(".svg"), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
-        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/main/statistic/view/GET/exec',
-        r"cat ${SHARED_API_DIR}/main/statistic/view/GET/result.collapsed | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
+        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/cc/statistic/view/GET/exec',
+        r"cat ${SHARED_API_DIR}/cc/statistic/view/GET/result.collapsed | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 
