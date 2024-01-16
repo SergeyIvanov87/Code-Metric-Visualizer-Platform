@@ -1,0 +1,20 @@
+{
+    "Method" : "GET",
+    "Query": "api.pmccabe_collector.restapi.org/cc/statistic/view",
+    "Params": {
+        "statistic" : {
+            "watch_list" : {
+                "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
+                "-prune": "! -path \"*buil*\" ! -path \"*thirdpart*\""
+            },
+            "-mmcc" : "1,",
+            "-tmcc" : "1,",
+            "-sif" : "1,",
+            "-lif" : "1,"
+        },
+        "-attr" : "mmcc,tmcc,sif,lif"
+    },
+    "Description": {
+        "README-CC-API-MANUAL.md": ""
+    }
+}
