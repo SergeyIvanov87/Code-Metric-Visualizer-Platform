@@ -6,6 +6,8 @@
         "-prune": "! -path \"*buil*\" ! -path \"*thirdpart*\""
     },
     "Description": {
-        "README-CC-API-MANUAL.md": ""
+        "header": "Supplies further API queries by extracting the files for analysis from a project source directory tree.\nParams of this query repeats after the general Linux command `find` (please refer `man find` to find out more information)\n",
+        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/cc/GET/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/cc/GET/result.txt > <your_filename>.txt`\n\n",
+        "footer": "The typical result of this command is a filtered out source files list which would be the target of further analysis."
     }
 }
