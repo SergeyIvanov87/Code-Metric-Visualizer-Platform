@@ -17,6 +17,8 @@ import filesystem_utils
 from api_gen_utils import compose_api_exec_script_name
 from api_gen_utils import compose_api_fs_node_name
 from api_gen_utils import get_generated_scripts_path
+from api_gen_utils import get_api_schema_files
+from api_gen_utils import decode_api_request_from_schema_file
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -30,7 +32,7 @@ parser = argparse.ArgumentParser(
     formatter_class=RawTextHelpFormatter,
 )
 
-parser.add_argument("api_file", help="Path to a file desrcibed a particular API-subset")
+parser.add_argument("api_root_dir", help="Path to the root directory incorporated JSON API schema descriptions")
 parser.add_argument("api_exec_generator", help="Path to a location of `api_generator.py`, which is responsible to generate the API-subset processing scripts")
 parser.add_argument("-o", "--output_dir",
                     help='Output directory where the generated scripts will be placed. Default=\"./{}\"'.format(get_generated_scripts_path()),
@@ -64,34 +66,38 @@ generated_api_server_scripts_path = args.output_dir
 os.makedirs(generated_api_server_scripts_path, exist_ok=True)
 
 errors_detected = []
-with open(args.api_file, "r") as api_file:
-    for request_line in api_file:
-        request_params = [s.strip() for s in request_line.split("\t")]
-        if len(request_params) < 3:
-            continue
+schemas_file_list = get_api_schema_files(args.api_root_dir)
+for schema_file in schemas_file_list:
+    req_name, request_data = decode_api_request_from_schema_file(schema_file)
+    req_type = request_data["Method"]
+    req_api = request_data["Query"]
+    req_params = request_data["Params"]
+    api_node, api_req_node = compose_api_fs_node_name(
+            "${INITIAL_PROJECT_LOCATION}", req_api, req_type
+    )
 
-        req_name = request_params[0]
 
-        """this builder must generate stub files for API request to implement"""
-        """Must be done BEFORE docker image crafted"""
-        try:
-            script_name_generated = compose_api_exec_script_name(req_name)
-            script_generated_path = os.path.join(generated_api_server_scripts_path, script_name_generated)
 
-            with open(script_generated_path, "x") as script:
-                filesystem_utils.make_file_executable(script_generated_path)
-                if req_name in scripts_generator.keys():
-                    scripts_generator[req_name](script)
-                else:
-                    make_default_script(script)
-        except FileExistsError as e:
-            print(
-                f'Skipping the script "{req_name}":\n\t"{e}"'
-            )
-            continue
-        except Exception as e:
-            errors_detected.append(str(e))
-            continue
+    """this builder must generate stub files for API request to implement"""
+    """Must be done BEFORE docker image crafted"""
+    try:
+        script_name_generated = compose_api_exec_script_name(req_name)
+        script_generated_path = os.path.join(generated_api_server_scripts_path, script_name_generated)
+
+        with open(script_generated_path, "x") as script:
+            filesystem_utils.make_file_executable(script_generated_path)
+            if req_name in scripts_generator.keys():
+                scripts_generator[req_name](script)
+            else:
+                make_default_script(script)
+    except FileExistsError as e:
+        print(
+            f'Skipping the script "{req_name}":\n\t"{e}"'
+        )
+        continue
+    except Exception as e:
+        errors_detected.append(str(e))
+        continue
 
 if len(errors_detected) != 0:
     raise Exception(

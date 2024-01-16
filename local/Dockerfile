@@ -11,7 +11,7 @@ RUN git clone https://gitlab.com/pmccabe/pmccabe.git && cd pmccabe && make -e DE
 RUN git clone https://github.com/SergeyIvanov87/pmccabe_visualizer.git && git clone https://github.com/brendangregg/FlameGraph.git
 
 COPY *.sh /package/
-COPY API.fs /package/API.replicated.fs
+COPY API /package/API
 
 COPY $SCRIPT_GEN_LOC/*.sh /package/
 

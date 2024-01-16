@@ -26,6 +26,18 @@ import filesystem_utils
 
 from api_gen_utils import compose_api_fs_node_name
 from api_gen_utils import get_api_leaf_node_name
+from api_gen_utils import get_api_schema_files
+from api_gen_utils import decode_api_request_from_schema_file
+from api_gen_utils import get_api_request_plain_params
+
+parser = argparse.ArgumentParser(
+    prog="Build file-system API nodes based on pseudo-REST API from cfg file"
+)
+
+parser.add_argument("api_root_dir", help="Path to the root directory incorporated JSON API schema descriptions")
+parser.add_argument("mount_point", help="destination to build file-system nodes")
+args = parser.parse_args()
+
 
 def create_api_fs_node(api_root, req, rtype, rparams):
     api_node, api_req_node = compose_api_fs_node_name(api_root, req, rtype)
@@ -86,20 +98,12 @@ def create_api_fs_node(api_root, req, rtype, rparams):
 
     return api_node, api_req_node
 
-parser = argparse.ArgumentParser(
-    prog="Build file-system API nodes based on pseudo-REST API from cfg file"
-)
+schemas_file_list = get_api_schema_files(args.api_root_dir)
+for schema_file in schemas_file_list:
+    req_name, request_data = decode_api_request_from_schema_file(schema_file)
+    req_type = request_data["Method"]
+    req_api = request_data["Query"]
+    req_params = get_api_request_plain_params(request_data["Params"])
 
-parser.add_argument("api_file", help="Path to file with API description")
-parser.add_argument("mount_point", help="destination to build file-system nodes")
-args = parser.parse_args()
-
-with open(args.api_file, "r") as api_file:
-    for request_line in api_file:
-        request_params = [s.strip() for s in request_line.split("\t")]
-        if len(request_params) < 3:
-            continue
-
-        (req_name, req_type, req_api, *req_params) = request_params
-        """re-create pseudo-filesystem directory structure based on API query"""
-        create_api_fs_node(args.mount_point, req_api, req_type, req_params)
+    """re-create pseudo-filesystem directory structure based on API query"""
+    create_api_fs_node(args.mount_point, req_api, req_type, req_params)
