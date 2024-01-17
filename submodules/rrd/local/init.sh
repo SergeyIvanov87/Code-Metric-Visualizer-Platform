@@ -7,9 +7,10 @@ MAIN_IMAGE_ENV_SHARED_LOCATION=${3}
 
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_executors.py ${WORK_DIR}/API.replicated.fs ${WORK_DIR} -o ${WORK_DIR}
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_services.py ${WORK_DIR}/API.replicated.fs
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API.replicated.fs ${INITIAL_PROJECT_LOCATION}
+${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
+${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
+${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API ${INITIAL_PROJECT_LOCATION}
+${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/cc/README-API-ANALYTIC.md
 
 # TODO think about making commit an initial RRD transaction at container starting or ask for user decision
 # There are few disadvantages about asking through STDIN:
@@ -21,11 +22,11 @@ ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API.replica
 # abandon any attempt to make it and keep container start-up process clear from any cumbersome logic.
 # So only services must be started up here!
 
-#BUILD_RRD_ARGS=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from read_api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/analytic/")))'`
-#BUILD_RRD_COUNTERS_ARGS=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from read_api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/analytic/rrd")))'`
-#BUILD_RRD_FROM_SOURCES=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from read_api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/main/")))'`
+#BUILD_RRD_ARGS=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from read_api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/analytic/")))'`
+#BUILD_RRD_COUNTERS_ARGS=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from read_api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/analytic/rrd")))'`
+#BUILD_RRD_FROM_SOURCES=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from read_api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/")))'`
 
-#printf "INFO: Set up 'api.pmccabe_collector.restapi.org/analytic' params before proceed.\n"
+#printf "INFO: Set up 'api.pmccabe_collector.restapi.org/cc/analytic' params before proceed.\n"
 #printf "Default params would be used otherwise:\n"
 #printf "\tSource files search engine: \t'find ${BUILD_RRD_FROM_SOURCES}'\n"
 #printf "\tMetrics evaluation interval: \t${BUILD_RRD_ARGS}\n\n"
@@ -60,10 +61,10 @@ done
 #    echo "Commiting RRD transaction..."
 
     # In order to be able to make pipeline of commands outputs need to read from PUT values pairs with '=' instead of ' '???
-    #echo 0 > ${SHARED_API_DIR}/analytic/PUT/exec
-    #cat ${SHARED_API_DIR}/analytic/PUT/result > ${SHARED_API_DIR}/main/statistic/GET/exec
-#    echo 0 > ${SHARED_API_DIR}/main/statistic/GET/exec
-#    cat ${SHARED_API_DIR}/main/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/analytic/rrd`" ${SHARED_API_DIR} -method init
+    #echo 0 > ${SHARED_API_DIR}/cc/analytic/PUT/exec
+    #cat ${SHARED_API_DIR}/cc/analytic/PUT/result > ${SHARED_API_DIR}/cc/statistic/GET/exec
+#    echo 0 > ${SHARED_API_DIR}/cc/statistic/GET/exec
+#    cat ${SHARED_API_DIR}/cc/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/cc/analytic/rrd`" ${SHARED_API_DIR} -method init
 #    echo "Completed"
 #fi
 

@@ -9,7 +9,7 @@ RUN pacman -Sy --noconfirm python python-pip inotify-tools rrdtool librsvg potra
 
 COPY *.sh /package/
 COPY *.py /package/
-COPY API.fs /package/API.replicated.fs
+COPY API /package/API
 
 COPY $SCRIPT_GEN_LOC/*.sh /package/
 

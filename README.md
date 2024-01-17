@@ -4,61 +4,79 @@ The docker image for `pmccabe_visualizer` https://github.com/SergeyIvanov87/pmcc
 
 The service is supposed to monitor cyclomatic complexity of a C/C++ project.
 
-The service implementation is still in progress and it has the very limited functionality.
+The service implementation is still in progress and it has limited functionality.
 The service is available as a `copilot`-based feature which has named `pmccabe_collector`. Only `pmccabe_collector` local-machine (Linux tested only) docker image is shipping at the moment.
-The purpose of `pmccabe_collector` is to reach a similar functionality as it enhanced by the `sidecar` pattern which goal here is to extend software developing experience.
-Launching `pmccabe_collector` and binding a docker shared folder into your existing C/C++ project directory, allow this container to populate filesystem API entrypoints, which are served for communicating with the `pmccabe_collector` docker service.
-Please check on the existing pseudo-filesystem API:
-[API](local/API.fs)
+The purpose of `pmccabe_collector` is to reach a similar functionality as it enhanced by the `sidecar` pattern which goal here is to extend software developing experience by governing some code metric subset known as "cyclomatic complexity".
+Launching `pmccabe_collector` and binding a docker shared folder into your existing C/C++ project directory, allow this container to populate filesystem API entrypoints, which are served for collecting and populating this metric subset.
+All communication with the `pmccabe_collector` docker service is available through pseudo-filesystem API, which is populated in [API manifest](local/API.fs)
 
-According to the REST ideology, a request could represent a particular hierarcy structure, thus `pmccabe_collector` leverages this idea and maps those API requests as nodes mapped to a filesystem hierarchy like as directories and files inside the populated API-entry point `api.pmccabe_collector.restapi.org` resided in your project directory.
-Each request can be executed as simple ACCESS-operation on a file named `exec` in the bottom of relevant filesystem hierarchy in the same way as the Linux `/proc` pseudo-filesystem employed in order to read (and/or store) some system settings.
+According to the REST ideology, requests could represent a particular hierarcy structure, thus `pmccabe_collector` leverages this idea and maps those API requests as a structure of nodes mapped to a filesystem hierarchy as directories and files inside the populated API-entry point `api.pmccabe_collector.restapi.org` resided in your project directory.
+Each request can be executed as simple ACCESS-operation on a file named `exec` or `modify_this_file` in the bottom of relevant filesystem hierarchy in the same way as the Linux `/proc` pseudo-filesystem employed in order to read (and/or store) some system settings.
 
 #### For example:
 
 The request
 
-`GET api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph`
+`GET api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph`
 
-can be triggered in the filesystem API mapped notation as:
+can be composed in the filesystem API mapped notation as the next transactional operation:
+1) To initiate the request all you need is to send some data into the input PIPE `exec`:
 
-`echo 0 > api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph/GET/exec`
+`echo 0 > api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/GET/exec`
 
-If you prefer to use GUI rather than CLI, then just open a path `api.pmccabe_collector.restapi.org/main/statistic/view/flamegraph` in your favorite File Manager. It is realy simple as it sounds! Regardless an approach you use, nevertheless you'll find the outcome of your query execution, usually meant a file, in the same directory where the original `exec` API-file located. Feeling curiosity or discovering any other ways to alter the result of query execution, it's possible to wander through such API filesystem content and play with a different kind of file nodes called parameters. Changing a value in these parameter-files you can affect the result (or view) of a request outcome.
-Typical use-case is add filtering `thirdparty` directories as `watch_list`. You can acrhive that by changing values of the parameters `0.-regex` and `1.-prune` resided by path `api.pmccabe_collector.restapi.org/main`, which actually represent parameters for the  well-known command `find` from the general command manual `man find`.
+which will establish IPC communication using pipes channel.
 
-This file-based interface is only container API supported at the moment.
+2) To extract a result of the operation just redirect read-request on the output PIPE `result.svg` into a destination file:
+
+`cat api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/GET/result.svg > ~/my_flamegraph.svg`
+
+Together these two operations represent the transaction. Although, contrary to acustomed transaction semantic, getting a result through reading the output PIPE will supplement you with the result of the last initiated request only. Therefore the API system doesn't act as a persistent queue. Although the operation pretends to be a synchronous "transaction", in reality it is not: you don't have to wait for a result using the output PIPE upon a request started, intead you can initiate a new operation by commiting write-request of the input `exec` PIPE. In this case the result of the former "transaction" would be discarded and the output PIPE would produce a new portion of data related to the last request you made.
+This discrepancy to the traditional transactional semantic was settled deliberately.
+Having non-blocking `exec` has been found more beneficial in this simple one-threading server case rather than preserving the pure synchronous transactions semantic.
+Having a single-threaded server and the pure synchronous transaction, a client would have been blocked on next `exec`-request until they consumed request of the previous transaction through the ouput PIPE.
+And schema "Send request/collect result" would transform into "Don't forget to collect the previous result/send request/collect result" which is said to be more complicated.
+
+Thereby the following considerations are settled down for the current implementation:
+a) A read-operation on the output PIPE MUST block until no requests are made.
+b) A request initiation by using a write-operation on the `exec` node MUST be a non-blocking operation
+c) A read-operation on the output PIPE MAY block temporary until the request execution is still in progress.
+
+For more information about pseudo filesystem API usage and for changing the default request arguments please refer to the document [the cyclomatic complexity API manual](local/README-CC-API-MANUAL.md)
+
+If you prefer to use GUI rather than CLI, then just open a path `api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/GET` in your favorite File Manager.
+Opening the directory `../GET` triggers an inotify-event, and as soon as the request finishes you will find the result in a newly created file.
+No any transactions in this case is meaning.
+It is realy simple as it sounds! Regardless the approach you use (CLI or GUI).
+
+The pseudo filesystem interface is only container API supported at the moment.
 
 # Build image
 
 To build the image please follow the steps:
 
-#### The-Container-Developer:
+#### As the-Container-User:
 
-As a first step, you need to generate API request handlers in a form of simple self-generated bash scripts. This script production phase is important step for developing process only, because it reassure that any changes in the basic API-file would not be forgotten.
+`cd <this repo>`
+
+`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest local`
+
+#### As the-Container-Developer:
+
+In case you wondered how to amend or enhance the current functionality by changing the API, please follow this path:
 
 `cd <this repo>`
 
 Modify API queries adding or changing JSON schemas in `API/*.json` and execute the cmd:
 
-`python ./build_api.py API > local/API.fs`
+`cp submodules or main>/API/* > <submodules or main>/local/API/`
 
-Modify `local/api_generator.py` in order to generate a proper serving script for particulat API query which was published in `API/*.json`
+Compose and put your scripts `*_exec.sh` carrying out processing of added queries logic into `<submodules or main>/local/services` directory.
 
-`python local/build_api_executors.py local/API.fs local -o local/services`
-
-Thats almost done! Next important step you need is to generate the image by itself. To do that, execute the next cmd:
+Finally, generate the image by itself. To do that, execute the next cmd:
 
 `DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest local`
 
-#### The-Container-User:
-
-`cd <this repo>`
-
-`python local/build_api_executors.py local/API.fs local -o local/services`
-
-`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest local`
-
+In case you found your API and its processors in `*_exec.sh` satisfying, please make the changes permanent and embody those script generation as automation step by putting them into the appropriate module `<submodules or main>/local/api_generator.py`
 
 # Launch a container from the image
 
@@ -78,10 +96,7 @@ The `777` allows docker `pmccabe_collector` service to access this mount point w
 
 `sudo docker run -it --mount type=bind,src=./,target=/mnt pmccabe_vis:latest`
 
-The service will build two files:
-- `init.xml`(which contains "database" of `pmccabe` metric for a project components/files/functions, please check on `man pmccabe`)
-- `init.svg` (an interactive flamegraph simplifies such metric representation; to study more about "flamegraph", please elaborate on https://github.com/brendangregg/FlameGraph#3-flamegraphpl)
-
+Having all steps acomplished and with no erros in a processing logic, the content representing pseudo filesystem appears by path `<your project directory>/api.pmccabe_collector.restapi.org`. Typically it contains the `cc` directory (stands for Cyclomatic Complexity) and `README-CC-*.md` file for API instructions.
 In none of those file are appeared, then other different failures have taken place. I'd very appreciate for any documented issues. In my own experience the essential utility `pmccabe` crashed when I was tried to estimate complexity of a Linux kernel project.
 
 # Submodules

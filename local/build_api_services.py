@@ -20,6 +20,8 @@ from api_gen_utils import compose_api_fs_node_name
 from api_gen_utils import compose_api_exec_script_name
 from api_gen_utils import compose_api_help_script_name
 from api_gen_utils import get_api_cli_service_script_path
+from api_gen_utils import get_api_schema_files
+from api_gen_utils import decode_api_request_from_schema_file
 from api_gen_utils import get_api_gui_service_script_path
 from api_gen_utils import get_generated_scripts_path
 from api_gen_utils import get_api_leaf_node_name
@@ -52,7 +54,11 @@ parser = argparse.ArgumentParser(
     prog="Build file-system API nodes based on pseudo-REST API from cfg file"
 )
 
-parser.add_argument("api_file", help="Path to file with API description")
+parser.add_argument("api_root_dir", help="Path to the root directory incorporated JSON API schema descriptions")
+parser.add_argument("generated_exec_script_dir", help="Path to the directory where the api executable scripts were generated")
+parser.add_argument("-o", "--output_dir",
+                    help='Output directory where the generated scripts will be placed. Default=\"./{}\"'.format(get_generated_scripts_path()),
+                    default=get_generated_scripts_path())
 
 args = parser.parse_args()
 
@@ -124,80 +130,81 @@ api_cli_schema = [
     '\ttrap "rm -f $pipe_result" ${SIGNALS} # as resets after subshell invocation\n',
     "done\n",
 ]
-os.makedirs(get_generated_scripts_path(), exist_ok=True)
 
+generated_api_server_scripts_path = args.output_dir
+os.makedirs(generated_api_server_scripts_path, exist_ok=True)
+
+schemas_file_list = get_api_schema_files(args.api_root_dir)
 errors_detected = []
-with open(args.api_file, "r") as api_file:
-    for request_line in api_file:
-        request_params = [s.strip() for s in request_line.split("\t")]
-        if len(request_params) < 3:
-            continue
+for schema_file in schemas_file_list:
+    req_name, request_data = decode_api_request_from_schema_file(schema_file)
+    req_type = request_data["Method"]
+    req_api = request_data["Query"]
+    req_params = request_data["Params"]
+    api_node, api_req_node = compose_api_fs_node_name(
+            "${INITIAL_PROJECT_LOCATION}", req_api, req_type
+    )
 
-        (req_name, req_type, req_api, *req_params) = request_params
-        api_node, api_req_node = compose_api_fs_node_name(
-                "${INITIAL_PROJECT_LOCATION}", req_api, req_type
-            )
+    try:
+        req_executor_name = check_script_valid(args.generated_exec_script_dir, req_name)
+    except Exception as e:
+        errors_detected.append(str(e))
+        continue
 
-        try:
-            req_executor_name = check_script_valid("", req_name)
-        except Exception as e:
-            errors_detected.append(str(e))
-            continue
+    # generate GUI API listener
+    api_server_script_file_path = get_api_gui_service_script_path(generated_api_server_scripts_path, req_name)
+    with open(api_server_script_file_path, "w") as listener_file:
+        api_gui_schema_concrete = api_gui_schema.copy()
+        api_gui_schema_concrete[1] = api_gui_schema_concrete[1].format(
+            "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_node
+        )
+        api_gui_schema_concrete[3] = api_gui_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+        api_gui_schema_concrete[4] = api_gui_schema_concrete[4].format(
+            api_req_node, get_fs_watch_event_for_request_type(req_type), get_api_leaf_node_name(req_type) + "$"
+        )
+        api_gui_schema_concrete[10] = api_gui_schema_concrete[10].format(
+            api_req_node)
 
-        # generate GUI API listener
-        api_server_script_file_path = get_api_gui_service_script_path(req_name)
-        with open(api_server_script_file_path, "w") as listener_file:
-            api_gui_schema_concrete = api_gui_schema.copy()
-            api_gui_schema_concrete[1] = api_gui_schema_concrete[1].format(
-                "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_node
-            )
-            api_gui_schema_concrete[3] = api_gui_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
-            api_gui_schema_concrete[4] = api_gui_schema_concrete[4].format(
-                api_req_node, get_fs_watch_event_for_request_type(req_type), get_api_leaf_node_name(req_type) + "$"
-            )
-            api_gui_schema_concrete[10] = api_gui_schema_concrete[10].format(
-                api_req_node)
+        api_gui_schema_concrete[11] = api_gui_schema_concrete[11].format(
+            "{WORK_DIR}",
+            req_executor_name,
+            "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
+            api_node,
+            os.path.join(api_req_node, "result_${date}"),
+            "{EXT}"
+        )
 
-            api_gui_schema_concrete[11] = api_gui_schema_concrete[11].format(
-                "{WORK_DIR}",
-                req_executor_name,
-                "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
-                api_node,
-                os.path.join(api_req_node, "result_${date}"),
-                "{EXT}"
-            )
+        api_gui_schema_concrete[12] = api_gui_schema_concrete[12].format(
+            os.path.join(api_req_node, "result_${date}"),
+            "{EXT}"
+        )
+        api_gui_schema_concrete[13] = api_gui_schema_concrete[13].format(
+            api_req_node)
 
-            api_gui_schema_concrete[12] = api_gui_schema_concrete[12].format(
-                os.path.join(api_req_node, "result_${date}"),
-                "{EXT}"
-            )
-            api_gui_schema_concrete[13] = api_gui_schema_concrete[13].format(
-                api_req_node)
+        listener_file.write("#!/usr/bin/bash\n\n")
+        listener_file.writelines(api_gui_schema_concrete)
 
-            listener_file.write("#!/usr/bin/bash\n\n")
-            listener_file.writelines(api_gui_schema_concrete)
+    filesystem_utils.make_file_executable(api_server_script_file_path)
 
-        filesystem_utils.make_file_executable(api_server_script_file_path)
+    #generate CLI API server
+    api_server_script_file_path = get_api_cli_service_script_path(generated_api_server_scripts_path, req_name)
+    with open(api_server_script_file_path, "w") as server_file:
+        api_cli_schema_concrete = api_cli_schema.copy()
+        api_cli_schema_concrete[1] = api_cli_schema_concrete[1].format(api_req_node
+        )
+        api_cli_schema_concrete[3] = api_cli_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
 
-        #generate CLI API server
-        api_server_script_file_path = get_api_cli_service_script_path(req_name)
-        with open(api_server_script_file_path, "w") as server_file:
-            api_cli_schema_concrete = api_cli_schema.copy()
-            api_cli_schema_concrete[1] = api_cli_schema_concrete[1].format(api_req_node
-            )
-            api_cli_schema_concrete[3] = api_cli_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+        api_cli_schema_concrete[37] = api_cli_schema_concrete[37].format(
+            "{WORK_DIR}",
+            req_executor_name,
+            "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
+            api_node
+        )
 
-            api_cli_schema_concrete[37] = api_cli_schema_concrete[37].format(
-                "{WORK_DIR}",
-                req_executor_name,
-                "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
-                api_node
-            )
+        server_file.write("#!/usr/bin/bash\n\n")
+        server_file.writelines(api_cli_schema_concrete)
 
-            server_file.write("#!/usr/bin/bash\n\n")
-            server_file.writelines(api_cli_schema_concrete)
-
-        filesystem_utils.make_file_executable(api_server_script_file_path)
+    filesystem_utils.make_file_executable(api_server_script_file_path)
 
 if len(errors_detected) != 0:
     raise Exception(
