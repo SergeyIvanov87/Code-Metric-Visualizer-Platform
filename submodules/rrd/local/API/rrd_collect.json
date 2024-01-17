@@ -19,5 +19,10 @@
             "NO_NAME_PARAM.11": "DS:lif_deviation:GAUGE:1y:U:U"
         },
         "-method": "update"
+    },
+    "Description": {
+        "header": "Extracts the cyclomatic complexity metrics: `mmcc`, `tmcc`, `sif`, `lif` - and commits a transaction in order to create/update RRD silos by the extracted metric span representing the current project state.\n\nIt uses the RRD data silos configuration as described by appropriated parameters of the `rrd` API query.\n",
+        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/cc/analytic/rrd/collect/POST/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/cc/analytic/rrd/collect/POST/result`\n\n",
+        "footer": "Although the query doesn't return anything useful for API consumer, it'd better wait on the output pipe until the query has been finished"
     }
 }

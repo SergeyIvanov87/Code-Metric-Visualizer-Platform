@@ -10,5 +10,10 @@
         "NO_NAME_PARAM.0": "AVERAGE",
         "package_counters": "mmcc_mean,mmcc_median,mmcc_deviation,tmcc_mean,tmcc_median,tmcc_deviation,sif_mean,sif_median,sif_deviation,lif_mean,lif_median,lif_deviation",
         "leaf_counters": "mmcc,tmcc,sif,lif"
+    },
+    "Description": {
+        "header": "Prints an CSV table of cyclomatic complexity metric trends, which stamps are extracted from RRD time series data silos.\nIt extracts the trend from RRD silos which were determined by appropriated params of `rrd_select` API query.\n",
+        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/cc/analytic/rrd/select/view/GET/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/cc/analytic/rrd/select/view/GET/result.csv > <your filemame>.csv`\n\n",
+        "footer": "The result of this query is a Comma-Separated-Values file, which could be opened my any well-known office application"
     }
 }

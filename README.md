@@ -62,14 +62,13 @@ To build the image please follow the steps:
 
 #### As the-Container-Developer:
 
-In case you wondered how to amend to enhance the current functionality by changing the API please follow this path:
-As a first step, you need to generate API request handlers in a form of simple self-generated bash scripts. This script production phase is important step for developing process only, because it reassure that any changes in the basic API-file would not be forgotten.
+In case you wondered how to amend or enhance the current functionality by changing the API, please follow this path:
 
 `cd <this repo>`
 
 Modify API queries adding or changing JSON schemas in `API/*.json` and execute the cmd:
 
-`python ./build_api.py API > <submodules or main>/local/API.fs`
+`cp submodules or main>/API/* > <submodules or main>/local/API/`
 
 Compose and put your scripts `*_exec.sh` carrying out processing of added queries logic into `<submodules or main>/local/services` directory.
 
@@ -97,7 +96,7 @@ The `777` allows docker `pmccabe_collector` service to access this mount point w
 
 `sudo docker run -it --mount type=bind,src=./,target=/mnt pmccabe_vis:latest`
 
-Having all steps acomplished and with no erros in a processing logic, the content representing pseudo filesystem appears by path `<your project directory>/api.pmccabe_collector.restapi.org`. Typically it contains the `main` directory and `README.md` file for instructions.
+Having all steps acomplished and with no erros in a processing logic, the content representing pseudo filesystem appears by path `<your project directory>/api.pmccabe_collector.restapi.org`. Typically it contains the `cc` directory (stands for Cyclomatic Complexity) and `README-CC-*.md` file for API instructions.
 In none of those file are appeared, then other different failures have taken place. I'd very appreciate for any documented issues. In my own experience the essential utility `pmccabe` crashed when I was tried to estimate complexity of a Linux kernel project.
 
 # Submodules
