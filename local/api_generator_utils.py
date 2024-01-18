@@ -24,6 +24,8 @@ def generate_api_node_env_init():
 def generate_read_api_fs_args():
     return [ r'for entry in "${API_NODE}"/*.*',
              r"do",
+             r"    if [[ $entry == *.md ]]; then continue; fi",
+             r"    ",
              r"    file_basename=${entry##*/}",
              r"    param_name=${file_basename#*.}",
              r"    readarray -t arr < ${entry}",
