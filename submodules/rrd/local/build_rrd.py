@@ -51,7 +51,35 @@ class rrd:
             if item_name is not None:
                 # symbol ':' is forbidden in rrd-file names, because rrdtool graph uses it as a DEF args separator
                 # replace it with ';'
-                return item_name.replace(':',';'), node_type_index
+                # Other symbols forbidden as symbol in item names across different OS
+                # UNIX{/}, Winows{<,>,:,",/,\,|,?,*}
+                # This requirements is a consequence ofthe fact than `item_name` represents
+                # name of the file on filesystem, thus it must not contain any special character
+                # ? ->'%question%'
+                # > -> "%right-angle-bracket%"
+                # < -> %left-angle-bracket%
+                # / -> %slash%
+                # \ -> %backslash%
+                # | -> %pipe%
+                # * -> %asterix%
+                # : -> %colon%
+                canonize_map = { "?":"%question%",
+                                 "<":"%left-angle-bracket%",
+                                 ">":"%right-angle-bracket%",
+                                 "/":"%slash%",
+                                 '\\' :"%backslash%",
+                                 "|":"%pipe%",
+                                 "*":"%asterisk%",
+                                 ":":"%colon%"
+                }
+                # replace the last : on + to determine line in a file with function overloading
+                if int(item_name.count(':') % 2) != 0:
+                    last_colon_pos = item_name.rfind(':')
+                    item_name = item_name[:last_colon_pos] + "+" + item_name[last_colon_pos + 1:]
+                # canonize the elapsed content of the string
+                for k,v in canonize_map.items():
+                    item_name = item_name.replace(k, v)
+                return item_name, node_type_index
         raise Exception(f"Unsupported node type in XML node {tostring(xml_node)}. Available types: {','.join(xml_node_types)}");
 
     @staticmethod
