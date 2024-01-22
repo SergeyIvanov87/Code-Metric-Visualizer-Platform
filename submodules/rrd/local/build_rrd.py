@@ -15,6 +15,8 @@ from collections import defaultdict
 from xml.etree.ElementTree import ElementTree, tostring
 from xml.etree import ElementTree
 
+import rrd_utils
+
 sys.path.append(os.getenv('MAIN_IMAGE_ENV_SHARED_LOCATION_ENV', ''))
 from filesystem_utils import append_file_mode
 
@@ -49,9 +51,8 @@ class rrd:
         for node_type_index in range(0, len(xml_node_types)):
             item_name=xml_node.get(xml_node_types[node_type_index])
             if item_name is not None:
-                # symbol ':' is forbidden in rrd-file names, because rrdtool graph uses it as a DEF args separator
-                # replace it with ';'
-                return item_name.replace(':',';'), node_type_index
+                item_name = rrd_utils.canonize_rrd_source_name(item_name)
+                return item_name, node_type_index
         raise Exception(f"Unsupported node type in XML node {tostring(xml_node)}. Available types: {','.join(xml_node_types)}");
 
     @staticmethod

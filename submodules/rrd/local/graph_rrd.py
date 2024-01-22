@@ -14,6 +14,7 @@ import sys
 from collections import defaultdict
 from math import sqrt
 
+import rrd_utils
 sys.path.append(os.getenv('MAIN_IMAGE_ENV_SHARED_LOCATION_ENV', ''))
 import read_api_fs_args
 
@@ -71,7 +72,8 @@ def graph_db_records(db_path, rrd_recognizer, graph_args, metrics_to_collect):
     graph_ext = graph_args[graph_args.index("-a") + 1].lower()
 
     output_graph_path = os.path.join(dirname,filename + "." + graph_ext)
-    graph_title = filename
+    source_name = os.path.splitext(filename)[0]
+    graph_title = rrd_utils.decanonize_rrd_source_name(source_name)
 
     # ask for a proper metrics depending on DB type
     if rrd_recognizer.is_package(db_path):

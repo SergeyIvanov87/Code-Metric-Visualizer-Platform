@@ -11,6 +11,8 @@ import re
 import subprocess
 import sys
 
+import rrd_utils
+
 sys.path.append(os.getenv('MAIN_IMAGE_ENV_SHARED_LOCATION_ENV', ''))
 import read_api_fs_args
 
@@ -55,7 +57,12 @@ def fetch_db_records(db_path, fetch_args):
         raise Exception("Unexpected process output, requires 2 record lines at least");
 
     stdout_lines = rrd_update_result.stdout.split('\n')
-    head = list(db_path + "/" + h for h in stdout_lines[0].split())
+
+    service_token = "api.pmccabe_collector.restapi.org"
+    db_path = os.path.splitext(db_path)[0]
+    token_start = db_path.find(service_token)
+    counter_name = rrd_utils.decanonize_rrd_source_name(db_path[token_start + len(service_token):])
+    head = list(counter_name + "[\"" + h + "\"]" for h in stdout_lines[0].split() )
     line_size = 0;
     body =[]
     for l in stdout_lines[1:-1]:
@@ -123,6 +130,19 @@ for f in rrd_files:
         for aggregated_body_row in aggregated_body:
             aggregated_body_row.extend(next(body_iter)[1:-1])   # remove TIME value
     index += 1
+
+# nan in last row protection
+all_nan_in_line = True
+while all_nan_in_line:
+    all_nan_in_line = True
+    last_row = aggregated_body[-1]
+    for v in last_row[2:-1]:
+        if v.find("nan") == -1:
+            all_nan_in_line = False
+            break
+
+    if all_nan_in_line == True:
+        del aggregated_body[-1]
 
 # write to stddout to use redirection later
 writer = csv.writer(sys.stdout)
