@@ -39,23 +39,6 @@ parser.add_argument("-o", "--output_dir",
                     default=get_generated_scripts_path())
 args = parser.parse_args()
 
-api_schema = [
-    ". ${1}/setenv.sh\n",
-    "{} > {}/help 2>&1\n",
-    "shopt -s extglob\n",
-    "inotifywait -m {0} {1} --include '{2}' |\n",
-    "\twhile read dir action file; do\n",
-    '\t\techo "file: ${file}, action; ${action}, dir: ${dir}"\n',
-    '\t\tcase "$action" in\n',
-    "\t\t\tACCESS|ATTRIB )\n",
-    '\t\t\t\t"${0}/{1}" {2} ${3} {4}/{5}\n',
-    "\t\t\t;;\n",
-    "\t\t\t*)\n",
-    "\t\t\t\t;;\n",
-    "\t\tesac\n",
-    "\tdone\n",
-]
-
 # Load api generator module: put particular `api_exec_generator` at beginning
 # to prevent loading `api_generator` from main image dir
 sys.path.insert(0, args.api_exec_generator)

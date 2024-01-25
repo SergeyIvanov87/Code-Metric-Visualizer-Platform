@@ -97,5 +97,6 @@ while len(traverse_dirs_list) != 0:
 
 os.makedirs(args.output_api_dir, exist_ok=True)
 for name, query in API_table.items():
+    name = name + ".json"
     with open(os.path.join(args.output_api_dir, name), "w") as api_schema_file:
         json.dump(query, api_schema_file)

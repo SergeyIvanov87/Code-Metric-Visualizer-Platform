@@ -1,0 +1,11 @@
+[project]
+name = "rest_api_server"
+dependencies = [
+    "flask",
+]
+version = "0.1"
+description = "TODO"
+
+[build-system]
+requires = ["flit_core<4"]
+build-backend = "flit_core.buildapi"
