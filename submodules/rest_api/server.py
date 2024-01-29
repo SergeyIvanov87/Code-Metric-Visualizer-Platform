@@ -31,7 +31,7 @@ def flamegraph():
 def view():
     f = open("/mnt/api.pmccabe_collector.restapi.org/cc/statistic/view/GET/exec", "w")
     p = Popen(['echo','0'], stdout=f, stderr=STDOUT)
-    pout = subprocess.run(['cat', '/mnt/api.pmccabe_collector.restapi.org/cc/statistic/view/GET/result.collapsed'], stdout=PIPE, stderr=STDOUT,universal_newlines=True)
+    pout = subprocess.run(['cat', '/mnt/api.pmccabe_collector.restapi.org/cc/statistic/view/GET/result.txt'], stdout=PIPE, stderr=STDOUT,universal_newlines=True)
     return f"<p>{pout.stdout}</p>"
 
 

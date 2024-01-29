@@ -6,10 +6,15 @@ import api_generator_utils
 Provides a functions set which manages to generate API executor scripts
 """
 
-def make_script_watch_list(script):
+def make_script_watch_list(script, desired_file_ext=""):
+    if len(desired_file_ext) == 0:
+        file_extension = ".txt"
+    else:
+        file_extension = "." + desired_file_ext
+
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(".txt"), r"",
+        *api_generator_utils.generate_get_result_type(file_extension), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
         r'echo "${brr[@]}" | xargs find ${INITIAL_PROJECT_LOCATION}',
@@ -19,10 +24,15 @@ def make_script_watch_list(script):
 def generate_script_watch_list_help():
     return "find --help"
 
-def make_script_statistic(script):
+def make_script_statistic(script, desired_file_ext=""):
+    if len(desired_file_ext) == 0:
+        file_extension = ".xml"
+    else:
+        file_extension = "." + desired_file_ext
+
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(".xml"), r"",
+        *api_generator_utils.generate_get_result_type(file_extension), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
         r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/cc/GET/exec',
@@ -33,10 +43,15 @@ def make_script_statistic(script):
 def generate_script_statistic_help():
     return "${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py --help"
 
-def make_script_view(script):
+def make_script_view(script, desired_file_ext=""):
+    if len(desired_file_ext) == 0:
+        file_extension = ".txt"
+    else:
+        file_extension = "." + desired_file_ext
+
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(".collapsed"), r"",
+        *api_generator_utils.generate_get_result_type(file_extension), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
         r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/cc/statistic/GET/exec',
@@ -47,14 +62,19 @@ def make_script_view(script):
 def generate_script_view_help():
     return "${WORK_DIR}/pmccabe_visualizer/collapse.py --help"
 
-def make_script_flamegraph(script):
+def make_script_flamegraph(script, desired_file_ext=""):
+    if len(desired_file_ext) == 0:
+        file_extension = ".svg"
+    else:
+        file_extension = "." + desired_file_ext
+
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(".svg"), r"",
+        *api_generator_utils.generate_get_result_type(file_extension), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
         r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/cc/statistic/view/GET/exec',
-        r"cat ${SHARED_API_DIR}/cc/statistic/view/GET/result.collapsed | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
+        r"cat ${SHARED_API_DIR}/cc/statistic/view/GET/result.txt | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
     )
     script.writelines(line + "\n" for line in body)
 

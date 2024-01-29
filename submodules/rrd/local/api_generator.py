@@ -2,10 +2,15 @@
 
 import api_generator_utils
 
-def make_script_analytic(script):
+def make_script_analytic(script, desired_file_ext=""):
+    if len(desired_file_ext) == 0:
+        file_extension = ""
+    else:
+        file_extension = "." + desired_file_ext
+
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(""), r"",
+        *api_generator_utils.generate_get_result_type(file_extension), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
         r'echo "${brr[@]}"',
@@ -15,10 +20,15 @@ def make_script_analytic(script):
 def generate_script_analytic_help():
     return "rrdtool -h"
 
-def make_script_rrd(script):
+def make_script_rrd(script, desired_file_ext=""):
+    if len(desired_file_ext) == 0:
+        file_extension = ""
+    else:
+        file_extension = "." + desired_file_ext
+
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(""), r"",
+        *api_generator_utils.generate_get_result_type(file_extension), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
         r'echo "${brr[@]}"',
@@ -28,10 +38,15 @@ def make_script_rrd(script):
 def generate_script_rrd_help():
     return "rrdtool -h"
 
-def make_script_rrd_collect(script):
+def make_script_rrd_collect(script, desired_file_ext=""):
+    if len(desired_file_ext) == 0:
+        file_extension = ""
+    else:
+        file_extension = "." + desired_file_ext
+
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(""), r"",
+        *api_generator_utils.generate_get_result_type(file_extension), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_bypassed_params_formatting(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
@@ -47,10 +62,14 @@ def make_script_rrd_collect(script):
 def generate_script_rrd_collect_help():
     return "rrdtool -h"
 
-def make_script_rrd_select(script):
+def make_script_rrd_select(script, desired_file_ext=""):
+    if len(desired_file_ext) == 0:
+        file_extension = ".txt"
+    else:
+        file_extension = "." + desired_file_ext
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(".txt"), r"",
+        *api_generator_utils.generate_get_result_type(file_extension), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         *api_generator_utils.generate_read_api_fs_args(), r"",
         r'echo "${brr[@]}" | xargs find ${RRD_ROOT}',
@@ -60,10 +79,14 @@ def make_script_rrd_select(script):
 def generate_script_rrd_select_help():
     return "rrdtool -h"
 
-def make_script_rrd_view(script):
+def make_script_rrd_view(script, desired_file_ext=""):
+    if len(desired_file_ext) == 0:
+        file_extension = ".csv"
+    else:
+        file_extension = "." + desired_file_ext
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(".csv"), r"",
+        *api_generator_utils.generate_get_result_type(file_extension), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/cc/analytic/rrd/select/GET/exec',
         r'cat ${SHARED_API_DIR}/cc/analytic/rrd/select/GET/result.txt | ${WORK_DIR}/fetch_rrd.py ${SHARED_API_DIR}/cc/analytic/rrd/select/view',
@@ -73,10 +96,15 @@ def make_script_rrd_view(script):
 def generate_script_rrd_view_help():
     return "rrdtool -h"
 
-def make_script_rrd_plot_view(script):
+def make_script_rrd_plot_view(script, desired_file_ext):
+    if len(desired_file_ext) == 0:
+        file_extension = ".png"
+    else:
+        file_extension = "." + desired_file_ext
+
     body = (
         *api_generator_utils.generate_exec_header(), r"",
-        *api_generator_utils.generate_get_result_type(".png"), r"",
+        *api_generator_utils.generate_get_result_type(file_extension), r"",
         *api_generator_utils.generate_api_node_env_init(), r"",
         r"RESULT_FILE=`mktemp -u`",
         r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/cc/analytic/rrd/select/GET/exec',

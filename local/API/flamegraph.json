@@ -1,4 +1,5 @@
 {
+    "Content-Type" : "image/svg+xml",
     "Method" : "GET",
     "Query": "api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph",
     "Params": {

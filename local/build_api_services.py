@@ -25,6 +25,7 @@ from api_gen_utils import decode_api_request_from_schema_file
 from api_gen_utils import get_api_gui_service_script_path
 from api_gen_utils import get_generated_scripts_path
 from api_gen_utils import get_api_leaf_node_name
+from api_gen_utils import file_extension_from_content_type
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -141,6 +142,11 @@ for schema_file in schemas_file_list:
     req_type = request_data["Method"]
     req_api = request_data["Query"]
     req_params = request_data["Params"]
+
+    content_type=""
+    if "Content-Type" in request_data:
+        content_type = request_data["Content-Type"]
+
     api_node, api_req_node = compose_api_fs_node_name(
             "${INITIAL_PROJECT_LOCATION}", req_api, req_type
     )
@@ -158,7 +164,13 @@ for schema_file in schemas_file_list:
         api_gui_schema_concrete[1] = api_gui_schema_concrete[1].format(
             "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_node
         )
-        api_gui_schema_concrete[3] = api_gui_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+
+        # determine result type: either from JSON or from script renerated
+        if len(content_type) != 0:
+            api_gui_schema_concrete[3] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
+        else:
+            api_gui_schema_concrete[3] = api_gui_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+
         api_gui_schema_concrete[4] = api_gui_schema_concrete[4].format(
             api_req_node, get_fs_watch_event_for_request_type(req_type), get_api_leaf_node_name(req_type) + "$"
         )
@@ -192,7 +204,12 @@ for schema_file in schemas_file_list:
         api_cli_schema_concrete = api_cli_schema.copy()
         api_cli_schema_concrete[1] = api_cli_schema_concrete[1].format(api_req_node
         )
-        api_cli_schema_concrete[3] = api_cli_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+
+        # determine result type: either from JSON or from script renerated
+        if len(content_type) != 0:
+            api_cli_schema_concrete[3] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
+        else:
+            api_cli_schema_concrete[3] = api_cli_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
 
         api_cli_schema_concrete[37] = api_cli_schema_concrete[37].format(
             "{WORK_DIR}",

@@ -75,3 +75,32 @@ def get_api_request_plain_params(req_param_json):
         if isinstance(req_param_json[p], str):
             params_list.append(str(p) + "=" + req_param_json[p])
     return params_list
+
+
+def file_extension_from_content_type(content_type):
+    mapping = {"image/apng":"apng",
+               "application/octet-stream":"bin",
+               "image/bmp":"bmp",
+               "application/x-bzip":"bz",
+               "application/x-bzip2":"bz2",
+               "application/x-csh":"csh",
+               "application/msword":"doc",
+               "application/vnd.openxmlformats-officedocument.wordprocessingml.document":"docx",
+               "application/epub+zip":"epub",
+               "application/gzip":"gz",
+               "image/gif":"gif",
+               "text/html":"html",
+               "image/jpeg":"jpg",
+               "application/json":"json",
+               "application/vnd.oasis.opendocument.spreadsheet":"ods",
+               "image/png":"png",
+               "application/pdf":"pdg",
+               "image/svg+xml":"svg",
+               "image/tiff":"tiff",
+               "text/plain":"txt",
+               "application/xml":"xml",
+               "application/zip":"zip"
+    }
+    if content_type not in mapping.keys():
+        raise KeyError(f"Content-Type: {content_type} is not found in the file extension mapping table")
+    return mapping[content_type]

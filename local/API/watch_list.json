@@ -1,9 +1,10 @@
 {
+    "Content-Type" : "text/plain",
     "Method" : "GET",
     "Query": "api.pmccabe_collector.restapi.org/cc",
     "Params": {
         "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
-        "-prune": "! -path \"*buil*\" ! -path \"*thirdpart*\""
+        "NO_NAME_PARAM.0": "-prune ! -path \"*buil*\" ! -path \"*thirdpart*\""
     },
     "Description": {
         "header": "Supplies further API queries by extracting the files for analysis from a project source directory tree.\nParams of this query repeats after the general Linux command `find` (please refer `man find` to find out more information)\n",

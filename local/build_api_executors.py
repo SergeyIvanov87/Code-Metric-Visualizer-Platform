@@ -19,6 +19,7 @@ from api_gen_utils import compose_api_fs_node_name
 from api_gen_utils import get_generated_scripts_path
 from api_gen_utils import get_api_schema_files
 from api_gen_utils import decode_api_request_from_schema_file
+from api_gen_utils import file_extension_from_content_type
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -55,6 +56,13 @@ for schema_file in schemas_file_list:
     req_type = request_data["Method"]
     req_api = request_data["Query"]
     req_params = request_data["Params"]
+
+    content_type=""
+    content_file_extension=""
+    if "Content-Type" in request_data:
+        content_type = request_data["Content-Type"]
+        content_file_extension = file_extension_from_content_type(content_type)
+
     api_node, api_req_node = compose_api_fs_node_name(
             "${INITIAL_PROJECT_LOCATION}", req_api, req_type
     )
@@ -70,7 +78,7 @@ for schema_file in schemas_file_list:
         with open(script_generated_path, "x") as script:
             filesystem_utils.make_file_executable(script_generated_path)
             if req_name in scripts_generator.keys():
-                scripts_generator[req_name](script)
+                scripts_generator[req_name](script, content_file_extension)
             else:
                 make_default_script(script)
     except FileExistsError as e:
