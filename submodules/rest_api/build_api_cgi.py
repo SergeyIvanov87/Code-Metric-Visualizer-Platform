@@ -70,8 +70,20 @@ def generate_cgi_schema(req_api, req_type, output_pipe, params, content_type):
             r'    return f"<p>{pout.read()}</p>"'
         ]
 
-    cgi_schema = [ r'@app.route("/{}",  methods=["{}"])'.format(req_api, req_type),
+    methods = f"\"{req_type}\""
+    make_redirect_url = [""]
+    if req_type == "POST":
+        # we cannot send post by typing a resource URL. We need for a 'submit' button placed on HTML form instead
+        # For each POST-request we just generate the appropriate GET-request which provides us
+        # with a submit HTML form
+        methods += ", \"GET\""
+        make_redirect_url =[ r'    if request.method == "GET":',
+                             r'        return f"<form style=\"display: none\" action=\"/{}\" method=\"post\">"+'.format(req_api) + r'"<button type=\"submit\" id=\"button_to_link\"> </button></form><label style=\"text-decoration: underline\" for=\"button_to_link\"> submit {} </label>"'.format(req_api)
+        ]
+
+    cgi_schema = [ r'@app.route("/{}",  methods=[{}])'.format(req_api, methods),
                    r'def {}():'.format(canonize_api_method_name),
+                   *make_redirect_url,
                    r'    api_query_pipe="/mnt/{}/{}/exec"'.format(req_api, req_type),
                    r'    api_result_pipe="/mnt/{}/{}/{}"'.format(req_api, req_type, output_pipe),
                    r'    pin = open(api_query_pipe, "w")',

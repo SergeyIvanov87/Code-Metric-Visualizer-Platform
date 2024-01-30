@@ -79,27 +79,31 @@ def get_api_request_plain_params(req_param_json):
 
 def file_extension_from_content_type(content_type):
     mapping = {"image/apng":"apng",
+               "application/epub+zip":"epub",
+               "application/gzip":"gz",
+               "application/json":"json",
+               "application/msword":"doc",
                "application/octet-stream":"bin",
-               "image/bmp":"bmp",
+               "application/pdf":"pdg",
+               "application/vnd.oasis.opendocument.spreadsheet":"ods",
+               "application/vnd.openxmlformats-officedocument.wordprocessingml.document":"docx",
                "application/x-bzip":"bz",
                "application/x-bzip2":"bz2",
                "application/x-csh":"csh",
-               "application/msword":"doc",
-               "application/vnd.openxmlformats-officedocument.wordprocessingml.document":"docx",
-               "application/epub+zip":"epub",
-               "application/gzip":"gz",
+               "application/xml":"xml",
+               "application/zip":"zip",
+
+               "image/bmp":"bmp",
                "image/gif":"gif",
-               "text/html":"html",
                "image/jpeg":"jpg",
-               "application/json":"json",
-               "application/vnd.oasis.opendocument.spreadsheet":"ods",
                "image/png":"png",
-               "application/pdf":"pdg",
                "image/svg+xml":"svg",
                "image/tiff":"tiff",
+
+               "text/csv":"csv",
+               "text/html":"html",
                "text/plain":"txt",
-               "application/xml":"xml",
-               "application/zip":"zip"
+
     }
     if content_type not in mapping.keys():
         raise KeyError(f"Content-Type: {content_type} is not found in the file extension mapping table")

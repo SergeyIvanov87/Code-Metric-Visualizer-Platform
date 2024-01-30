@@ -96,7 +96,7 @@ def make_script_rrd_view(script, desired_file_ext=""):
 def generate_script_rrd_view_help():
     return "rrdtool -h"
 
-def make_script_rrd_plot_view(script, desired_file_ext):
+def make_script_rrd_plot_view(script, desired_file_ext=""):
     if len(desired_file_ext) == 0:
         file_extension = ".png"
     else:

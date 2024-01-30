@@ -13,6 +13,7 @@ cp ${WORK_DIR}/rest_api_server/rest_api_server/cgi_template.py ${WORK_DIR}/rest_
 ${WORK_DIR}/build_api_cgi.py ${WORK_DIR}/API api.pmccabe_collector.restapi.org >> ${WORK_DIR}/rest_api_server/rest_api_server/cgi.py
 cd ${WORK_DIR}/rest_api_server/
 
+echo "DEBUG CMD:  cp ../rest_api_server/rest_api_server/cgi_template.py ../rest_api_server/rest_api_server/cgi.py && ../build_api_cgi.py ../API api.pmccabe_collector.restapi.org >> ../rest_api_server/rest_api_server/cgi.py"
 pipx install -e .
 flask --app rest_api_server run --host 0.0.0.0
 
