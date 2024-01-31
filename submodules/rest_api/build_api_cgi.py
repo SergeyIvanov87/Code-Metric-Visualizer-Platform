@@ -101,7 +101,7 @@ for schema_file in schemas_file_list:
     req_api = request_data["Query"]
     req_params = request_data["Params"]
 
-    content_type=""
+    content_type="text/plain"
     if "Content-Type" in request_data:
         content_type = request_data["Content-Type"]
 

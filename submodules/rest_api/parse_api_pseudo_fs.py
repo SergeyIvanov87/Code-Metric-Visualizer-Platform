@@ -10,6 +10,7 @@ from collections import defaultdict
 
 sys.path.append(os.getenv("MAIN_IMAGE_ENV_SHARED_LOCATION_ENV", ""))
 import read_api_fs_args
+from api_gen_utils import content_type_from_file_extension
 
 # import filesystem_utils
 # import api_gen_utils
@@ -39,16 +40,16 @@ def read_directory_content(path, directories_tree, arguments_for_directories):
     return parsed_directories_list, directories_tree, arguments_for_directories
 
 
-def is_api_leaf_dir(path):
+def get_api_leaf_dir_pipes(path):
     pipes_files = {
         f
         for f in os.listdir(path)
         if stat.S_ISFIFO(os.stat(os.path.join(path, f)).st_mode)
     }
-    return len(pipes_files) == 2
+    return pipes_files
 
 
-def restore_api(leaf_dir, fs_tree, fs_args_tree):
+def restore_api(leaf_dir, fs_tree, fs_args_tree, api_query_pipes):
     supported_req_type = ["GET", "PUT", "POST"]
     req_type = os.path.basename(leaf_dir)
     if req_type not in supported_req_type:
@@ -59,6 +60,16 @@ def restore_api(leaf_dir, fs_tree, fs_args_tree):
     API_query["Method"] = req_type
     API_query["Query"] = os.path.dirname(leaf_dir)
     API_query["Params"] = {}
+
+    # extract content-type from api pipes extension:
+    output_pipe_file_extension="txt"
+    for p in api_query_pipes:
+        p_splitted = p.split(".")
+        if len(p_splitted) == 2 and p_splitted[0].find("result") != -1:
+            output_pipe_file_extension=p_splitted[1]
+            break
+    API_query["Content-Type"] = content_type_from_file_extension(output_pipe_file_extension)
+
     api_params = API_query
     api_params_ref = None
     api_parent_dir = os.path.dirname(leaf_dir)
@@ -88,8 +99,10 @@ while len(traverse_dirs_list) != 0:
     parsed_dirs, fs_tree, fs_args_tree = read_directory_content(
         current_dir, fs_tree, fs_args_tree
     )
-    if is_api_leaf_dir(current_dir):
-        API_query_name, API_query = restore_api(current_dir, fs_tree, fs_args_tree)
+    api_pipes = get_api_leaf_dir_pipes(current_dir)
+    if len(api_pipes) == 2:
+        # it must be API leaf dir
+        API_query_name, API_query = restore_api(current_dir, fs_tree, fs_args_tree, api_pipes)
         API_table[API_query_name] = API_query
 
     traverse_dirs_list.extend(parsed_dirs)

@@ -77,8 +77,8 @@ def get_api_request_plain_params(req_param_json):
     return params_list
 
 
-def file_extension_from_content_type(content_type):
-    mapping = {"image/apng":"apng",
+def get_context_type_ext_mapping():
+    return {"image/apng":"apng",
                "application/epub+zip":"epub",
                "application/gzip":"gz",
                "application/json":"json",
@@ -103,8 +103,21 @@ def file_extension_from_content_type(content_type):
                "text/csv":"csv",
                "text/html":"html",
                "text/plain":"txt",
-
     }
+
+def file_extension_from_content_type(content_type):
+    mapping = get_context_type_ext_mapping()
     if content_type not in mapping.keys():
         raise KeyError(f"Content-Type: {content_type} is not found in the file extension mapping table")
     return mapping[content_type]
+
+def content_type_from_file_extension(file_extension):
+    content_type = ""
+    for k, v in get_context_type_ext_mapping().items():
+        if v == file_extension:
+            content_type = k
+            break
+
+    if content_type == "":
+        raise KeyError(f"The file extension: {file_extension} is not found in the Content-Type mapping table")
+    return content_type
