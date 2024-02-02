@@ -5,7 +5,7 @@ WORKDIR package
 #ARG SCRIPT_GEN_LOC=rest_api_server
 
 # install app dependencies
-RUN pacman -Sy --noconfirm python python-flask python-pipx
+RUN pacman -Sy --noconfirm python python-flask python-markdown python-pipx
 
 COPY *.sh /package/
 COPY *.py /package/

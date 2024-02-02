@@ -18,7 +18,6 @@ import stat
 sys.path.append(os.getenv('MAIN_IMAGE_ENV_SHARED_LOCATION_ENV', ''))
 
 from filesystem_utils import append_file_mode
-
 import filesystem_utils
 
 from api_gen_utils import compose_api_exec_script_name
@@ -85,7 +84,7 @@ def generate_cgi_schema(req_api, req_type, output_pipe, params, content_type):
                    r'def {}():'.format(canonize_api_method_name),
                    *make_redirect_url,
                    r'    api_query_pipe="/mnt/{}/{}/exec"'.format(req_api, req_type),
-                   r'    api_result_pipe="/mnt/{}/{}/{}"'.format(req_api, req_type, output_pipe),
+                   r'    api_result_pipe="/mnt/{}"'.format(output_pipe),
                    r'    pin = open(api_query_pipe, "w")',
                    *get_query_params(params), r'',
                    r'    pin.write(query_params_str)',
@@ -94,6 +93,17 @@ def generate_cgi_schema(req_api, req_type, output_pipe, params, content_type):
     ]
     return cgi_schema
 
+
+# print the main page
+cgi_main = [ r'@app.route("/api.pmccabe_collector.restapi.org", methods=["GET"])',
+             r'def index():',
+             r'    with open("rest_api_server/templates/index.md", "r") as readme_file:',
+             r'        api_description = readme_file.read()',
+             r'        api_description = markdown.markdown(api_description)',
+             r'    return render_template("index.html", content_body=api_description)'
+]
+print("\n".join(cgi_main))
+print("")
 
 for schema_file in schemas_file_list:
     req_name, request_data = decode_api_request_from_schema_file(schema_file)
@@ -110,18 +120,18 @@ for schema_file in schemas_file_list:
         continue
 
     # determine output PIPE name extension
-    req_fs_leaf_node = os.path.join(req_api, req_type)
-    pipes_files = { f for f in os.listdir(req_fs_leaf_node) if stat.S_ISFIFO(os.stat(os.path.join(req_fs_leaf_node, f)).st_mode) }
-    output_pipe = ""
-    for pf in pipes_files:
-        if pf.find("result") != -1:
-            output_pipe = pf
-            break
-    if len(output_pipe) == 0:
-        raise Exception(f"Incorrect filesystem API node: {req_fs_leaf_node}.\nIt must contains 'result' pipe")
+    req_fs_output_pipe_name = os.path.join(req_api, req_type, "result." + file_extension_from_content_type(content_type))
+    #pipes_files = { f for f in os.listdir(req_fs_leaf_node) if stat.S_ISFIFO(os.stat(os.path.join(req_fs_leaf_node, f)).st_mode) }
+    #output_pipe = ""
+    #for pf in pipes_files:
+        #if pf.find("result") != -1:
+        #    output_pipe = pf
+            #break
+    #if len(output_pipe) == 0:
+        #raise Exception(f"Incorrect filesystem API node: {req_fs_leaf_node}.\nIt must contains 'result' pipe")
 
     req_api = req_api[domain_entry_pos:]
 
-    cgi_content = generate_cgi_schema(req_api, req_type, output_pipe, req_params, content_type)
+    cgi_content = generate_cgi_schema(req_api, req_type, req_fs_output_pipe_name, req_params, content_type)
     for l in cgi_content:
         print(l)

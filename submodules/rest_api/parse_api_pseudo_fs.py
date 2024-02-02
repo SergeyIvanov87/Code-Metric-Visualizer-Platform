@@ -10,6 +10,7 @@ from collections import defaultdict
 
 sys.path.append(os.getenv("MAIN_IMAGE_ENV_SHARED_LOCATION_ENV", ""))
 import read_api_fs_args
+import filesystem_utils
 from api_gen_utils import content_type_from_file_extension
 
 # import filesystem_utils
@@ -21,13 +22,14 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument("mount_point", help="An existing mounted pseudo fs root node path")
+parser.add_argument("domain_name_api_entry", help="build API queries processor for that particular domain")
 parser.add_argument(
     "output_api_dir", help="Path to the output directory with restored JSON API schemas"
 )
 args = parser.parse_args()
 
 
-def read_directory_content(path, directories_tree, arguments_for_directories):
+def read_directory_content(path, directories_tree, arguments_for_directories, directories_for_markdown):
     parsed_directories_list = {
         os.path.join(path, d)
         for d in os.listdir(path)
@@ -36,8 +38,12 @@ def read_directory_content(path, directories_tree, arguments_for_directories):
     local_directories_tree = {d: path for d in parsed_directories_list}
     if len(local_directories_tree) != 0:
         directories_tree.update(local_directories_tree)
+    # parse files in directories which may represent arguments for FS API
     arguments_for_directories[path] = read_api_fs_args.read_args_dict(path)
-    return parsed_directories_list, directories_tree, arguments_for_directories
+
+    # search Markdown files
+    directories_for_markdown.extend(filesystem_utils.read_files_from_path(path, '.*\.md$'))
+    return parsed_directories_list, directories_tree, arguments_for_directories, directories_for_markdown
 
 
 def get_api_leaf_dir_pipes(path):
@@ -49,7 +55,7 @@ def get_api_leaf_dir_pipes(path):
     return pipes_files
 
 
-def restore_api(leaf_dir, fs_tree, fs_args_tree, api_query_pipes):
+def restore_api(leaf_dir, fs_tree, fs_args_tree, api_query_pipes, api_domain):
     supported_req_type = ["GET", "PUT", "POST"]
     req_type = os.path.basename(leaf_dir)
     if req_type not in supported_req_type:
@@ -57,8 +63,14 @@ def restore_api(leaf_dir, fs_tree, fs_args_tree, api_query_pipes):
             f"Incorrect API directory: {leaf_dir}. It must terminated by: {','.join(supported_req_type)}"
         )
     API_query = {}
+    query_name = os.path.dirname(leaf_dir)
+    domain_entry_pos = query_name.find(api_domain)
+    if domain_entry_pos == -1:
+        return API_query
+    query_name = query_name[domain_entry_pos:]
+
     API_query["Method"] = req_type
-    API_query["Query"] = os.path.dirname(leaf_dir)
+    API_query["Query"] = query_name
     API_query["Params"] = {}
 
     # extract content-type from api pipes extension:
@@ -93,23 +105,41 @@ def restore_api(leaf_dir, fs_tree, fs_args_tree, api_query_pipes):
 API_table = {}
 fs_tree = {}
 fs_args_tree = defaultdict(dict)
+directories_for_markdown = []
+
+# DFS starting from mount_point
 traverse_dirs_list = [args.mount_point]
 while len(traverse_dirs_list) != 0:
     current_dir = traverse_dirs_list.pop()
-    parsed_dirs, fs_tree, fs_args_tree = read_directory_content(
-        current_dir, fs_tree, fs_args_tree
+    parsed_dirs, fs_tree, fs_args_tree, directories_for_markdown = read_directory_content(
+        current_dir, fs_tree, fs_args_tree, directories_for_markdown
     )
     api_pipes = get_api_leaf_dir_pipes(current_dir)
     if len(api_pipes) == 2:
         # it must be API leaf dir
-        API_query_name, API_query = restore_api(current_dir, fs_tree, fs_args_tree, api_pipes)
+        API_query_name, API_query = restore_api(current_dir, fs_tree, fs_args_tree, api_pipes, args.domain_name_api_entry)
         API_table[API_query_name] = API_query
 
     traverse_dirs_list.extend(parsed_dirs)
 
+# unify *.md files content into single file
+index_markdown_content = []
+for md in set(directories_for_markdown):
+    with open(md, "r") as md_file:
+        index_markdown_content.extend(md_file.read().splitlines());
 
 os.makedirs(args.output_api_dir, exist_ok=True)
 for name, query in API_table.items():
     name = name + ".json"
     with open(os.path.join(args.output_api_dir, name), "w") as api_schema_file:
         json.dump(query, api_schema_file)
+    query_url = query["Query"]
+
+    # inject relative link onto HTTP query into markdown content
+    for i in range(0, len(index_markdown_content)):
+        if index_markdown_content[i].find("### " + query_url + "/" + query["Method"]) != -1:
+            index_markdown_content[i] += f" [execute]({query_url})"
+
+if len(directories_for_markdown) != 0:
+    with open(os.path.join(args.output_api_dir, "index.md"), "w") as index_markdown:
+        index_markdown.writelines(l + '\n' for l in index_markdown_content)
