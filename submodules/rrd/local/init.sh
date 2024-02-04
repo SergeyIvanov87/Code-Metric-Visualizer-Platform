@@ -22,9 +22,9 @@ ${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_
 # abandon any attempt to make it and keep container start-up process clear from any cumbersome logic.
 # So only services must be started up here!
 
-#BUILD_RRD_ARGS=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from read_api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/analytic/")))'`
-#BUILD_RRD_COUNTERS_ARGS=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from read_api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/analytic/rrd")))'`
-#BUILD_RRD_FROM_SOURCES=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from read_api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/")))'`
+#BUILD_RRD_ARGS=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/analytic/")))'`
+#BUILD_RRD_COUNTERS_ARGS=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/analytic/rrd")))'`
+#BUILD_RRD_FROM_SOURCES=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/")))'`
 
 #printf "INFO: Set up 'api.pmccabe_collector.restapi.org/cc/analytic' params before proceed.\n"
 #printf "Default params would be used otherwise:\n"

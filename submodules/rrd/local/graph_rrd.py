@@ -16,7 +16,8 @@ from math import sqrt
 
 import rrd_utils
 sys.path.append(os.getenv('MAIN_IMAGE_ENV_SHARED_LOCATION_ENV', ''))
-import read_api_fs_args
+import api_fs_args
+import filesystem_utils
 
 def get_last_timestamp(db_path, default_timestamp="1701154261"):
     timestamp=default_timestamp
@@ -112,14 +113,7 @@ def graph_db_records(db_path, rrd_recognizer, graph_args, metrics_to_collect):
     return output_graph_path, rrd_update_result.stdout.split('x')
 
 def read_db_files_from_path(path, file_match_regex='.*\.rrd$'):
-    p = re.compile(file_match_regex)
-    if os.path.isfile(path) and p.match(path):
-        return [path]
-
-    files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path,f))]
-    rrd_db_files = [ os.path.join(path,f) for f in files if p.match(f) ]
-
-    return rrd_db_files
+    return filesystem_utils.read_files_from_path(path, '.*\.rrd$')
 
 parser = argparse.ArgumentParser(
     prog="RRD databases recursive graph plotter",
@@ -136,7 +130,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 components_2_fetch = sys.stdin.read().split()
-cmd_args_list, filtering_args_list = read_api_fs_args.read_n_separate_args(args.api_arg_dir, ["package_counters", "leaf_counters", "colors"])
+cmd_args_list, filtering_args_list = api_fs_args.read_n_separate_args(args.api_arg_dir, ["package_counters", "leaf_counters", "colors"])
 
 rrd_files = []
 for component in components_2_fetch:

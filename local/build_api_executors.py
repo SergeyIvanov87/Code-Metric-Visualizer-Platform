@@ -14,12 +14,14 @@ import stat
 
 import filesystem_utils
 
-from api_gen_utils import compose_api_exec_script_name
-from api_gen_utils import compose_api_fs_node_name
-from api_gen_utils import get_generated_scripts_path
-from api_gen_utils import get_api_schema_files
-from api_gen_utils import decode_api_request_from_schema_file
-from api_gen_utils import file_extension_from_content_type
+from api_fs_conventions import compose_api_exec_script_name
+from api_fs_conventions import compose_api_fs_request_location_paths
+from api_fs_conventions import get_generated_scripts_path
+from api_fs_conventions import get_api_schema_files
+
+from api_schema_utils import deserialize_api_request_from_schema_file
+from api_schema_utils import file_extension_from_content_type
+from api_schema_utils import file_extension_from_content_type_or_default
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -52,18 +54,14 @@ os.makedirs(generated_api_server_scripts_path, exist_ok=True)
 errors_detected = []
 schemas_file_list = get_api_schema_files(args.api_root_dir)
 for schema_file in schemas_file_list:
-    req_name, request_data = decode_api_request_from_schema_file(schema_file)
+    req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
     req_type = request_data["Method"]
     req_api = request_data["Query"]
     req_params = request_data["Params"]
 
-    content_type=""
-    content_file_extension=""
-    if "Content-Type" in request_data:
-        content_type = request_data["Content-Type"]
-        content_file_extension = file_extension_from_content_type(content_type)
+    content_file_extension = file_extension_from_content_type_or_default(request_data, "")
 
-    api_node, api_req_node = compose_api_fs_node_name(
+    api_node, api_req_node = compose_api_fs_request_location_paths(
             "${INITIAL_PROJECT_LOCATION}", req_api, req_type
     )
 

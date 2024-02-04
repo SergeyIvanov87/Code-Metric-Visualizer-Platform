@@ -14,7 +14,8 @@ import sys
 import rrd_utils
 
 sys.path.append(os.getenv('MAIN_IMAGE_ENV_SHARED_LOCATION_ENV', ''))
-import read_api_fs_args
+import api_fs_args
+import filesystem_utils
 
 def get_last_timestamp(db_path, default_timestamp="1701154261"):
     timestamp=default_timestamp
@@ -79,14 +80,8 @@ def fetch_db_records(db_path, fetch_args):
 
 
 def read_db_files_from_path(path, file_match_regex='.*\.rrd$'):
-    p = re.compile(file_match_regex)
-    if os.path.isfile(path) and p.match(path):
-        return [path]
+    return filesystem_utils.read_files_from_path(path, '.*\.rrd$')
 
-    files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path,f))]
-    rrd_db_files = [ os.path.join(path,f) for f in files if p.match(f) ]
-
-    return rrd_db_files
 
 parser = argparse.ArgumentParser(
     prog="RRD databases recursive fetcher",
@@ -100,7 +95,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 components_2_fetch = sys.stdin.read().split()
-cmd_args_list, filtering_args_list = read_api_fs_args.read_n_separate_args(args.api_arg_dir, ["package_counters", "leaf_counters"])
+cmd_args_list, filtering_args_list = api_fs_args.read_n_separate_args(args.api_arg_dir, ["package_counters", "leaf_counters"])
 
 rrd_files = []
 for component in components_2_fetch:

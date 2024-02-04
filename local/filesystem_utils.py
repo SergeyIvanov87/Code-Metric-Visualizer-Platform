@@ -16,7 +16,7 @@ def append_file_list_mode(file_list, append_modes):
 def make_file_executable(file):
     append_file_mode(file, stat.S_IEXEC)
 
-def read_files_from_path(path, file_match_regex='.*\.md$'):
+def read_files_from_path(path, file_match_regex):
     p = re.compile(file_match_regex)
     if os.path.isfile(path) and p.match(path):
         return [path]

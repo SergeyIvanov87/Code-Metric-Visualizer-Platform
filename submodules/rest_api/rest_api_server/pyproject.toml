@@ -4,7 +4,7 @@ dependencies = [
     "flask",
 ]
 version = "0.1"
-description = "TODO"
+description = "Provides API generated from JSON schemas, hands out HTTP queries to pseudo FS API services and collect results from output pipes"
 
 [build-system]
 requires = ["flit_core<4"]

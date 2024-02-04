@@ -9,19 +9,18 @@ import sys
 from collections import defaultdict
 
 sys.path.append(os.getenv("MAIN_IMAGE_ENV_SHARED_LOCATION_ENV", ""))
-import read_api_fs_args
+import api_fs_args
 import filesystem_utils
-from api_gen_utils import content_type_from_file_extension
+from api_schema_utils import content_type_from_file_extension
 
-# import filesystem_utils
-# import api_gen_utils
+# import api_fs_conventions
 
 
 parser = argparse.ArgumentParser(
     prog="Traverse across file-system API nodes and restore API from it"
 )
 
-parser.add_argument("mount_point", help="An existing mounted pseudo fs root node path")
+parser.add_argument("mount_point", help="A project location directory")
 parser.add_argument("domain_name_api_entry", help="build API queries processor for that particular domain")
 parser.add_argument(
     "output_api_dir", help="Path to the output directory with restored JSON API schemas"
@@ -39,7 +38,7 @@ def read_directory_content(path, directories_tree, arguments_for_directories, di
     if len(local_directories_tree) != 0:
         directories_tree.update(local_directories_tree)
     # parse files in directories which may represent arguments for FS API
-    arguments_for_directories[path] = read_api_fs_args.read_args_dict(path)
+    arguments_for_directories[path] = api_fs_args.read_args_dict(path)
 
     # search Markdown files
     directories_for_markdown.extend(filesystem_utils.read_files_from_path(path, '.*\.md$'))
@@ -66,7 +65,7 @@ def restore_api(leaf_dir, fs_tree, fs_args_tree, api_query_pipes, api_domain):
     query_name = os.path.dirname(leaf_dir)
     domain_entry_pos = query_name.find(api_domain)
     if domain_entry_pos == -1:
-        return API_query
+        return "", API_query
     query_name = query_name[domain_entry_pos:]
 
     API_query["Method"] = req_type
@@ -74,13 +73,14 @@ def restore_api(leaf_dir, fs_tree, fs_args_tree, api_query_pipes, api_domain):
     API_query["Params"] = {}
 
     # extract content-type from api pipes extension:
-    output_pipe_file_extension="txt"
+    output_pipe_file_extension=""
     for p in api_query_pipes:
         p_splitted = p.split(".")
         if len(p_splitted) == 2 and p_splitted[0].find("result") != -1:
             output_pipe_file_extension=p_splitted[1]
             break
-    API_query["Content-Type"] = content_type_from_file_extension(output_pipe_file_extension)
+    if output_pipe_file_extension != "":
+        API_query["Content-Type"] = content_type_from_file_extension(output_pipe_file_extension)
 
     api_params = API_query
     api_params_ref = None
@@ -108,7 +108,7 @@ fs_args_tree = defaultdict(dict)
 directories_for_markdown = []
 
 # DFS starting from mount_point
-traverse_dirs_list = [args.mount_point]
+traverse_dirs_list = [os.path.join(args.mount_point, args.domain_name_api_entry)]
 while len(traverse_dirs_list) != 0:
     current_dir = traverse_dirs_list.pop()
     parsed_dirs, fs_tree, fs_args_tree, directories_for_markdown = read_directory_content(
@@ -118,7 +118,8 @@ while len(traverse_dirs_list) != 0:
     if len(api_pipes) == 2:
         # it must be API leaf dir
         API_query_name, API_query = restore_api(current_dir, fs_tree, fs_args_tree, api_pipes, args.domain_name_api_entry)
-        API_table[API_query_name] = API_query
+        if API_query_name != "" and len(API_query) != 0:
+            API_table[API_query_name] = API_query
 
     traverse_dirs_list.extend(parsed_dirs)
 
