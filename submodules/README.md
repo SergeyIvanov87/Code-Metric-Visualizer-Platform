@@ -1,6 +1,9 @@
 # Submodules
 
-Submodules provide extended functionality by introducing additional features built on top of the main module.
+Submodules provide extended functionality by introducing additional features built on top of the main module:
+
+- [REST API](rest_api/README.md)
+- RRD analytic
 
 # Build image
 The instruction how to built the submodules is quite similar with the main image creation steps and encompass the following procedures (the `rrd` submodule is considered):
