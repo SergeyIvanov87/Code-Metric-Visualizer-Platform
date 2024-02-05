@@ -12,6 +12,7 @@ COPY *.sh /package/
 COPY *.py /package/
 COPY API /package/API
 COPY $SCRIPT_GEN_LOC /package/
+RUN dos2unix /package/*
 
 RUN mkdir /main_image_env
 ENV MAIN_IMAGE_ENV_SHARED_LOCATION_ENV="/main_image_env"
