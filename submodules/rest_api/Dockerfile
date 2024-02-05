@@ -1,11 +1,12 @@
 # syntax=docker/dockerfile:1
 
-FROM archlinux:base-devel
+FROM alpine:latest
 WORKDIR package
 #ARG SCRIPT_GEN_LOC=rest_api_server
 
 # install app dependencies
-RUN pacman -Sy --noconfirm python python-flask python-markdown python-pipx
+RUN apk add --no-cache python3 dos2unix
+RUN apk add --no-cache py3-flask py3-markdown pipx
 
 COPY *.sh /package/
 COPY *.py /package/

@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/sh
 
 WORK_DIR=${1}
 INITIAL_PROJECT_LOCATION=${2}
