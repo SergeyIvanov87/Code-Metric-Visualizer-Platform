@@ -1,4 +1,5 @@
 {
+    "Content-Type" : "text/plain",
     "Method" : "GET",
     "Query": "api.pmccabe_collector.restapi.org/cc/analytic/rrd/select",
     "Params": {

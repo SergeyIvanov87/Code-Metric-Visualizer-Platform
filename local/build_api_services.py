@@ -16,15 +16,17 @@ import stat
 
 import filesystem_utils
 
-from api_gen_utils import compose_api_fs_node_name
-from api_gen_utils import compose_api_exec_script_name
-from api_gen_utils import compose_api_help_script_name
-from api_gen_utils import get_api_cli_service_script_path
-from api_gen_utils import get_api_schema_files
-from api_gen_utils import decode_api_request_from_schema_file
-from api_gen_utils import get_api_gui_service_script_path
-from api_gen_utils import get_generated_scripts_path
-from api_gen_utils import get_api_leaf_node_name
+from api_fs_conventions import api_gui_exec_filename_from_req_type
+from api_fs_conventions import compose_api_fs_request_location_paths
+from api_fs_conventions import compose_api_exec_script_name
+from api_fs_conventions import compose_api_help_script_name
+from api_fs_conventions import get_api_cli_service_script_path
+from api_fs_conventions import get_api_schema_files
+from api_fs_conventions import get_api_gui_service_script_path
+from api_fs_conventions import get_generated_scripts_path
+
+from api_schema_utils import deserialize_api_request_from_schema_file
+from api_schema_utils import file_extension_from_content_type
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -86,11 +88,11 @@ api_gui_schema = [
 
 api_cli_schema = [
     ". ${1}/setenv.sh\n",
-    "api_req_node={}\n",
+    "api_exec_node_directory={}\n",
     "shopt -s extglob\n",
     "EXT=`${0}/{1} --result_type`\n",
-    "pipe_result=${api_req_node}/result${EXT}\n",
-    "pipe_request=${api_req_node}/exec\n",
+    "pipe_result=${api_exec_node_directory}/result${EXT}\n",
+    "pipe_request=${api_exec_node_directory}/exec\n",
     'SIGNALS="HUP QUIT ABRT KILL EXIT TERM"\n',
     "if [[ -p $pipe_request ]]; then\n",
     "\trm -f $pipe_request\n",
@@ -105,11 +107,11 @@ api_cli_schema = [
     'WATCH_PID=0\n',
     "while true\n",
     "do\n",
-    '\tif [[ -f "${api_req_node}/in_progress" ]]; then\n',
-    '\t\trm -f "${api_req_node}/in_progress"\n',
+    '\tif [[ -f "${api_exec_node_directory}/in_progress" ]]; then\n',
+    '\t\trm -f "${api_exec_node_directory}/in_progress"\n',
     "\tfi\n",
     "\tCMD_READ=`cat $pipe_request`\n",
-    '\t echo "START: ${api_req_node}"\n',
+    '\t echo "START: ${api_exec_node_directory}"\n',
     "\tif [ ${WATCH_PID} != 0 ]; then\n",
     "\t\t# check WATCHDOG alive\n",
     "\t\tkill -s 0 ${WATCH_PID} > /dev/null 2>&1\n",
@@ -121,10 +123,10 @@ api_cli_schema = [
     "\t\t# avoid zombie\n",
     "\t\twait ${WATCH_PID}\n",
     "\tfi\n",
-    '\ttouch "${api_req_node}/in_progress"\n',
+    '\ttouch "${api_exec_node_directory}/in_progress"\n',
     '\tRESULT_OUT=$(${0}/{1} ${2} {3} ', '"${CMD_READ}" | base64)\n',
-    '\trm -f ${api_req_node}/in_progress\n',
-    '\t(touch ${api_req_node}/ready && echo "${RESULT_OUT}" | base64 -d >$pipe_result && rm -rf ${api_req_node}/ready && echo "CONSUMED: ${api_req_node}") &\n',
+    '\trm -f ${api_exec_node_directory}/in_progress\n',
+    '\t(touch ${api_exec_node_directory}/ready && echo "${RESULT_OUT}" | base64 -d >$pipe_result && rm -rf ${api_exec_node_directory}/ready && echo "CONSUMED: ${api_exec_node_directory}") &\n',
     "\tWATCH_PID=$!\n",
     '\ttrap "rm -f $pipe_request" ${SIGNALS} # as resets after subshell invocation\n',
     '\ttrap "rm -f $pipe_result" ${SIGNALS} # as resets after subshell invocation\n',
@@ -137,11 +139,16 @@ os.makedirs(generated_api_server_scripts_path, exist_ok=True)
 schemas_file_list = get_api_schema_files(args.api_root_dir)
 errors_detected = []
 for schema_file in schemas_file_list:
-    req_name, request_data = decode_api_request_from_schema_file(schema_file)
+    req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
     req_type = request_data["Method"]
     req_api = request_data["Query"]
     req_params = request_data["Params"]
-    api_node, api_req_node = compose_api_fs_node_name(
+
+    content_type=""
+    if "Content-Type" in request_data:
+        content_type = request_data["Content-Type"]
+
+    api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
             "${INITIAL_PROJECT_LOCATION}", req_api, req_type
     )
 
@@ -156,30 +163,36 @@ for schema_file in schemas_file_list:
     with open(api_server_script_file_path, "w") as listener_file:
         api_gui_schema_concrete = api_gui_schema.copy()
         api_gui_schema_concrete[1] = api_gui_schema_concrete[1].format(
-            "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_node
+            "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_req_directory
         )
-        api_gui_schema_concrete[3] = api_gui_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+
+        # determine result type: either from JSON or from script renerated
+        if len(content_type) != 0:
+            api_gui_schema_concrete[3] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
+        else:
+            api_gui_schema_concrete[3] = api_gui_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+
         api_gui_schema_concrete[4] = api_gui_schema_concrete[4].format(
-            api_req_node, get_fs_watch_event_for_request_type(req_type), get_api_leaf_node_name(req_type) + "$"
+            api_exec_node_directory, get_fs_watch_event_for_request_type(req_type), api_gui_exec_filename_from_req_type(req_type) + "$"
         )
         api_gui_schema_concrete[10] = api_gui_schema_concrete[10].format(
-            api_req_node)
+            api_exec_node_directory)
 
         api_gui_schema_concrete[11] = api_gui_schema_concrete[11].format(
             "{WORK_DIR}",
             req_executor_name,
             "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
-            api_node,
-            os.path.join(api_req_node, "result_${date}"),
+            api_req_directory,
+            os.path.join(api_exec_node_directory, "result_${date}"),
             "{EXT}"
         )
 
         api_gui_schema_concrete[12] = api_gui_schema_concrete[12].format(
-            os.path.join(api_req_node, "result_${date}"),
+            os.path.join(api_exec_node_directory, "result_${date}"),
             "{EXT}"
         )
         api_gui_schema_concrete[13] = api_gui_schema_concrete[13].format(
-            api_req_node)
+            api_exec_node_directory)
 
         listener_file.write("#!/usr/bin/bash\n\n")
         listener_file.writelines(api_gui_schema_concrete)
@@ -190,15 +203,20 @@ for schema_file in schemas_file_list:
     api_server_script_file_path = get_api_cli_service_script_path(generated_api_server_scripts_path, req_name)
     with open(api_server_script_file_path, "w") as server_file:
         api_cli_schema_concrete = api_cli_schema.copy()
-        api_cli_schema_concrete[1] = api_cli_schema_concrete[1].format(api_req_node
+        api_cli_schema_concrete[1] = api_cli_schema_concrete[1].format(api_exec_node_directory
         )
-        api_cli_schema_concrete[3] = api_cli_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+
+        # determine result type: either from JSON or from script renerated
+        if len(content_type) != 0:
+            api_cli_schema_concrete[3] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
+        else:
+            api_cli_schema_concrete[3] = api_cli_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
 
         api_cli_schema_concrete[37] = api_cli_schema_concrete[37].format(
             "{WORK_DIR}",
             req_executor_name,
             "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
-            api_node
+            api_req_directory
         )
 
         server_file.write("#!/usr/bin/bash\n\n")

@@ -14,11 +14,14 @@ import stat
 
 import filesystem_utils
 
-from api_gen_utils import compose_api_exec_script_name
-from api_gen_utils import compose_api_fs_node_name
-from api_gen_utils import get_generated_scripts_path
-from api_gen_utils import get_api_schema_files
-from api_gen_utils import decode_api_request_from_schema_file
+from api_fs_conventions import compose_api_exec_script_name
+from api_fs_conventions import compose_api_fs_request_location_paths
+from api_fs_conventions import get_generated_scripts_path
+from api_fs_conventions import get_api_schema_files
+
+from api_schema_utils import deserialize_api_request_from_schema_file
+from api_schema_utils import file_extension_from_content_type
+from api_schema_utils import file_extension_from_content_type_or_default
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -39,23 +42,6 @@ parser.add_argument("-o", "--output_dir",
                     default=get_generated_scripts_path())
 args = parser.parse_args()
 
-api_schema = [
-    ". ${1}/setenv.sh\n",
-    "{} > {}/help 2>&1\n",
-    "shopt -s extglob\n",
-    "inotifywait -m {0} {1} --include '{2}' |\n",
-    "\twhile read dir action file; do\n",
-    '\t\techo "file: ${file}, action; ${action}, dir: ${dir}"\n',
-    '\t\tcase "$action" in\n',
-    "\t\t\tACCESS|ATTRIB )\n",
-    '\t\t\t\t"${0}/{1}" {2} ${3} {4}/{5}\n',
-    "\t\t\t;;\n",
-    "\t\t\t*)\n",
-    "\t\t\t\t;;\n",
-    "\t\tesac\n",
-    "\tdone\n",
-]
-
 # Load api generator module: put particular `api_exec_generator` at beginning
 # to prevent loading `api_generator` from main image dir
 sys.path.insert(0, args.api_exec_generator)
@@ -68,11 +54,14 @@ os.makedirs(generated_api_server_scripts_path, exist_ok=True)
 errors_detected = []
 schemas_file_list = get_api_schema_files(args.api_root_dir)
 for schema_file in schemas_file_list:
-    req_name, request_data = decode_api_request_from_schema_file(schema_file)
+    req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
     req_type = request_data["Method"]
     req_api = request_data["Query"]
     req_params = request_data["Params"]
-    api_node, api_req_node = compose_api_fs_node_name(
+
+    content_file_extension = file_extension_from_content_type_or_default(request_data, "")
+
+    api_node, api_req_node = compose_api_fs_request_location_paths(
             "${INITIAL_PROJECT_LOCATION}", req_api, req_type
     )
 
@@ -87,7 +76,7 @@ for schema_file in schemas_file_list:
         with open(script_generated_path, "x") as script:
             filesystem_utils.make_file_executable(script_generated_path)
             if req_name in scripts_generator.keys():
-                scripts_generator[req_name](script)
+                scripts_generator[req_name](script, content_file_extension)
             else:
                 make_default_script(script)
     except FileExistsError as e:

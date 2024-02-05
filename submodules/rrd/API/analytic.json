@@ -4,7 +4,7 @@
     "Params": {
         "watch_list" : {
             "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
-            "-prune": "! -path \"*build*\" ! -path \"*thirdparty*\" ! -path \"*submodule*\""
+            "NO_NAME_PARAM.0": "-prune ! -path \"*build*\" ! -path \"*thirdparty*\" ! -path \"*submodule*\""
         },
         "-mmcc" : "1,",
         "-tmcc" : "1,",

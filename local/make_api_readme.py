@@ -14,8 +14,7 @@ import stat
 from collections import defaultdict
 
 import filesystem_utils
-from api_gen_utils import get_api_schema_files
-from api_gen_utils import decode_api_request_from_schema_file
+from api_schema_utils import deserialize_api_request_from_schema_file
 
 
 parser = argparse.ArgumentParser(
@@ -25,10 +24,10 @@ parser = argparse.ArgumentParser(
 parser.add_argument("api_root_dir", help="Path to the root directory incorporated JSON API schema descriptions")
 args = parser.parse_args()
 
-schemas_file_list = get_api_schema_files(args.api_root_dir)
+schemas_file_list = filesystem_utils.read_files_from_path(args.api_root_dir, ".*\.json$")
 request_descriptions = defaultdict(list)
 for schema_file in schemas_file_list:
-    req_name, request_data = decode_api_request_from_schema_file(schema_file)
+    req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
     if "Description" not in request_data:
         continue
     description_body = request_data["Description"]["body"]
