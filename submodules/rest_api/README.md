@@ -15,9 +15,9 @@ Once started, as being said before, the REST-API service searches for all regist
 
 2. A pseudo filesystem API request SHOULD be accompanied by a markdown description file **`*.md`.** detectable in the filesystem tree
 
-The rule **1.** allows the query be executed using HTTP request using the same valid path as and URI and by the regarding HTTP method
+The rule **1.** allows the request be executed using HTTP request using the same valid path as and URI and by the regarding HTTP method
 
-The refinements **2.** allows the query to be enumerated in the API entrance list discoverable on root URI index page loading. This trivial option simplified navigation and usability tredemendously.
+The refinement **2.** allows the request to be enumerated in the API entrance list discoverable on root URI index page loading. This trivial option simplified navigation and usability tredemendously.
 
 The description format MUST comprise:
 
@@ -25,7 +25,7 @@ The description format MUST comprise:
 
 * a request **URI** terminated by a **`Method`** next after ### (Heading Level 3).
 
-Please refer to the [make_api_readme.py](../../local/make_api_readme.py) and [API query example](../../API/watch_list.json)
+Please refer to the [make_api_readme.py](../../local/make_api_readme.py) and  the `Description` section of an [API request example](../../API/watch_list.json)
 
 
 # Build the container
