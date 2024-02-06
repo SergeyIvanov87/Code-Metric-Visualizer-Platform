@@ -15,8 +15,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build the Main Docker image
-      run: docker build local --file Dockerfile --tag pmccabe_main:$(date +%s)
+      run: docker build local --tag pmccabe_main:$(date +%s)
     - name: Build the RRD Docker image
-      run: docker build submodules/rrd/local --file Dockerfile --tag pmccabe_rrd:$(date +%s)
+      run: docker build submodules/rrd/local --tag pmccabe_rrd:$(date +%s)
     - name: Build the REST API Docker image
-      run: docker build submodules/rest_api --file Dockerfile --tag pmccabe_rest_api:$(date +%s)
+      run: docker build submodules/rest_api --tag pmccabe_rest_api:$(date +%s)
