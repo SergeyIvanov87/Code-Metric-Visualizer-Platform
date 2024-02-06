@@ -79,6 +79,9 @@ def write_args(directory, rparams):
             param_name_filepath = os.path.join(directory, param_digit_format.format(counter) + "." + param_name)
             counter += 1
 
+            if os.path.isfile(param_name_filepath):
+                print(f"API request arg: {param_name_filepath} - exists, skip it")
+                continue
             with open(param_name_filepath, "w") as api_file_param:
                 api_file_param.write(param_value)
                 filesystem_utils.append_file_mode(
