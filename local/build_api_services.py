@@ -194,7 +194,7 @@ for schema_file in schemas_file_list:
         api_gui_schema_concrete[13] = api_gui_schema_concrete[13].format(
             api_exec_node_directory)
 
-        listener_file.write("#!/usr/bin/bash\n\n")
+        listener_file.write("#!/bin/bash\n\n")
         listener_file.writelines(api_gui_schema_concrete)
 
     filesystem_utils.make_file_executable(api_server_script_file_path)
@@ -219,7 +219,7 @@ for schema_file in schemas_file_list:
             api_req_directory
         )
 
-        server_file.write("#!/usr/bin/bash\n\n")
+        server_file.write("#!/bin/bash\n\n")
         server_file.writelines(api_cli_schema_concrete)
 
     filesystem_utils.make_file_executable(api_server_script_file_path)
