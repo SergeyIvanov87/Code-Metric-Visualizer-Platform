@@ -27,7 +27,7 @@ EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
 def make_default_script(script):
     script.write(
-        f"#!/usr/bin/bash\n\n. ${1}/setenv.sh\n\nRESULT_FILE=${2}_result\n\n{EMPTY_DEV_SCRIPT_MARK}"
+        f"#!/bin/bash\n\n. ${1}/setenv.sh\n\nRESULT_FILE=${2}_result\n\n{EMPTY_DEV_SCRIPT_MARK}"
     )
 
 parser = argparse.ArgumentParser(

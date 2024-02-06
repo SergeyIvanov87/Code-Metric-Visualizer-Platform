@@ -5,7 +5,7 @@ Provides utilities to generate API executor scripts
 """
 
 def generate_exec_header():
-    return [ r"#!/usr/bin/bash" ]
+    return [ r"#!/bin/bash" ]
 
 def generate_get_result_type(extension):
     return [ r'if [[ ${1} == "--result_type" ]];',

@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 WORK_DIR=${1}
 INITIAL_PROJECT_LOCATION=${2}
@@ -51,7 +51,7 @@ ${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_
 
 echo "run API listeners:"
 for s in ${WORK_DIR}/services/*.sh; do
-    ${s} ${MAIN_IMAGE_ENV_SHARED_LOCATION} &
+    /bin/bash ${s} ${MAIN_IMAGE_ENV_SHARED_LOCATION} &
     echo "${s} has been started"
 done
 
