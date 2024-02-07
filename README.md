@@ -101,4 +101,4 @@ In none of those file are appeared, then other different failures have taken pla
 
 # Submodules
 
-It's possible to enhance the main functionality by employing additional dependent containers. Please refer to a README.md file in the `submodules` directory
+It's possible to enhance the main functionality significantly by employing additional dependent services. I strongly recommend your refer to the [README.md](submodules/README.md) file located the `submodules` directory
