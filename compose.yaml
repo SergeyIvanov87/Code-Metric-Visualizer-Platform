@@ -1,0 +1,30 @@
+
+services:
+  main:
+    build: local/
+    environment:
+      - PROJECT_PATH=${PROJECT_PATH}
+    volumes:
+      - ${PROJECT_PATH}:/mnt
+      - main-shared-volume:/main_image_env
+
+  rrd_analytic:
+    build: submodules/rrd/local/
+    environment:
+      - PROJECT_PATH=${PROJECT_PATH}
+    volumes:
+      - ${PROJECT_PATH}:/mnt
+      - main-shared-volume:/main_image_env
+
+  rest_api:
+    build: submodules/rest_api
+    environment:
+      - PROJECT_PATH=${PROJECT_PATH}
+    volumes:
+      - ${PROJECT_PATH}:/mnt
+      - main-shared-volume:/main_image_env
+    ports:
+      - "8000:5000"
+
+volumes:
+  main-shared-volume:
