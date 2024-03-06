@@ -20,6 +20,9 @@ echo "cp ../rest_api_server/rest_api_server/cgi_template.py ../rest_api_server/r
 echo "flask --app rest_api_server run --host 0.0.0.0"
 
 pipx install -e .
-flask --app rest_api_server run --host 0.0.0.0
+while :
+do
+    python -m flask run
+done
 
 sleep infinity
