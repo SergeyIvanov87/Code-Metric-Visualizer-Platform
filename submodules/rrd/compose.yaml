@@ -1,0 +1,11 @@
+services:
+  rrd_analytic:
+    build: local/
+    environment:
+      - PROJECT_PATH=${PROJECT_PATH}
+    volumes:
+      - ${PROJECT_PATH}:/mnt
+      - main-shared-volume:/main_image_env
+
+volumes:
+  main-shared-volume:

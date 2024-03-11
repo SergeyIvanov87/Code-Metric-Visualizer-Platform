@@ -50,7 +50,21 @@ It is realy simple as it sounds! Regardless the approach you use (CLI or GUI).
 
 The pseudo filesystem interface is only container API supported at the moment.
 
-# Build image
+# HOW-TO
+
+There are several ways to use these images: using `docker-compose` to build and launch all existing images or set them up using manual approach:
+
+## To build & Run Images using Docker-Compose automatically
+
+To leverage this fully-automated approach, please use `docker-compose`:
+
+`PROJECT_PATH=<path to your C/C++ repository> docker compose up`
+
+which will build and launch the main image and all registered submodules
+
+## Manual approach
+
+### Build image
 
 To build the image please follow the steps:
 
@@ -78,9 +92,9 @@ Finally, generate the image by itself. To do that, execute the next cmd:
 
 In case you found your API and its processors in `*_exec.sh` satisfying, please make the changes permanent and embody those script generation as automation step by putting them into the appropriate module `<submodules or main>/local/api_generator.py`
 
-# Launch a container from the image
+### Launch a container from the image
 
-### Go to your C/C++ project directory:
+#### Go to your C/C++ project directory:
 
 `cd <your project directory>`
 
@@ -92,7 +106,7 @@ In case you found your API and its processors in `*_exec.sh` satisfying, please 
 
 The `777` allows docker `pmccabe_collector` service to access this mount point which belong to the host filesystem which would have become unavailable otherwise.
 
-### Run the container in your project directory
+#### Run the container in your project directory
 
 `sudo docker run -it --mount type=bind,src=./,target=/mnt pmccabe_vis:latest`
 

@@ -2,7 +2,15 @@
 
 FROM alpine:latest
 WORKDIR package
-#ARG SCRIPT_GEN_LOC=rest_api_server
+
+ARG FLASK_APP=rest_api_server
+ENV FLASK_APP=$FLASK_APP
+
+ARG FLASK_RUN_HOST=0.0.0.0
+ENV FLASK_RUN_HOST=$FLASK_RUN_HOST
+
+ARG FLASK_RUN_PORT=5000
+ENV FLASK_RUN_PORT=$FLASK_RUN_PORT
 
 # install app dependencies
 RUN apk add --no-cache python3 dos2unix

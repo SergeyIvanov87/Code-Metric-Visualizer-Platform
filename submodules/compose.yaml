@@ -1,0 +1,3 @@
+include:
+    - rrd/compose.yaml
+    - rest_api/compose.yaml
