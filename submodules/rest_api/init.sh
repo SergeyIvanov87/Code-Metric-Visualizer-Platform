@@ -6,7 +6,7 @@ SHARED_API_DIR=${2}/api.pmccabe_collector.restapi.org
 MAIN_IMAGE_ENV_SHARED_LOCATION=${3}
 
 mkdir -p ${SHARED_API_DIR}
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/restore_api_from_pseudo_fs.py ${INITIAL_PROJECT_LOCATION} api.pmccabe_collector.restapi.org ${WORK_DIR}/API
+${MAIN_IMAGE_ENV_SHARED_LOCATION}/restore_api_from_pseudo_fs.py ${SHARED_API_DIR} api.pmccabe_collector.restapi.org ${WORK_DIR}/API
 
 rm -f ${WORK_DIR}/rest_api_server/rest_api_server/cgi.py
 cp ${WORK_DIR}/rest_api_server/rest_api_server/cgi_template.py ${WORK_DIR}/rest_api_server/rest_api_server/cgi.py

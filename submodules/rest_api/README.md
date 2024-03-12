@@ -25,7 +25,7 @@ The description format MUST comprise:
 
 * a request **URI** terminated by a **`Method`** next after ### (Heading Level 3).
 
-Please refer to the [make_api_readme.py](../../local/make_api_readme.py) and  the `Description` section of an [API request example](../../API/watch_list.json)
+Please refer to the [make_api_readme.py](../../cyclomatic_complexity/make_api_readme.py) and  the `Description` section of an [API request example](../../API/watch_list.json)
 
 
 # Build the container

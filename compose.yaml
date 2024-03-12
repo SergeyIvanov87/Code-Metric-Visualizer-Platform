@@ -1,4 +1,4 @@
 
 include:
   - submodules/compose.yaml
-  - local/compose.yaml
+  - cyclomatic_complexity/compose.yaml

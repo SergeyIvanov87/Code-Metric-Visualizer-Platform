@@ -9,7 +9,7 @@ MAIN_IMAGE_ENV_SHARED_LOCATION=${3}
 mkdir -p ${SHARED_API_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API ${INITIAL_PROJECT_LOCATION}
+${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/cc/README-API-ANALYTIC.md
 
 # TODO think about making commit an initial RRD transaction at container starting or ask for user decision

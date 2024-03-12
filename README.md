@@ -8,7 +8,7 @@ The service implementation is still in progress and it has limited functionality
 The service is available as a `copilot`-based feature which has named `pmccabe_collector`. Only `pmccabe_collector` local-machine (Linux tested only) docker image is shipping at the moment.
 The purpose of `pmccabe_collector` is to reach a similar functionality as it enhanced by the `sidecar` pattern which goal here is to extend software developing experience by governing some code metric subset known as "cyclomatic complexity".
 Launching `pmccabe_collector` and binding a docker shared folder into your existing C/C++ project directory, allow this container to populate filesystem API entrypoints, which are served for collecting and populating this metric subset.
-All communication with the `pmccabe_collector` docker service is available through pseudo-filesystem API, which is populated in [API manifest](local/API.fs)
+All communication with the `pmccabe_collector` docker service is available through pseudo-filesystem API, which is populated in [API manifest](cyclomatic_complexity/API.fs)
 
 According to the REST ideology, requests could represent a particular hierarcy structure, thus `pmccabe_collector` leverages this idea and maps those API requests as a structure of nodes mapped to a filesystem hierarchy as directories and files inside the populated API-entry point `api.pmccabe_collector.restapi.org` resided in your project directory.
 Each request can be executed as simple ACCESS-operation on a file named `exec` or `modify_this_file` in the bottom of relevant filesystem hierarchy in the same way as the Linux `/proc` pseudo-filesystem employed in order to read (and/or store) some system settings.
@@ -41,7 +41,7 @@ a) A read-operation on the output PIPE MUST block until no requests are made.
 b) A request initiation by using a write-operation on the `exec` node MUST be a non-blocking operation
 c) A read-operation on the output PIPE MAY block temporary until the request execution is still in progress.
 
-For more information about pseudo filesystem API usage and for changing the default request arguments please refer to the document [the cyclomatic complexity API manual](local/README-CC-API-MANUAL.md)
+For more information about pseudo filesystem API usage and for changing the default request arguments please refer to the document [the cyclomatic complexity API manual](cyclomatic_complexity/README-CC-API-MANUAL.md)
 
 If you prefer to use GUI rather than CLI, then just open a path `api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/GET` in your favorite File Manager.
 Opening the directory `../GET` triggers an inotify-event, and as soon as the request finishes you will find the result in a newly created file.
@@ -64,6 +64,11 @@ which will build and launch the main image and all registered submodules
 
 ## Manual approach
 
+### Create a volume for filesystem API exposure
+
+`docker volume create -d local -o type=none -o device=/tmp/api -o o=bind api_volume`
+
+
 ### Build image
 
 To build the image please follow the steps:
@@ -72,7 +77,7 @@ To build the image please follow the steps:
 
 `cd <this repo>`
 
-`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest local`
+`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest cyclomatic_complexity`
 
 #### As the-Container-Developer:
 
@@ -82,15 +87,15 @@ In case you wondered how to amend or enhance the current functionality by changi
 
 Modify API queries adding or changing JSON schemas in `API/*.json` and execute the cmd:
 
-`cp submodules or main>/API/* > <submodules or main>/local/API/`
+`cp submodules or main>/API/* > <submodules or main>/cyclomatic_complexity/API/`
 
-Compose and put your scripts `*_exec.sh` carrying out processing of added queries logic into `<submodules or main>/local/services` directory.
+Compose and put your scripts `*_exec.sh` carrying out processing of added queries logic into `<submodules or main>/cyclomatic_complexity/services` directory.
 
 Finally, generate the image by itself. To do that, execute the next cmd:
 
-`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest local`
+`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest cyclomatic_complexity`
 
-In case you found your API and its processors in `*_exec.sh` satisfying, please make the changes permanent and embody those script generation as automation step by putting them into the appropriate module `<submodules or main>/local/api_generator.py`
+In case you found your API and its processors in `*_exec.sh` satisfying, please make the changes permanent and embody those script generation as automation step by putting them into the appropriate module `<submodules or main>/cyclomatic_complexity/api_generator.py`
 
 ### Launch a container from the image
 
