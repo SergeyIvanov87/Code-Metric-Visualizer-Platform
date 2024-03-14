@@ -18,4 +18,5 @@ RUN dos2unix /package/*
 
 RUN mkdir /main_image_env
 ENV MAIN_IMAGE_ENV_SHARED_LOCATION_ENV="/main_image_env"
-ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/main_image_env"]
+VOLUME /api
+ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/main_image_env", "/api"]

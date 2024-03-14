@@ -2,15 +2,15 @@
 
 WORK_DIR=${1}
 INITIAL_PROJECT_LOCATION=${2}
-SHARED_API_DIR=${2}/api.pmccabe_collector.restapi.org
 MAIN_IMAGE_ENV_SHARED_LOCATION=${3}
-
+SHARED_API_DIR=${4}
+MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/cc/README-API-ANALYTIC.md
+${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-ANALYTIC.md
 
 # TODO think about making commit an initial RRD transaction at container starting or ask for user decision
 # There are few disadvantages about asking through STDIN:
@@ -61,10 +61,10 @@ done
 #    echo "Commiting RRD transaction..."
 
     # In order to be able to make pipeline of commands outputs need to read from PUT values pairs with '=' instead of ' '???
-    #echo 0 > ${SHARED_API_DIR}/cc/analytic/PUT/exec
-    #cat ${SHARED_API_DIR}/cc/analytic/PUT/result > ${SHARED_API_DIR}/cc/statistic/GET/exec
-#    echo 0 > ${SHARED_API_DIR}/cc/statistic/GET/exec
-#    cat ${SHARED_API_DIR}/cc/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/cc/analytic/rrd`" ${SHARED_API_DIR} -method init
+    #echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/exec
+    #cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/result > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
+#    echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
+#    cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd`" ${SHARED_API_DIR} -method init
 #    echo "Completed"
 #fi
 

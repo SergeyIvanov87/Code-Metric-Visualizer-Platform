@@ -2,10 +2,11 @@
 
 WORK_DIR=${1}
 INITIAL_PROJECT_LOCATION=${2}
-SHARED_API_DIR=${2}/api.pmccabe_collector.restapi.org
 MAIN_IMAGE_ENV_SHARED_LOCATION=${3}
+SHARED_API_DIR=${4}
 
-echo -e "#!/bash\n\nexport WORK_DIR=${WORK_DIR} \nexport MAIN_IMAGE_ENV_SHARED_LOCATION=${MAIN_IMAGE_ENV_SHARED_LOCATION} \nexport SHARED_DIR=${SHARED_DIR} \nexport SHARED_API_DIR=${SHARED_API_DIR} \nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION} \nexport RRD_ROOT=${SHARED_API_DIR}" > ${MAIN_IMAGE_ENV_SHARED_LOCATION}/setenv.sh
+MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
+echo -e "#!/bash\n\nexport WORK_DIR=${WORK_DIR} \nexport MAIN_IMAGE_ENV_SHARED_LOCATION=${MAIN_IMAGE_ENV_SHARED_LOCATION} \nexport SHARED_DIR=${SHARED_DIR} \nexport SHARED_API_DIR=${SHARED_API_DIR} \nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION} \nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} \nexport RRD_ROOT=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}" > ${MAIN_IMAGE_ENV_SHARED_LOCATION}/setenv.sh
 
 # allow pmccabe_collector to access reposiroty
 git config --global --add safe.directory ${INITIAL_PROJECT_LOCATION}
@@ -15,7 +16,7 @@ mkdir -p ${SHARED_API_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_executors.py ${WORK_DIR}/API ${MAIN_IMAGE_ENV_SHARED_LOCATION} -o ${WORK_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/cc/README-API-STATISTIC.md
+${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-STATISTIC.md
 
 # TODO think about necessity in creating any pivot metrics
 # There are few disadvantages about it:

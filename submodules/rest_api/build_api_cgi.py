@@ -28,6 +28,7 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument("api_schemas_input_dir", help="Path to the input directory where JSON API schema description files located")
+parser.add_argument("filesystem_api_mount_point", help="Path to the shared mount of filesystem API path")
 parser.add_argument("domain_name_api_entry", help="build API queries processor for that particular domain")
 args = parser.parse_args()
 
@@ -55,7 +56,7 @@ def get_query_params(params):
              r'    query_params_str=query_params_str.removesuffix(" ")'
     ]
 
-def generate_cgi_schema(req_api, req_type, output_pipe, params, content_type):
+def generate_cgi_schema(filesystem_api_mount_point, req_api, req_type, output_pipe, params, content_type):
     canonize_api_method_name = req_api.replace(os.sep, "_")
     canonize_api_method_name = canonize_api_method_name.replace('.', '_')
 
@@ -84,8 +85,8 @@ def generate_cgi_schema(req_api, req_type, output_pipe, params, content_type):
     cgi_schema = [ r'@app.route("/{}",  methods=[{}])'.format(req_api, methods),
                    r'def {}():'.format(canonize_api_method_name),
                    *make_redirect_url,
-                   r'    api_query_pipe="/mnt/{}/{}/exec"'.format(req_api, req_type),
-                   r'    api_result_pipe="/mnt/{}"'.format(output_pipe),
+                   r'    api_query_pipe="/{}/{}/{}/exec"'.format(filesystem_api_mount_point, req_api, req_type),
+                   r'    api_result_pipe="/{}/{}"'.format(filesystem_api_mount_point, output_pipe),
                    r'    pin = open(api_query_pipe, "w")',
                    *get_query_params(params), r'',
                    r'    pin.write(query_params_str)',
@@ -130,6 +131,6 @@ for schema_file in schemas_file_list:
         req_fs_output_pipe_name = os.path.join(req_api, req_type, "result." + file_extension_from_content_type(content_type))
 
     req_api = req_api[domain_entry_pos:]
-    cgi_content = generate_cgi_schema(req_api, req_type, req_fs_output_pipe_name, req_params, content_type)
+    cgi_content = generate_cgi_schema(args.filesystem_api_mount_point, req_api, req_type, req_fs_output_pipe_name, req_params, content_type)
     for l in cgi_content:
         print(l)
