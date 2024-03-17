@@ -2,11 +2,9 @@ services:
   rest_api:
     build: ./
     environment:
-      - PROJECT_PATH=${PROJECT_PATH}
       - FLASK_RUN_PORT=${FLASK_RUN_PORT:-5000}
       - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}
     volumes:
-      - ${PROJECT_PATH}:/mnt
       - main-shared-volume:/main_image_env
       - api.pmccabe_collector.restapi.org:/api
     ports:

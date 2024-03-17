@@ -7,6 +7,9 @@ SHARED_API_DIR=${4}
 MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
 mkdir -p ${SHARED_API_DIR}
+
+# clear existing generated API schema files to facilitate clear-build environment
+rm -f ${WORK_DIR}/API/*
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/restore_api_from_pseudo_fs.py ${SHARED_API_DIR} ${MAIN_SERVICE_NAME} ${WORK_DIR}/API
 
 rm -f ${WORK_DIR}/rest_api_server/rest_api_server/cgi.py

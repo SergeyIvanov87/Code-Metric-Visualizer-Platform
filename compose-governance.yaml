@@ -1,0 +1,24 @@
+
+include:
+  - submodules/compose-governance.yaml
+  - cyclomatic_complexity/compose-governance.yaml
+
+services:
+  vcs_project:
+    build:
+      context: ./
+      dockerfile: ./observable_project_version_control/Dockerfile
+    environment:
+      - CRON_REPO_UPDATE_SCHEDULE="0 0 * * *"
+      - PROJECT_URL=${PROJECT_URL}
+      - PROJECT_BRANCH=${PROJECT_BRANCH}
+
+    volumes:
+      - api.pmccabe_collector.project:/mnt
+      - api.pmccabe_collector.restapi.org:/api
+
+volumes:
+  api.pmccabe_collector.project:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true
