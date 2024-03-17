@@ -1,7 +1,7 @@
 
 include:
-  - submodules/compose.yaml
-  - cyclomatic_complexity/compose.yaml
+  - submodules/compose-analytic.yaml
+  - cyclomatic_complexity/compose-analytic.yaml
 
 volumes:
   api.pmccabe_collector.restapi.org:
