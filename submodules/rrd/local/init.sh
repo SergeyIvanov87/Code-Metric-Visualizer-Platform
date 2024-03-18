@@ -4,9 +4,15 @@ WORK_DIR=${1}
 INITIAL_PROJECT_LOCATION=${2}
 MAIN_IMAGE_ENV_SHARED_LOCATION=${3}
 SHARED_API_DIR=${4}
+RRD_DATA_STORAGE_DIR=${5}/api.pmccabe_collector.restapi.org
+
 MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
+# ??? TODO decide do you require it or not?
+# echo -e "#!/bash\n\nexport WORK_DIR=${WORK_DIR} \nexport MAIN_IMAGE_ENV_SHARED_LOCATION=${MAIN_IMAGE_ENV_SHARED_LOCATION} \nexport SHARED_DIR=${SHARED_DIR} \nexport SHARED_API_DIR=${SHARED_API_DIR} \nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION} \nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}" > ${MAIN_IMAGE_ENV_SHARED_LOCATION}/setenv.sh
+
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
+mkdir -p ${RRD_DATA_STORAGE_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}

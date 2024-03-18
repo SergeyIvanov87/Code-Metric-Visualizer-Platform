@@ -55,7 +55,7 @@ def make_script_rrd_collect(script, desired_file_ext=""):
         r'echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/exec',
         r'ONLY_METRICS_IN_RANGE=`cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/result`',
         r'echo $(replace_space_in_even_position "${ONLY_METRICS_IN_RANGE}") > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec',
-        r'cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "${RRD_DB_PARAMS}" ${SHARED_API_DIR}/${MAIN_SERVICE_NAME} ${brr[@]}',
+        r'cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "${RRD_DB_PARAMS}" ${RRD_DATA_STORAGE_DIR} ${brr[@]}',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -72,7 +72,7 @@ def make_script_rrd_select(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${brr[@]}" | xargs find ${RRD_ROOT}',
+        r'echo "${brr[@]}" | xargs find ${RRD_DATA_STORAGE_DIR}',
     )
     script.writelines(line + "\n" for line in body)
 
