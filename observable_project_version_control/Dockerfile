@@ -3,7 +3,6 @@ WORKDIR package
 
 ENV PROJECT_URL="this must be a project URL"
 ENV PROJECT_BRANCH="this must be a project branch"
-ENV CRON_REPO_UPDATE_SCHEDULE="0 0 * * *"
 
 # install app dependencies
 RUN apk add --no-cache python3 dos2unix
