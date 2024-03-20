@@ -1,0 +1,22 @@
+{
+    "jobs": [
+        {
+            "source": "git.json",
+            "pre": "true",
+            "post": "touch run_rrd.json",
+            "comment": "checkout the project and queue next command for execution"
+        },
+        {
+            "source": "rrd.json",
+            "pre": "[ -e run_rrd.json]",
+            "post": "rm force_rrd.json",
+            "comment": "build RRD databases OR update record if exist"
+        },
+        {
+            "source": "rrd_collect.json",
+            "pre": "false",
+            "post": "false",
+            "comment": "seems like the previous command update records if DBs exist or recreate missing DB once new project source files appeared upon 'git.json' finishing. There is no point to invoke this command at the moment"
+        }
+    ]
+}

@@ -1,0 +1,127 @@
+#!/usr/bin/python
+
+"""
+Generates `CGI` script for API request serving
+"""
+
+import argparse
+from argparse import RawTextHelpFormatter
+from collections import defaultdict
+from math import log10
+
+import json
+import os
+import pathlib
+import sys
+import stat
+
+sys.path.append(os.getenv('MAIN_IMAGE_ENV_SHARED_LOCATION_ENV', ''))
+
+import filesystem_utils
+
+from api_schema_utils import deserialize_api_request_from_schema_file
+from api_schema_utils import file_extension_from_content_type
+
+
+parser = argparse.ArgumentParser(
+    prog="Build CRON scheduling jobs list from API json files",
+    formatter_class=RawTextHelpFormatter,
+)
+
+parser.add_argument("api_schemas_input_dir", help="Path to the input directory where JSON API schema description files located")
+parser.add_argument("filesystem_api_mount_point", help="Path to the shared mount of filesystem API path")
+parser.add_argument("domain_name_api_entry", help="build API queries scheduler for that particular domain")
+parser.add_argument("cron_time_pattern", help="Enter time pattern in the crontab format: \"Minute Hour DayOfTheMonth[1,31] MonthOfTheYear[1,12] DayOfTheWeek ")
+args = parser.parse_args()
+
+def intersection(list_lhs, list_rhs):
+    return [ i for i in list_lhs if i in list_rhs ]
+
+schemas_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, ".*\.json$")
+order_list_file_path = os.path.join(args.api_schemas_input_dir, "service_broker_queries_order_list.json")
+if order_list_file_path not in schemas_file_list:
+    raise Exception(f"Required file \"{order_list_file_path}\" is absent. It MUST contain an order of queries to build a schedule up. Please add it")
+
+# remove `order_list_file` from `schemas_file_list` which will be sorted off according to order_list_file
+schemas_file_list.remove(order_list_file_path)
+
+# fill in queries call-order
+ordered_schemas_file_list = []
+jobs_call_condition_table = defaultdict(dict)
+with open(order_list_file_path, "r") as order_list_file:
+    try:
+        order_list_file_data = json.load(order_list_file)
+        if "jobs" not in order_list_file_data.keys():
+            raise Exception(f"File \"{order_list_file_path}\" MUST contain \"jobs\" array, got:\n {order_list_file_data}")
+
+        for item in order_list_file_data["jobs"]:
+            if "source" not in item.keys():
+                raise Exception(f"In file \"{order_list_file_path}\" \"jobs\" an array item must contain MAJOR field \"source\" with query file location, got:\n {item}")
+            full_path_source = os.path.join(args.api_schemas_input_dir,item["source"])
+            ordered_schemas_file_list.append(full_path_source)
+            jobs_call_condition_table[full_path_source] = item
+    except json.decoder.JSONDecodeError as e:
+        raise Exception(f"Error: {str(e)} in file: {order_list_file_path}")
+
+# test consistency
+if len(schemas_file_list) != len(ordered_schemas_file_list) or len(intersection(ordered_schemas_file_list, schemas_file_list)) != len(schemas_file_list):
+    raise Exception(f"API query files presented in \"{args.api_schemas_input_dir}\" and required by schema in \"{order_list_file_path}\" are differ:\n{schemas_file_list}\nvs\n{ordered_schemas_file_list}\nPlease fix it, maybe you forgot something.")
+
+def get_query_params(params):
+    #str_keys = (f"'{k}'" for k in params.keys()).join(", ")
+    #str_values = (f"'{v}'" for v in params.values()).join(", ")
+    return [ f"    default_params = {json.dumps(params)}",
+             r'    query_params = {}',
+             r'    if "default" in request.args:',
+             r'         for k,v in default_params.items():',
+             r'            if not isinstance(v, dict):',
+             f"                query_params[k]=v",
+             r'    else:',
+             r'        # allow only params from JSON schema ',
+             f"        for k,v in default_params.items():",
+             r'            # pass params from query, if exist',
+             r'            if not isinstance(v, dict) and k in request.args:',
+             f"                query_params[k]=request.args.get(k,v)",
+             f"    query_params_str=''",
+             f"    for k,v in query_params.items():",
+             r'        query_params_str +=f"{k}={v} "',
+             r'    query_params_str=query_params_str.removesuffix(" ")'
+    ]
+
+def generate_cron_jobs_schema(filesystem_api_mount_point, req_api, req_type, output_pipe, params, job_control):
+    full_query_pipe_path = os.path.join(filesystem_api_mount_point, req_api, req_type, "exec")
+    full_result_pipe_path = os.path.join(filesystem_api_mount_point, output_pipe)
+    job_generator_str = '{} && echo 0 > {} && cat {} && echo "\\"{}\\" completed" && {}'.format(job_control["pre"], full_query_pipe_path, full_result_pipe_path, req_api, job_control["post"])
+    return job_generator_str
+
+#  build jobs
+jobs_content = []
+for schema_file in ordered_schemas_file_list:
+    req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
+    req_type = request_data["Method"]
+    req_api = request_data["Query"]
+    req_params = request_data["Params"]
+
+    # filter unrelated API queries
+    domain_entry_pos = req_api.find(args.domain_name_api_entry)
+    if domain_entry_pos == -1:
+        continue
+
+    # Content-Type is an optional field
+    content_type=""
+    if "Content-Type" in request_data:
+        content_type = request_data["Content-Type"]
+
+    # determine output PIPE name extension base on Content-Type
+    if content_type == "":
+        req_fs_output_pipe_name = os.path.join(req_api, req_type, "result")
+        content_type="text/plain"
+    else:
+        req_fs_output_pipe_name = os.path.join(req_api, req_type, "result." + file_extension_from_content_type(content_type))
+
+    req_api = req_api[domain_entry_pos:]
+    jobs_content.append(generate_cron_jobs_schema(args.filesystem_api_mount_point, req_api, req_type, req_fs_output_pipe_name, req_params, jobs_call_condition_table[schema_file]))
+
+if len(jobs_content) != 0:
+    print(args.cron_time_pattern, end='\t')
+    print(" && ".join(jobs_content))
