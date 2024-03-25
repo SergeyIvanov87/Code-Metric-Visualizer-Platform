@@ -9,7 +9,7 @@ services:
       context: ./
       dockerfile: ./service_broker/Dockerfile
     environment:
-      - CRON_REPO_UPDATE_SCHEDULE="0 0 * * *"
+      CRON_REPO_UPDATE_SCHEDULE: 0 0 * * *
     volumes:
       - api.pmccabe_collector.restapi.org:/api
 

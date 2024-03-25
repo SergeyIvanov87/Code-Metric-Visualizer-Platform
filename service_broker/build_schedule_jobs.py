@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("api_schemas_input_dir", help="Path to the input directory where JSON API schema description files located")
 parser.add_argument("filesystem_api_mount_point", help="Path to the shared mount of filesystem API path")
 parser.add_argument("domain_name_api_entry", help="build API queries scheduler for that particular domain")
-parser.add_argument("cron_time_pattern", help="Enter time pattern in the crontab format: \"Minute Hour DayOfTheMonth[1,31] MonthOfTheYear[1,12] DayOfTheWeek ")
+
 args = parser.parse_args()
 
 def intersection(list_lhs, list_rhs):
@@ -123,5 +123,4 @@ for schema_file in ordered_schemas_file_list:
     jobs_content.append(generate_cron_jobs_schema(args.filesystem_api_mount_point, req_api, req_type, req_fs_output_pipe_name, req_params, jobs_call_condition_table[schema_file]))
 
 if len(jobs_content) != 0:
-    print(args.cron_time_pattern, end='\t')
     print(" && ".join(jobs_content))

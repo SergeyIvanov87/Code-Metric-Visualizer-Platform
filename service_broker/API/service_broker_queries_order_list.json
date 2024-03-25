@@ -8,15 +8,15 @@
         },
         {
             "source": "rrd.json",
-            "pre": "[ -e run_rrd.json]",
-            "post": "rm force_rrd.json",
-            "comment": "build RRD databases OR update record if exist"
+            "pre": "[ -e run_rrd.json ]",
+            "post": "rm run_rrd.json",
+            "comment": "RRD build parameters show"
         },
         {
             "source": "rrd_collect.json",
-            "pre": "false",
+            "pre": "true",
             "post": "false",
-            "comment": "seems like the previous command update records if DBs exist or recreate missing DB once new project source files appeared upon 'git.json' finishing. There is no point to invoke this command at the moment"
+            "comment": "The job updates records if DBs exist or recreates missing DB once new project source files appeared upon 'git.json' finishing"
         }
     ]
 }

@@ -1,6 +1,7 @@
 #!/bin/sh
 
 WORK_DIR=${1}
+# TODO check if required
 INITIAL_PROJECT_LOCATION=${2}
 MAIN_IMAGE_ENV_SHARED_LOCATION=${3}
 SHARED_API_DIR=${4}
