@@ -1,14 +1,13 @@
 services:
   rrd_analytic:
     build: local/
-    environment:
-      - PROJECT_PATH=${PROJECT_PATH}
     volumes:
-      - ${PROJECT_PATH}:/mnt
+      - api.pmccabe_collector.project:/mnt
       - main-shared-volume:/main_image_env
       - api.pmccabe_collector.restapi.org:/api
 
 volumes:
+  api.pmccabe_collector.project:
   main-shared-volume:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
