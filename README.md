@@ -6,20 +6,20 @@ The service is supposed to monitor cyclomatic complexity of a C/C++ project.
 
 The service implementation is still in progress and it has limited functionality.
 The service is available as a `copilot`-based feature which has named `pmccabe_collector`. Only `pmccabe_collector` local-machine (Linux tested only) docker image is shipping at the moment.
-The purpose of `pmccabe_collector` is to reach a similar functionality as it enhanced by the `sidecar` pattern which goal here is to extend software developing experience by governing some code metric subset known as "cyclomatic complexity".
-Launching `pmccabe_collector` and binding a docker shared folder into your existing C/C++ project directory, allow this container to populate filesystem API entrypoints, which are served for collecting and populating this metric subset.
-All communication with the `pmccabe_collector` docker service is available through pseudo-filesystem API, which is populated in [API manifest](cyclomatic_complexity/API.fs)
-
-According to the REST ideology, requests could represent a particular hierarcy structure, thus `pmccabe_collector` leverages this idea and maps those API requests as a structure of nodes mapped to a filesystem hierarchy as directories and files inside the populated API-entry point `api.pmccabe_collector.restapi.org` resided in your project directory.
+The purpose of `pmccabe_collector` is to extend software developing experience by governing some code metric subset known as "cyclomatic complexity".
+Launching `pmccabe_collector` and targeting it to your C/C++ project, you could leverage API populated by this service to collect, manifest and govern this metric subset.
+All communication with the particular `pmccabe_collector` docker container is available either through simplest pseudo-filesystem API, which is populated in [API manifest](cyclomatic_complexity/API.fs), or using HTTP queries, if you decided to employ [REST API submodule](submodules/rest_api)
+Whatever you prefered, the API subset remains the same. Thanks to the REST ideology, it is possible to generate both sets of API: requests could represent a particular hierarcy structure, thus `pmccabe_collector` leverages this idea and maps those API requests as a structure of nodes mapped to a filesystem hierarchy as directories and files inside the populated API-entry point `api.pmccabe_collector.restapi.org` resided in your project directory.
 Each request can be executed as simple ACCESS-operation on a file named `exec` or `modify_this_file` in the bottom of relevant filesystem hierarchy in the same way as the Linux `/proc` pseudo-filesystem employed in order to read (and/or store) some system settings.
 
-#### For example:
+#### Few words about using the pseudo-filesystem API
 
 The request
 
 `GET api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph`
 
 can be composed in the filesystem API mapped notation as the next transactional operation:
+
 1) To initiate the request all you need is to send some data into the input PIPE `exec`:
 
 `echo 0 > api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/GET/exec`
@@ -43,81 +43,85 @@ c) A read-operation on the output PIPE MAY block temporary until the request exe
 
 For more information about pseudo filesystem API usage and for changing the default request arguments please refer to the document [the cyclomatic complexity API manual](cyclomatic_complexity/README-CC-API-MANUAL.md)
 
-If you prefer to use GUI rather than CLI, then just open a path `api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/GET` in your favorite File Manager.
+If you prefer to use GUI rather than CLI, then you could just follow a path `api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/GET` in your favorite File Manager.
 Opening the directory `../GET` triggers an inotify-event, and as soon as the request finishes you will find the result in a newly created file.
 No any transactions in this case is meaning.
 It is realy simple as it sounds! Regardless the approach you use (CLI or GUI).
 
 The pseudo filesystem interface is only container API supported at the moment.
 
+
+# Use-Cases (UCs)
+
+There are few supported use-cases which are embodied by using different set of images in that repository:
+
+### Analysis UC
+
+    To collect & check code metrics during your casual activities or making refactoring by demand using API
+### Analytic UC
+
+    Collect & store code metric in [Round-Robin-Database](https://oss.oetiker.ch/rrdtool) on a regular basis automatically
+
+
+# Prerequisites
+
+### General
+
+To be able to compose a use-case using docker images in this repo, the containers on a local host must communicate to each other.
+
+- You MUST configure a docker volume `api.pmccabe_collector.restapi.org`, which will represent the point of service communications, by executing the following command:
+
+    `mkdir -p <local host mount point> && chmod 777 <local host mount point> && docker volume create -d local -o type=none -o device=<local host mount point> -o o=bind api.pmccabe_collector.restapi.org`
+
+Although `<local host mount point>` SHOULD NOT be employable by `Analytic UC`, you'd better create it.
+
+- YOU SHOULD define environment variables `FLASK_RUN_HOST` and `FLASK_RUN_PORT` to determine where REST API service will listen incoming connections (default values `0.0.0.0` and `5000` respectfully).
+
+### Analysis UC
+
+You MUST define environment variable `PROJECT_PATH` when launching `docker compose  -f compose-analysis.yaml` (or use the following bind mount `--mount type=bind,src=${PROJECT_PATH}/,target=/mnt` for `docker run`), which MUST specify your source code project path.
+
+### Analytic UC
+
+You MUST define environment variables `PROJECT_URL` and `PROJECT_BRANCH` when launching both `docker compose  -f compose-analytic.yaml` and `docker build`, which specify your project repository and branch( `git` by default).
+You SHOULD define the environment variable `CRON_REPO_UPDATE_SCHEDULE` to specify an analytic job invocation shedule (metrics collected every day, by default) in `crontab` format.
+
 # HOW-TO
 
-There are several ways to use these images: using `docker-compose` to build and launch all existing images or set them up using manual approach:
+There are several ways to use these images: using `docker-compose` to build and to launch all existing images or set them up using manual approach:
 
-## To build & Run Images using Docker-Compose automatically
+## To build & to Run entire services using Docker-Compose automatically (RECOMMENDED)
 
 To leverage this fully-automated approach, please use `docker-compose`:
 
-`PROJECT_PATH=<path to your C/C++ repository> docker compose up`
+### Analysis UC
 
-which will build and launch the main image and all registered submodules
+`PROJECT_PATH=<path to your C/C++ repository> docker compose -f compose-analysis.yaml up`
 
-## Manual approach
+which will build and launch the main image and all required submodules
 
-### Create a volume for filesystem API exposure
+### Analytic UC
 
-`docker volume create -d local -o type=none -o device=/tmp/api -o o=bind api_volume`
+`CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" PROJECT_URL=https://github.com/<your repository> PROJECT_BRANCH=<your branch> docker compose -f compose-analytic.yaml up`
 
+which will build and launch the all required services to carry out the conducting analysis
 
-### Build image
+## To build & to Run each image separatedly
 
-To build the image please follow the steps:
+### Build & Run images
 
-#### As the-Container-User:
+To build the images please follow up the corresponding section `Build & Run Image` in manuals below:
 
-`cd <this repo>`
+### Analysis UC
 
-`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest cyclomatic_complexity`
+- [cyclomatic_complexity](cyclomatic_complexity/README.md)
+- [rrd](submodules/rrd/README.md)
+- [rest_api](submodules/rest_api/README.md)
 
-#### As the-Container-Developer:
+### Analytic UC
 
-In case you wondered how to amend or enhance the current functionality by changing the API, please follow this path:
-
-`cd <this repo>`
-
-Modify API queries adding or changing JSON schemas in `API/*.json` and execute the cmd:
-
-`cp submodules or main>/API/* > <submodules or main>/cyclomatic_complexity/API/`
-
-Compose and put your scripts `*_exec.sh` carrying out processing of added queries logic into `<submodules or main>/cyclomatic_complexity/services` directory.
-
-Finally, generate the image by itself. To do that, execute the next cmd:
-
-`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_vis:latest cyclomatic_complexity`
-
-In case you found your API and its processors in `*_exec.sh` satisfying, please make the changes permanent and embody those script generation as automation step by putting them into the appropriate module `<submodules or main>/cyclomatic_complexity/api_generator.py`
-
-### Launch a container from the image
-
-#### Go to your C/C++ project directory:
-
-`cd <your project directory>`
-
- and run
-
-`mkdir api.pmccabe_collector.restapi.org`
-
-`chmod 777 api.pmccabe_collector.restapi.org`
-
-The `777` allows docker `pmccabe_collector` service to access this mount point which belong to the host filesystem which would have become unavailable otherwise.
-
-#### Run the container in your project directory
-
-`sudo docker run -it --mount type=bind,src=./,target=/mnt pmccabe_vis:latest`
-
-Having all steps acomplished and with no erros in a processing logic, the content representing pseudo filesystem appears by path `<your project directory>/api.pmccabe_collector.restapi.org`. Typically it contains the `cc` directory (stands for Cyclomatic Complexity) and `README-CC-*.md` file for API instructions.
-In none of those file are appeared, then other different failures have taken place. I'd very appreciate for any documented issues. In my own experience the essential utility `pmccabe` crashed when I was tried to estimate complexity of a Linux kernel project.
-
-# Submodules
-
-It's possible to enhance the main functionality significantly by employing additional dependent services. I strongly recommend your refer to the [README.md](submodules/README.md) file located the `submodules` directory
+- [observable_project_version_control](observable_project_version_control/README.md)
+- [cyclomatic_complexity](cyclomatic_complexity/README.md)
+- [rrd](submodules/rrd/README.md)
+- [rest_api](submodules/rest_api/README.md)
+- [service_broker](service_broker/README.md)
