@@ -17,27 +17,27 @@ jobs:
     - name: Get time
       run: export DATE=$(date +%s)
     - name: Build the VCS Docker image
-      run: docker build observable_project_version_control --tag vcs_project:$TTTT
+      run: docker build observable_project_version_control --tag vcs_project:$DATE
     - name: Build the CC Docker image
-      run: docker build cyclomatic_complexity --tag cc_visualizer:$TTTT
+      run: docker build cyclomatic_complexity --tag cc_visualizer:$DATE
     - name: Build the RRD Docker image
-      run: docker build submodules/rrd/local --tag rrd_analytic:$TTTTT
+      run: docker build submodules/rrd/local --tag rrd_analytic:$DATE
     - name: Build the REST API Docker image
-      run: docker build submodules/rest_api --tag rest_api:$TTTT
+      run: docker build submodules/rest_api --tag rest_api:$DATE
     - name: Build the Service Broker Docker image
-      run: docker build service_broker --tag broker:$TTTT
+      run: docker build service_broker --tag broker:$DATE
     - name: Create API volume
       run: mkdir -p api && chmod 777 api && docker volume create -d local -o type=none -o device=api -o o=bind api.pmccabe_collector.restapi.org
     - name: Run VCS Docker
-      run: docker run -it --name vcs_project -v api.pmccabe_collector.restapi.org:/api -e PROJECT_URL=https://github.com/SergeyIvanov87/TrafficInspector.git -e PROJECT_BRANCH=master vcs_project:$TTTT
+      run: docker run -it --name vcs_project -v api.pmccabe_collector.restapi.org:/api -e PROJECT_URL=https://github.com/SergeyIvanov87/TrafficInspector.git -e PROJECT_BRANCH=master vcs_project:$DATE
     - name: Run CC Docker
-      run: docker run -it --name cc_visualizer -v api.pmccabe_collector.restapi.org:/api --volumes-from vcs_project cc_visualizer:$TTTT
+      run: docker run -it --name cc_visualizer -v api.pmccabe_collector.restapi.org:/api --volumes-from vcs_project cc_visualizer:$DATE
     - name: Create RRD volume
       run: mkdir -p rrd_data && chmod 777 rrd_data && docker volume create -d local -o type=none -o device=rrd_data -o o=bind api.pmccabe_collector.rrd_analytic
     - name: Run RRD Docker
-      run: docker run -it --name rrd_analytic -v api.pmccabe_collector.restapi.org:/api -v api.pmccabe_collector.rrd_analytic:/rrd_data --volumes-from cc_visualizer rrd_analytic:$TTTT
+      run: docker run -it --name rrd_analytic -v api.pmccabe_collector.restapi.org:/api -v api.pmccabe_collector.rrd_analytic:/rrd_data --volumes-from cc_visualizer rrd_analytic:$DATE
     - name: Run REST Docker
-      run: docker run -it --name rest_api -v api.pmccabe_collector.restapi.org:/api -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc_visualizer -p 5000:5000 rest_api:$TTTT
+      run: docker run -it --name rest_api -v api.pmccabe_collector.restapi.org:/api -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc_visualizer -p 5000:5000 rest_api:$DATE
     - name: Run Broker Docker
-      run: docker run -it --name broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:$TTTT
+      run: docker run -it --name broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:$DATE
 
