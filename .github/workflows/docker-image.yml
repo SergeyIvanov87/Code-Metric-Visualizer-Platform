@@ -34,7 +34,7 @@ jobs:
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Build the Service Broker Docker image
-      run: docker build service_broker --tag broker:$DATE
+      run: docker build -f service_broker/Dockerfile -t broker:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Create API volume
