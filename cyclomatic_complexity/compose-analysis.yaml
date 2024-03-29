@@ -1,5 +1,5 @@
 services:
-  main:
+  cc_visualizer:
     build: ./
     environment:
       - PROJECT_PATH=${PROJECT_PATH}

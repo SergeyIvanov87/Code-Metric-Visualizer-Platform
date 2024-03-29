@@ -6,7 +6,7 @@ The service is an orchestrator, which holds a control logic of the Analytic UC
 
 ### General
 
-- You MUST configure a docker volume `api.pmccabe_collector.restapi.org`, which will represent the point of service communications, by executing the following command:
+- You **MUST** configure a docker volume `api.pmccabe_collector.restapi.org`, which will represent the point of service communications, by executing the following command:
 
     `mkdir -p <local host mount point> && chmod 777 <local host mount point> && docker volume create -d local -o type=none -o device=<local host mount point> -o o=bind api.pmccabe_collector.restapi.org`
 
@@ -32,4 +32,4 @@ From the main repository directory run:
 
 The service requires all other services to be started. Once they started, use the following command:
 
-`docker run -it --name broker --volumes-from project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:latest`
+`docker run -it --name broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:latest`

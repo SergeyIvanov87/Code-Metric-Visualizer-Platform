@@ -37,8 +37,8 @@ Having a single-threaded server and the pure synchronous transaction, a client w
 And schema "Send request/collect result" would transform into "Don't forget to collect the previous result/send request/collect result" which is said to be more complicated.
 
 Thereby the following considerations are settled down for the current implementation:
-a) A read-operation on the output PIPE MUST block until no requests are made.
-b) A request initiation by using a write-operation on the `exec` node MUST be a non-blocking operation
+a) A read-operation on the output PIPE **MUST** block until no requests are made.
+b) A request initiation by using a write-operation on the `exec` node **MUST** be a non-blocking operation
 c) A read-operation on the output PIPE MAY block temporary until the request execution is still in progress.
 
 For more information about pseudo filesystem API usage and for changing the default request arguments please refer to the document [the cyclomatic complexity API manual](cyclomatic_complexity/README-CC-API-MANUAL.md)
@@ -57,10 +57,11 @@ There are few supported use-cases which are embodied by using different set of i
 
 ### Analysis UC
 
-    To collect & check code metrics during your casual activities or making refactoring by demand using API
+To collect & check code metrics during your casual activities or making refactoring by demand using API
+
 ### Analytic UC
 
-    Collect & store code metric in [Round-Robin-Database](https://oss.oetiker.ch/rrdtool) on a regular basis automatically
+Collect & store code metric in [Round-Robin-Database](https://oss.oetiker.ch/rrdtool) on a regular basis automatically
 
 
 # Prerequisites
@@ -69,22 +70,22 @@ There are few supported use-cases which are embodied by using different set of i
 
 To be able to compose a use-case using docker images in this repo, the containers on a local host must communicate to each other.
 
-- You MUST configure a docker volume `api.pmccabe_collector.restapi.org`, which will represent the point of service communications, by executing the following command:
+- You **MUST** configure a docker volume `api.pmccabe_collector.restapi.org`, which will represent the point of service communications, by executing the following command:
 
     `mkdir -p <local host mount point> && chmod 777 <local host mount point> && docker volume create -d local -o type=none -o device=<local host mount point> -o o=bind api.pmccabe_collector.restapi.org`
 
-Although `<local host mount point>` SHOULD NOT be employable by `Analytic UC`, you'd better create it.
+Although `<local host mount point>` **SHOULD NOT** be employable by `Analytic UC`, you'd better create it.
 
-- YOU SHOULD define environment variables `FLASK_RUN_HOST` and `FLASK_RUN_PORT` to determine where REST API service will listen incoming connections (default values `0.0.0.0` and `5000` respectfully).
+- You **SHOULD** define environment variables `FLASK_RUN_HOST` and `FLASK_RUN_PORT` to determine where REST API service will listen incoming connections (default values `0.0.0.0` and `5000` respectfully).
 
 ### Analysis UC
 
-You MUST define environment variable `PROJECT_PATH` when launching `docker compose  -f compose-analysis.yaml` (or use the following bind mount `--mount type=bind,src=${PROJECT_PATH}/,target=/mnt` for `docker run`), which MUST specify your source code project path.
+You **MUST** define environment variable `PROJECT_PATH` when launching `docker compose  -f compose-analysis.yaml` (or use the following bind mount `--mount type=bind,src=${PROJECT_PATH}/,target=/mnt` for `docker run`), which **MUST** specify your source code project path.
 
 ### Analytic UC
 
-You MUST define environment variables `PROJECT_URL` and `PROJECT_BRANCH` when launching both `docker compose  -f compose-analytic.yaml` and `docker build`, which specify your project repository and branch( `git` by default).
-You SHOULD define the environment variable `CRON_REPO_UPDATE_SCHEDULE` to specify an analytic job invocation shedule (metrics collected every day, by default) in `crontab` format.
+You **MUST** define environment variables `PROJECT_URL` and `PROJECT_BRANCH` when launching both `docker compose  -f compose-analytic.yaml` and `docker build`, which specify your project repository and branch( `git` by default).
+You **SHOULD** define the environment variable `CRON_REPO_UPDATE_SCHEDULE` to specify an analytic job invocation shedule (metrics collected every day, by default) in `crontab` format.
 
 # HOW-TO
 

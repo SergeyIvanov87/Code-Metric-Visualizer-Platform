@@ -1,5 +1,5 @@
 services:
-  main:
+  cc_visualizer:
     build: ./
     volumes:
       - api.pmccabe_collector.project:/mnt

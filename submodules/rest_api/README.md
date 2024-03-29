@@ -11,15 +11,15 @@ The root URI represents the main index-page comprising all **`*.md`** manual-pag
 
 Once started, as being said before, the REST-API service searches for all registered services by parsing the filesystem tree using the set of predefined rules:
 
-1. A pseudo filesystem API request MUST be represented by a valid path terminated by a method: **GET**, **POST**, **PUT** etc. On the depth of these tree hierarchies there MUST be special PIPE files **exec** and **result<.EXT >** located. Where **<.EXT >** MUST stand for a valid **Content-Type** header of the particular REST request.
+1. A pseudo filesystem API request **MUST** be represented by a valid path terminated by a particular method from the valid HTTP request list: **GET**, **POST**, **PUT** etc. On the depth of these tree hierarchies there **MUST** be special PIPE files **exec** and **result<.EXT >** resided. Where **<.EXT >** **MUST** stand for a valid **Content-Type** header of the particular REST request.
 
-2. A pseudo filesystem API request SHOULD be accompanied by a markdown description file **`*.md`.** detectable in the filesystem tree
+2. A pseudo filesystem API request **SHOULD** be accompanied by a markdown description file **`*.md`.** detectable in the filesystem tree
 
 The rule **1.** allows the request be executed using HTTP request using the same valid path as and URI and by the regarding HTTP method
 
 The refinement **2.** allows the request to be enumerated in the API entrance list discoverable on root URI index page loading. This trivial option simplified navigation and usability tremendously.
 
-The description format MUST comprise:
+The description format **MUST** comprise:
 
 * a request name next after ## (Heading Level 2)
 
@@ -32,17 +32,17 @@ Please refer to the [make_api_readme.py](../../cyclomatic_complexity/make_api_re
 
 ### General
 
-- You MUST configure a docker volume `api.pmccabe_collector.restapi.org`, which will represent the point of service communications, by executing the following command:
+- You **MUST** configure a docker volume `api.pmccabe_collector.restapi.org`, which will represent the point of service communications, by executing the following command:
 
     `mkdir -p <local host mount point> && chmod 777 <local host mount point> && docker volume create -d local -o type=none -o device=<local host mount point> -o o=bind api.pmccabe_collector.restapi.org`
 
 ### Analysis UC
 
-- YOU SHOULD define environment variables `FLASK_RUN_HOST` and `FLASK_RUN_PORT` to determine where REST API service will listen incoming connections (default values `0.0.0.0` and `5000` respectfully).
+- You **SHOULD** define environment variables `FLASK_RUN_HOST` and `FLASK_RUN_PORT` to determine where REST API service will listen incoming connections (default values `0.0.0.0` and `5000` respectfully).
 
 ### Analytic UC
 
-- YOU SHOULD define environment variables `FLASK_RUN_HOST` and `FLASK_RUN_PORT` to determine where REST API service will listen incoming connections (default values `0.0.0.0` and `5000` respectfully).
+- You **SHOULD** define environment variables `FLASK_RUN_HOST` and `FLASK_RUN_PORT` to determine where REST API service will listen incoming connections (default values `0.0.0.0` and `5000` respectfully).
 
 
 # Build & Run image
@@ -53,9 +53,9 @@ From the main repository directory run:
 
 `DOCKER_BUILDKIT=1 docker build -t rest_api:latest -f submodules/rest_api/Dockerfile submodules/rest_api`
 
-Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), [rrd](../rrd), thereby launch the `pmccabe_cc`, `rrd` images at first.
+Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), [rrd](../rrd), thereby launch the `cc_visualizer`, `rrd_analytic` images at first.
 
-`docker run -it --name rest_api_gw -v api.pmccabe_collector.restapi.org:/api -e FLASK_RUN_PORT=6666 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from main rest_api:latest`
+`docker run -it --name rest_api_gw -v api.pmccabe_collector.restapi.org:/api -e FLASK_RUN_PORT=6666 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc_visualizer rest_api:latest`
 
 
 ### Analytic UC
@@ -64,6 +64,6 @@ From the main repository directory run:
 
 `DOCKER_BUILDKIT=1 docker build -t rest_api:latest -f submodules/rest_api/Dockerfile submodules/rest_api`
 
-Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), [rrd](../rrd), [observable_project_version_control](../../observable_project_version_control), thereby launch the `pmccabe_cc`, `rrd`, `project` images at first.
+Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), [rrd](../rrd), [observable_project_version_control](../../observable_project_version_control), thereby launch the `cc_visualizer`, `rrd_analytic`, `vcs_project` images at first.
 
-`docker run -it --name rest_api_gw -v api.pmccabe_collector.restapi.org:/api -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from main -p 5000:5000 rest_api:latest`
+`docker run -it --name rest_api_gw -v api.pmccabe_collector.restapi.org:/api -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc_visualizer -p 5000:5000 rest_api:latest`
