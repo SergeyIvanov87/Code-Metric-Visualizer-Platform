@@ -18,7 +18,7 @@ jobs:
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
     - name: Build the VCS Docker image
-      run: docker build observable_project_version_control --tag vcs_project:$DATE .
+      run: docker build -f observable_project_version_control/Dockerfile -t vcs_project:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Build the CC Docker image
