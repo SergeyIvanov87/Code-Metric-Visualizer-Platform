@@ -44,17 +44,17 @@ jobs:
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Run CC Docker
-      run: docker run -d --name cc_visualizer -v api.pmccabe_collector.restapi.org:/api --volumes-from vcs_project cc_visualizer:$DATE
+      run: docker run -d --name cc_visualizer -v "api:/api" --volumes-from vcs_project cc_visualizer:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Create RRD volume
       run: mkdir -p rrd_data && chmod 777 rrd_data && docker volume create -d local -o type=none -o device=rrd_data -o o=bind api.pmccabe_collector.rrd_analytic
     - name: Run RRD Docker
-      run: docker run -d --name rrd_analytic -v api.pmccabe_collector.restapi.org:/api -v api.pmccabe_collector.rrd_analytic:/rrd_data --volumes-from cc_visualizer rrd_analytic:$DATE
+      run: docker run -d --name rrd_analytic -v "api:/api" -v "rrd_data:/rrd_data" --volumes-from cc_visualizer rrd_analytic:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Run REST Docker
-      run: docker run -d --name rest_api -v api.pmccabe_collector.restapi.org:/api -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc_visualizer -p 5000:5000 rest_api:$DATE
+      run: docker run -d --name rest_api -v "api:/api" -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc_visualizer -p 5000:5000 rest_api:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Run Broker Docker
