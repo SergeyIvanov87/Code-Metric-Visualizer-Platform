@@ -32,4 +32,4 @@ From the main repository directory run:
 
 The service requires all other services to be started. Once they started, use the following command:
 
-`docker run -it --name broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:latest`
+`docker run -it --name service_broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:latest`
