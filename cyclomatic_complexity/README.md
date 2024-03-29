@@ -36,8 +36,8 @@ then launch it
 
 From the main repository directory run:
 
-`DOCKER_BUILDKIT=1 sudo build -t cc_visualizer:latest -f cyclomatic_complexity/Dockerfile .`
+`DOCKER_BUILDKIT=1 docker build -t cc_visualizer:latest -f cyclomatic_complexity/Dockerfile .`
 
 Launching depends on [observable_project_version_control](../observable_project_version_control), thereby launch the `vcs_project` image at first.
 
-`sudo run -it --name cc_visualizer --volumes-from vcs_project cc_visualizer:latest`
+`docker run -it --name cc_visualizer --volumes-from vcs_project cc_visualizer:latest`

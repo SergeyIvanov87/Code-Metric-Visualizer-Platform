@@ -55,7 +55,7 @@ From the main repository directory run:
 
 Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), [rrd](../rrd), thereby launch the `cc_visualizer`, `rrd_analytic` images at first.
 
-`docker run -it --name rest_api_gw -v api.pmccabe_collector.restapi.org:/api -e FLASK_RUN_PORT=6666 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc_visualizer rest_api:latest`
+`docker run -it --name rest_api -v api.pmccabe_collector.restapi.org:/api -e FLASK_RUN_PORT=6666 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc_visualizer rest_api:latest`
 
 
 ### Analytic UC
@@ -66,4 +66,4 @@ From the main repository directory run:
 
 Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), [rrd](../rrd), [observable_project_version_control](../../observable_project_version_control), thereby launch the `cc_visualizer`, `rrd_analytic`, `vcs_project` images at first.
 
-`docker run -it --name rest_api_gw -v api.pmccabe_collector.restapi.org:/api -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc_visualizer -p 5000:5000 rest_api:latest`
+`docker run -it --name rest_api -v api.pmccabe_collector.restapi.org:/api -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc_visualizer -p 5000:5000 rest_api:latest`
