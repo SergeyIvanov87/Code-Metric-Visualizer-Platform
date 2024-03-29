@@ -40,7 +40,7 @@ jobs:
     - name: Create API volume
       run: mkdir -p api && chmod 777 api && docker volume create -d local -o type=none -o device=api -o o=bind api.pmccabe_collector.restapi.org
     - name: Run VCS Docker
-      run: docker run -it --name vcs_project -v api.pmccabe_collector.restapi.org:/api -e PROJECT_URL=https://github.com/SergeyIvanov87/TrafficInspector.git -e PROJECT_BRANCH=master vcs_project:$DATE
+      run: docker run -it --name vcs_project -v "api:/api" -e PROJECT_URL=https://github.com/SergeyIvanov87/TrafficInspector.git -e PROJECT_BRANCH=master vcs_project:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Run CC Docker
