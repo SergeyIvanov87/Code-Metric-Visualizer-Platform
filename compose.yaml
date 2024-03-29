@@ -1,4 +1,0 @@
-
-include:
-  - submodules/compose.yaml
-  - local/compose.yaml

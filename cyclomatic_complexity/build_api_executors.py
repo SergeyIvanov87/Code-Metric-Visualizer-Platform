@@ -62,7 +62,7 @@ for schema_file in schemas_file_list:
     content_file_extension = file_extension_from_content_type_or_default(request_data, "")
 
     api_node, api_req_node = compose_api_fs_request_location_paths(
-            "${INITIAL_PROJECT_LOCATION}", req_api, req_type
+            "${SHARED_API_DIR}", req_api, req_type
     )
 
 

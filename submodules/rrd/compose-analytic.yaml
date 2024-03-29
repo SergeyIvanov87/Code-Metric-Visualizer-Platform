@@ -1,17 +1,17 @@
 services:
-  rest_api:
-    build: ./
-    environment:
-      - FLASK_RUN_PORT=${FLASK_RUN_PORT:-5000}
-      - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}
+  rrd_analytic:
+    build: local/
     volumes:
       - main-shared-volume:/main_image_env
       - api.pmccabe_collector.restapi.org:/api
-    ports:
-      - 5000:5000
+      - api.pmccabe_collector.rrd_analytic:/rrd_data
 
 volumes:
+  api.pmccabe_collector.project:
   main-shared-volume:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
+    external: true
+  api.pmccabe_collector.rrd_analytic:
+    name: api.pmccabe_collector.rrd_analytic
     external: true

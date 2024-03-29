@@ -1,0 +1,9 @@
+
+include:
+  - submodules/compose-analysis.yaml
+  - cyclomatic_complexity/compose-analysis.yaml
+
+volumes:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true

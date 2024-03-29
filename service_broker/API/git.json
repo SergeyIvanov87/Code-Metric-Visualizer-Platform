@@ -1,0 +1,13 @@
+{
+    "Content-Type" : "text/plain",
+    "Method" : "POST",
+    "Query": "api.pmccabe_collector.restapi.org/project/git",
+    "Params": {
+        "NO_NAME_PARAM.0": ""
+    },
+    "Description": {
+        "header": "Version control for the abservable project\n",
+        "body": "Redirects commands to the subsequent version control\n\n",
+        "footer": "The typical result of this command is an output of the version control command execution."
+    }
+}

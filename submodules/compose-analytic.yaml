@@ -1,3 +1,3 @@
 include:
-    - rrd/compose.yaml
+    - rrd/compose-analytic.yaml
     - rest_api/compose.yaml

@@ -38,4 +38,5 @@ COPY *.py /main_image_env/
 RUN dos2unix /package/*
 RUN dos2unix /main_image_env/*
 
-ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/main_image_env"]
+VOLUME ["/api", "/mnt"]
+ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/main_image_env", "/api"]

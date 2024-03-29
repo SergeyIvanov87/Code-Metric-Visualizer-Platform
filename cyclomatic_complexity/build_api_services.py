@@ -149,7 +149,7 @@ for schema_file in schemas_file_list:
         content_type = request_data["Content-Type"]
 
     api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
-            "${INITIAL_PROJECT_LOCATION}", req_api, req_type
+            "${SHARED_API_DIR}", req_api, req_type
     )
 
     try:
