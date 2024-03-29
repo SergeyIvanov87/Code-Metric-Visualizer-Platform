@@ -26,6 +26,8 @@ The service is not engaged into this UC
 
 ### Analytic UC
 
-`DOCKER_BUILDKIT=1 sudo docker build -t project_vc:latest -f observable_project_version_control/Dockerfile .`
+From the main repository directory run:
+
+`DOCKER_BUILDKIT=1 docker build -t project_vc:latest -f observable_project_version_control/Dockerfile .`
 
 `docker run -it --name project -v api.pmccabe_collector.restapi.org:/api -e PROJECT_URL=<your project repository> -e PROJECT_BRANCH=<your project branch> project_vc:latest`

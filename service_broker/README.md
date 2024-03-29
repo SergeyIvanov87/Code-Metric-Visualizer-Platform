@@ -26,8 +26,10 @@ The service is not engaged into this UC
 
 ### Analytic UC
 
-`DOCKER_BUILDKIT=1 sudo docker build -t service_broker:latest -f service_broker/Dockerfile .`
+From the main repository directory run:
+
+`DOCKER_BUILDKIT=1 docker build -t service_broker:latest -f service_broker/Dockerfile .`
 
 The service requires all other services to be started. Once they started, use the following command:
 
-`sudo docker run -it --name broker --volumes-from project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:latest`
+`docker run -it --name broker --volumes-from project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:latest`

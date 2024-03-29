@@ -1,11 +1,9 @@
 #!/bin/bash
 
 WORK_DIR=${1}
-#TODO check if required
-INITIAL_PROJECT_LOCATION=${2}
-MAIN_IMAGE_ENV_SHARED_LOCATION=${3}
-SHARED_API_DIR=${4}
-export RRD_DATA_STORAGE_DIR=${5}/api.pmccabe_collector.restapi.org
+MAIN_IMAGE_ENV_SHARED_LOCATION=${2}
+SHARED_API_DIR=${3}
+export RRD_DATA_STORAGE_DIR=${4}/api.pmccabe_collector.restapi.org
 
 MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 # ??? TODO decide do you require it or not?

@@ -1,6 +1,6 @@
 # Cyclomatic Complexity
 
-The service evaluates and manifest the cyclomatic complexity metric of code (C/C++ are supported yet) by implementing the [API](API)
+The service evaluates and manifests the cyclomatic complexity metric of code (C/C++ are supported yet) by implementing the [API](API)
 
 # Prerequisites
 
@@ -24,16 +24,20 @@ Since the service depends on [observable_project_version_control](../observable_
 
 ### Analysis UC
 
-`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_cc:latest -f cyclomatic_complexity/Dockerfile .`
+From the main repository directory run:
+
+`DOCKER_BUILDKIT=1 docker build -t pmccabe_cc:latest -f cyclomatic_complexity/Dockerfile .`
 
 then launch it
 
-`sudo docker run -it --mount type=bind,src=${PROJECT_PATH},target=/mnt -v api.pmccabe_collector.restapi.org:/api --name main pmccabe_vis:latest`
+`docker run -it --mount type=bind,src=${PROJECT_PATH},target=/mnt -v api.pmccabe_collector.restapi.org:/api --name main pmccabe_vis:latest`
 
 ### Analytic UC
 
-`DOCKER_BUILDKIT=1 sudo docker build -t pmccabe_cc:latest -f cyclomatic_complexity/Dockerfile .`
+From the main repository directory run:
+
+`DOCKER_BUILDKIT=1 sudo build -t pmccabe_cc:latest -f cyclomatic_complexity/Dockerfile .`
 
 Launching depends on [observable_project_version_control](../observable_project_version_control), thereby launch the `project` image at first.
 
-`sudo docker run -it --name main --volumes-from project pmccabe_cc:latest`
+`sudo run -it --name main --volumes-from project pmccabe_cc:latest`
