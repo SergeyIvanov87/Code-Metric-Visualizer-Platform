@@ -34,7 +34,7 @@ jobs:
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Build the Service Broker Docker image
-      run: docker build -f service_broker/Dockerfile -t broker:$DATE .
+      run: docker build -f service_broker/Dockerfile -t service_broker:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Create API volume
@@ -58,7 +58,7 @@ jobs:
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Run Broker Docker
-      run: docker run -d --name broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:$DATE
+      run: docker run -d --name service_broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
 
