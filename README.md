@@ -57,12 +57,13 @@ There are few supported use-cases which are embodied by using different set of i
 
 ### Analysis UC
 
-To collect & check code metrics during your casual activities or making refactoring by demand using API
+To collect & check code metrics during your casual activities or making refactoring by demand using API.
+To find more details, please check out for the [Analysis UC diagram](diagrams/analysis_UC.png)
 
 ### Analytic UC
 
-Collect & store code metric in [Round-Robin-Database](https://oss.oetiker.ch/rrdtool) on a regular basis automatically
-
+Collect & store code metric in [Round-Robin-Database](https://oss.oetiker.ch/rrdtool) on a regular basis automatically.
+To find more details, please check out for the [Analytic UC diagram](diagrams/analytic_UC.png)
 
 # Prerequisites
 
