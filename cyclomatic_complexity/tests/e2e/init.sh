@@ -6,7 +6,7 @@ export SHARED_API_DIR=${3}
 
 export UTILS="${WORK_DIR}/utils"
 
-MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
+export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
 echo "Run tests:"
 for s in ${WORK_DIR}/test_*.py; do

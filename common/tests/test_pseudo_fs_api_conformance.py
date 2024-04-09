@@ -2,12 +2,6 @@
 
 #!/usr/bin/python
 
-"""
-Generates `CGI` script for API request serving
-"""
-
-import argparse
-
 import json
 import os
 import pathlib
@@ -20,43 +14,50 @@ import filesystem_utils
 
 from api_schema_utils import deserialize_api_request_from_schema_file
 from api_schema_utils import file_extension_from_content_type
+from settings import Settings
 
+global_settings = Settings()
 
-
-@pytest.fixture()
 def get_api_schema_files():
-    work_dir = os.getenv('WORK_DIR', '')
-    project_dir = os.getenv('INITIAL_PROJECT_LOCATION', '')
-    api_dir = os.getenv('SHARED_API_DIR', '')
+    global global_settings
+    return filesystem_utils.read_files_from_path("/API", ".*\.json$")
 
-    return filesystem_utils.read_files_from_path(api_dir, ".*\.json$")
+def get_api_queries():
+    valid_queries_dict = {}
+    global global_settings
 
-def test_filesystem_api_nodes(get_api_schema_files):
-    for schema_file in get_api_schema_files:
+    for schema_file in get_api_schema_files():
         req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
         assert req_name
         assert request_data
-        assert ("Method", "Query", "Params") in request_data.keys()
-    '''
-    # filter unrelated API queries
-    domain_entry_pos = req_api.find(args.domain_name_api_entry)
-    if domain_entry_pos == -1:
-        continue
+        assert "Method" in request_data.keys()
+        assert "Query" in request_data.keys()
+        assert "Params" in request_data.keys()
+        valid_queries_dict[req_name] = request_data
+
+        # filter out non-related queries
+        domain_entry_pos = request_data["Query"].find(global_settings.domain_name_api_entry)
+        if domain_entry_pos == -1:
+            continue
+    return valid_queries_dict
+
+testdata = list(get_api_queries().items())
+
+@pytest.mark.parametrize("name,query", testdata)
+def test_filesystem_api_nodes(name, query):
+    global global_settings
+    method = query["Method"]
+    query_str = query["Query"]
+    params = query["Params"]
 
     # Content-Type is an optional field
     content_type=""
-    if "Content-Type" in request_data:
-        content_type = request_data["Content-Type"]
+    if "Content-Type" in query:
+        content_type = query["Content-Type"]
 
-    # determine output PIPE name extension base on Content-Type
-    if content_type == "":
-        req_fs_output_pipe_name = os.path.join(req_api, req_type, "result")
-        content_type="text/plain"
-    else:
-        req_fs_output_pipe_name = os.path.join(req_api, req_type, "result." + file_extension_from_content_type(content_type))
+    pipes = ["exec", "result" if content_type == "" else "result." + file_extension_from_content_type(content_type)]
+    pipes = [os.path.join(global_settings.api_dir, query_str, method, p) for p in pipes]
 
-    req_api = req_api[domain_entry_pos:]
-    cgi_content = generate_cgi_schema(args.filesystem_api_mount_point, req_api, req_type, req_fs_output_pipe_name, req_params, content_type)
-    for l in cgi_content:
-        print(l)
-    '''
+    # check that special files are really pipes
+    for p in pipes:
+        assert stat.S_ISFIFO(os.stat(p).st_mode)
