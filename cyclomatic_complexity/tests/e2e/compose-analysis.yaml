@@ -1,0 +1,14 @@
+services:
+  cc_e2e_tester:
+    build:
+      context: ../../../
+      dockerfile: cyclomatic_complexity/tests/e2e/Dockerfile
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+    depends_on:
+       - cc_visualizer
+
+volumes:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true

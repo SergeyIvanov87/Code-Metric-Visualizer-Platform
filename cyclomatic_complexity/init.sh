@@ -11,6 +11,14 @@ echo -e "#!/bash\n\nexport WORK_DIR=${WORK_DIR} \nexport MAIN_IMAGE_ENV_SHARED_L
 # allow pmccabe_collector to access reposiroty
 git config --global --add safe.directory ${INITIAL_PROJECT_LOCATION}
 
+termination_handler(){
+   echo "***Stopping"
+   exit 0
+}
+
+# Setup signal handlers
+trap 'termination_handler' SIGTERM
+
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_executors.py ${WORK_DIR}/API ${MAIN_IMAGE_ENV_SHARED_LOCATION} -o ${WORK_DIR}
@@ -38,4 +46,5 @@ for s in ${WORK_DIR}/services/*.sh; do
     echo "${s} has been started"
 done
 
-sleep infinity
+sleep infinity &
+wait $!
