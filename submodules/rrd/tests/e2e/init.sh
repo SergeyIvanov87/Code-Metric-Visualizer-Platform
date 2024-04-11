@@ -16,6 +16,8 @@ export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
 echo "Create CC API which RRD depends on"
 /main_image_env/build_api_pseudo_fs.py /cc_API ${SHARED_API_DIR}
+echo "Mock CC API"
+find /mnt -regex ".*\\.\\(hpp\\|cpp\\|c\\|h\\)" -type f | /package/pmccabe_visualizer/pmccabe_build.py > /api/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml
 
 echo "Run tests:"
 for s in ${WORK_DIR}/test_*.py; do

@@ -21,6 +21,10 @@ trap 'termination_handler' SIGTERM
 
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
+TMPDIR=$(mktemp -d --tmpdir=${SHARED_API_DIR})
+if [ $? -ne 0 ]; then echo "Cannot create ${SHARED_API_DIR}. Please check access rights to the VOLUME '/api' and grant the container all of them"; exit -1; fi
+rm -rf $TMPDIR
+
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_executors.py ${WORK_DIR}/API ${MAIN_IMAGE_ENV_SHARED_LOCATION} -o ${WORK_DIR}
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
 ${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}

@@ -19,7 +19,7 @@ RUN apk add --no-cache python3 pytest dos2unix bash
 
 COPY --from=build /usr/bin/pmccabe /usr/bin/pmccabe
 RUN mkdir -p /package/pmccabe_visualizer
-COPY --from=build /package/pmccabe_visualizer/*.py pmccabe_visualizer/
+COPY --from=build /package/pmccabe_visualizer/*.py /package/pmccabe_visualizer/
 
 
 COPY submodules/rrd/API /API
@@ -33,8 +33,8 @@ COPY submodules/rrd/tests/e2e/*.sh /tests/
 COPY submodules/rrd/tests/e2e/data /mnt/
 
 # TODO temporary source of utils
-RUN mkdir -p /tests/utils
-COPY submodules/rrd/*.py /tests/utils/
+RUN mkdir -p /tests
+COPY submodules/rrd/local/*.py /tests/
 
 RUN dos2unix /tests/*
 
