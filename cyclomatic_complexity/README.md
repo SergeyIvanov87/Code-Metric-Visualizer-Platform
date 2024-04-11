@@ -41,3 +41,13 @@ From the main repository directory run:
 Launching depends on [observable_project_version_control](../observable_project_version_control), thereby launch the `vcs_project` image at first.
 
 `docker run -it --name cc_visualizer --volumes-from vcs_project cc_visualizer:latest`
+
+# Testing the container
+
+From the main repository directory run:
+
+`docker-compose -f cyclomatic_complexity/compose-analysis.test.yaml build`
+
+and then
+
+`docker-compose -f cyclomatic_complexity/compose-analysis.test.yaml up --abort-on-container-exit`

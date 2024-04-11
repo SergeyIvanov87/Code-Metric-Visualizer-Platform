@@ -4,11 +4,11 @@ services:
       context: ../../../
       dockerfile: cyclomatic_complexity/tests/e2e/Dockerfile
     volumes:
-      - api.pmccabe_collector.restapi.org:/api
+      - api.pmccabe_collector.restapi.org.test:/api
+      - api.pmccabe_collector.project.test:/mnt
     depends_on:
        - cc_visualizer
 
 volumes:
-  api.pmccabe_collector.restapi.org:
-    name: api.pmccabe_collector.restapi.org
-    external: true
+  api.pmccabe_collector.project.test:
+  api.pmccabe_collector.restapi.org.test:

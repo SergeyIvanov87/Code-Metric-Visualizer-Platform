@@ -127,3 +127,40 @@ To build the images please follow up the corresponding section `Build & Run Imag
 - [rrd](submodules/rrd/README.md)
 - [rest_api](submodules/rest_api/README.md)
 - [service_broker](service_broker/README.md)
+
+
+## To build & to Test entire services using Docker-Compose automatically (RECOMMENDED)
+
+To leverage this fully-automated approach, please use `docker-compose`:
+
+### Analysis UC
+
+`docker compose -f cyclomatic_complexity/compose-analysis.test.yaml build`
+
+`docker compose -f cyclomatic_complexity/compose-analysis.test.yaml up --abort-on-container-exit`
+
+which will build and test the main image and all required submodules
+
+### Analytic UC
+
+Coming soon...
+
+## To build & to Test each image separatedly
+
+### Build & Test images
+
+To test the images please follow up the corresponding section `Testing the container` in manuals below:
+
+### Analysis UC
+
+- [cyclomatic_complexity](cyclomatic_complexity/README.md)
+- [rrd](submodules/rrd/README.md)
+- [rest_api](submodules/rest_api/README.md)
+
+### Analytic UC
+
+- [observable_project_version_control](observable_project_version_control/README.md)
+- [cyclomatic_complexity](cyclomatic_complexity/README.md)
+- [rrd](submodules/rrd/README.md)
+- [rest_api](submodules/rest_api/README.md)
+- [service_broker](service_broker/README.md)
