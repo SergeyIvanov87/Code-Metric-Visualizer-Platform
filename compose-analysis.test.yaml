@@ -1,0 +1,3 @@
+include:
+  - submodules/compose-analysis.test.yaml
+  - cyclomatic_complexity/compose-analysis.test.yaml

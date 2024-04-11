@@ -1,8 +1,8 @@
 #!/bin/bash
 
-WORK_DIR=${1}
-MAIN_IMAGE_ENV_SHARED_LOCATION=${2}
-SHARED_API_DIR=${3}
+export WORK_DIR=${1}
+export MAIN_IMAGE_ENV_SHARED_LOCATION=${2}
+export SHARED_API_DIR=${3}
 export RRD_DATA_STORAGE_DIR=${4}/api.pmccabe_collector.restapi.org
 
 MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
@@ -54,6 +54,14 @@ ${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_
 #    printf '\n'
 #done
 
+termination_handler(){
+   echo "***Stopping"
+   exit 0
+}
+
+echo "Setup signal handlers"
+trap 'termination_handler' SIGTERM
+
 echo "run API listeners:"
 for s in ${WORK_DIR}/services/*.sh; do
     /bin/bash ${s} ${MAIN_IMAGE_ENV_SHARED_LOCATION} &
@@ -73,4 +81,5 @@ done
 #    echo "Completed"
 #fi
 
-sleep infinity
+sleep infinity &
+wait $!
