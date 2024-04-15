@@ -22,6 +22,6 @@ RUN dos2unix /tests/*
 RUN mkdir /main_image_env
 RUN dos2unix /tests/*
 COPY cyclomatic_complexity/*.py /main_image_env/
-VOLUME ["/api", "/mnt", "/main_image_env"]
+VOLUME ["/api", "/main_image_env"]
 
-ENTRYPOINT ["/tests/init.sh", "/tests", "/mnt", "/api"]
+ENTRYPOINT ["/tests/init.sh", "/tests", "/api"]
