@@ -1,0 +1,17 @@
+include:
+  - tests/compose-analysis.test.yaml
+
+services:
+  rest_api:
+    build: ./
+    hostname: rest_api
+    volumes:
+      - api.pmccabe_collector.restapi.org.test:/api
+# TODO temporary solution due to issue #34
+      - main-shared-volume:/main_image_env
+    ports:
+      - 5000:5000
+
+volumes:
+  api.pmccabe_collector.restapi.org.test:
+  main-shared-volume:
