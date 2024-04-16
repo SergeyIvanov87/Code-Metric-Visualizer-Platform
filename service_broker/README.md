@@ -33,3 +33,13 @@ From the main repository directory run:
 The service requires all other services to be started. Once they started, use the following command:
 
 `docker run -it --name service_broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:latest`
+
+# Testing the container
+
+From the main repository directory run:
+
+`docker-compose -f service_broker/compose-analytic.test.yaml build`
+
+and then
+
+`docker-compose -f service_broker/compose-analytic.test.yaml up --abort-on-container-exit`

@@ -1,0 +1,10 @@
+services:
+  service_broker_e2e_tester:
+    build:
+      context: ../../../
+      dockerfile: service_broker/tests/e2e/Dockerfile
+    volumes:
+      - api.pmccabe_collector.restapi.org.test:/api
+
+volumes:
+  api.pmccabe_collector.restapi.org.test:
