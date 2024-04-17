@@ -23,10 +23,10 @@ jobs:
         DATE: ${{ steps.date.outputs.date }}
     - name: Build the CC Docker image
       run: docker build cyclomatic_complexity --tag cc_visualizer:$DATE
-    - name: Test the CC Docker image
-      run: docker-compose -f cyclomatic_complexity/compose-analysis.test.yaml up --abort-on-container-exit
       env:
         DATE: ${{ steps.date.outputs.date }}
+    - name: Test the CC Docker image
+      run: docker-compose -f cyclomatic_complexity/compose-analysis.test.yaml up --abort-on-container-exit
     - name: Build the RRD Docker image
       run: docker build submodules/rrd/local --tag rrd_analytic:$DATE
       env:
