@@ -1,2 +1,4 @@
+version: "3.3"
+
 include:
   - e2e/compose-analysis.yaml
