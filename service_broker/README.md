@@ -38,8 +38,8 @@ The service requires all other services to be started. Once they started, use th
 
 From the main repository directory run:
 
-`docker-compose -f service_broker/compose-analytic.test.yaml build`
+`docker compose -f service_broker/compose-analytic.test.yaml build`
 
 and then
 
-`docker-compose -f service_broker/compose-analytic.test.yaml up --abort-on-container-exit`
+`docker compose -f service_broker/compose-analytic.test.yaml up --abort-on-container-exit`

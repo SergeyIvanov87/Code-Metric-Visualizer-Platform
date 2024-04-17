@@ -48,8 +48,8 @@ Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), [obse
 
 From the main repository directory run:
 
-`docker-compose -f submodules/rrd/compose-analysis.test.yaml build`
+`docker compose -f submodules/rrd/compose-analysis.test.yaml build`
 
 and then
 
-`docker-compose -f submodules/rrd/compose-analysis.test.yaml up --abort-on-container-exit`
+`docker compose -f submodules/rrd/compose-analysis.test.yaml up --abort-on-container-exit`

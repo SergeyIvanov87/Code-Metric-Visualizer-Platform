@@ -46,8 +46,8 @@ Launching depends on [observable_project_version_control](../observable_project_
 
 From the main repository directory run:
 
-`docker-compose -f cyclomatic_complexity/compose-analysis.test.yaml build`
+`docker compose -f cyclomatic_complexity/compose-analysis.test.yaml build`
 
 and then
 
-`docker-compose -f cyclomatic_complexity/compose-analysis.test.yaml up --abort-on-container-exit`
+`docker compose -f cyclomatic_complexity/compose-analysis.test.yaml up --abort-on-container-exit`

@@ -90,11 +90,11 @@ You **SHOULD** define the environment variable `CRON_REPO_UPDATE_SCHEDULE` to sp
 
 # HOW-TO
 
-There are several ways to use these images: using `docker-compose` to build and to launch all existing images or set them up using manual approach:
+There are several ways to use these images: using `docker compose` to build and to launch all existing images or set them up using manual approach:
 
 ## To build & to Run entire services using Docker-Compose automatically (RECOMMENDED)
 
-To leverage this fully-automated approach, please use `docker-compose`:
+To leverage this fully-automated approach, please use `docker compose`:
 
 ### Analysis UC
 
@@ -131,7 +131,7 @@ To build the images please follow up the corresponding section `Build & Run Imag
 
 ## To build & to Test entire services using Docker-Compose automatically (RECOMMENDED)
 
-To leverage this fully-automated approach, please use `docker-compose`:
+To leverage this fully-automated approach, please use `docker compose`:
 
 ### Analysis UC
 
