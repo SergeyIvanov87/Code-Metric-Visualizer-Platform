@@ -68,7 +68,7 @@ def deserialize_api_request_from_schema_file(api_request_schema_path):
             for f in must_have_fields:
                 if f not in request:
                     raise ValueError(f"API schema must describe attribute: {f}. Check the schema in: {api_request_schema_path}")
-            name = os.path.basename(api_request_schema_path).split('.')[0]
+            name = os.path.splitext(os.path.basename(api_request_schema_path))[0]
         except json.decoder.JSONDecodeError as e:
             raise Exception(f"Error: {str(e)} in file: {api_request_schema_path}")
     return name, request

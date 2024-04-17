@@ -1,0 +1,17 @@
+services:
+  rest_api_e2e_tester:
+    build:
+      context: ../../../../
+      dockerfile: submodules/rest_api/tests/e2e/Dockerfile
+    volumes:
+      - api.pmccabe_collector.restapi.org.test:/api
+# TODO temporary solution due to issue #34
+      - main-shared-volume:/main_image_env
+# TODO temporary solution due to issue #34
+#    depends_on:
+#       - rest_api
+
+volumes:
+  api.pmccabe_collector.restapi.org.test:
+# TODO temporary solution due to issue #34
+  main-shared-volume:

@@ -1,0 +1,12 @@
+{
+    "Content-Type" : "text/plain",
+    "Method" : "GET",
+    "Query": "api.pmccabe_collector.restapi.org",
+    "Params": {
+    },
+    "Description": {
+        "header": "portal header\n",
+        "body": "portal body\n",
+        "footer": "portal footer"
+    }
+}

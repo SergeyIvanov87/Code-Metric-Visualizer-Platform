@@ -1,0 +1,2 @@
+include:
+  - e2e/compose-analysis.yaml

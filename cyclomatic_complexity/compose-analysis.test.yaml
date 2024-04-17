@@ -1,0 +1,13 @@
+include:
+  - tests/compose-analysis.yaml
+
+services:
+  cc_visualizer:
+    build: ./
+    volumes:
+      - api.pmccabe_collector.project.test:/mnt
+      - api.pmccabe_collector.restapi.org.test:/api
+
+volumes:
+  api.pmccabe_collector.project.test:
+  api.pmccabe_collector.restapi.org.test:

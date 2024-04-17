@@ -4,6 +4,14 @@ WORK_DIR=${1}
 MAIN_IMAGE_ENV_SHARED_LOCATION=${2}
 SHARED_API_DIR=${3}
 
+termination_handler(){
+   echo "***Stopping"
+   exit 0
+}
+
+# Setup signal handlers
+trap 'termination_handler' SIGTERM
+
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
 
@@ -18,4 +26,5 @@ ${WORK_DIR}/build_schedule_jobs.py ${WORK_DIR}/API ${SHARED_API_DIR} api.pmccabe
 crontab jobs_schedule
 while true; do crond -f -l 0 -d 0; done
 
-sleep infinity
+sleep infinity &
+wait $!

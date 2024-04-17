@@ -43,3 +43,13 @@ From the main repository directory run:
 Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), [observable_project_version_control](../../observable_project_version_control), thereby launch the `cc_visualizer`, `vcs_project` images at first.
 
 `docker run -it --name rrd_analytic -v api.pmccabe_collector.restapi.org:/api -v api.pmccabe_collector.rrd_analytic:/rrd_data --volumes-from cc_visualizer rrd_analytic:latest`
+
+# Testing the container
+
+From the main repository directory run:
+
+`docker compose -f submodules/rrd/compose-analysis.test.yaml build`
+
+and then
+
+`docker compose -f submodules/rrd/compose-analysis.test.yaml up --abort-on-container-exit`
