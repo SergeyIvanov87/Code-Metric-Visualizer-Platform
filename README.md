@@ -8,7 +8,7 @@ The service implementation is still in progress and it has limited functionality
 The service is available as a `copilot`-based feature which has named `pmccabe_collector`. Only `pmccabe_collector` local-machine (Linux tested only) docker image is shipping at the moment.
 The purpose of `pmccabe_collector` is to extend software developing experience by governing some code metric subset known as "cyclomatic complexity".
 Launching `pmccabe_collector` and targeting it to your C/C++ project, you could leverage API populated by this service to collect, manifest and govern this metric subset.
-All communication with the particular `pmccabe_collector` docker container is available either through simplest pseudo-filesystem API, which is populated in [API manifest](cyclomatic_complexity/API.fs), or using HTTP queries, if you decided to employ [REST API submodule](submodules/rest_api)
+All communication with the particular `pmccabe_collector` docker container is available either through simplest pseudo-filesystem API, which is populated in [API manifest](cyclomatic_complexity/API.fs), or using HTTP queries, if you decided to employ [REST API](rest_api)
 Whatever you prefered, the API subset remains the same. Thanks to the REST ideology, it is possible to generate both sets of API: requests could represent a particular hierarcy structure, thus `pmccabe_collector` leverages this idea and maps those API requests as a structure of nodes mapped to a filesystem hierarchy as directories and files inside the populated API-entry point `api.pmccabe_collector.restapi.org` resided in your project directory.
 Each request can be executed as simple ACCESS-operation on a file named `exec` or `modify_this_file` in the bottom of relevant filesystem hierarchy in the same way as the Linux `/proc` pseudo-filesystem employed in order to read (and/or store) some system settings.
 
@@ -117,15 +117,15 @@ To build the images please follow up the corresponding section `Build & Run Imag
 ### Analysis UC
 
 - [cyclomatic_complexity](cyclomatic_complexity/README.md)
-- [rrd](submodules/rrd/README.md)
-- [rest_api](submodules/rest_api/README.md)
+- [rrd](rrd/README.md)
+- [rest_api](rest_api/README.md)
 
 ### Analytic UC
 
 - [observable_project_version_control](observable_project_version_control/README.md)
 - [cyclomatic_complexity](cyclomatic_complexity/README.md)
-- [rrd](submodules/rrd/README.md)
-- [rest_api](submodules/rest_api/README.md)
+- [rrd](rrd/README.md)
+- [rest_api](rest_api/README.md)
 - [service_broker](service_broker/README.md)
 
 
@@ -154,13 +154,13 @@ To test the images please follow up the corresponding section `Testing the conta
 ### Analysis UC
 
 - [cyclomatic_complexity](cyclomatic_complexity/README.md)
-- [rrd](submodules/rrd/README.md)
-- [rest_api](submodules/rest_api/README.md)
+- [rrd](rrd/README.md)
+- [rest_api](rest_api/README.md)
 
 ### Analytic UC
 
 - [observable_project_version_control](observable_project_version_control/README.md)
 - [cyclomatic_complexity](cyclomatic_complexity/README.md)
-- [rrd](submodules/rrd/README.md)
-- [rest_api](submodules/rest_api/README.md)
+- [rrd](rrd/README.md)
+- [rest_api](rest_api/README.md)
 - [service_broker](service_broker/README.md)

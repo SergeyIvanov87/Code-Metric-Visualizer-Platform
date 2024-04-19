@@ -5,16 +5,16 @@ WORKDIR tests
 # install app dependencies
 RUN apk add --no-cache python3 py3-requests pytest dos2unix bash
 
-COPY submodules/rest_api/API /API
+COPY rest_api/API /API
 
 COPY common/tests/*.py /tests/
-COPY submodules/rest_api/tests/e2e/*.py /tests/
-COPY submodules/rest_api/tests/e2e/*.sh /tests/
-COPY submodules/rest_api/tests/e2e/data /tests/data
+COPY rest_api/tests/e2e/*.py /tests/
+COPY rest_api/tests/e2e/*.sh /tests/
+COPY rest_api/tests/e2e/data /tests/data
 
 # TODO temporary source of utils
 RUN mkdir -p /tests
-COPY submodules/rest_api/*.py /tests/
+COPY rest_api/*.py /tests/
 
 RUN dos2unix /tests/*
 

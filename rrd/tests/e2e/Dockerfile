@@ -22,19 +22,19 @@ RUN mkdir -p /package/pmccabe_visualizer
 COPY --from=build /package/pmccabe_visualizer/*.py /package/pmccabe_visualizer/
 
 
-COPY submodules/rrd/API /API
+COPY rrd/API /API
 COPY cyclomatic_complexity/API/statistic.json /cc_API/
 
 COPY common/tests/*.py /tests/
-COPY submodules/rrd/tests/e2e/*.py /tests/
-COPY submodules/rrd/tests/e2e/*.sh /tests/
+COPY rrd/tests/e2e/*.py /tests/
+COPY rrd/tests/e2e/*.sh /tests/
 
 # TODO think about sending those via ssh
-COPY submodules/rrd/tests/e2e/data /mnt/
+COPY rrd/tests/e2e/data /mnt/
 
 # TODO temporary source of utils
 RUN mkdir -p /tests
-COPY submodules/rrd/local/*.py /tests/
+COPY rrd/local/*.py /tests/
 
 RUN dos2unix /tests/*
 

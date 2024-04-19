@@ -1,6 +1,7 @@
 
 include:
-  - submodules/compose-analysis.yaml
+  - rrd/compose-analysis.yaml
+  - rest_api/compose.yaml
   - cyclomatic_complexity/compose-analysis.yaml
 
 volumes:
