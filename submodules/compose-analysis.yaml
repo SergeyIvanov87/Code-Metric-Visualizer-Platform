@@ -1,3 +1,0 @@
-include:
-    - rrd/compose-analysis.yaml
-    - rest_api/compose.yaml

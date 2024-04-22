@@ -26,9 +26,9 @@ No special requirements for this UC
 
 From the main repository directory run:
 
-`DOCKER_BUILDKIT=1 docker build -t rrd_analytic:latest -f submodules/rrd/local/Dockerfile submodules/rrd/local`
+`DOCKER_BUILDKIT=1 docker build -t rrd_analytic:latest -f rrd/local/Dockerfile rrd/local`
 
-Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), thereby launch the `cc_visualizer` image at first.
+Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), thereby launch the `cc_visualizer` image at first.
 
 
 `docker run -it --name rrd_analytic -v api.pmccabe_collector.restapi.org:/api --volumes-from cc_visualizer rrd_analytic:latest`
@@ -38,9 +38,9 @@ Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), there
 
 From the main repository directory run:
 
-`DOCKER_BUILDKIT=1 docker build -t rest_api:latest -f submodules/rrd/local/Dockerfile submodules/rrd/local`
+`DOCKER_BUILDKIT=1 docker build -t rest_api:latest -f rrd/local/Dockerfile rrd/local`
 
-Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), [observable_project_version_control](../../observable_project_version_control), thereby launch the `cc_visualizer`, `vcs_project` images at first.
+Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), [observable_project_version_control](../observable_project_version_control), thereby launch the `cc_visualizer`, `vcs_project` images at first.
 
 `docker run -it --name rrd_analytic -v api.pmccabe_collector.restapi.org:/api -v api.pmccabe_collector.rrd_analytic:/rrd_data --volumes-from cc_visualizer rrd_analytic:latest`
 
@@ -48,8 +48,8 @@ Launching depends on [cyclomatic_complexity](../../cyclomatic_complexity), [obse
 
 From the main repository directory run:
 
-`docker compose -f submodules/rrd/compose-analysis.test.yaml build`
+`docker compose -f rrd/compose-analysis.test.yaml build`
 
 and then
 
-`docker compose -f submodules/rrd/compose-analysis.test.yaml up --abort-on-container-exit`
+`docker compose -f rrd/compose-analysis.test.yaml up --abort-on-container-exit`

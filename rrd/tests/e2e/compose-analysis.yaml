@@ -1,8 +1,8 @@
 services:
   rrd_e2e_tester:
     build:
-      context: ../../../../
-      dockerfile: submodules/rrd/tests/e2e/Dockerfile
+      context: ../../../
+      dockerfile: rrd/tests/e2e/Dockerfile
     volumes:
       - api.pmccabe_collector.restapi.org.test:/api
       - api.pmccabe_collector.rrd_analytic:/rrd_data
