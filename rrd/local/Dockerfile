@@ -9,15 +9,22 @@ RUN apk add --no-cache python3 dos2unix
 RUN apk add --no-cache inotify-tools bash
 RUN apk add --no-cache rrdtool librsvg potrace imagemagick ghostscript-fonts terminus-font
 
-COPY *.sh /package/
-COPY *.py /package/
-COPY API /package/API
+COPY rrd/local/*.sh /package/
+COPY rrd/local/*.py /package/
+COPY rrd/API /package/API
 
-COPY $SCRIPT_GEN_LOC/*.sh /package/
+COPY rrd/local/$SCRIPT_GEN_LOC/*.sh /package/
 RUN dos2unix /package/*
 
-RUN mkdir /main_image_env
-ENV MAIN_IMAGE_ENV_SHARED_LOCATION_ENV="/main_image_env"
+RUN mkdir -p /opt
+COPY common/modules /opt/modules
+COPY common/build_api_executors.py /opt/
+COPY common/build_api_services.py /opt/
+COPY common/build_api_pseudo_fs.py /opt/
+COPY common/make_api_readme.py /opt/
+RUN dos2unix /opt/*
+RUN dos2unix /opt/modules*
+
 VOLUME /api
 VOLUME /rrd_data
-ENTRYPOINT ["/package/init.sh", "/package", "/main_image_env", "/api", "/rrd_data"]
+ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api", "/rrd_data"]

@@ -15,7 +15,8 @@ from collections import defaultdict
 from math import sqrt
 
 import rrd_utils
-sys.path.append(os.getenv('MAIN_IMAGE_ENV_SHARED_LOCATION_ENV', ''))
+sys.path.append('modules')
+
 import api_fs_args
 import filesystem_utils
 

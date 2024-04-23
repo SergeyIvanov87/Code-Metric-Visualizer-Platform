@@ -7,15 +7,10 @@ services:
       - api.pmccabe_collector.restapi.org.test:/api
       - api.pmccabe_collector.rrd_analytic:/rrd_data
       - api.pmccabe_collector.project.test:/mnt
-# TODO temporary solution due to issue #34
-      - main-shared-volume:/main_image_env
-# TODO temporary solution due to issue #34
-#    depends_on:
-#       - rrd_analytic
+    depends_on:
+      - rrd_analytic
 
 volumes:
   api.pmccabe_collector.project.test:
   api.pmccabe_collector.restapi.org.test:
   api.pmccabe_collector.rrd_analytic:
-# TODO temporary solution due to issue #34
-  main-shared-volume:

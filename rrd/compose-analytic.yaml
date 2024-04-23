@@ -1,14 +1,14 @@
 services:
   rrd_analytic:
-    build: local/
+    build:
+      context: ../
+      dockerfile: ./rrd/local/Dockerfile
     volumes:
-      - main-shared-volume:/main_image_env
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.rrd_analytic:/rrd_data
 
 volumes:
   api.pmccabe_collector.project:
-  main-shared-volume:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
