@@ -1,15 +1,15 @@
 services:
   cc_visualizer:
-    build: ./
+    build:
+      context: ../
+      dockerfile: ./cyclomatic_complexity/Dockerfile
     environment:
       - PROJECT_PATH=${PROJECT_PATH}
     volumes:
       - ${PROJECT_PATH}:/mnt
-      - main-shared-volume:/main_image_env
       - api.pmccabe_collector.restapi.org:/api
 
 volumes:
-  main-shared-volume:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true

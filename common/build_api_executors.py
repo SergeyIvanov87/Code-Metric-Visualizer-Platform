@@ -12,6 +12,8 @@ import pathlib
 import sys
 import stat
 
+sys.path.append('modules')
+
 import filesystem_utils
 
 from api_fs_conventions import compose_api_exec_script_name
@@ -27,7 +29,7 @@ EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
 def make_default_script(script):
     script.write(
-        f"#!/bin/bash\n\n. ${1}/setenv.sh\n\nRESULT_FILE=${2}_result\n\n{EMPTY_DEV_SCRIPT_MARK}"
+        f"#!/bin/bash\n\nRESULT_FILE=${1}_result\n\n{EMPTY_DEV_SCRIPT_MARK}"
     )
 
 parser = argparse.ArgumentParser(

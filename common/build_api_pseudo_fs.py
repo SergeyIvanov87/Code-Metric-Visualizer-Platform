@@ -20,6 +20,8 @@ import pathlib
 import stat
 import sys
 
+sys.path.append('modules')
+
 import filesystem_utils
 
 from api_fs_conventions import compose_api_fs_request_location_paths

@@ -1,12 +1,12 @@
 #!/bin/bash
 
-WORK_DIR=${1}
+export WORK_DIR=${1}
 export INITIAL_PROJECT_LOCATION=${2}
-MAIN_IMAGE_ENV_SHARED_LOCATION=${3}
-SHARED_API_DIR=${4}
+export OPT_DIR=${3}
+export SHARED_API_DIR=${4}
+export PYTHONPATH="${3}:${3}/modules"
 
-MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
-echo -e "#!/bash\n\nexport WORK_DIR=${WORK_DIR} \nexport MAIN_IMAGE_ENV_SHARED_LOCATION=${MAIN_IMAGE_ENV_SHARED_LOCATION} \nexport SHARED_DIR=${SHARED_DIR} \nexport SHARED_API_DIR=${SHARED_API_DIR} \nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION} \nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}" > ${MAIN_IMAGE_ENV_SHARED_LOCATION}/setenv.sh
+export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
 # allow pmccabe_collector to access reposiroty
 git config --global --add safe.directory ${INITIAL_PROJECT_LOCATION}
@@ -25,10 +25,10 @@ TMPDIR=$(mktemp -d --tmpdir=${SHARED_API_DIR})
 if [ $? -ne 0 ]; then echo "Cannot create ${SHARED_API_DIR}. Please check access rights to the VOLUME '/api' and grant the container all of them"; exit -1; fi
 rm -rf $TMPDIR
 
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_executors.py ${WORK_DIR}/API ${MAIN_IMAGE_ENV_SHARED_LOCATION} -o ${WORK_DIR}
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-STATISTIC.md
+${OPT_DIR}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
+${OPT_DIR}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
+${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
+${OPT_DIR}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-STATISTIC.md
 
 # TODO think about necessity in creating any pivot metrics
 # There are few disadvantages about it:
@@ -41,12 +41,9 @@ ${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_
 #
 # Conclusion: do not attempt to call any API commands to build statistic here in init.sh
 
-#${WORK_DIR}/build_pmccabe_xml.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} "${SHARED_API_DIR}/init.xml"
-#${WORK_DIR}/build_pmccabe_flamegraph.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} "${SHARED_API_DIR}/init.xml" "${SHARED_API_DIR}/init"
-
 echo "run API listeners:"
 for s in ${WORK_DIR}/services/*.sh; do
-    ${s} ${MAIN_IMAGE_ENV_SHARED_LOCATION} &
+    ${s} ${OPT_DIR} &
     echo "${s} has been started"
 done
 

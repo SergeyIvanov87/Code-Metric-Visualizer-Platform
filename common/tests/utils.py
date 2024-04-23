@@ -5,8 +5,8 @@ import pytest
 import sys
 import stat
 
+sys.path.append(os.getenv('MODULES', 'modules'))
 
-sys.path.append(os.getenv('UTILS', ''))
 import filesystem_utils
 from api_schema_utils import deserialize_api_request_from_schema_file
 from api_schema_utils import file_extension_from_content_type

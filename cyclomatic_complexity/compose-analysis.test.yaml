@@ -3,7 +3,9 @@ include:
 
 services:
   cc_visualizer:
-    build: ./
+    build:
+      context: ../
+      dockerfile: ./cyclomatic_complexity/Dockerfile
     volumes:
       - api.pmccabe_collector.project.test:/mnt
       - api.pmccabe_collector.restapi.org.test:/api

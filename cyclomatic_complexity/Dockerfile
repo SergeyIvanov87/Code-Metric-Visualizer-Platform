@@ -26,17 +26,22 @@ COPY --from=build /package/FlameGraph/flamegraph.pl FlameGraph/flamegraph.pl
 COPY --from=build /package/pmccabe_visualizer/*.py pmccabe_visualizer/
 
 
-COPY *.sh /package/
-COPY API /package/API
+COPY cyclomatic_complexity/*.sh /package/
+COPY cyclomatic_complexity/*.py /package/
+COPY cyclomatic_complexity/API /package/API
 
-COPY $SCRIPT_GEN_LOC/*.sh /package/
+COPY cyclomatic_complexity/$SCRIPT_GEN_LOC/*.sh /package/
 
-RUN mkdir /main_image_env
-VOLUME /main_image_env
-COPY *.py /main_image_env/
+RUN mkdir -p /opt
+COPY common/modules /opt/modules
+COPY common/build_api_executors.py /opt/
+COPY common/build_api_services.py /opt/
+COPY common/build_api_pseudo_fs.py /opt/
+COPY common/make_api_readme.py /opt/
+RUN dos2unix /opt/*
+RUN dos2unix /opt/modules*
 
 RUN dos2unix /package/*
-RUN dos2unix /main_image_env/*
 
 VOLUME ["/api", "/mnt"]
-ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/main_image_env", "/api"]
+ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/opt", "/api"]

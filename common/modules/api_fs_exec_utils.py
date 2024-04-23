@@ -16,9 +16,12 @@ def generate_get_result_type(extension):
     ]
 
 def generate_api_node_env_init():
-    return [ r"API_NODE=${2}",
-             r'readarray -t IN_ARGS <<< "${3}"',
-             r". ${1}/setenv.sh"
+    return [ r'if [ "$#" -ne 2 ]; then',
+             r'    echo "Illegal number of parameters $#. Expected parameters: API_NODE and IN_ARGS array"',
+             r'    exit -1',
+             r'fi',
+             r"API_NODE=${1}",
+             r'readarray -t IN_ARGS <<< "${2}"'
     ]
 
 def generate_read_api_fs_args():
