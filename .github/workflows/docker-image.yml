@@ -22,7 +22,7 @@ jobs:
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Build the CC Docker image
-      run: docker build cyclomatic_complexity --tag cc_visualizer:$DATE
+      run: docker build -f cyclomatic_complexity/Dockerfile --tag cc_visualizer:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the CC Docker image
