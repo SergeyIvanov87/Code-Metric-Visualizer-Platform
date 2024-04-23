@@ -16,13 +16,23 @@ ENV FLASK_RUN_PORT=$FLASK_RUN_PORT
 RUN apk add --no-cache python3 dos2unix
 RUN apk add --no-cache py3-flask py3-markdown pipx
 
-COPY *.sh /package/
-COPY *.py /package/
-COPY API /package/API
+COPY rest_api/rest_api_server /package/rest_api_server
+COPY rest_api/*.sh /package/
+COPY rest_api/*.py /package/
+COPY rest_api/API /package/API
 COPY $SCRIPT_GEN_LOC /package/
 RUN dos2unix /package/*
 
-RUN mkdir /main_image_env
-ENV MAIN_IMAGE_ENV_SHARED_LOCATION_ENV="/main_image_env"
+RUN mkdir -p /opt
+COPY common/modules /opt/modules
+COPY common/build_api_executors.py /opt/
+COPY common/build_api_services.py /opt/
+COPY common/build_api_pseudo_fs.py /opt/
+COPY common/make_api_readme.py /opt/
+COPY common/restore_api_from_pseudo_fs.py /opt/
+
+RUN dos2unix /opt/*
+RUN dos2unix /opt/modules*
+
 VOLUME /api
-ENTRYPOINT ["/package/init.sh", "/package", "/main_image_env", "/api"]
+ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api"]

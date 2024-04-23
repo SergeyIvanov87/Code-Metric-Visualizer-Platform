@@ -3,15 +3,16 @@ include:
 
 services:
   rest_api:
-    build: ./
+    build:
+      context: ../
+      dockerfile: ./rest_api/Dockerfile
     hostname: rest_api
     volumes:
       - api.pmccabe_collector.restapi.org.test:/api
-# TODO temporary solution due to issue #34
-      - main-shared-volume:/main_image_env
     ports:
       - 5000:5000
+    depends_on:
+      - rest_api_e2e_api_initializer
 
 volumes:
   api.pmccabe_collector.restapi.org.test:
-  main-shared-volume:

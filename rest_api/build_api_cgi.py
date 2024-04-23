@@ -14,7 +14,7 @@ import pathlib
 import sys
 import stat
 
-sys.path.append(os.getenv('MAIN_IMAGE_ENV_SHARED_LOCATION_ENV', ''))
+sys.path.append('modules')
 
 import filesystem_utils
 
