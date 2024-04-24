@@ -9,11 +9,11 @@ RUN apk add --no-cache python3 dos2unix
 RUN apk add --no-cache inotify-tools bash
 RUN apk add --no-cache rrdtool librsvg potrace imagemagick ghostscript-fonts terminus-font
 
-COPY rrd/local/*.sh /package/
-COPY rrd/local/*.py /package/
+COPY rrd/*.sh /package/
+COPY rrd/*.py /package/
 COPY rrd/API /package/API
 
-COPY rrd/local/$SCRIPT_GEN_LOC/*.sh /package/
+COPY rrd/$SCRIPT_GEN_LOC/*.sh /package/
 RUN dos2unix /package/*
 
 RUN mkdir -p /opt

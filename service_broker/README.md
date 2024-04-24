@@ -28,7 +28,7 @@ The service is not engaged into this UC
 
 From the main repository directory run:
 
-`DOCKER_BUILDKIT=1 docker build -t service_broker:latest -f service_broker/Dockerfile .`
+`docker build -t service_broker:latest -f service_broker/Dockerfile .`
 
 The service requires all other services to be started. Once they started, use the following command:
 

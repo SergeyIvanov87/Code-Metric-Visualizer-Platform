@@ -34,7 +34,7 @@ COPY rrd/tests/e2e/data /mnt/
 
 # TODO temporary source of utils
 RUN mkdir -p /tests/utils
-COPY rrd/local/*.py /tests/
+COPY rrd/*.py /tests/
 
 RUN dos2unix /tests/*
 

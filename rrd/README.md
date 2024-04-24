@@ -26,7 +26,7 @@ No special requirements for this UC
 
 From the main repository directory run:
 
-`DOCKER_BUILDKIT=1 docker build -t rrd_analytic:latest -f rrd/local/Dockerfile rrd/local`
+`docker build -t rrd_analytic:latest -f rrd/Dockerfile .`
 
 Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), thereby launch the `cc_visualizer` image at first.
 
@@ -38,7 +38,7 @@ Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), thereby 
 
 From the main repository directory run:
 
-`DOCKER_BUILDKIT=1 docker build -t rest_api:latest -f rrd/local/Dockerfile rrd/local`
+`docker build -t rrd_analytic:latest -f rrd/Dockerfile .`
 
 Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), [observable_project_version_control](../observable_project_version_control), thereby launch the `cc_visualizer`, `vcs_project` images at first.
 

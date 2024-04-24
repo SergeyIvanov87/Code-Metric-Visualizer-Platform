@@ -5,7 +5,7 @@ services:
   rrd_analytic:
     build:
       context: ../
-      dockerfile: ./rrd/local/Dockerfile
+      dockerfile: ./rrd/Dockerfile
     volumes:
       - api.pmccabe_collector.project.test:/mnt
       - api.pmccabe_collector.restapi.org.test:/api
