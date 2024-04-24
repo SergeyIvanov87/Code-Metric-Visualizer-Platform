@@ -1,13 +1,12 @@
 #!/bin/bash
 
 export WORK_DIR=${1}
-export MAIN_IMAGE_ENV_SHARED_LOCATION=${2}
+export OPT_DIR=${2}
+export PYTHONPATH="${2}:${2}/modules"
 export SHARED_API_DIR=${3}
 export RRD_DATA_STORAGE_DIR=${4}/api.pmccabe_collector.restapi.org
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
-# ??? TODO decide do you require it or not?
-# echo -e "#!/bash\n\nexport WORK_DIR=${WORK_DIR} \nexport MAIN_IMAGE_ENV_SHARED_LOCATION=${MAIN_IMAGE_ENV_SHARED_LOCATION} \nexport SHARED_DIR=${SHARED_DIR} \nexport SHARED_API_DIR=${SHARED_API_DIR} \nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION} \nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}" > ${MAIN_IMAGE_ENV_SHARED_LOCATION}/setenv.sh
 
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
@@ -18,10 +17,10 @@ rm -rf $TMPDIR
 mkdir -p ${RRD_DATA_STORAGE_DIR}
 if [ $? -ne 0 ]; then echo "Cannot create ${RRD_DATA_STORAGE_DIR}. Please check access rights to the VOLUME '/rrd_data' and grant the container all of them"; exit -1; fi
 
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
-${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-ANALYTIC.md
+${OPT_DIR}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
+${OPT_DIR}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
+${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
+${OPT_DIR}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-ANALYTIC.md
 
 # TODO think about making commit an initial RRD transaction at container starting or ask for user decision
 # There are few disadvantages about asking through STDIN:
@@ -33,9 +32,9 @@ ${MAIN_IMAGE_ENV_SHARED_LOCATION}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_
 # abandon any attempt to make it and keep container start-up process clear from any cumbersome logic.
 # So only services must be started up here!
 
-#BUILD_RRD_ARGS=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/analytic/")))'`
-#BUILD_RRD_COUNTERS_ARGS=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/analytic/rrd")))'`
-#BUILD_RRD_FROM_SOURCES=`cd ${MAIN_IMAGE_ENV_SHARED_LOCATION} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/")))'`
+#BUILD_RRD_ARGS=`cd ${OPT_DIR} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/analytic/")))'`
+#BUILD_RRD_COUNTERS_ARGS=`cd ${OPT_DIR} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/analytic/rrd")))'`
+#BUILD_RRD_FROM_SOURCES=`cd ${OPT_DIR} && python -c 'import os; import sys; sys.path.append(os.environ["MAIN_IMAGE_ENV_SHARED_LOCATION_ENV"]); from api_fs_args import read_args; print(" ".join(read_args("'${SHARED_API_DIR}'/cc/")))'`
 
 #printf "INFO: Set up 'api.pmccabe_collector.restapi.org/cc/analytic' params before proceed.\n"
 #printf "Default params would be used otherwise:\n"
@@ -70,7 +69,7 @@ trap 'termination_handler' SIGTERM
 
 echo "run API listeners:"
 for s in ${WORK_DIR}/services/*.sh; do
-    /bin/bash ${s} ${MAIN_IMAGE_ENV_SHARED_LOCATION} &
+    /bin/bash ${s} &
     echo "${s} has been started"
 done
 
@@ -83,7 +82,7 @@ done
     #echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/exec
     #cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/result > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
 #    echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
-#    cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${MAIN_IMAGE_ENV_SHARED_LOCATION} ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd`" ${SHARED_API_DIR} -method init
+#    cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${OPT_DIR} ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd`" ${SHARED_API_DIR} -method init
 #    echo "Completed"
 #fi
 

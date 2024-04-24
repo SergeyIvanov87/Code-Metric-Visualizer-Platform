@@ -28,6 +28,6 @@ The service is not engaged into this UC
 
 From the main repository directory run:
 
-`DOCKER_BUILDKIT=1 docker build -t vcs_project:latest -f observable_project_version_control/Dockerfile .`
+`docker build -t vcs_project:latest -f observable_project_version_control/Dockerfile .`
 
 `docker run -it --name vcs_project -v api.pmccabe_collector.restapi.org:/api -e PROJECT_URL=<your project repository> -e PROJECT_BRANCH=<your project branch> vcs_project:latest`

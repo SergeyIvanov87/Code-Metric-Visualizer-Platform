@@ -3,16 +3,15 @@ include:
 
 services:
   rrd_analytic:
-    build: local/
+    build:
+      context: ../
+      dockerfile: ./rrd/Dockerfile
     volumes:
       - api.pmccabe_collector.project.test:/mnt
       - api.pmccabe_collector.restapi.org.test:/api
       - api.pmccabe_collector.rrd_analytic:/rrd_data
-# TODO temporary solution due to issue #34
-      - main-shared-volume:/main_image_env
 
 volumes:
   api.pmccabe_collector.project.test:
   api.pmccabe_collector.restapi.org.test:
   api.pmccabe_collector.rrd_analytic:
-  main-shared-volume:

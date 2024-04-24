@@ -3,20 +3,18 @@ FROM alpine:latest
 WORKDIR tests
 
 # install app dependencies
-RUN apk add --no-cache python3 pytest dos2unix bash
+RUN apk add --no-cache python3 py3-requests pytest curl dos2unix bash
 
-COPY service_broker/API API
+COPY rest_api/API /API
 
-COPY common/tests/settings.py /tests/
-COPY common/tests/utils.py /tests/
-
-COPY service_broker/tests/e2e/*.py /tests/
-COPY service_broker/tests/e2e/*.sh /tests/
-#COPY service_broker/tests/e2e/data /tests/data
+COPY common/tests/*.py /tests/
+COPY rest_api/tests/e2e/service_tester/*.py /tests/
+COPY rest_api/tests/e2e/service_tester/*.sh /tests/
+COPY rest_api/tests/e2e/data /tests/data
 
 # TODO temporary source of utils
 RUN mkdir -p /tests/utils
-COPY service_broker/*.py /tests/
+COPY rest_api/*.py /tests/
 
 RUN dos2unix /tests/*
 

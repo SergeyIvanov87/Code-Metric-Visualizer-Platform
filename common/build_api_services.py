@@ -14,6 +14,8 @@ import pathlib
 import sys
 import stat
 
+sys.path.append('modules')
+
 import filesystem_utils
 
 from api_fs_conventions import api_gui_exec_filename_from_req_type
@@ -65,7 +67,6 @@ parser.add_argument("-o", "--output_dir",
 args = parser.parse_args()
 
 api_gui_schema = [
-    ". ${1}/setenv.sh\n",
     "{} > {}/help 2>&1\n",
     "shopt -s extglob\n",
     "EXT=`${0}/{1} --result_type`\n",
@@ -76,7 +77,7 @@ api_gui_schema = [
     "\t\t\tACCESS|ATTRIB|MODIFY )\n",
     "\t\t\t\tdate=`date +%Y-%m-%dT%H:%M:%S`\n",
     "\t\t\t\ttouch {0}/in_progress\n",
-    '\t\t\t\t"${0}/{1}" ${2} {3} 0 > {4}${5}\n',
+    '\t\t\t\t"${0}/{1}" {2} 0 > {3}${4}\n',
     '\t\t\t\tchmod +rw {0}${1}\n',
     "\t\t\t\trm -f {0}/in_progress\n",
     "\t\t\t;;\n",
@@ -87,7 +88,6 @@ api_gui_schema = [
 ]
 
 api_cli_schema = [
-    ". ${1}/setenv.sh\n",
     "api_exec_node_directory={}\n",
     "shopt -s extglob\n",
     "EXT=`${0}/{1} --result_type`\n",
@@ -124,7 +124,7 @@ api_cli_schema = [
     "\t\twait ${WATCH_PID}\n",
     "\tfi\n",
     '\ttouch "${api_exec_node_directory}/in_progress"\n',
-    '\tRESULT_OUT=$(${0}/{1} ${2} {3} ', '"${CMD_READ}" | base64)\n',
+    '\tRESULT_OUT=$(${0}/{1} {2} ', '"${CMD_READ}" | base64)\n',
     '\trm -f ${api_exec_node_directory}/in_progress\n',
     '\t(touch ${api_exec_node_directory}/ready && echo "${RESULT_OUT}" | base64 -d >$pipe_result && rm -rf ${api_exec_node_directory}/ready && echo "CONSUMED: ${api_exec_node_directory}") &\n',
     "\tWATCH_PID=$!\n",
@@ -162,36 +162,44 @@ for schema_file in schemas_file_list:
     api_server_script_file_path = get_api_gui_service_script_path(generated_api_server_scripts_path, req_name)
     with open(api_server_script_file_path, "w") as listener_file:
         api_gui_schema_concrete = api_gui_schema.copy()
-        api_gui_schema_concrete[1] = api_gui_schema_concrete[1].format(
+        template_schema_row_index = 0
+        api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
             "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_req_directory
         )
 
         # determine result type: either from JSON or from script renerated
+        template_schema_row_index += 2
         if len(content_type) != 0:
-            api_gui_schema_concrete[3] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
+            api_gui_schema_concrete[template_schema_row_index] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
         else:
-            api_gui_schema_concrete[3] = api_gui_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+            api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format("{WORK_DIR}",req_executor_name)
 
-        api_gui_schema_concrete[4] = api_gui_schema_concrete[4].format(
+        template_schema_row_index += 1
+        api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
             api_exec_node_directory, get_fs_watch_event_for_request_type(req_type), api_gui_exec_filename_from_req_type(req_type) + "$"
         )
-        api_gui_schema_concrete[10] = api_gui_schema_concrete[10].format(
+
+        template_schema_row_index += 6
+        api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
             api_exec_node_directory)
 
-        api_gui_schema_concrete[11] = api_gui_schema_concrete[11].format(
+        template_schema_row_index += 1
+        api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
             "{WORK_DIR}",
             req_executor_name,
-            "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
             api_req_directory,
             os.path.join(api_exec_node_directory, "result_${date}"),
             "{EXT}"
         )
 
-        api_gui_schema_concrete[12] = api_gui_schema_concrete[12].format(
+        template_schema_row_index += 1
+        api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
             os.path.join(api_exec_node_directory, "result_${date}"),
             "{EXT}"
         )
-        api_gui_schema_concrete[13] = api_gui_schema_concrete[13].format(
+
+        template_schema_row_index += 1
+        api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
             api_exec_node_directory)
 
         listener_file.write("#!/bin/bash\n\n")
@@ -203,19 +211,22 @@ for schema_file in schemas_file_list:
     api_server_script_file_path = get_api_cli_service_script_path(generated_api_server_scripts_path, req_name)
     with open(api_server_script_file_path, "w") as server_file:
         api_cli_schema_concrete = api_cli_schema.copy()
-        api_cli_schema_concrete[1] = api_cli_schema_concrete[1].format(api_exec_node_directory
+
+        template_schema_row_index = 0
+        api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(api_exec_node_directory
         )
 
         # determine result type: either from JSON or from script renerated
+        template_schema_row_index += 2
         if len(content_type) != 0:
-            api_cli_schema_concrete[3] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
+            api_cli_schema_concrete[template_schema_row_index] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
         else:
-            api_cli_schema_concrete[3] = api_cli_schema_concrete[3].format("{WORK_DIR}",req_executor_name)
+            api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format("{WORK_DIR}",req_executor_name)
 
-        api_cli_schema_concrete[37] = api_cli_schema_concrete[37].format(
+        template_schema_row_index += 34
+        api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(
             "{WORK_DIR}",
             req_executor_name,
-            "{MAIN_IMAGE_ENV_SHARED_LOCATION}",
             api_req_directory
         )
 

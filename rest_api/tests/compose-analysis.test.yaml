@@ -1,2 +1,3 @@
 include:
-  - e2e/compose-analysis.test.yaml
+  - e2e/api_initializer/compose-analysis.test.yaml
+  - e2e/service_tester/compose-analysis.test.yaml

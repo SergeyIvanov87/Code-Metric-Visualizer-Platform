@@ -17,7 +17,7 @@ from xml.etree import ElementTree
 
 import rrd_utils
 
-sys.path.append(os.getenv('MAIN_IMAGE_ENV_SHARED_LOCATION_ENV', ''))
+sys.path.append('modules')
 from filesystem_utils import append_file_mode
 
 supported_methods = ["init", "update"]

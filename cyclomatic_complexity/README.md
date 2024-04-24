@@ -26,7 +26,7 @@ Since the service depends on [observable_project_version_control](../observable_
 
 From the main repository directory run:
 
-`DOCKER_BUILDKIT=1 docker build -t cc_visualizer:latest -f cyclomatic_complexity/Dockerfile .`
+`docker build -t cc_visualizer:latest -f cyclomatic_complexity/Dockerfile .`
 
 then launch it
 
@@ -36,7 +36,7 @@ then launch it
 
 From the main repository directory run:
 
-`DOCKER_BUILDKIT=1 docker build -t cc_visualizer:latest -f cyclomatic_complexity/Dockerfile .`
+`docker build -t cc_visualizer:latest -f cyclomatic_complexity/Dockerfile .`
 
 Launching depends on [observable_project_version_control](../observable_project_version_control), thereby launch the `vcs_project` image at first.
 

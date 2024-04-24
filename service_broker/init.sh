@@ -1,8 +1,10 @@
 #!/bin/bash
 
-WORK_DIR=${1}
-MAIN_IMAGE_ENV_SHARED_LOCATION=${2}
-SHARED_API_DIR=${3}
+export WORK_DIR=${1}
+export OPT_DIR=${2}
+export PYTHONPATH="${2}:${2}/modules"
+
+export SHARED_API_DIR=${3}
 
 termination_handler(){
    echo "***Stopping"

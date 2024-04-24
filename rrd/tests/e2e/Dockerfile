@@ -33,15 +33,19 @@ COPY rrd/tests/e2e/*.sh /tests/
 COPY rrd/tests/e2e/data /mnt/
 
 # TODO temporary source of utils
-RUN mkdir -p /tests
-COPY rrd/local/*.py /tests/
+RUN mkdir -p /tests/utils
+COPY rrd/*.py /tests/
 
 RUN dos2unix /tests/*
 
-# TODO temporary solution due to issue #34 unresolved: add VOLUME /main_image_env
-RUN mkdir /main_image_env
+COPY common/*.py /tests/utils/
+COPY common/modules /tests/utils/modules
+
 RUN dos2unix /tests/*
-COPY cyclomatic_complexity/*.py /main_image_env/
-VOLUME ["/api", "/mnt", "/rrd_data", "/main_image_env"]
+RUN dos2unix /tests/utils/*
+RUN dos2unix /tests/utils/modules/*
+
+RUN dos2unix /tests/*
+VOLUME ["/api", "/mnt", "/rrd_data"]
 
 ENTRYPOINT ["/tests/init.sh", "/tests", "/mnt", "/api", "/rrd_data"]

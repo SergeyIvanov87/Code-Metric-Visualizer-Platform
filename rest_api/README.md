@@ -51,7 +51,7 @@ Please refer to the [make_api_readme.py](../../cyclomatic_complexity/make_api_re
 
 From the main repository directory run:
 
-`DOCKER_BUILDKIT=1 docker build -t rest_api:latest -f rest_api/Dockerfile rest_api`
+`docker build -t rest_api:latest -f rest_api/Dockerfile .`
 
 Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), [rrd](../rrd), thereby launch the `cc_visualizer`, `rrd_analytic` images at first.
 
@@ -62,7 +62,7 @@ Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), [rrd](..
 
 From the main repository directory run:
 
-`DOCKER_BUILDKIT=1 docker build -t rest_api:latest -f rest_api/Dockerfile rest_api`
+`docker build -t rest_api:latest -f rest_api/Dockerfile .`
 
 Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), [rrd](../rrd), [observable_project_version_control](../observable_project_version_control), thereby launch the `cc_visualizer`, `rrd_analytic`, `vcs_project` images at first.
 

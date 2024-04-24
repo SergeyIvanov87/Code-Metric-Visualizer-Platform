@@ -13,6 +13,8 @@ import sys
 import stat
 from collections import defaultdict
 
+sys.path.append('modules')
+
 import filesystem_utils
 from api_schema_utils import deserialize_api_request_from_schema_file
 

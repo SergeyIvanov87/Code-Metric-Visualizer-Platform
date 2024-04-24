@@ -1,8 +1,10 @@
 #!/bin/sh
 
-WORK_DIR=${1}
-MAIN_IMAGE_ENV_SHARED_LOCATION=${2}
-SHARED_API_DIR=${3}
+export WORK_DIR=${1}
+export OPT_DIR=${2}
+export PYTHONPATH="${2}:${2}/modules"
+
+export SHARED_API_DIR=${3}
 MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
 termination_handler(){
@@ -37,7 +39,7 @@ do
         wait $!
         continue
     fi
-    ${MAIN_IMAGE_ENV_SHARED_LOCATION}/restore_api_from_pseudo_fs.py ${SHARED_API_DIR} ${MAIN_SERVICE_NAME} ${WORK_DIR}/restored_API
+    ${OPT_DIR}/restore_api_from_pseudo_fs.py ${SHARED_API_DIR} ${MAIN_SERVICE_NAME} ${WORK_DIR}/restored_API
 
     # wait for API files
     if [ `ls ${WORK_DIR}/restored_API/*.json | wc -l` == 0 ]; then

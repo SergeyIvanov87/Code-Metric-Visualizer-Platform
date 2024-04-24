@@ -8,7 +8,9 @@ import sys
 
 from collections import defaultdict
 
+sys.path.append('modules')
 sys.path.append(os.getenv("MAIN_IMAGE_ENV_SHARED_LOCATION_ENV", ""))
+
 import api_fs_args
 import filesystem_utils
 from api_schema_utils import content_type_from_file_extension
