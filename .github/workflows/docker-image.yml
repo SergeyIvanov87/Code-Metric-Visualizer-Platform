@@ -28,13 +28,13 @@ jobs:
     - name: Test the CC Docker image
       run: docker compose -f cyclomatic_complexity/compose-analysis.test.yaml up --abort-on-container-exit
     - name: Build the RRD Docker image
-      run: docker build rrd/local --tag rrd_analytic:$DATE
+      run: docker build -f rrd/local/Dockerfile --tag rrd_analytic:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the RRD Docker image
       run: docker compose -f rrd/compose-analysis.test.yaml up --abort-on-container-exit
     - name: Build the REST API Docker image
-      run: docker build rest_api --tag rest_api:$DATE
+      run: docker build -f rest_api/Dockerfile --tag rest_api:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the REST API Docker image
