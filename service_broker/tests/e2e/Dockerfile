@@ -15,14 +15,18 @@ COPY service_broker/tests/e2e/*.sh /tests/
 #COPY service_broker/tests/e2e/data /tests/data
 
 # TODO temporary source of utils
-RUN mkdir -p /tests
+RUN mkdir -p /tests/utils
 COPY service_broker/*.py /tests/
 
 RUN dos2unix /tests/*
 
-# TODO temporary solution due to issue #34 unresolved: add VOLUME /main_image_env
-RUN mkdir /main_image_env
-COPY cyclomatic_complexity/*.py /main_image_env/
+COPY common/*.py /tests/utils/
+COPY common/modules /tests/utils/modules
+
+RUN dos2unix /tests/*
+RUN dos2unix /tests/utils/*
+RUN dos2unix /tests/utils/modules/*
+
 VOLUME ["/api"]
 
 ENTRYPOINT ["/tests/init.sh", "/tests", "/api"]

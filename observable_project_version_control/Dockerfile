@@ -13,12 +13,16 @@ COPY observable_project_version_control/*.sh /package/
 COPY observable_project_version_control/*.py /package/
 COPY observable_project_version_control/API /package/API
 
-RUN mkdir /main_image_env
+RUN mkdir -p /opt
+COPY common/modules /opt/modules
+COPY common/build_api_executors.py /opt/
+COPY common/build_api_services.py /opt/
+COPY common/build_api_pseudo_fs.py /opt/
+COPY common/make_api_readme.py /opt/
 
-COPY cyclomatic_complexity/*.py /main_image_env/
-
+RUN dos2unix /opt/*
+RUN dos2unix /opt/modules*
 RUN dos2unix /package/*
-RUN dos2unix /main_image_env/*
 
 VOLUME ["/api", "/mnt"]
-ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/main_image_env", "/api"]
+ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/opt", "/api"]

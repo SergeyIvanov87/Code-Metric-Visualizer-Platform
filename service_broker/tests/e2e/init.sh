@@ -2,8 +2,11 @@
 
 export WORK_DIR=${1}
 export SHARED_API_DIR=${2}
-export UTILS="/main_image_env"
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
+
+export PYTHONPATH="${WORK_DIR}:${WORK_DIR}/utils:${WORK_DIR}/utils/modules"
+UTILS="${WORK_DIR}/utils"
+export MODULES="${WORK_DIR}/utils/modules"
 
 echo "Generate Mock API"
 mv ${WORK_DIR}/API/service_broker_queries_order_list.json service_broker_queries_order_list.json
@@ -16,7 +19,7 @@ echo "run Mock API servers:"
 if [ -d /tmp/test ]; then rm -rf /tmp/test; fi
 mkdir -p /tmp/test
 for s in ${WORK_DIR}/services/*_server.sh; do
-    ${s} ${MAIN_IMAGE_ENV_SHARED_LOCATION} &
+    ${s} ${UTILS} &
     echo "${s} has been started"
 done
 
