@@ -30,7 +30,8 @@ from api_fs_conventions import get_generated_scripts_path
 from api_schema_utils import deserialize_api_request_from_schema_file
 from api_schema_utils import file_extension_from_content_type
 
-from api_fs_services_utils import generate_exec_watchdog_function
+from api_fs_bash_utils import generate_exec_watchdog_function
+from api_fs_bash_utils import generate_extract_attr_value_from_string
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -122,11 +123,14 @@ api_cli_schema = [
     '\t\trm -f "${api_exec_node_directory}/in_progress"\n',
     "\tfi\n",
     "\tCMD_READ=`cat $pipe_request`\n",
-    "\tSESSION_ID_VALUE=${" + generate_extract_attr_value_from_string()[0] + " ${CMD_READ} ${SESSION_ID_ATTR} '='}"
+    "\t" + generate_extract_attr_value_from_string()[0] + " ${SESSION_ID_ATTR} ${CMD_READ} \"####LET_US_HOPE_THIS_STRING_IS_UNIQUE_AS_SESSION_ID####\" '=' SESSION_ID_VALUE\n",
     "\tif [ -z ${pipe_result_array[${SESSION_ID_VALUE}]} ]; then\n",
     '\t\tpipe_result_consumer="${pipe_result}_${SESSION_ID_VALUE}"\n',
     "\t\tpipe_result_array[${SESSION_ID_VALUE}]=${pipe_result_consumer}\n",
-    "\t\tmkfifo -m 644 ${pipe_result_consumer}\n",
+    "\t\tif [ ! -p ${pipe_result_consumer} ]; then\n",
+    "\t\t\trm -f ${pipe_result_consumer}\n",
+    "\t\t\tmkfifo -m 644 ${pipe_result_consumer}\n",
+    "\t\tfi\n",
     '\t\ttrap "rm -f $pipe_result_consumer" ${SIGNALS}\n',
     "\tfi\n",
     "\tif [ -z ${WATCH_PID_ARRAY[${SESSION_ID_VALUE}]} ]; then\n",
@@ -134,15 +138,13 @@ api_cli_schema = [
     "\tfi\n",
     "\tpipe_result_consumer=${pipe_result_array[${SESSION_ID_VALUE}]}\n",
     '\t echo "START: ${api_exec_node_directory}"\n',
-    generate_exec_watchdog_function()[0] + "${WATCH_PID_ARRAY[${SESSION_ID_VALUE}]} ${pipe_result_array[${SESSION_ID_VALUE}]}\n",
+    '\t' + generate_exec_watchdog_function()[0] + " ${WATCH_PID_ARRAY[${SESSION_ID_VALUE}]} ${pipe_result_array[${SESSION_ID_VALUE}]}\n",
     "\tWATCH_PID_ARRAY[${SESSION_ID_VALUE}]=0\n",
     '\ttouch "${api_exec_node_directory}/in_progress"\n',
     '\tRESULT_OUT=$(${0}/{1} {2} ', '"${CMD_READ}" | base64)\n',
     '\trm -f ${api_exec_node_directory}/in_progress\n',
     '\t(touch ${api_exec_node_directory}/ready && echo "${RESULT_OUT}" | base64 -d >$pipe_result_consumer && rm -rf ${api_exec_node_directory}/ready && echo "CONSUMED: ${api_exec_node_directory}") &\n',
     "\tWATCH_PID_ARRAY[${SESSION_ID_VALUE}]=$!\n",
-    '\ttrap "rm -f $pipe_request" ${SIGNALS} # as resets after subshell invocation\n',
-    '\ttrap "rm -f $pipe_result" ${SIGNALS} # as resets after subshell invocation\n',
     "done\n",
 ]
 
@@ -237,7 +239,7 @@ for schema_file in schemas_file_list:
         else:
             api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format("{WORK_DIR}",req_executor_name)
 
-        template_schema_row_index += 34
+        template_schema_row_index += 43
         api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(
             "{WORK_DIR}",
             req_executor_name,
