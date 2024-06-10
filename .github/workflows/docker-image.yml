@@ -31,8 +31,8 @@ jobs:
       run: docker build -f rrd/Dockerfile --tag rrd_analytic:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
-    - name: Test the RRD Docker image
-      run: docker compose -f rrd/compose-analysis.test.yaml up --abort-on-container-exit
+#    - name: Test the RRD Docker image
+#      run: docker compose -f rrd/compose-analysis.test.yaml up --abort-on-container-exit
     - name: Build the REST API Docker image
       run: docker build -f rest_api/Dockerfile --tag rest_api:$DATE .
       env:

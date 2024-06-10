@@ -8,6 +8,9 @@ export RRD_DATA_STORAGE_DIR=${4}/api.pmccabe_collector.restapi.org
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+# use source this script as fast way to setup environment for debugging
+echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport RRD_DATA_STORAGE_DIR=${RRD_DATA_STORAGE_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
+
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
 TMPDIR=$(mktemp -d --tmpdir=${SHARED_API_DIR})
