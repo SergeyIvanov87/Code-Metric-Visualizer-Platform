@@ -48,7 +48,7 @@ def make_script_statistic(script, desired_file_ext=""):
         r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/GET/exec',
         api_fs_bash_utils.wait_until_pipe_exist()[0] + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/GET/${MULTISESSION_PIPE_OUT_WATCH_LIST}",
         r"cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/GET/${MULTISESSION_PIPE_OUT_WATCH_LIST} | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py ${brr[@]}",
-        r"rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/GET/${MULTISESSION_PIPE_OUT_WATCH_LIST}"
+        r"if [ ! -z ${SESSION_ID_VALUE} ]; then rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/GET/${MULTISESSION_PIPE_OUT_WATCH_LIST}; fi"
     )
     script.writelines(line + "\n" for line in body)
 
@@ -74,7 +74,7 @@ def make_script_view(script, desired_file_ext=""):
         r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec',
         api_fs_bash_utils.wait_until_pipe_exist()[0] + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/${MULTISESSION_PIPE_OUT}",
         r"cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/${MULTISESSION_PIPE_OUT} | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]}",
-        r"rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/${MULTISESSION_PIPE_OUT}"
+        r"if [ ! -z ${SESSION_ID_VALUE} ]; then rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/${MULTISESSION_PIPE_OUT}; fi"
     )
     script.writelines(line + "\n" for line in body)
 
@@ -100,7 +100,7 @@ def make_script_flamegraph(script, desired_file_ext=""):
         r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/view/GET/exec',
         api_fs_bash_utils.wait_until_pipe_exist()[0] + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/view/GET/${MULTISESSION_PIPE_OUT}",
         r"cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/view/GET/${MULTISESSION_PIPE_OUT} | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
-        r"rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/view/GET/${MULTISESSION_PIPE_OUT}"
+        r"if [ ! -z ${SESSION_ID_VALUE} ]; then rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/view/GET/${MULTISESSION_PIPE_OUT}; fi"
     )
     script.writelines(line + "\n" for line in body)
 
