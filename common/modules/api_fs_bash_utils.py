@@ -22,7 +22,7 @@ def generate_exec_watchdog_function():
     ]
 
 
-def generate_extract_attr_value_from_string():
+def __extract_attr_value_from_string_function__():
     function_name = "extract_avp_from_string_or_default"
     return function_name, [
         "{}()".format(function_name) + " {\n",
@@ -46,7 +46,15 @@ def generate_extract_attr_value_from_string():
         "}\n"
     ]
 
-def add_suffix_if_exist():
+def generate_extract_attr_value_from_string():
+    return __extract_attr_value_from_string_function__()[1]
+
+def extract_attr_value_from_string():
+    return __extract_attr_value_from_string_function__()[0]
+
+
+
+def __add_suffix_if_exist_function__():
     function_name = "add_suffix_if_exist"
     return function_name, [
         "{}()".format(function_name) + " {\n",
@@ -58,10 +66,24 @@ def add_suffix_if_exist():
         "}\n"
         ]
 
-def wait_until_pipe_exist():
+def generate_add_suffix_if_exist():
+    return __add_suffix_if_exist_function__()[1]
+
+def add_suffix_if_exist():
+    return __add_suffix_if_exist_function__()[0]
+
+
+
+def __wait_until_pipe_exist_function__():
     function_name = "wait_until_pipe_exist"
     return function_name, [
         "{}()".format(function_name) + " {\n",
         '    while [ ! -p ${1} ]; do sleep 0.1; done\n',
         '}\n'
         ]
+
+def generate_wait_until_pipe_exist():
+    return __wait_until_pipe_exist_function__()[1]
+
+def wait_until_pipe_exist():
+    return __wait_until_pipe_exist_function__()[0]

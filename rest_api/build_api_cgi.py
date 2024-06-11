@@ -39,6 +39,7 @@ def get_query_params(params):
     #str_keys = (f"'{k}'" for k in params.keys()).join(", ")
     #str_values = (f"'{v}'" for v in params.values()).join(", ")
     return [ f"    default_params = {json.dumps(params)}",
+            # rest_api always uses SESSION_ID
              r'    query_params = {"SESSION_ID": socket.gethostname()}',
              r'    if "default" in request.args:',
              r'         for k,v in default_params.items():',
@@ -86,6 +87,7 @@ def generate_cgi_schema(filesystem_api_mount_point, req_api, req_type, output_pi
                    r'def {}():'.format(canonize_api_method_name),
                    *make_redirect_url,
                    r'    api_query_pipe="/{}/{}/{}/exec"'.format(filesystem_api_mount_point, req_api, req_type),
+                   # rest_api always uses SESSION_ID
                    r'    api_result_pipe="/{}/{}_" + socket.gethostname()'.format(filesystem_api_mount_point, output_pipe),
                    r'    pin = open(api_query_pipe, "w")',
                    *get_query_params(params), r'',

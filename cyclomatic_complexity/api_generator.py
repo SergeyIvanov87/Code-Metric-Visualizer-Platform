@@ -15,12 +15,12 @@ def make_script_watch_list(script, desired_file_ext=""):
 
     body = (
         *api_fs_exec_utils.generate_exec_header(), r"",
-        *api_fs_bash_utils.generate_extract_attr_value_from_string()[1], r"",
-        *api_fs_bash_utils.add_suffix_if_exist()[1], r"",
-        *api_fs_bash_utils.wait_until_pipe_exist()[1], r"",
+        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
+        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
+        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
-        api_fs_bash_utils.generate_extract_attr_value_from_string()[0] + " \"SESSION_ID\" ${2} \"\" '=' SESSION_ID_VALUE", r"",
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" ${2} \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
         r'echo "${brr[@]}" | xargs find ${INITIAL_PROJECT_LOCATION}',
     )
@@ -37,16 +37,16 @@ def make_script_statistic(script, desired_file_ext=""):
 
     body = (
         *api_fs_exec_utils.generate_exec_header(), r"",
-        *api_fs_bash_utils.generate_extract_attr_value_from_string()[1], r"",
-        *api_fs_bash_utils.add_suffix_if_exist()[1], r"",
-        *api_fs_bash_utils.wait_until_pipe_exist()[1], r"",
+        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
+        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
+        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
-        api_fs_bash_utils.generate_extract_attr_value_from_string()[0] + " \"SESSION_ID\" ${2} \"\" '=' SESSION_ID_VALUE", r"",
-        api_fs_bash_utils.add_suffix_if_exist()[0] + " \"${SESSION_ID_VALUE}\" \"result.txt\" MULTISESSION_PIPE_OUT_WATCH_LIST", r"",
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" ${2} \"\" '=' SESSION_ID_VALUE", r"",
+        api_fs_bash_utils.add_suffix_if_exist() + " \"${SESSION_ID_VALUE}\" \"result.txt\" MULTISESSION_PIPE_OUT_WATCH_LIST", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
         r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/GET/exec',
-        api_fs_bash_utils.wait_until_pipe_exist()[0] + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/GET/${MULTISESSION_PIPE_OUT_WATCH_LIST}",
+        api_fs_bash_utils.wait_until_pipe_exist() + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/GET/${MULTISESSION_PIPE_OUT_WATCH_LIST}",
         r"cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/GET/${MULTISESSION_PIPE_OUT_WATCH_LIST} | ${WORK_DIR}/pmccabe_visualizer/pmccabe_build.py ${brr[@]}",
         r"if [ ! -z ${SESSION_ID_VALUE} ]; then rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/GET/${MULTISESSION_PIPE_OUT_WATCH_LIST}; fi"
     )
@@ -63,16 +63,16 @@ def make_script_view(script, desired_file_ext=""):
 
     body = (
         *api_fs_exec_utils.generate_exec_header(), r"",
-        *api_fs_bash_utils.generate_extract_attr_value_from_string()[1], r"",
-        *api_fs_bash_utils.add_suffix_if_exist()[1], r"",
-        *api_fs_bash_utils.wait_until_pipe_exist()[1], r"",
+        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
+        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
+        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
-        api_fs_bash_utils.generate_extract_attr_value_from_string()[0] + " \"SESSION_ID\" ${2} \"\" '=' SESSION_ID_VALUE", r"",
-        api_fs_bash_utils.add_suffix_if_exist()[0] + " \"${SESSION_ID_VALUE}\" \"result.xml\" MULTISESSION_PIPE_OUT", r"",
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" ${2} \"\" '=' SESSION_ID_VALUE", r"",
+        api_fs_bash_utils.add_suffix_if_exist() + " \"${SESSION_ID_VALUE}\" \"result.xml\" MULTISESSION_PIPE_OUT", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
         r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec',
-        api_fs_bash_utils.wait_until_pipe_exist()[0] + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/${MULTISESSION_PIPE_OUT}",
+        api_fs_bash_utils.wait_until_pipe_exist() + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/${MULTISESSION_PIPE_OUT}",
         r"cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/${MULTISESSION_PIPE_OUT} | ${WORK_DIR}/pmccabe_visualizer/collapse.py ${brr[@]}",
         r"if [ ! -z ${SESSION_ID_VALUE} ]; then rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/${MULTISESSION_PIPE_OUT}; fi"
     )
@@ -89,16 +89,16 @@ def make_script_flamegraph(script, desired_file_ext=""):
 
     body = (
         *api_fs_exec_utils.generate_exec_header(), r"",
-        *api_fs_bash_utils.generate_extract_attr_value_from_string()[1], r"",
-        *api_fs_bash_utils.add_suffix_if_exist()[1], r"",
-        *api_fs_bash_utils.wait_until_pipe_exist()[1], r"",
+        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
+        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
+        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
-        api_fs_bash_utils.generate_extract_attr_value_from_string()[0] + " \"SESSION_ID\" ${2} \"\" '=' SESSION_ID_VALUE", r"",
-        api_fs_bash_utils.add_suffix_if_exist()[0] + " \"${SESSION_ID_VALUE}\" \"result.txt\" MULTISESSION_PIPE_OUT", r"",
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" ${2} \"\" '=' SESSION_ID_VALUE", r"",
+        api_fs_bash_utils.add_suffix_if_exist() + " \"${SESSION_ID_VALUE}\" \"result.txt\" MULTISESSION_PIPE_OUT", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
         r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/view/GET/exec',
-        api_fs_bash_utils.wait_until_pipe_exist()[0] + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/view/GET/${MULTISESSION_PIPE_OUT}",
+        api_fs_bash_utils.wait_until_pipe_exist() + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/view/GET/${MULTISESSION_PIPE_OUT}",
         r"cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/view/GET/${MULTISESSION_PIPE_OUT} | ${WORK_DIR}/FlameGraph/flamegraph.pl ${brr[@]}",
         r"if [ ! -z ${SESSION_ID_VALUE} ]; then rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/view/GET/${MULTISESSION_PIPE_OUT}; fi"
     )

@@ -90,6 +90,10 @@ def get_query_params(params):
     ]
 
 def generate_cron_jobs_schema(filesystem_api_mount_point, req_api, req_type, output_pipe, params, job_control):
+    # avoid isung any external scripts/command invocation in crond-scripts
+    # it has no utter SHELL-support, hence many scrips/commands are unavaialbe
+    # For example, ask `hostname` using python API. It will be able to extract real container hostname
+    # as soon as this is used by `init.sh`
     hostname = socket.gethostname()
     full_query_pipe_path = os.path.join(filesystem_api_mount_point, req_api, req_type, "exec")
     full_result_pipe_path = os.path.join(filesystem_api_mount_point, output_pipe)
