@@ -229,8 +229,8 @@ for schema_file in schemas_file_list:
     with open(api_server_script_file_path, "w") as server_file:
         api_cli_schema_concrete = api_cli_schema.copy()
 
-        template_schema_row_index = len(generate_exec_watchdog_function()[1])
-        template_schema_row_index += len(generate_extract_attr_value_from_string()[1])
+        template_schema_row_index = len(generate_exec_watchdog_function())
+        template_schema_row_index += len(generate_extract_attr_value_from_string())
         api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(api_exec_node_directory
         )
 
