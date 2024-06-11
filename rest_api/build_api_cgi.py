@@ -92,7 +92,7 @@ def generate_cgi_schema(filesystem_api_mount_point, req_api, req_type, output_pi
                    r'    pin.write(query_params_str)',
                    r'    pin.close()',
                    r'    api_result_pipe_timeout_cycles=0',
-                   r'    while not stat.S_ISFIFO(os.stat(api_result_pipe).st_mode):',
+                   r'    while not (os.path.isfile(api_result_pipe) and stat.S_ISFIFO(os.stat(api_result_pipe).st_mode)):',
                    r'        sleep(0.1)',
                    r'        api_result_pipe_timeout_cycles += 1',
                    r'        if api_result_pipe_timeout_cycles >= 30:',
