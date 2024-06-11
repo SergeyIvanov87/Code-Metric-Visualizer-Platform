@@ -1,4 +1,4 @@
-def generate_exec_watchdog_function():
+def __exec_watchdog_function__():
     function_name = "exec_watchdog"
     return function_name, [
         "{}() ".format(function_name) + " {\n",
@@ -20,6 +20,14 @@ def generate_exec_watchdog_function():
         "    fi\n",
         "}\n",
     ]
+
+def generate_exec_watchdog_function():
+    return __exec_watchdog_function__()[1]
+
+def exec_watchdog_function():
+    return __exec_watchdog_function__()[0]
+
+
 
 
 def __extract_attr_value_from_string_function__():

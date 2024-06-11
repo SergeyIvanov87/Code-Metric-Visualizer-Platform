@@ -31,7 +31,9 @@ from api_schema_utils import deserialize_api_request_from_schema_file
 from api_schema_utils import file_extension_from_content_type
 
 from api_fs_bash_utils import generate_exec_watchdog_function
+from api_fs_bash_utils import exec_watchdog_function
 from api_fs_bash_utils import generate_extract_attr_value_from_string
+from api_fs_bash_utils import extract_attr_value_from_string
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -91,8 +93,8 @@ api_gui_schema = [
 ]
 
 api_cli_schema = [
-    *generate_exec_watchdog_function()[1],
-    *generate_extract_attr_value_from_string()[1],
+    *generate_exec_watchdog_function(),
+    *generate_extract_attr_value_from_string(),
     "api_exec_node_directory={}\n",
     "shopt -s extglob\n",
     "EXT=`${0}/{1} --result_type`\n",
@@ -123,7 +125,7 @@ api_cli_schema = [
     '\t\trm -f "${api_exec_node_directory}/in_progress"\n',
     "\tfi\n",
     "\tCMD_READ=`cat $pipe_request`\n",
-    "\t" + generate_extract_attr_value_from_string()[0] + " ${SESSION_ID_ATTR} ${CMD_READ} \"#####\" '=' SESSION_ID_VALUE\n",
+    "\t" + extract_attr_value_from_string() + " ${SESSION_ID_ATTR} ${CMD_READ} \"#####\" '=' SESSION_ID_VALUE\n",
     "\tif [ -z ${pipe_result_array[${SESSION_ID_VALUE}]} ]; then\n",
     '\t\tpipe_result_consumer="${pipe_result}_${SESSION_ID_VALUE}"\n',
     "\t\tpipe_result_array[${SESSION_ID_VALUE}]=${pipe_result_consumer}\n",
@@ -138,7 +140,7 @@ api_cli_schema = [
     "\tfi\n",
     "\tpipe_result_consumer=${pipe_result_array[${SESSION_ID_VALUE}]}\n",
     '\t echo "`date +%H:%M:%S:%3N`\tSTART    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}"\n',
-    '\t' + generate_exec_watchdog_function()[0] + " ${WATCH_PID_ARRAY[${SESSION_ID_VALUE}]} ${pipe_result_array[${SESSION_ID_VALUE}]}\n",
+    '\t' + exec_watchdog_function() + " ${WATCH_PID_ARRAY[${SESSION_ID_VALUE}]} ${pipe_result_array[${SESSION_ID_VALUE}]}\n",
     "\tWATCH_PID_ARRAY[${SESSION_ID_VALUE}]=0\n",
     '\ttouch "${api_exec_node_directory}/in_progress"\n',
     '\tRESULT_OUT=$(${0}/{1} {2} ', '"${CMD_READ}" | base64)\n',
