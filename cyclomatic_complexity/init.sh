@@ -8,6 +8,9 @@ export PYTHONPATH="${3}:${3}/modules"
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+# use source this script as fast way to setup environment for debugging
+echo -e "export WORK_DIR=${WORK_DIR}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
+
 # allow pmccabe_collector to access reposiroty
 git config --global --add safe.directory ${INITIAL_PROJECT_LOCATION}
 

@@ -79,7 +79,7 @@ def restore_api(leaf_dir, fs_tree, fs_args_tree, api_query_pipes, api_domain):
     for p in api_query_pipes:
         p_splitted = p.split(".")
         if len(p_splitted) == 2 and p_splitted[0].find("result") != -1:
-            output_pipe_file_extension=p_splitted[1]
+            output_pipe_file_extension=p_splitted[1].split('_')[0]  # multisessional API pipes has a suffix always
             break
     if output_pipe_file_extension != "":
         API_query["Content-Type"] = content_type_from_file_extension(output_pipe_file_extension)
@@ -117,7 +117,7 @@ while len(traverse_dirs_list) != 0:
         current_dir, fs_tree, fs_args_tree, directories_for_markdown
     )
     api_pipes = get_api_leaf_dir_pipes(current_dir)
-    if len(api_pipes) == 2:
+    if len(api_pipes) >= 2: # take into account multisessional output pipes. They number might be more than 2
         # it must be API leaf dir
         API_query_name, API_query = restore_api(current_dir, fs_tree, fs_args_tree, api_pipes, args.domain_name_api_entry)
         if API_query_name != "" and len(API_query) != 0:
