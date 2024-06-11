@@ -12,6 +12,7 @@ from math import log10
 import json
 import os
 import pathlib
+import socket
 import sys
 import stat
 
@@ -89,9 +90,11 @@ def get_query_params(params):
     ]
 
 def generate_cron_jobs_schema(filesystem_api_mount_point, req_api, req_type, output_pipe, params, job_control):
+    hostname = socket.gethostname()
     full_query_pipe_path = os.path.join(filesystem_api_mount_point, req_api, req_type, "exec")
     full_result_pipe_path = os.path.join(filesystem_api_mount_point, output_pipe)
-    job_generator_str = '{} && echo 0 > {} && cat {} && echo "\\"{}\\" completed" && {}'.format(job_control["pre"], full_query_pipe_path, full_result_pipe_path, req_api, job_control["post"])
+    full_result_pipe_path = full_result_pipe_path + "_" + hostname
+    job_generator_str = '{} && echo "SESSION_ID={}" > {} && while [ ! -p {} ]; do sleep 0.5; echo "wait for pipe {} ready"; done && cat {} && echo "\\"{}\\" completed" && {}'.format(job_control["pre"], hostname, full_query_pipe_path, full_result_pipe_path, full_result_pipe_path, full_result_pipe_path, req_api, job_control["post"])
     return job_generator_str
 
 #  build jobs
