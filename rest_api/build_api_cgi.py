@@ -39,7 +39,7 @@ def get_query_params(params):
     #str_keys = (f"'{k}'" for k in params.keys()).join(", ")
     #str_values = (f"'{v}'" for v in params.values()).join(", ")
     return [ f"    default_params = {json.dumps(params)}",
-             r'    query_params = {}',
+             r'    query_params = {"SESSION_ID": socket.gethostname()}',
              r'    if "default" in request.args:',
              r'         for k,v in default_params.items():',
              r'            if not isinstance(v, dict):',
@@ -86,11 +86,17 @@ def generate_cgi_schema(filesystem_api_mount_point, req_api, req_type, output_pi
                    r'def {}():'.format(canonize_api_method_name),
                    *make_redirect_url,
                    r'    api_query_pipe="/{}/{}/{}/exec"'.format(filesystem_api_mount_point, req_api, req_type),
-                   r'    api_result_pipe="/{}/{}"'.format(filesystem_api_mount_point, output_pipe),
+                   r'    api_result_pipe="/{}/{}_" + socket.gethostname()'.format(filesystem_api_mount_point, output_pipe),
                    r'    pin = open(api_query_pipe, "w")',
                    *get_query_params(params), r'',
                    r'    pin.write(query_params_str)',
                    r'    pin.close()',
+                   r'    api_result_pipe_timeout_cycles=0',
+                   r'    while not stat.S_ISFIFO(os.stat(api_result_pipe).st_mode):',
+                   r'        sleep(0.1)',
+                   r'        api_result_pipe_timeout_cycles += 1',
+                   r'        if api_result_pipe_timeout_cycles >= 30:',
+                   r'            return f"<p>\"Filesystem API did not respond\"</p>"',
                    *response_generator, r''
     ]
     return cgi_schema
