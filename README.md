@@ -71,9 +71,13 @@ To find more details, please check out for the [Analytic UC diagram](diagrams/an
 
 To be able to compose a use-case using docker images in this repo, the containers on a local host must communicate to each other.
 
-- You **MUST** configure a docker volume `api.pmccabe_collector.restapi.org`, which will represent the point of service communications, by executing the following command:
+- You **MUST** configure a docker volume `api.pmccabe_collector.restapi.org`, which will represent the point of functional service communications, by executing the following command:
 
     `mkdir -p <local host mount point> && chmod 777 <local host mount point> && docker volume create -d local -o type=none -o device=<local host mount point> -o o=bind api.pmccabe_collector.restapi.org`
+
+- You **MUST** configure a docker network `api.pmccabe_collector.network`. which will be used as the point of inner service communications, logging and integrational tests like `Simian Army` etc., by executing the following command:
+
+    `docker network create -d bridge api.pmccabe_collector.network`
 
 Although `<local host mount point>` **SHOULD NOT** be employable by `Analytic UC`, you'd better create it.
 
@@ -135,11 +139,7 @@ To leverage this fully-automated approach, please use `docker compose`:
 
 ### Analysis UC
 
-`docker compose -f cyclomatic_complexity/compose-analysis.test.yaml build`
-
-`docker compose -f cyclomatic_complexity/compose-analysis.test.yaml up --abort-on-container-exit`
-
-which will build and test the main image and all required submodules
+Coming soon...
 
 ### Analytic UC
 

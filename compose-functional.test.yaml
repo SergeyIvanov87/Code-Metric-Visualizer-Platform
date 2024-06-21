@@ -1,0 +1,147 @@
+include:
+  - common/compose-common.yaml
+
+services:
+  cc_visualizer:
+    extends:
+      file: cyclomatic_complexity/compose-functional.test.yaml
+      service: cc_visualizer
+    depends_on:
+      test_aggregator:
+        condition: service_healthy
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  cc_functional_tester:
+    extends:
+      file: cyclomatic_complexity/tests/functional/compose-functional.test.yaml
+      service: cc_functional_tester
+    environment:
+      - EXIT_ONCE_DONE=false
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  rrd_analytic:
+    extends:
+      file: rrd/compose-functional.test.yaml
+      service: rrd_analytic
+    depends_on:
+      - cc_visualizer
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  rrd_functional_tester:
+    extends:
+      file: rrd/tests/functional/compose-functional.test.yaml
+      service: rrd_functional_tester
+    environment:
+      - EXIT_ONCE_DONE=false
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  rest_api:
+    extends:
+      file: rest_api/compose-functional.test.yaml
+      service: rest_api
+    depends_on:
+      - cc_visualizer
+      - rrd_analytic
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  rest_api_functional_api_initializer:
+    extends:
+      file: rest_api/tests/functional/api_initializer/compose-functional.test.yaml
+      service: rest_api_functional_api_initializer
+    environment:
+      - EXIT_ONCE_DONE=false
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  rest_api_functional_service_tester:
+    extends:
+      file: rest_api/tests/functional/service_tester/compose-functional.test.yaml
+      service: rest_api_functional_service_tester
+    environment:
+      - EXIT_ONCE_DONE=false
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  service_broker:
+    extends:
+      file: service_broker/compose-functional.test.yaml
+      service: service_broker
+    depends_on:
+      - cc_visualizer
+      - rrd_analytic
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  service_broker_functional_tester:
+    extends:
+      file: service_broker/tests/functional/compose-functional.test.yaml
+      service: service_broker_functional_tester
+    environment:
+      - EXIT_ONCE_DONE=false
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
+
+volumes:
+  test_aggregator_logs_storage:
+  api.pmccabe_collector.project.cc.test:
+  api.pmccabe_collector.restapi.org.cc.test:
+  api.pmccabe_collector.project.rrd.test:
+  api.pmccabe_collector.rrd.rrd_analytic:
+  api.pmccabe_collector.restapi.org.rrd.test:
+  api.pmccabe_collector.restapi.org.rest_api.test:
+  api.pmccabe_collector.restapi.org.service_broker.test:
