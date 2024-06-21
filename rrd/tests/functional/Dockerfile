@@ -10,42 +10,27 @@ RUN git clone https://github.com/SergeyIvanov87/pmccabe_visualizer.git
 
 
 # main image logic
-FROM alpine:latest
-
-WORKDIR tests
-
-# install app dependencies
-RUN apk add --no-cache python3 pytest dos2unix bash
+FROM test_pseudo_fs:latest
+WORKDIR package
 
 COPY --from=build /usr/bin/pmccabe /usr/bin/pmccabe
 RUN mkdir -p /package/pmccabe_visualizer
 COPY --from=build /package/pmccabe_visualizer/*.py /package/pmccabe_visualizer/
 
-
 COPY rrd/API /API
 COPY cyclomatic_complexity/API/statistic.json /cc_API/
 
-COPY common/tests/*.py /tests/
-COPY rrd/tests/e2e/*.py /tests/
-COPY rrd/tests/e2e/*.sh /tests/
+COPY rrd/tests/functional/*.py /tests/
+COPY rrd/tests/functional/*.sh /tests/
 
 # TODO think about sending those via ssh
-COPY rrd/tests/e2e/data /mnt/
+COPY rrd/tests/functional/data /package/test_data
 
-# TODO temporary source of utils
-RUN mkdir -p /tests/utils
 COPY rrd/*.py /tests/
 
 RUN dos2unix /tests/*
-
-COPY common/*.py /tests/utils/
-COPY common/modules /tests/utils/modules
-
-RUN dos2unix /tests/*
-RUN dos2unix /tests/utils/*
-RUN dos2unix /tests/utils/modules/*
-
 RUN dos2unix /tests/*
 VOLUME ["/api", "/mnt", "/rrd_data"]
 
+ENV RRD_TESTABLE_CONTAINER_HOSTNAME=""
 ENTRYPOINT ["/tests/init.sh", "/tests", "/mnt", "/api", "/rrd_data"]
