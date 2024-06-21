@@ -1,0 +1,2 @@
+include:
+  - integrational/compose-analysis.integrational-test.yaml

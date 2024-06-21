@@ -1,0 +1,18 @@
+include:
+  - common/images/test_pseudo_fs/compose.yaml
+
+services:
+  cc_functional_tester:
+    build:
+      context: ../../../
+      dockerfile: cyclomatic_complexity/tests/functional/Dockerfile
+    volumes:
+      - api.pmccabe_collector.restapi.org.cc.test:/api
+      - api.pmccabe_collector.project.cc.test:/mnt
+    depends_on:
+       - cc_visualizer
+       - test_pseudo_fs
+
+#volumes:
+#  api.pmccabe_collector.project.cc.test:
+#  api.pmccabe_collector.restapi.org.cc.test:

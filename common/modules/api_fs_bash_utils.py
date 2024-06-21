@@ -41,7 +41,8 @@ def __extract_attr_value_from_string_function__():
         '    readarray -t IN_ARGS <<< "${STR}"\n',
         "    for arg in ${IN_ARGS[@]}\n",
         "    do\n",
-        '        if [[ "${arg}" = ${ATTR}* ]];\n' "    then\n",
+        '        if [[ "${arg}" = ${ATTR}* ]];\n',
+        "        then\n",
         '            readarray -d ${AVP_DELIM} -t AVP <<< "${arg}"\n',
         "            VALUE=${AVP[1]}\n",
         "        fi\n",
@@ -49,8 +50,8 @@ def __extract_attr_value_from_string_function__():
         "    if [ -z ${VALUE} ]; then\n",
         "        VALUE=${DEFAULT}\n",
         "    fi\n",
-        "    VALUE=$(echo $VALUE|tr -d '\n')\n",
-        "    eval $5='$VALUE'\n",
+        "    VALUE=$(echo $VALUE|tr -d '\\n')\n",
+        r"    eval $5='" +'"${VALUE}"' + "'\n",
         "}\n"
     ]
 

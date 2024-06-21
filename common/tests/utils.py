@@ -5,6 +5,8 @@ import pytest
 import sys
 import stat
 
+from time import sleep
+
 sys.path.append(os.getenv('MODULES', 'modules'))
 
 import filesystem_utils
@@ -35,7 +37,7 @@ def get_api_queries(api_files_schema_dir_path, domain_name_api_entry):
             continue
     return valid_queries_dict
 
-def compose_api_querie_pipe_names(api_mount_dir, query):
+def compose_api_queries_pipe_names(api_mount_dir, query, session_id=""):
     method = query["Method"]
     query_str = query["Query"]
     params = query["Params"]
@@ -46,6 +48,22 @@ def compose_api_querie_pipe_names(api_mount_dir, query):
     if "Content-Type" in query:
         content_type = query["Content-Type"]
 
-    pipes = ("exec", "result" if content_type == "" else "result." + file_extension_from_content_type(content_type))
+    if len(session_id) == 0:
+        pipes = ("exec", "result" if content_type == "" else "result." + file_extension_from_content_type(content_type))
+    else:
+        pipes = ("exec", "result_" + session_id  if content_type == "" else "result." + file_extension_from_content_type(content_type) + "_" + session_id)
     pipes = [os.path.join(api_mount_dir, query_str, method, p) for p in pipes]
     return pipes
+
+
+def wait_until_pipe_exist(pipe_pathname, sleep_between_cycles=0.1, max_cycles_count=30, console_ping=True):
+    cycles_count = 0
+    while not (os.path.exists(pipe_pathname) and stat.S_ISFIFO(os.stat(pipe_pathname).st_mode)):
+        sleep(sleep_between_cycles)
+        cycles_count += 1
+
+        if (cycles_count % 10) == 0 and console_ping:
+            print(f"pipe '{pipe_pathname}' readiness awaiting is in progress...", file=sys.stdout, flush=True)
+
+        if cycles_count >= max_cycles_count:
+            raise RuntimeError(f"Pipe: {pipe_pathname} - hasn't been created during expected timeout: sleep {sleep_between_cycles}, cycles {max_cycles_count}")

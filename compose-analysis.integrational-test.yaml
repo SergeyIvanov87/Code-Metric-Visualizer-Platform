@@ -1,0 +1,20 @@
+include:
+  #- compose-analysis.yaml
+  - cyclomatic_complexity/compose-analysis.integrational-test.yaml
+  - rrd/compose-analysis.integrational-test.yaml
+  - rest_api/compose-analysis.integrational-test.yaml
+  - common/compose-common.yaml
+
+networks:
+  syslog:
+    name: my-pre-existing-network
+    external: true
+
+volumes:
+  test_aggregator_logs_storage:
+  api.pmccabe_collector.project:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true
+  api.pmccabe_collector.rrd_analytic:
+

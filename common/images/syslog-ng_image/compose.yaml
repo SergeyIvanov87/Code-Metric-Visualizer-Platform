@@ -1,0 +1,32 @@
+services:
+  syslog-ng:
+    build:
+      context: ../../../
+      dockerfile: common/images/syslog-ng_image/Dockerfile
+    env_file:
+      - path: ./.env
+        required: true
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ= # timezone
+      - DOWNSTREAM_SYSLOG_HOSTNAME=${DOWNSTREAM_SYSLOG_HOSTNAME}
+      - DOWNSTREAM_SYSLOG_UDP_PORT=${DOWNSTREAM_SYSLOG_UDP_PORT}
+      - DOWNSTREAM_SYSLOG_TCP_PORT=${DOWNSTREAM_SYSLOG_TCP_PORT}
+    container_name: ${DOWNSTREAM_SYSLOG_HOSTNAME}
+    hostname: ${DOWNSTREAM_SYSLOG_HOSTNAME}
+    volumes:
+      - /srv/syslog/logs:/var/log
+    ports:
+      - ${HOST_UPSTREAM_SYSLOG_UDP_PORT}:${DOWNSTREAM_SYSLOG_UDP_PORT}/udp
+      - ${HOST_UPSTREAM_SYSLOG_TCP_PORT}:${DOWNSTREAM_SYSLOG_TCP_PORT}/tcp
+    restart: unless-stopped
+    networks:
+      - api.pmccabe_collector.network
+    logging:
+      driver: "json-file"
+
+networks:
+  syslog:
+    name: my-pre-existing-network
+    external: true

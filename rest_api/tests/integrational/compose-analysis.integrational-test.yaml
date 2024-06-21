@@ -1,0 +1,17 @@
+services:
+  rest_api_integrational_tester:
+    build:
+      context: ../../../
+      dockerfile: rest_api/tests/integrational/Dockerfile
+    environment:
+      - EXIT_ONCE_DONE=false
+    depends_on:
+      test_aggregator:
+        condition: service_healthy
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - syslog

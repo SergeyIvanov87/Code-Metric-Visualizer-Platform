@@ -1,0 +1,31 @@
+services:
+  test_aggregator:
+    build:
+      context: ../../../
+      dockerfile: common/images/test_aggregator_image/Dockerfile
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    env_file:
+      - path: ./.env
+        required: true
+      - path: ../../../common/images/syslog-ng_image/.env
+        required: true # values from that files used only for container runtime, not for the current compose!!!
+    environment:
+        - WAIT_MSEC_UNTIL_FINISH=${WAIT_MSEC_UNTIL_FINISH}
+        - UPSTREAM_AGGREGATOR_TCP_PORT=${UPSTREAM_AGGREGATOR_TCP_PORT}
+        - HOST_UPSTREAM_AGGREGATOR_TCP_PORT=${HOST_UPSTREAM_AGGREGATOR_TCP_PORT}
+    networks:
+      - api.pmccabe_collector.network
+    ports:
+      - ${HOST_UPSTREAM_AGGREGATOR_TCP_PORT}:${UPSTREAM_AGGREGATOR_TCP_PORT}/tcp
+    volumes:
+      - test_aggregator_logs_storage:/logs
+
+networks:
+  syslog:
+    name: my-pre-existing-network
+    external: true
+
+volumes:
+  test_aggregator_logs_storage:

@@ -20,7 +20,6 @@ COPY rest_api/rest_api_server /package/rest_api_server
 COPY rest_api/*.sh /package/
 COPY rest_api/*.py /package/
 COPY rest_api/API /package/API
-COPY $SCRIPT_GEN_LOC /package/
 RUN dos2unix /package/*
 
 RUN mkdir -p /opt
