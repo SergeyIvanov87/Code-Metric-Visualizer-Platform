@@ -1,0 +1,4 @@
+include:
+  - common/images/test_pseudo_fs/compose.yaml
+  - api_initializer/compose-functional.test.yaml
+  - service_tester/compose-functional.test.yaml

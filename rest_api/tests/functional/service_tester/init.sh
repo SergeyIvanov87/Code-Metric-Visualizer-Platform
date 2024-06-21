@@ -15,7 +15,7 @@ ${UTILS}/restore_api_from_pseudo_fs.py ${SHARED_API_DIR} ${MAIN_SERVICE_NAME} ${
 
 echo "Wait until service started"
 let wait_for_counter=0
-let wait_for_limit=6
+let wait_for_limit=12
 let wait_for_sec=10
 SERVICE=http://rest_api:5000
 while true
@@ -38,7 +38,20 @@ do
 done
 
 echo "Run tests:"
+RET=0
 cp ${WORK_DIR}/data/portal.json ${WORK_DIR}/restored_API/portal.json
 for s in ${WORK_DIR}/test_*.py; do
-    pytest ${s}
+    pytest -s ${s}
+    VAL=$?
+    if [ $VAL != 0 ]
+    then
+        RET=$VAL
+    fi
 done
+
+if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
+
+echo "wait for termination"
+sleep infinity &
+wait $!
+exit $RET

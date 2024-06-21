@@ -70,10 +70,12 @@ Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), [rrd](..
 
 # Testing the container
 
+### Standalone container functional test
+
 From the main repository directory run:
 
-`docker compose -f rest_api/compose-analysis.test.yaml build`
+`docker compose -f rest_api/compose-functional.test.yaml build`
 
 and then
 
-`docker compose -f rest_api/compose-analysis.test.yaml up --abort-on-container-exit`
+`docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit`

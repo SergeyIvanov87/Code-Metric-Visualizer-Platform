@@ -28,6 +28,7 @@ def execute_query(name, query):
 
 @pytest.mark.parametrize("name,query", testdata)
 def test_api_queries_lietening(name, query):
+    print(f"Execute test: {name}")
     global global_settings
 
     execute_query(name,query)
