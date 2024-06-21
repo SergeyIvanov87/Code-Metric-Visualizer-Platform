@@ -44,10 +44,16 @@ Launching depends on [observable_project_version_control](../observable_project_
 
 # Testing the container
 
+### Standalone container functional test
+
 From the main repository directory run:
 
-`docker compose -f cyclomatic_complexity/compose-analysis.test.yaml build`
+`docker compose -f cyclomatic_complexity/compose-functional.test.yaml build`
 
 and then
 
-`docker compose -f cyclomatic_complexity/compose-analysis.test.yaml up --abort-on-container-exit`
+`docker compose -f cyclomatic_complexity/compose-functional.test.yaml up --abort-on-container-exit`
+
+### All containers functional tests
+
+`docker compose -f compose-functional.test.yaml up --abort-on-container-exit`

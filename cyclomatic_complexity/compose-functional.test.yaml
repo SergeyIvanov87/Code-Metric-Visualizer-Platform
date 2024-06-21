@@ -1,0 +1,15 @@
+include:
+  - tests/compose-functional.test.yaml
+
+services:
+  cc_visualizer:
+    build:
+      context: ../
+      dockerfile: ./cyclomatic_complexity/Dockerfile
+    volumes:
+      - api.pmccabe_collector.project.cc.test:/mnt
+      - api.pmccabe_collector.restapi.org.cc.test:/api
+
+volumes:
+  api.pmccabe_collector.project.cc.test:
+  api.pmccabe_collector.restapi.org.cc.test:

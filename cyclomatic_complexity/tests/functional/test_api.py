@@ -6,11 +6,10 @@ import pytest
 from settings import Settings
 from utils import get_api_queries
 from utils import get_files
-from utils import compose_api_querie_pipe_names
+from utils import compose_api_queries_pipe_names
 
 global_settings = Settings()
 testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).items())
-
 
 def check_watch_list_api(query, pipes, expected_files):
     with open(pipes[0], "w") as pin:
@@ -52,24 +51,26 @@ def check_flamegraph_api(query, pipes):
         return
     assert 0
 
+
 @pytest.fixture()
-def project_cpp_files():
+def test_data_cpp_files():
     global global_settings
     return set(get_files(global_settings.project_dir, r".*\.cpp"))
 
 @pytest.mark.parametrize("name,query", testdata)
-def test_filesystem_api_nodes(name, query, project_cpp_files):
+def test_filesystem_api_nodes(name, query, test_data_cpp_files):
+    print(f"Execute test: {name}")
     global global_settings
 
     # compose expected pipe names, based on query data
-    pipes = compose_api_querie_pipe_names(global_settings.api_dir, query)
+    pipes = compose_api_queries_pipe_names(global_settings.api_dir, query)
 
     if name == "watch_list":
-        check_watch_list_api(query, pipes, project_cpp_files)
+        check_watch_list_api(query, pipes, test_data_cpp_files)
     elif name == "statistic":
-        check_statistic_api(query, pipes, project_cpp_files)
+        check_statistic_api(query, pipes, test_data_cpp_files)
     elif name == "view":
-        check_view_api(query, pipes, project_cpp_files)
+        check_view_api(query, pipes, test_data_cpp_files)
     elif name == "flamegraph":
         check_flamegraph_api(query, pipes)
     else:
