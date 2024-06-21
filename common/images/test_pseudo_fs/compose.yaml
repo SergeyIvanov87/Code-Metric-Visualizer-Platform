@@ -1,0 +1,8 @@
+services:
+  test_pseudo_fs:
+    build:
+      context: ../../../
+      dockerfile: common/images/test_pseudo_fs/Dockerfile
+    image: test_pseudo_fs
+    environment:
+        - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}

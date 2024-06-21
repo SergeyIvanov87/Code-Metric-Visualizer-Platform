@@ -9,7 +9,7 @@ import stat
 
 from settings import Settings
 from utils import get_api_queries
-from utils import compose_api_querie_pipe_names
+from utils import compose_api_queries_pipe_names
 
 global_settings = Settings()
 testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).items())
@@ -19,7 +19,7 @@ def test_filesystem_api_nodes(name, query):
     global global_settings
 
     # compose expected pipe names, based on query data
-    pipes = compose_api_querie_pipe_names(global_settings.api_dir, query)
+    pipes = compose_api_queries_pipe_names(global_settings.api_dir, query)
 
     # check that special files are really pipes
     for p in pipes:
