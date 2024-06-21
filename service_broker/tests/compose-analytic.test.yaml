@@ -1,2 +1,0 @@
-include:
-  - e2e/compose-analytic.test.yaml

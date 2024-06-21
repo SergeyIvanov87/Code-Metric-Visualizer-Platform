@@ -1,5 +1,5 @@
 include:
-  - tests/compose-analytic.test.yaml
+  - tests/compose-functional.test.yaml
 
 services:
   service_broker:
@@ -9,7 +9,7 @@ services:
     environment:
       CRON_REPO_UPDATE_SCHEDULE: "* * * * *"
     volumes:
-      - api.pmccabe_collector.restapi.org.test:/api
+      - api.pmccabe_collector.restapi.org.service_broker.test:/api
 
 volumes:
-    api.pmccabe_collector.restapi.org.test:
+    api.pmccabe_collector.restapi.org.service_broker.test:
