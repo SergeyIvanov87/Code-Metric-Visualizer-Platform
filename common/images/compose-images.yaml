@@ -1,0 +1,4 @@
+include:
+    - syslog-ng_image/compose.yaml
+    - test_aggregator_image/compose.yaml
+    - test_pseudo_fs/compose.yaml
