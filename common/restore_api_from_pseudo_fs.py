@@ -43,7 +43,7 @@ def read_directory_content(path, directories_tree, arguments_for_directories, di
     arguments_for_directories[path] = api_fs_args.read_args_dict(path)
 
     # search Markdown files
-    directories_for_markdown.extend(filesystem_utils.read_files_from_path(path, '.*\.md$'))
+    directories_for_markdown.extend(filesystem_utils.read_files_from_path(path, '.*\\.md$'))
     return parsed_directories_list, directories_tree, arguments_for_directories, directories_for_markdown
 
 
