@@ -16,9 +16,9 @@ parser = argparse.ArgumentParser(
 log_formats = ("raw", "pcap")
 
 parser.add_argument("log_directory", help="Log directory with files to observe")
-parser.add_argument("name_regex", help="Regex to match a container name considered as a test-container")
+parser.add_argument("name_regex", help="Regex to match a producer, which log records would be collected and investigated")
 parser.add_argument("-f", "--format", help="Expected file formatting: \"raw\",\"pcap\". Default: \"raw\"", type=str, default=log_formats[0])
-parser.add_argument("-t", "--timeout", help="Timeout [milliseconds]. Wait for activity on logger files and exit if no event happened", type=int, default=60000)
+parser.add_argument("-t", "--timeout", help="Timeout [milliseconds] to wait for activity in dedicated logger files before finishing", type=int, default=60000)
 args = parser.parse_args()
 
 
@@ -27,10 +27,9 @@ wm = pyinotify.WatchManager()
 mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_MODIFY
 
 class TestRecord:
-    def __init__(self, timestamp, data, status = 0):
+    def __init__(self, timestamp, data):
         self.timestamp = timestamp
         self.data = data
-        self.status = status
 
     @staticmethod
     def __parse_timeprefix__(string, fmt):
@@ -157,18 +156,24 @@ class LogDispatcher:
             file.seek(0, 2)
             size = file.tell()
             if size < self.files_offset_bytes[file_name]:
-                # truncated
+                # File was truncated
                 self.files_offset_bytes[file_name] = 0
-            # set a position where a last attempt stopped
+
+            # got to position where a last analyze was stopped
             file.seek(self.files_offset_bytes[file_name])
 
             # consume file data
-            # since unbuffered input, which even might be represented by 1 symbol, is expected
-            # application MUST not process input non-terminated by '\n'.
-            # Once a line terminated bye EOL, it indicates a complete syslog-ng packet here
+            # As unbuffered input is expected, which even might be represented by a single symbol,
+            # application MUST not process the input record which is non-terminated by EOL,
+            # which means that partial logger record has been received. Otherwise, necessary pattern matching
+            # would be not recognized on the partial string, which will lead us to disparity in data
+            # and incorrect result interpretation
+            #
+            # Once a line terminated bye EOL, it indicates a complete syslog-ng packet,
+            # which might be recognized later
             for line in file:
                 if line[-1] != '\n':
-                    print (f"Skip: not enough data yet, file offset: {self.files_offset_bytes[file_name]}")
+                    print (f"Partial record detected: wait for a whole packet, file offset: {self.files_offset_bytes[file_name]}")
                     raise BufferError()
 
                 self.files_offset_bytes[file_name] += len(line)
@@ -221,24 +226,24 @@ handler = EventHandler(files_dispatcher)
 notifier = pyinotify.Notifier(wm, handler, timeout=args.timeout)
 wdd = wm.add_watch(args.log_directory, mask, rec=True)
 
-# notifier.loop()
 notifier.process_events()
 while notifier.check_events():
     notifier.read_events()
     notifier.process_events()
 
-# If no event happened, it might indicate that aggregator established watch points after file I/O had happened
-# Let's analyze all files in monitoring directories, if no events were detected
+# If no further event occured, it might indicate that aggregator established watch points after last file I/O operations had happened
+# or there were no new activity on files for observationg
+# Let's analyze all files in monitoring directories since no events were detected.
 if handler.file_processed_event_count == 0:
-    print(f"No activities on directory: {args.log_directory} were detected. Analyze files forcibly...")
+    print(f"No any I/O events in directory: {args.log_directory} were detected. Analyze logs forcibly...")
 
     files = [os.path.join(args.log_directory,f) for f in os.listdir(args.log_directory)]
     for f in files:
         if os.path.isfile(f):
-            print(f"process file: {f}")
+            print(f"Process file: {f}")
             handler.log_dispatcher.dispatch(f)
 else:
-    print(f"No more activities in logger during {args.timeout}milliseconds. Start analysis of collected logs...")
+    print(f"No more activities in logger during {args.timeout}milliseconds. Start analysis of gathered logs...")
 
 stat = handler.log_dispatcher.gather_statistics()
 
