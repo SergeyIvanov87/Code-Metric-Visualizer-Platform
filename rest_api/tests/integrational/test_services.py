@@ -4,6 +4,7 @@ import os
 import pytest
 import requests
 import shutil
+import socket
 
 from settings import Settings
 from utils import get_api_queries
@@ -17,13 +18,15 @@ def execute_query(name, query):
 
     url = 'http://rest_api:5000/' + query["Query"]
     headers = {'Accept-Charset': 'UTF-8'}
+    params = query["Params"]
+    params["SESSION_ID"] = socket.gethostname() + "_" + name
     match query["Method"].lower():
         case "get":
-            resp = requests.get(url, headers=headers)
+            resp = requests.get(url, data=params, headers=headers)
         case "put":
-            resp = requests.put(url, data=query["Params"], headers=headers)
+            resp = requests.put(url, data=params, headers=headers)
         case "post":
-            resp = requests.post(url, data=query["Params"], headers=headers)
+            resp = requests.post(url, data=params, headers=headers)
     assert resp.ok
 
 @pytest.mark.parametrize("name,query", testdata)

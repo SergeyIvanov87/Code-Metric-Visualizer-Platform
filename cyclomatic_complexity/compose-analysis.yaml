@@ -5,6 +5,13 @@ services:
       dockerfile: ./cyclomatic_complexity/Dockerfile
     environment:
       - PROJECT_PATH=${PROJECT_PATH}
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
     volumes:
       - ${PROJECT_PATH}:/mnt
       - api.pmccabe_collector.restapi.org:/api

@@ -25,8 +25,3 @@ services:
       - api.pmccabe_collector.network
     logging:
       driver: "json-file"
-
-networks:
-  syslog:
-    name: my-pre-existing-network
-    external: true

@@ -14,8 +14,14 @@ mkdir -p ${WORK_DIR}/API_for_testing
 cp -r ${WORK_DIR}/collected_API/* ${WORK_DIR}/API_for_testing/
 
 echo "Run tests:"
+RET=0
 for s in ${WORK_DIR}/test_*.py; do
-    pytest ${s}
+    pytest -s ${s}
+    VAL=$?
+    if [ $VAL != 0 ]
+    then
+        RET=$VAL
+    fi
 done
 
 echo "wait for termination"

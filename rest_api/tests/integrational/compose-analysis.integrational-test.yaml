@@ -14,4 +14,4 @@ services:
         syslog-address: "tcp://localhost:13601"
         tag: "{{.Name}}"
     networks:
-      - syslog
+      - api.pmccabe_collector.network
