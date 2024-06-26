@@ -14,6 +14,7 @@ ENV FLASK_RUN_PORT=$FLASK_RUN_PORT
 
 # install app dependencies
 RUN apk add --no-cache python3 dos2unix
+RUN apk add --no-cache inotify-tools bash
 RUN apk add --no-cache py3-flask py3-markdown pipx
 
 COPY rest_api/rest_api_server /package/rest_api_server
