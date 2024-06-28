@@ -32,7 +32,7 @@ parser.add_argument("filesystem_api_mount_point", help="Path to the shared mount
 parser.add_argument("domain_name_api_entry", help="build API queries processor for that particular domain")
 args = parser.parse_args()
 
-schemas_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, ".*\.json$")
+schemas_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, r".*\.json$")
 
 
 def get_query_params(params):

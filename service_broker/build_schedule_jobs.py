@@ -38,7 +38,7 @@ args = parser.parse_args()
 def intersection(list_lhs, list_rhs):
     return [ i for i in list_lhs if i in list_rhs ]
 
-schemas_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, ".*\.json$")
+schemas_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, r".*\.json$")
 order_list_file_path = os.path.join(args.api_schemas_input_dir, "service_broker_queries_order_list.json")
 if order_list_file_path not in schemas_file_list:
     raise Exception(f"Required file \"{order_list_file_path}\" is absent. It MUST contain an order of queries to build a schedule up. Please add it")

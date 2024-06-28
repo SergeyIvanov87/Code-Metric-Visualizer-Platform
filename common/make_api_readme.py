@@ -18,38 +18,42 @@ sys.path.append('modules')
 import filesystem_utils
 from api_schema_utils import deserialize_api_request_from_schema_file
 
+def make_api_readme(api_root_dir, output_stream=sys.stdout, query_schema_file_regex = ".*\\.json$"):
+    schemas_file_list = filesystem_utils.read_files_from_path(api_root_dir, query_schema_file_regex)
+    request_descriptions = defaultdict(list)
+    for schema_file in schemas_file_list:
+        req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
+        if "Description" not in request_data:
+            continue
+        description_body = request_data["Description"]["body"]
+        request_descriptions[req_name].append("## " + req_name)
+        request_descriptions[req_name].append("### " + os.path.join(request_data["Query"], request_data["Method"]))
+        if "header" not in request_data["Description"]:
+            continue
+        request_descriptions[req_name].append(request_data["Description"]["header"])
+        request_descriptions[req_name].append("")
 
-parser = argparse.ArgumentParser(
-    prog="Build README from API JSON schema"
-)
+        if "body" not in request_data["Description"]:
+            continue
+        request_descriptions[req_name].append(request_data["Description"]["body"])
+        request_descriptions[req_name].append("")
 
-parser.add_argument("api_root_dir", help="Path to the root directory incorporated JSON API schema descriptions")
-args = parser.parse_args()
+        if "footer" not in request_data["Description"]:
+            continue
+        request_descriptions[req_name].append(request_data["Description"]["footer"])
 
-schemas_file_list = filesystem_utils.read_files_from_path(args.api_root_dir, ".*\.json$")
-request_descriptions = defaultdict(list)
-for schema_file in schemas_file_list:
-    req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
-    if "Description" not in request_data:
-        continue
-    description_body = request_data["Description"]["body"]
-    request_descriptions[req_name].append("## " + req_name)
-    request_descriptions[req_name].append("### " + os.path.join(request_data["Query"], request_data["Method"]))
-    if "header" not in request_data["Description"]:
-        continue
-    request_descriptions[req_name].append(request_data["Description"]["header"])
-    request_descriptions[req_name].append("")
+    for key, value in request_descriptions.items():
+        for row in value:
+            print(f"{row}\n", file=output_stream)
+        print("\n\n", file=output_stream)
 
-    if "body" not in request_data["Description"]:
-        continue
-    request_descriptions[req_name].append(request_data["Description"]["body"])
-    request_descriptions[req_name].append("")
 
-    if "footer" not in request_data["Description"]:
-        continue
-    request_descriptions[req_name].append(request_data["Description"]["footer"])
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="Build README from API JSON schema"
+    )
 
-for key, value in request_descriptions.items():
-    for row in value:
-        print(f"{row}\n")
-    print("\n\n")
+    parser.add_argument("api_root_dir", help="Path to the root directory incorporated JSON API schema descriptions")
+    args = parser.parse_args()
+
+    make_api_readme(args.api_root_dir, sys.stdout)

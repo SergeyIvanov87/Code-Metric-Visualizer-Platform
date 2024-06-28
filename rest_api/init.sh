@@ -34,14 +34,14 @@ API_UPDATE_EVENT_TIMEOUT_SEC=1
 API_UPDATE_EVENT_TIMEOUT_LIMIT=3
 API_UPDATE_EVENT_TIMEOUT_COUNTER=0
 # Loop until any unrecoverable error would occur
+HAS_GOT_API_UPDATE_EVENT=0
 while [ $RETURN_STATUS -eq 0 ]; do
-        HAS_GOT_API_UPDATE_EVENT=0
-
         # Handle the chain-reaction of API *md files creation.
         # It occurs when multiple services are starting simultaneously and populating their API and that will trigger
         # REST_API service down-up every time when standalone *md file is published.
         # To deal with that situation, the algorithm collect all events during timeout and process a final bundle
         # to restart REST_API only once
+        let API_UPDATE_EVENT_TIMEOUT_COUNTER=0
         while [ $API_UPDATE_EVENT_TIMEOUT_COUNTER -le $API_UPDATE_EVENT_TIMEOUT_LIMIT ]; do
             # Algorithm modifies RETURN_STATUS variable inside this inner loop, which would have been a different subshell if we have launched it in
             # a accustomed way like:
@@ -54,8 +54,10 @@ while [ $RETURN_STATUS -eq 0 ]; do
             # and allow this watching algorithm to be stopped by emergency
             while read dir action file; do
                 case "$action" in
-                    CREATE|DELETE|MODIFY )
+                    CREATE|DELETE|MODIFY|MOVE_TO|MOVE_FROM )
                         let HAS_GOT_API_UPDATE_EVENT=$HAS_GOT_API_UPDATE_EVENT+1
+
+                        # reset timeout counter upon event emerging
                         let API_UPDATE_EVENT_TIMEOUT_COUNTER=0
                         echo "Event has been detected: ${file}, action; ${action}, dir: ${dir}. Reconfigure REST_API Service...."
                         ;;
@@ -66,19 +68,18 @@ while [ $RETURN_STATUS -eq 0 ]; do
             done <<< "$(inotifywait -rq ${SHARED_API_DIR} -e modify,create,delete -t ${API_UPDATE_EVENT_TIMEOUT_SEC} --include '.md$' )"
             let API_UPDATE_EVENT_TIMEOUT_COUNTER=$API_UPDATE_EVENT_TIMEOUT_COUNTER+1
         done
-        let API_UPDATE_EVENT_TIMEOUT_COUNTER=0
         # In general, it must restart a running server instance by sending SIGTERM to its PID.
         # PID is expected to be stored in REST_API_INSTANCE_PIDFILE.
-        # This file cannot appear instantly, as well as a REST_API server instance recreated, thus we wait for this file appearance.
+        # This file cannot appear instantly, as well as a REST_API server instance recreated, thus we check for this file reappearance.
         # The situation is more accute when events occured rapidly...
-        # Therefore to be consistent, It had better wait until the service starts.
+        # Therefore to be consistent, It had better make light checks only until the service starts without waiting this uninterruptibly.
 
-        # By the way, through an unpredictable error in launching the new server instance may occureded
-        # to avoid waiting forever, it is OK untill it checks whether WATCHDOG is alive.
-        # If WATCHDOG is alive then it can handle the situation or gives another try,
-        # we is about to continue waiting for REST_API service uprising, unless
-        # WATCHDOG is dead itself. Once the service is dead, this container became inoperable
-        while [ ! -f ${REST_API_INSTANCE_PIDFILE} ]; do
+        # By the way, as an unpredictable error in launching the new server instance may occured,
+        # hence the algorithm will test additionally whether WATCHDOG is alive.
+        # If the WATCHDOG is alive and the SERVER is dead then the former can handle the situation or gives SERVER an another attempt,
+        # Thus, we is about to continue waiting for REST_API service uprising, unless
+        # WATCHDOG is dead itself. Once the both WATCHDOG and SERVER are dead, this container became inoperable
+        if [ ! -f ${REST_API_INSTANCE_PIDFILE} ]; then
             kill -s 0 ${WATCHDOG_PID} > /dev/null 2>&1
             WATCHDOG_TEST_RESULT=$?
             if [ $WATCHDOG_TEST_RESULT != 0 ]; then
@@ -86,9 +87,9 @@ while [ $RETURN_STATUS -eq 0 ]; do
                 RETURN_STATUS=255
                 break
             fi
-            echo "Waiting for a server to start..."
-            sleep 1;
-        done
+            echo "The server hasn't started yet..."
+            continue
+        fi
 
         # Restart the running service instance only if API has been changed
         if [ ${HAS_GOT_API_UPDATE_EVENT} -gt 0 ]; then
@@ -100,24 +101,10 @@ while [ $RETURN_STATUS -eq 0 ]; do
                 sleep 0.1
                 echo "Waiting for a server to stop, pid ${REST_API_INSTANCE_PIDFILE_PID}..."
             done
-            # wait for a new instance to start and also make sure than WATCHDOG is alive so that
-            # no any unrecoverable erro has occured.
-            # If we omit thsi check than next WATCHDOG & service cheking will happen up on another
-            # inotify event has come, which may be unreachable.
-            # The solution might be introducing inotify timeout instead, but using that
-            # we might miss events occured during that timeout
-            while [ ! -f ${REST_API_INSTANCE_PIDFILE} ]; do
-                kill -s 0 ${WATCHDOG_PID} > /dev/null 2>&1
-                WATCHDOG_TEST_RESULT=$?
-                if [ $WATCHDOG_TEST_RESULT != 0 ]; then
-                    echo "Unrecoverable error has occured. Container is inoperable. Abort."
-                    WATCHDOG_PID=0
-                    RETURN_STATUS=255
-                    break
-                fi
-                echo "Waiting for a new server instance to start..."
-                sleep 1;
-            done
+            echo "The server stopped"
+
+            # reset event counter
+            HAS_GOT_API_UPDATE_EVENT=0
         fi
 done
 

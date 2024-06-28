@@ -4,6 +4,8 @@ import os
 import pytest
 import requests
 import shutil
+import service_tester_utils
+import time
 
 from settings import Settings
 from utils import get_api_queries
@@ -14,6 +16,13 @@ testdata = list(get_api_queries(os.path.join(global_settings.work_dir, "restored
 
 def execute_query(name, query):
     global global_settings
+
+    iteration_number=0
+    wait_for_restart_iteration_limit=30
+    while not service_tester_utils.ping_service("rest_api", 5000) and iteration_number <= wait_for_restart_iteration_limit:
+        print(f"Waiting for service up, iteration: {iteration_number}/{wait_for_restart_iteration_limit}")
+        time.sleep(1)
+        iteration_number+=1
 
     url = 'http://rest_api:5000/' + query["Query"]
     headers = {'Accept-Charset': 'UTF-8'}
