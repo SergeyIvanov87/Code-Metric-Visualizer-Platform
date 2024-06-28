@@ -203,9 +203,12 @@ parser.add_argument(
 args = parser.parse_args()
 
 pmccabe_tree_xml = sys.stdin.read()
-xml_root = ElementTree.fromstring(pmccabe_tree_xml)
+try:
+    xml_root = ElementTree.fromstring(pmccabe_tree_xml)
 
-processor = rrd(xml_root)
-timestamp=processor.retrieve_last_ts(args.path)
-timestamp = str(int(timestamp) + 1)
-processor.build(args.args.split(), args.path, timestamp, args.method)
+    processor = rrd(xml_root)
+    timestamp=processor.retrieve_last_ts(args.path)
+    timestamp = str(int(timestamp) + 1)
+    processor.build(args.args.split(), args.path, timestamp, args.method)
+except Exception as e:
+    print(f"Build RRD failed with exception: {e}.\nPMCCabe XML:\n{pmccabe_tree_xml}")

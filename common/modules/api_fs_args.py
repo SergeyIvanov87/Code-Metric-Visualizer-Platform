@@ -13,7 +13,7 @@ def first_index(x):
 
 def read_args(directory):
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-    p = re.compile('[0-9]+\..*')
+    p = re.compile(r'[0-9]+\..*')
     arg_names = [ f for f in files if p.match(f) ]
 
     completed_cmd_args = []
@@ -29,7 +29,7 @@ def read_args(directory):
 
 def read_n_separate_args(directory, separated_args_names=[]):
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-    p = re.compile('[0-9]+\..*')
+    p = re.compile(r'[0-9]+\..*')
     arg_names = [ f for f in files if p.match(f) ]
 
     completed_cmd_args = []
@@ -54,7 +54,7 @@ def read_n_separate_args(directory, separated_args_names=[]):
 
 def read_args_dict(directory):
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-    p = re.compile('[0-9]+\..*')
+    p = re.compile(r'[0-9]+\..*')
     arg_names = [ f for f in files if p.match(f) ]
 
     completed_cmd_args = {}

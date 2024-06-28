@@ -30,6 +30,13 @@ termination_handler(){
     echo "- ${LOG_AGGREGATED_RESULT_PATH}/result_log_out"
     echo "- ${LOG_AGGREGATED_RESULT_PATH}/result_log_err"
     echo "- ${LOG_AGGREGATED_PATH}/tester.log"
+    if [ $RET != 0 ]; then
+        echo "================================================================="
+        echo "|                  ERROR Log:                                   |"
+        echo "================================================================="
+        cat `${LOG_AGGREGATED_RESULT_PATH}/result_log_err`
+        echo "================================================================="
+    fi
     exit ${RET}
 }
 
