@@ -18,7 +18,6 @@ from make_api_readme import make_api_readme
 global_settings = Settings()
 testdata = list(get_api_queries(os.path.join(global_settings.work_dir, "restored_API"), global_settings.domain_name_api_entry).items())
 
-todo_counter=0
 def check_if_query_available(domain, query):
     global global_settings
 
