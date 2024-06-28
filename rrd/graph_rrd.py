@@ -39,7 +39,7 @@ def get_last_timestamp(db_path, default_timestamp="1701154261"):
     return timestamp
 
 class RRDRecognizer:
-    def __init__(self, leaf_regex="(.*::)*:[0-9]+\.rrd$"):
+    def __init__(self, leaf_regex=r"(.*::)*:[0-9]+\.rrd$"):
         self.leaf_pattern = re.compile(leaf_regex)
 
     def is_package(self, filepath):
@@ -113,8 +113,8 @@ def graph_db_records(db_path, rrd_recognizer, graph_args, metrics_to_collect):
 
     return output_graph_path, rrd_update_result.stdout.split('x')
 
-def read_db_files_from_path(path, file_match_regex='.*\.rrd$'):
-    return filesystem_utils.read_files_from_path(path, '.*\.rrd$')
+def read_db_files_from_path(path, file_match_regex=r'.*\.rrd$'):
+    return filesystem_utils.read_files_from_path(path, file_match_regex)
 
 parser = argparse.ArgumentParser(
     prog="RRD databases recursive graph plotter",

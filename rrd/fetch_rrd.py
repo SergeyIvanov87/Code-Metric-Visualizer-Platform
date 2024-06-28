@@ -80,8 +80,8 @@ def fetch_db_records(db_path, fetch_args):
     return head, body
 
 
-def read_db_files_from_path(path, file_match_regex='.*\.rrd$'):
-    return filesystem_utils.read_files_from_path(path, '.*\.rrd$')
+def read_db_files_from_path(path, file_match_regex=r'.*\.rrd$'):
+    return filesystem_utils.read_files_from_path(path, file_match_regex)
 
 
 parser = argparse.ArgumentParser(
