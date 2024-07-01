@@ -27,14 +27,14 @@ termination_handler(){
 
     RET=`cat ${LOG_AGGREGATED_RESULT_PATH}/result`
     echo "Test Suites execution result: ${RET}. Full log can be found: "
-    echo "- ${LOG_AGGREGATED_RESULT_PATH}/result_log_out"
-    echo "- ${LOG_AGGREGATED_RESULT_PATH}/result_log_err"
+    echo "- ${LOG_AGGREGATED_RESULT_PATH}/result_log_stdout"
+    echo "- ${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
     echo "- ${LOG_AGGREGATED_PATH}/tester.log"
     if [ $RET != 0 ]; then
         echo "================================================================="
         echo "|                  ERROR Log:                                   |"
         echo "================================================================="
-        cat `${LOG_AGGREGATED_RESULT_PATH}/result_log_err`
+        cat `${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr`
         echo "================================================================="
     fi
     exit ${RET}
