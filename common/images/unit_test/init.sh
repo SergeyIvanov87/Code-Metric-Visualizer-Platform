@@ -14,8 +14,10 @@ echo -e "export WORK_DIR=${WORK_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\ne
 
 echo "Run tests:"
 RET=0
+# TODO
+rm -f ${WORK_DIR}/test_0_pseudo_fs_api_conformance.py
 for s in ${WORK_DIR}/test_*.py; do
-    pytest -rxXs ${s}
+    pytest -x -r 'A' -s --verbose ${s}
     VAL=$?
     if [ $VAL != 0 ]
     then

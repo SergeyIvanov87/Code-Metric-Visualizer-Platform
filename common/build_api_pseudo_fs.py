@@ -33,14 +33,6 @@ from api_schema_utils import deserialize_api_request_from_schema_file
 
 from api_fs_args import write_args
 
-parser = argparse.ArgumentParser(
-    prog="Build file-system API nodes based on pseudo-REST API from cfg file"
-)
-
-parser.add_argument("api_root_dir", help="Path to the root directory incorporated JSON API schema descriptions")
-parser.add_argument("mount_point", help="destination to build file-system nodes")
-args = parser.parse_args()
-
 
 def create_api_fs_node(api_root_path, req, rtype, rparams):
     api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(api_root_path, req, rtype)
@@ -79,12 +71,26 @@ def create_api_fs_node(api_root_path, req, rtype, rparams):
     write_args(api_req_directory, rparams)
     return api_req_directory, api_exec_node_directory
 
-schemas_file_list = get_api_schema_files(args.api_root_dir)
-for schema_file in schemas_file_list:
-    req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
-    req_type = request_data["Method"]
-    req_api = request_data["Query"]
-    req_params = get_api_request_plain_params(request_data["Params"])
+def build_api_pseudo_fs(api_schema_path, mount_point):
+    schemas_file_list = get_api_schema_files(api_schema_path)
+    for schema_file in schemas_file_list:
+        req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
+        req_type = request_data["Method"]
+        req_api = request_data["Query"]
+        req_params = get_api_request_plain_params(request_data["Params"])
 
-    """re-create pseudo-filesystem directory structure based on API query"""
-    create_api_fs_node(args.mount_point, req_api, req_type, req_params)
+        """re-create pseudo-filesystem directory structure based on API query"""
+        create_api_fs_node(mount_point, req_api, req_type, req_params)
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="Build file-system API nodes based on pseudo-REST API from cfg file"
+    )
+
+    parser.add_argument("api_root_dir", help="Path to the root directory incorporated JSON API schema descriptions")
+    parser.add_argument("mount_point", help="destination to build file-system nodes")
+    args = parser.parse_args()
+
+    build_api_pseudo_fs(args.api_root_dir, args.mount_point)
