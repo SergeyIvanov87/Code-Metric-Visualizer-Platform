@@ -85,3 +85,9 @@ jobs:
       run: docker run -d --name service_broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
+    - name: Stop Standalone Containers
+      run: docker stop vcs_project cc_visualizer rrd_analytic rest_api service_broker
+    - name: Start Analysis UC
+      run: docker compose -f compose-analysis.yaml up --abort-on-container-exit
+    - name: Start Integrational Tests on running Analysis UC
+      run: docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit
