@@ -12,30 +12,27 @@ from queries import FS_API_Executor
 from utils import get_api_queries
 from utils import get_files
 from utils import compose_api_queries_pipe_names
+from api_fs_query import APIQuery
 
 global_settings = Settings()
 executor = FS_API_Executor("/API", global_settings.api_dir, global_settings.domain_name_api_entry)
 testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).items())
 
 def check_analytic_api(query, pipes, expected_files):
-    xml = ""
     print(f"initiate test query: {query["Query"]}")
-    with open(pipes[0], "w") as pin:
-        pin.write("0")
+    api_query = APIQuery(pipes)
+    api_query.execute()
     print(f"getting result of query: {query["Query"]}")
-    with open(pipes[1], "r") as pout:
-        xml = pout.read()
+    xml = api_query.wait_result("", 0.1, 30, True)
     assert len(xml)
 
 
 def check_rrd_api(query, pipes, expected_files):
-    xml = ""
     print(f"initiate test query: {query["Query"]}")
-    with open(pipes[0], "w") as pin:
-        pin.write("0")
+    api_query = APIQuery(pipes)
+    api_query.execute()
     print(f"getting result of query: {query["Query"]}")
-    with open(pipes[1], "r") as pout:
-        xml = pout.read()
+    xml = api_query.wait_result("", 0.1, 30, True)
     assert len(xml)
 
 def make_rrd_names_from(source_files, rrd_volume_mount_path):
@@ -59,13 +56,11 @@ def check_rrd_collect_api(query, pipes, project_cpp_files):
 
     h = Heartbeat()
     h.run(f"Test 'check_rrd_collect_api' is in progress...")
-    print(f"initiate test query: {query["Query"]}")
-    with open(pipes[0], "w") as pin:
-        pin.write("0")
+    api_query = APIQuery(pipes)
+    api_query.execute()
     print(f"getting result of query: {query["Query"]}")
-    with open(pipes[1], "r") as pout:
-        out = pout.read()
-        assert len(out) == 0
+    out = api_query.wait_result("", 0.1, 30, True)
+    assert len(out) == 0
     h.stop()
 
     for f in rrd_files:
@@ -84,13 +79,11 @@ def check_rrd_select_api(query, pipes, project_cpp_files):
     h.stop()
 
     # seach appropriated RRD files using `rrd_select` api
-    out = ""
     print(f"initiate test query: {query["Query"]}")
-    with open(pipes[0], "w") as pin:
-        pin.write("0")
-    with open(pipes[1], "r") as pout:
-        out = pout.read()
+    api_query = APIQuery(pipes)
+    api_query.execute()
     print(f"getting result of query: {query["Query"]}")
+    out = api_query.wait_result("", 0.1, 30, True)
     rrd_storage = os.getenv('RRD_DATA_STORAGE_DIR', '')
     shutil.rmtree(os.path.join(rrd_storage, "mnt"), ignore_errors=True)
 
@@ -105,13 +98,11 @@ def check_rrd_view_api(query, pipes):
     executor.execute("rrd_collect")
     h.stop()
 
-    out = ""
     print(f"initiate test query: {query["Query"]}")
-    with open(pipes[0], "w") as pin:
-        pin.write("0")
+    api_query = APIQuery(pipes)
+    api_query.execute()
     print(f"getting result of query: {query["Query"]}")
-    with open(pipes[1], "r") as pout:
-        out = pout.read()
+    out = api_query.wait_result("", 0.1, 30, True)
     rrd_storage = os.getenv('RRD_DATA_STORAGE_DIR', '')
     shutil.rmtree(os.path.join(rrd_storage, "mnt"), ignore_errors=True)
 
@@ -132,13 +123,11 @@ def check_rrd_plot_view_api(query, pipes):
     executor.execute("rrd_collect")
     h.stop()
 
-    out = ""
     print(f"initiate test query: {query["Query"]}")
-    with open(pipes[0], "w") as pin:
-        pin.write("0")
+    api_query = APIQuery(pipes)
+    api_query.execute()
     print(f"getting result of query: {query["Query"]}")
-    with open(pipes[1], "rb") as pout:
-        out = pout.read()
+    out = api_query.wait_binary_result("", 0.1, 30, True)
     rrd_storage = os.getenv('RRD_DATA_STORAGE_DIR', '')
     shutil.rmtree(os.path.join(rrd_storage, "mnt"), ignore_errors=True)
 

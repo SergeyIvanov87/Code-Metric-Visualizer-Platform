@@ -7,50 +7,42 @@ from settings import Settings
 from utils import get_api_queries
 from utils import get_files
 from utils import compose_api_queries_pipe_names
+from api_fs_query import APIQuery
 
 global_settings = Settings()
 testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).items())
 
 def check_watch_list_api(query, pipes, expected_files):
-    with open(pipes[0], "w") as pin:
-        pin.write("0")
-    with open(pipes[1], "r") as pout:
-        files_list = pout.read().split()
-        assert len(files_list)
-        for f in files_list:
-            assert f in expected_files
-        return
-    assert 0
+    api_query = APIQuery(pipes)
+    api_query.execute()
+    print(f"getting result of query: {query["Query"]}")
+    files_list = api_query.wait_result("", 0.1, 30, True)
+    assert len(files_list)
+    for f in files_list:
+        assert f in expected_files
 
 def check_statistic_api(query, pipes, expected_files):
-    with open(pipes[0], "w") as pin:
-        pin.write("0")
-    with open(pipes[1], "r") as pout:
-        xml = pout.read()
-        assert len(xml)
-        for f in expected_files:
-            assert xml.find(os.path.basename(f)) != -1
-        return
-    assert 0
+    api_query = APIQuery(pipes)
+    api_query.execute()
+    print(f"getting result of query: {query["Query"]}")
+    xml = api_query.wait_result("", 0.1, 30, True)
+    assert len(xml)
+    for f in expected_files:
+        assert xml.find(os.path.basename(f)) != -1
 
 def check_view_api(query, pipes, expected_files):
-    with open(pipes[0], "w") as pin:
-        pin.write("0")
-    with open(pipes[1], "rb") as pout:
-        view = pout.read()
-        assert len(view)
-        return
-    assert 0
+    api_query = APIQuery(pipes)
+    api_query.execute()
+    print(f"getting result of query: {query["Query"]}")
+    view = api_query.wait_binary_result("", 0.1, 30, True)
+    assert len(view)
 
 def check_flamegraph_api(query, pipes):
-    with open(pipes[0], "w") as pin:
-        pin.write("0")
-    with open(pipes[1], "rb") as pout:
-        svg = pout.read()
-        assert svg
-        return
-    assert 0
-
+    api_query = APIQuery(pipes)
+    api_query.execute()
+    print(f"getting result of query: {query["Query"]}")
+    svg = api_query.wait_binary_result("", 0.1, 30, True)
+    assert svg
 
 @pytest.fixture()
 def test_data_cpp_files():

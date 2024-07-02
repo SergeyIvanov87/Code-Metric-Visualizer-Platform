@@ -74,7 +74,7 @@ class APIQuery:
         with open(exec_pipe_path, "w") as pin:
             pin.write(canonize_args(exec_args_str))
 
-    def wait_result(self, session_id = "", sleep_between_cycles=0.1, max_cycles_count=30, console_ping = False):
+    def __wait_result_with_pipe_mode__(self, mode, session_id, sleep_between_cycles, max_cycles_count, console_ping):
         cycles_count = 0
         pipe_to_read = ""
         if session_id == "":
@@ -98,7 +98,16 @@ class APIQuery:
             if cycles_count >= max_cycles_count:
                 raise RuntimeError(f"Pipe: {pipe_to_read} - hasn't been created during expected timeout: sleep {sleep_between_cycles}, cycles {max_cycles_count}")
 
-        with open(pipe_to_read, "r") as pout:
+        with open(pipe_to_read, mode) as pout:
             result = pout.read()
 
+        # remove temporal pipe unless it's main session id
+        if session_id != "":
+            os.remove(pipe_to_read)
         return result
+
+    def wait_binary_result(self, session_id = "", sleep_between_cycles=0.1, max_cycles_count=30, console_ping = False):
+        return self.__wait_result_with_pipe_mode__("rb", session_id, sleep_between_cycles, max_cycles_count, console_ping)
+
+    def wait_result(self, session_id = "", sleep_between_cycles=0.1, max_cycles_count=30, console_ping = False):
+        return self.__wait_result_with_pipe_mode__("r", session_id, sleep_between_cycles, max_cycles_count, console_ping)
