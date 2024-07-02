@@ -5,4 +5,4 @@ services:
       dockerfile: common/images/unit_test/Dockerfile
     image: unit_tests
     environment:
-        - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-false} #TODO true
+        - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}
