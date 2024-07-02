@@ -16,7 +16,7 @@ def check_watch_list_api(query, pipes, expected_files):
     api_query = APIQuery(pipes)
     api_query.execute()
     print(f"getting result of query: {query["Query"]}")
-    files_list = api_query.wait_result("", 0.1, 30, True)
+    files_list = api_query.wait_result("", 0.1, 30, True).split()
     assert len(files_list)
     for f in files_list:
         assert f in expected_files

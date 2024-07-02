@@ -21,7 +21,7 @@ def check_watch_list_api(query, pipes, exec_params, session_id_value):
     api_query = APIQuery(pipes)
     api_query.execute(session_id_value)
     print(f"getting result of query: {query["Query"]}")
-    files_list = api_query.wait_result(session_id_value, 0.1, 30, True)
+    files_list = api_query.wait_result(session_id_value, 0.1, 30, True).split()
     assert len(files_list)
 
 def check_statistic_api(query, pipes, exec_params, session_id_value):
