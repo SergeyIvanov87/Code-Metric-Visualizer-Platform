@@ -52,16 +52,14 @@ def run_around_tests():
     for s in server_scripts:
         servers.append(console_server.launch_detached(s, server_env, ""))
 
-    print("yield", file=sys.stdout, flush=True)
     yield servers
-    print("Tear down", file=sys.stdout, flush=True)
+    print("Stop servers", file=sys.stdout, flush=True)
     # Tear down
     # stop servers
     for s in servers:
         console_server.kill_detached(s)
 
     # avoid zombies
-    print("avoid zombies", file=sys.stdout, flush=True)
     for s in servers:
         s.wait(timeout=3)
 
@@ -94,29 +92,42 @@ def test_filesystem_api_nodes_main_session(name, query, run_around_tests):
         return
     assert 0
 
-'''
+
 class APIExecutor(AsyncExecutor):
-    def __init__(self, communication_pipes, index):
-        super.__init(self)
-        self.communication_pipes = communication_pipes
+    def __init__(self, api_mount_directory, query, index):
+        AsyncExecutor.__init__(self)
+        self.api_mount_directory = api_mount_directory
+        self.query = query
         self.index = index
 
-    def make_transaction(self, number_of_transaction):
-        session_id_value = socket.gethostname() + "_" + str(self.index)
+    @staticmethod
+    def make_transaction(obj, number_of_transaction):
+        session_id_value_base = socket.gethostname() + "_" + str(obj.index)
         for i in range(0, number_of_transaction):
-            exec_params = "SESSION_ID=" + session_id_value + str(i)
+            session_id_value = session_id_value_base  + str(i)
+            exec_params = "SESSION_ID=" + session_id_value
+
+            communication_pipes = compose_api_queries_pipe_names(obj.api_mount_directory, obj.query, session_id_value)
 
             # check API transaction
-            print(f"API executor[{self.index}], transaction: {i}", file=sys.stdout, flush=True)
-            with open(self.communication_pipes[0], "w") as pin:
-                pin.write(exec_params)
-            with open(self.communication_pipes[1], "r") as pout:
+            print(f"API executor[{obj.index}], transaction: {i}", file=sys.stdout, flush=True)
+            with open(communication_pipes[0], "w") as pin:
+                pin.write(exec_params + "\n")
+
+            api_result_pipe_timeout_cycles=0
+            while not (os.path.exists(communication_pipes[1]) and stat.S_ISFIFO(os.stat(communication_pipes[1]).st_mode)):
+                time.sleep(0.1)
+                api_result_pipe_timeout_cycles += 1
+            assert api_result_pipe_timeout_cycles <= 30
+
+            with open(communication_pipes[1], "r") as pout:
                 assert len(pout.read())
+                continue
             assert 0
 
     def run(self, number_of_transaction = 17):
         print(f"run API executor[{self.index}]", file=sys.stdout, flush=True)
-        super.run(self, self.make_transaction, self, number_of_transaction)
+        super().run(APIExecutor.make_transaction, [self, number_of_transaction])
 
 
 @pytest.mark.parametrize("name,query", testdata)
@@ -127,10 +138,14 @@ def test_filesystem_api_nodes_multi_session(name, query, run_around_tests):
     # compose expected pipe names, based on query data
     communication_pipes = compose_api_queries_pipe_names(global_settings.api_dir, query)
     # check that special files are really pipes
-    print(f"Check API pipes: {communication_pipes}", file=sys.stdout, flush=True)
+    print(f"Check base API pipes: {communication_pipes}", file=sys.stdout, flush=True)
     for p in communication_pipes:
-        assert os.path.exists(p)
-        assert stat.S_ISFIFO(os.stat(p).st_mode)
+        api_result_pipe_timeout_cycles=0
+        while not (os.path.exists(p) and stat.S_ISFIFO(os.stat(p).st_mode)):
+            time.sleep(0.1)
+            api_result_pipe_timeout_cycles += 1
+            assert api_result_pipe_timeout_cycles <= 30
+
 
 
     # compose expected pipe names, based on query data
@@ -138,11 +153,10 @@ def test_filesystem_api_nodes_multi_session(name, query, run_around_tests):
     exec_params = "SESSION_ID=" + session_id_value
 
     executors=[]
-    for i in range(0,1):
-        executor = APIExecutor(communication_pipes, i);
+    for i in range(0,5):
+        executor = APIExecutor(global_settings.api_dir, query, i);
         executor.run()
         executors.append(executor)
 
     for e in executors:
         e.join()
-'''

@@ -19,6 +19,7 @@ def make_script_req_1(script, desired_file_ext):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        r'sleep 1',
         r'echo "args: ${brr[@]}"',
     )
     script.writelines(line + "\n" for line in body)
@@ -38,6 +39,7 @@ def make_script_req_2(script, desired_file_ext):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        r'sleep 1',
         r'echo "args: ${brr[@]}"',
     )
     script.writelines(line + "\n" for line in body)
@@ -57,6 +59,7 @@ def make_script_req_3(script, desired_file_ext):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        r'sleep 1',
         r'echo "args: ${brr[@]}"',
     )
     script.writelines(line + "\n" for line in body)

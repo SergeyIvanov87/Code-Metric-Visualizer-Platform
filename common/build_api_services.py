@@ -115,7 +115,7 @@ api_cli_schema = [
     '        if [[ -f "${api_exec_node_directory}/in_progress" ]]; then\n',
     '            rm -f "${api_exec_node_directory}/in_progress"\n',
     "        fi\n",
-    '        echo "`date +%H:%M:%S:%3N`: request ${REQUEST_NUM}:"\n',
+    '        echo "`date +%H:%M:%S:%3N` request ${REQUEST_NUM}"\n',
     "        " + extract_attr_value_from_string() + " ${SESSION_ID_ATTR} \"${CMD_READ}\" \"#####\" '=' SESSION_ID_VALUE\n",
     "        if [ -z ${pipe_result_array[${SESSION_ID_VALUE}]} ]; then\n",
     '            pipe_result_consumer="${pipe_result}_${SESSION_ID_VALUE}"\n',
