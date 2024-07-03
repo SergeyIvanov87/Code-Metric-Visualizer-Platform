@@ -3,6 +3,8 @@ services:
     build:
       context: ../
       dockerfile: ./rrd/Dockerfile
+    depends_on:
+      - syslog-ng
     logging:
       driver: syslog
       options:

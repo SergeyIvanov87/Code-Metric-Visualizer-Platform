@@ -3,6 +3,8 @@ services:
     build:
       context: ../
       dockerfile: ./rest_api/Dockerfile
+    depends_on:
+      - syslog-ng
     environment:
       - FLASK_RUN_PORT=${FLASK_RUN_PORT:-5000}
       - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}

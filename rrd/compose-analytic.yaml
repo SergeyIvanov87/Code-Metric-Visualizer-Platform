@@ -3,9 +3,21 @@ services:
     build:
       context: ../
       dockerfile: ./rrd/Dockerfile
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
     volumes:
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.rrd_analytic:/rrd_data
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
 
 volumes:
   api.pmccabe_collector.project:

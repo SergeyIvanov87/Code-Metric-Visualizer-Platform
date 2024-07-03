@@ -3,6 +3,8 @@ services:
     build:
       context: ../
       dockerfile: ./cyclomatic_complexity/Dockerfile
+    depends_on:
+      - syslog-ng
     environment:
       - PROJECT_PATH=${PROJECT_PATH}
     logging:
