@@ -19,7 +19,7 @@ testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).i
 def check_watch_list_api(query, pipes, exec_params, session_id_value):
     print(f"initiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
-    api_query.execute(session_id_value)
+    api_query.execute(exec_params)
     print(f"getting result of query: {query["Query"]}")
     files_list = api_query.wait_result(session_id_value, 0.1, 30, True).split()
     assert len(files_list)
@@ -32,7 +32,7 @@ def check_statistic_api(query, pipes, exec_params, session_id_value):
 
     print(f"initiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
-    api_query.execute(session_id_value)
+    api_query.execute(exec_params)
     print(f"getting result of query: {query["Query"]}")
     xml = api_query.wait_result(session_id_value, 0.1, 30, True)
     assert len(xml)
@@ -45,7 +45,7 @@ def check_statistic_api(query, pipes, exec_params, session_id_value):
 def check_view_api(query, pipes, exec_params, session_id_value):
     print(f"initiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
-    api_query.execute(session_id_value)
+    api_query.execute(exec_params)
     print(f"getting result of query: {query["Query"]}")
     view = api_query.wait_binary_result(session_id_value, 0.1, 30, True)
     assert len(view)
@@ -53,7 +53,7 @@ def check_view_api(query, pipes, exec_params, session_id_value):
 def check_flamegraph_api(query, pipes, exec_params, session_id_value):
     print(f"initiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
-    api_query.execute(session_id_value)
+    api_query.execute(exec_params)
     print(f"getting result of query: {query["Query"]}")
     svg = api_query.wait_binary_result(session_id_value, 0.1, 30, True)
     assert svg
