@@ -8,6 +8,18 @@ on:
 
 jobs:
 
+  unit_testing:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Execute unit tests
+      run: docker compose -f common/images/unit_test/compose.yaml up
+
   build:
 
     runs-on: ubuntu-latest

@@ -18,6 +18,8 @@ from flask import render_template
 from rest_api_server import app
 from time import sleep
 
+from api_fs_query import APIQuery
+
 @app.route('/restart')
 def restart():
     os._exit(0)

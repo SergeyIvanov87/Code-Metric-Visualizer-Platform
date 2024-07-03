@@ -10,6 +10,7 @@ from utils import get_api_queries
 from utils import get_files
 from utils import compose_api_queries_pipe_names
 from utils import wait_until_pipe_exist
+from api_fs_query import APIQuery
 
 global_settings = Settings()
 executor = FS_API_Executor("/API", global_settings.api_dir, global_settings.domain_name_api_entry)
@@ -17,15 +18,11 @@ testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).i
 
 def check_watch_list_api(query, pipes, exec_params, session_id_value):
     print(f"initiate test query: {query["Query"]}")
-    with open(pipes[0], "w") as pin:
-        pin.write(exec_params)
+    api_query = APIQuery(pipes)
+    api_query.execute(session_id_value)
     print(f"getting result of query: {query["Query"]}")
-    wait_until_pipe_exist(pipes[1])
-    with open(pipes[1], "r") as pout:
-        files_list = pout.read().split()
-        assert len(files_list)
-        return
-    assert 0
+    files_list = api_query.wait_result(session_id_value, 0.1, 30, True).split()
+    assert len(files_list)
 
 def check_statistic_api(query, pipes, exec_params, session_id_value):
     global executor
@@ -34,44 +31,32 @@ def check_statistic_api(query, pipes, exec_params, session_id_value):
     assert len(watch_files_list)
 
     print(f"initiate test query: {query["Query"]}")
-    with open(pipes[0], "w") as pin:
-        pin.write(exec_params)
+    api_query = APIQuery(pipes)
+    api_query.execute(session_id_value)
     print(f"getting result of query: {query["Query"]}")
-    wait_until_pipe_exist(pipes[1])
-    with open(pipes[1], "r") as pout:
-        xml = pout.read()
-        assert len(xml)
-        found_metrics=[]
-        for f in watch_files_list:
-            if xml.find(os.path.basename(f)) != -1:
-                found_metrics.append(f)
-        assert len(found_metrics) != 0
-        return
-    assert 0
+    xml = api_query.wait_result(session_id_value, 0.1, 30, True)
+    assert len(xml)
+    found_metrics=[]
+    for f in watch_files_list:
+        if xml.find(os.path.basename(f)) != -1:
+            found_metrics.append(f)
+    assert len(found_metrics) != 0
 
 def check_view_api(query, pipes, exec_params, session_id_value):
     print(f"initiate test query: {query["Query"]}")
-    with open(pipes[0], "w") as pin:
-        pin.write(exec_params)
+    api_query = APIQuery(pipes)
+    api_query.execute(session_id_value)
     print(f"getting result of query: {query["Query"]}")
-    wait_until_pipe_exist(pipes[1])
-    with open(pipes[1], "rb") as pout:
-        view = pout.read()
-        assert len(view)
-        return
-    assert 0
+    view = api_query.wait_binary_result(session_id_value, 0.1, 30, True)
+    assert len(view)
 
 def check_flamegraph_api(query, pipes, exec_params, session_id_value):
     print(f"initiate test query: {query["Query"]}")
-    with open(pipes[0], "w") as pin:
-        pin.write(exec_params)
+    api_query = APIQuery(pipes)
+    api_query.execute(session_id_value)
     print(f"getting result of query: {query["Query"]}")
-    wait_until_pipe_exist(pipes[1])
-    with open(pipes[1], "rb") as pout:
-        svg = pout.read()
-        assert svg
-        return
-    assert 0
+    svg = api_query.wait_binary_result(session_id_value, 0.1, 30, True)
+    assert svg
 
 
 @pytest.mark.parametrize("name,query", testdata)

@@ -40,7 +40,7 @@ def get_query_params(params):
     #str_values = (f"'{v}'" for v in params.values()).join(", ")
     return [ f"    default_params = {json.dumps(params)}",
             # rest_api always uses SESSION_ID
-             r'    query_params = {"SESSION_ID": socket.gethostname()}',
+             r'    query_params = {"SESSION_ID": session_id_value}',
              r'    if "default" in request.args:',
              r'         for k,v in default_params.items():',
              r'            if not isinstance(v, dict):',
@@ -63,13 +63,13 @@ def generate_cgi_schema(filesystem_api_mount_point, req_api, req_type, output_pi
 
     if len(content_type) != 0:
         response_generator = [
-            r'    pout = open(api_result_pipe, "rb")',
-            r'    return send_file(io.BytesIO(pout.read()), download_name="pout.{}", mimetype="{}")'.format(file_extension_from_content_type(content_type), content_type),
+            r'    out = query.wait_binary_result(session_id_value, 0.1, 30, True)',
+            r'    return send_file(io.BytesIO(out), download_name="out.{}", mimetype="{}")'.format(file_extension_from_content_type(content_type), content_type),
         ]
     else:
         response_generator = [
-            r'    pout = open(api_result_pipe, "r")',
-            r'    return f"<p>{pout.read()}</p>"'
+            r'    out = query.wait_result(session_id_value, 0.1, 30, True)',
+            r'    return f"<p>{out}</p>"'
         ]
 
     methods = f"\"{req_type}\""
@@ -88,11 +88,11 @@ def generate_cgi_schema(filesystem_api_mount_point, req_api, req_type, output_pi
                    *make_redirect_url,
                    r'    api_query_pipe="/{}/{}/{}/exec"'.format(filesystem_api_mount_point, req_api, req_type),
                    # rest_api always uses SESSION_ID
-                   r'    api_result_pipe="/{}/{}_" + socket.gethostname()'.format(filesystem_api_mount_point, output_pipe),
-                   r'    pin = open(api_query_pipe, "w")',
+                   r'    session_id_value=socket.gethostname()',
+                   r'    api_result_pipe="/{}/{}_" + session_id_value'.format(filesystem_api_mount_point, output_pipe),
+                   r'    query = APIQuery([api_query_pipe, api_result_pipe])',
                    *get_query_params(params), r'',
-                   r'    pin.write(query_params_str)',
-                   r'    pin.close()',
+                   r'    query.execute(query_params_str)',
                    r'    api_result_pipe_timeout_cycles=0',
                    r'    while not (os.path.exists(api_result_pipe) and stat.S_ISFIFO(os.stat(api_result_pipe).st_mode)):',
                    r'        sleep(0.1)',
