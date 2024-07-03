@@ -10,6 +10,8 @@ services:
     build:
       context: ./
       dockerfile: ./service_broker/Dockerfile
+    depends_on:
+      - syslog-ng
     environment:
       CRON_REPO_UPDATE_SCHEDULE: 0 0 * * *
     logging:
@@ -26,6 +28,8 @@ services:
     build:
       context: ./
       dockerfile: ./observable_project_version_control/Dockerfile
+    depends_on:
+      - syslog-ng
     logging:
       driver: syslog
       options:

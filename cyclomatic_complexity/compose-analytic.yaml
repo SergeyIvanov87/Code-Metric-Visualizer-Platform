@@ -3,6 +3,8 @@ services:
     build:
       context: ../
       dockerfile: ./cyclomatic_complexity/Dockerfile
+    depends_on:
+      - syslog-ng
     logging:
       driver: syslog
       options:
