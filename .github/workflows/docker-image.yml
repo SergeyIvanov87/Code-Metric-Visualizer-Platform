@@ -106,7 +106,7 @@ jobs:
     - name: Tryout syslog-ng
       run: docker compose -f common/images/syslog-ng_image/compose.yaml
     - name: Start Analysis UC
-      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d --abort-on-container-exit
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
     - name: Start Integrational Tests on running Analysis UC
       run: docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit
 
