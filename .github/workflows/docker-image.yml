@@ -87,7 +87,33 @@ jobs:
         DATE: ${{ steps.date.outputs.date }}
     - name: Stop Standalone Containers
       run: docker stop vcs_project cc_visualizer rrd_analytic rest_api service_broker
+
+  analysis_use-case:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clone external C/C++ project
+      run: git clone https://github.com/SergeyIvanov87/MRUVocabulary.git MRUVocabulary
     - name: Start Analysis UC
-      run: docker compose -f compose-analysis.yaml up --abort-on-container-exit
+      run: PROJECT_PATH=MRUVocabulary docker compose -f compose-analysis.yaml up --abort-on-container-exit
+    - name: Start Integrational Tests on running Analysis UC
+      run: docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit
+
+  analytic_use-case:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Start Analysis UC
+      run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml up --abort-on-container-exit
     - name: Start Integrational Tests on running Analysis UC
       run: docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit
