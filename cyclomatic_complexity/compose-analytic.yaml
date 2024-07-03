@@ -3,6 +3,13 @@ services:
     build:
       context: ../
       dockerfile: ./cyclomatic_complexity/Dockerfile
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
     volumes:
       - api.pmccabe_collector.project:/mnt
       - api.pmccabe_collector.restapi.org:/api
@@ -12,8 +19,3 @@ volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
-    #driver: local
-    #driver_opts:
-        #device: /tmp/docker,
-        #o: bind,
-        #type: none

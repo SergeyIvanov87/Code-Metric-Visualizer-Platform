@@ -104,7 +104,7 @@ jobs:
     - name: Clone external C/C++ project
       run: git clone https://github.com/SergeyIvanov87/MRUVocabulary.git $GITHUB_WORKSPACE/MRUVocabulary
     - name: Start Analysis UC
-      run: PROJECT_PATH=MRUVocabulary docker compose -f compose-analysis.yaml up --abort-on-container-exit
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up --abort-on-container-exit
     - name: Start Integrational Tests on running Analysis UC
       run: docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit
 
@@ -121,6 +121,8 @@ jobs:
       run: mkdir -p api && chmod 777 api && docker volume create -d local -o type=none -o device=api -o o=bind api.pmccabe_collector.restapi.org
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
+    - name: Create RRD snapshots volume
+      run: LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=rrd_snapshots && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd_analytic
     - name: Start Analysis UC
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml up --abort-on-container-exit
     - name: Start Integrational Tests on running Analysis UC
