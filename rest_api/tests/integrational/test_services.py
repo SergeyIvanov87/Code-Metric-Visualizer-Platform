@@ -6,6 +6,8 @@ import requests
 import shutil
 import socket
 
+import service_tester_utils
+
 from settings import Settings
 from utils import get_api_queries
 from utils import get_files
@@ -18,6 +20,11 @@ def execute_query(name, query):
 
     url = 'http://rest_api:5000/' + query["Query"]
     headers = {'Accept-Charset': 'UTF-8'}
+
+    service_is_up = service_tester_utils.if_service_started_up_until("rest_api", 5000, 60, 1)
+    assert service_is_up
+
+    print(f"send query: {url}")
     params = query["Params"]
     params["SESSION_ID"] = socket.gethostname() + "_" + name
     match query["Method"].lower():
