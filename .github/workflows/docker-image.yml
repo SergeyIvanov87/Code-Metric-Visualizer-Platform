@@ -109,7 +109,7 @@ jobs:
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
     - name: Start Integrational Tests on running Analysis UC
       run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit
-      name: Start Integrational Tests on running Analysis UC one more time
+    - name: Start Integrational Tests on running Analysis UC one more time
       run: docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit
 
   analytic_use-case:
