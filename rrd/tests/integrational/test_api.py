@@ -120,11 +120,11 @@ def check_rrd_plot_view_api(query, pipes, exec_params, session_id_value):
 
 @pytest.mark.parametrize("name,query", testdata)
 def test_filesystem_api_nodes(name, query):
-    print(f"Execute test: {name}")
-    global global_settings
-
     # compose expected pipe names, based on query data
     session_id_value = socket.gethostname() + "_" + name
+    print(f"Execute test: {name}, session: {session_id_value}")
+    global global_settings
+
     pipes = compose_api_queries_pipe_names(global_settings.api_dir, query, session_id_value)
     exec_params = "SESSION_ID=" + session_id_value
 

@@ -1,5 +1,6 @@
 
 include:
+  - common/images/syslog-ng_image/compose.yaml
   - rrd/compose-analytic.yaml
   - rest_api/compose.yaml
   - cyclomatic_complexity/compose-analytic.yaml
@@ -9,8 +10,17 @@ services:
     build:
       context: ./
       dockerfile: ./service_broker/Dockerfile
+    depends_on:
+      - syslog-ng
     environment:
       CRON_REPO_UPDATE_SCHEDULE: 0 0 * * *
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
     volumes:
       - api.pmccabe_collector.restapi.org:/api
 
@@ -18,12 +28,26 @@ services:
     build:
       context: ./
       dockerfile: ./observable_project_version_control/Dockerfile
+    depends_on:
+      - syslog-ng
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
     environment:
       - PROJECT_URL=${PROJECT_URL}
       - PROJECT_BRANCH=${PROJECT_BRANCH}
     volumes:
       - api.pmccabe_collector.project:/mnt
       - api.pmccabe_collector.restapi.org:/api
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
 
 volumes:
   api.pmccabe_collector.project:

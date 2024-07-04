@@ -1,5 +1,6 @@
 import requests
 import time
+import sys
 
 def ping_service(service, port):
     url = f"http://{service}:{port}"
@@ -18,8 +19,8 @@ def ping_service(service, port):
 def if_service_ceased_until(service, port, max_iteration_limit, iteration_timeout_sec = 1):
     iteration_number = 0
     while ping_service(service, port) and iteration_number <= max_iteration_limit:
-        print(f"Waiting for service \"{service}:{port}\" termination, iteration: {iteration_number}/{max_iteration_limit}")
-        time.sleep(1)
+        print(f"Waiting for service \"{service}:{port}\" termination, iteration: {iteration_number}/{max_iteration_limit}", file=sys.stdout, flush=True)
+        time.sleep(iteration_timeout_sec)
         iteration_number+=1
 
     return iteration_number < max_iteration_limit
@@ -27,8 +28,8 @@ def if_service_ceased_until(service, port, max_iteration_limit, iteration_timeou
 def if_service_started_up_until(service, port, max_iteration_limit, iteration_timeout_sec = 1):
     iteration_number = 0
     while not ping_service(service, port) and iteration_number <= max_iteration_limit:
-        print(f"Waiting for service \"{service}:{port}\" starting up, iteration: {iteration_number}/{max_iteration_limit}")
-        time.sleep(1)
+        print(f"Waiting for service \"{service}:{port}\" starting up, iteration: {iteration_number}/{max_iteration_limit}", file=sys.stdout, flush=True)
+        time.sleep(iteration_timeout_sec)
         iteration_number+=1
 
     return iteration_number < max_iteration_limit

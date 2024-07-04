@@ -1,8 +1,15 @@
 
 include:
+#  - common/compose-common.yaml
+  - common/images/syslog-ng_image/compose.yaml
   - rrd/compose-analysis.yaml
   - rest_api/compose.yaml
   - cyclomatic_complexity/compose-analysis.yaml
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
 
 volumes:
   api.pmccabe_collector.restapi.org:

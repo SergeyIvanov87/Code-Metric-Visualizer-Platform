@@ -93,7 +93,7 @@ class APIQuery:
             cycles_count += 1
 
             if (cycles_count % 10) == 0 and console_ping:
-                print(f"pipe '{pipe_to_read}' readiness awaiting is in progress[{pipe_to_read}]...", file=sys.stdout, flush=True)
+                print(f"pipe '{pipe_to_read}' readiness awaiting is in progress[{cycles_count}]...", file=sys.stdout, flush=True)
 
             if cycles_count >= max_cycles_count:
                 raise RuntimeError(f"Pipe: {pipe_to_read} - hasn't been created during expected timeout: sleep {sleep_between_cycles}, cycles {max_cycles_count}")

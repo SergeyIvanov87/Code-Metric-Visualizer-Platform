@@ -36,6 +36,7 @@ do
 done
 ) &
 WATCH_PID=$!
+cat ${real_statistic_pipe_out}
 
 echo "Run tests:"
 RET=0

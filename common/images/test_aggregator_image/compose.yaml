@@ -22,10 +22,5 @@ services:
     volumes:
       - test_aggregator_logs_storage:/logs
 
-networks:
-  syslog:
-    name: my-pre-existing-network
-    external: true
-
 volumes:
   test_aggregator_logs_storage:

@@ -5,6 +5,7 @@ RUN apk add --no-cache py3-requests curl
 
 COPY rest_api/API /API
 
+COPY rest_api/tests/*.py /tests/
 COPY rest_api/tests/functional/service_tester/*.py /tests/
 COPY rest_api/tests/functional/service_tester/*.sh /tests/
 COPY rest_api/tests/functional/data /tests/data

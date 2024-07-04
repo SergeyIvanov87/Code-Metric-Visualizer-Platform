@@ -50,8 +50,15 @@ In addition to **General** prerequisites above, you **MUST** define environment 
 
 ### Analytic UC
 
-In addition to **General** prerequisites above, you **MUST** define environment variables `PROJECT_URL` and `PROJECT_BRANCH` when launching both `docker compose  -f compose-analytic.yaml` and `docker build`, which specify your project repository and branch( `git` by default).
-You **SHOULD** define the environment variable `CRON_REPO_UPDATE_SCHEDULE` to specify an analytic job invocation shedule (metrics collected every day, by default) in `crontab` format.
+In addition to **General** prerequisites above:
+
+- You **MUST** configure a docker volume `api.pmccabe_collector.rrd_analytic`, which will store analyzed metrics snapshots in RRDs (Round-Robin databases), by executing the following command:
+
+    `LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=<local host RRD mount point> && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd_analytic`
+
+- You **MUST** define environment variables `PROJECT_URL` and `PROJECT_BRANCH` when launching both `docker compose  -f compose-analytic.yaml` and `docker build`, which specify your project repository and branch( `git` by default).
+
+- You **SHOULD** define the environment variable `CRON_REPO_UPDATE_SCHEDULE` to specify an analytic job invocation shedule (metrics collected every day, by default) in `crontab` format.
 
 # HOW-TO
 

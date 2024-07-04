@@ -1,13 +1,14 @@
 include:
-  #- compose-analysis.yaml
+  - common/images/test_pseudo_fs/compose.yaml
   - cyclomatic_complexity/compose-analysis.integrational-test.yaml
   - rrd/compose-analysis.integrational-test.yaml
   - rest_api/compose-analysis.integrational-test.yaml
-  - common/compose-common.yaml
+  #- common/compose-common.yaml
+  - common/images/test_aggregator_image/compose.yaml
 
 networks:
-  syslog:
-    name: my-pre-existing-network
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
     external: true
 
 volumes:
@@ -17,4 +18,3 @@ volumes:
     name: api.pmccabe_collector.restapi.org
     external: true
   api.pmccabe_collector.rrd_analytic:
-
