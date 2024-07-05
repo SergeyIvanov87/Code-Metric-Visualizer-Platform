@@ -1,4 +1,4 @@
-# pmccabe_visualizer_docker
+# Code Metric Visualizer Platform
 
 The docker image for `pmccabe_visualizer` https://github.com/SergeyIvanov87/pmccabe_visualizer
 
