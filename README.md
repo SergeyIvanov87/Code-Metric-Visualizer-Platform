@@ -232,5 +232,5 @@ Anytime afther that invoke the command to launch the integrational test scope:
 
 `docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit`
 
-This testing flow of this integrational scop can be represented on the following picture:
+This testing flow of this integrational test scope can be represented on the following picture:
 ![alt text](assets/all_integrational_tests_in_parallel.png)
