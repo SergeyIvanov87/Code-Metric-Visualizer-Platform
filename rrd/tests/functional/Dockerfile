@@ -17,18 +17,16 @@ COPY --from=build /usr/bin/pmccabe /usr/bin/pmccabe
 RUN mkdir -p /package/pmccabe_visualizer
 COPY --from=build /package/pmccabe_visualizer/*.py /package/pmccabe_visualizer/
 
-COPY rrd/API /API
 COPY cyclomatic_complexity/API/statistic.json /cc_API/
-
-COPY rrd/tests/functional/*.py /tests/
-COPY rrd/tests/functional/*.sh /tests/
-
 # TODO think about sending those via ssh
 COPY rrd/tests/functional/data /package/test_data
 
+COPY rrd/API /API
 COPY rrd/*.py /tests/
 
-RUN dos2unix /tests/*
+COPY rrd/tests/functional/*.sh /tests/
+COPY rrd/tests/functional/*.py /tests/
+
 RUN dos2unix /tests/*
 VOLUME ["/api", "/mnt", "/rrd_data"]
 
