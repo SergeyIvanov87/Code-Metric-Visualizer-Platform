@@ -58,6 +58,11 @@ Please pay attention, that after **SESSION_ID** was manifested as `exec` argumen
 ## GUI File Manager
 
 If you prefer to use GUI rather than CLI, then you could just follow a path `api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/GET` in your favorite File Manager.
-Opening the directory `../GET` triggers an inotify-event, and as soon as the request finishes you will find the result in a newly created file.
+Opening the directory `../GET`
+![alt text](assets/file_manager_api_req_params.png)
+
+triggers an inotify-event, and as soon as the request finishes you will find the result in a newly created file.
+![alt text](assets/file_manager_api_req_result.png)
+
 No any transactions in this case is meaning.
 It is realy simple as it sounds! Regardless the approach you use (CLI or GUI).
