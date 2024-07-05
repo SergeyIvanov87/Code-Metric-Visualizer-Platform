@@ -75,8 +75,9 @@ def check_rrd_select_api(query, pipes, project_cpp_files):
     global executor
     h = Heartbeat()
     h.run(f"Test 'check_rrd_select_api' is in progress...")
-    executor.execute("rrd_collect")
+    out = executor.execute("rrd_collect", "check_rrd_select_api_rrd_collect_helper")
     h.stop()
+    assert len(out) == 0, "check_rrd_select_api_rrd_collect_helper has been failed"
 
     # seach appropriated RRD files using `rrd_select` api
     print(f"initiate test query: {query["Query"]}")
@@ -94,9 +95,10 @@ def check_rrd_view_api(query, pipes):
     # prepare RRD files
     global executor
     h = Heartbeat()
-    h.run(f"Test 'check_rrd_select_api' is in progress...")
-    executor.execute("rrd_collect")
+    h.run(f"Test 'check_rrd_view_api' is in progress...")
+    out = executor.execute("rrd_collect", "check_rrd_view_api_rrd_collect_helper")
     h.stop()
+    assert len(out) == 0, "check_rrd_view_api_rrd_collect_helper has been failed"
 
     print(f"initiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
@@ -120,8 +122,9 @@ def check_rrd_plot_view_api(query, pipes):
     global executor
     h = Heartbeat()
     h.run(f"Test 'check_rrd_plot_view_api' is in progress...")
-    executor.execute("rrd_collect")
+    out = executor.execute("rrd_collect", "check_rrd_plot_view_api_rrd_collect_helper")
     h.stop()
+    assert len(out) == 0, "check_rrd_view_api_rrd_collect_helper has been failed"
 
     print(f"initiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
