@@ -220,7 +220,7 @@ This testing flow can be represented on the following picture:
 
 Simian army is delayed... An integration test scope came instead!
 
-Launch `Analysis UC` or `Analytic UC` by exeting the following command:
+Launch `Analysis UC` or `Analytic UC` by executing the following command:
 
 `docker compose -f compose-analysis.yaml up -d`
 
@@ -228,7 +228,7 @@ or
 
 `docker compose -f compose-analytic.yaml up -d`
 
-At anytime afther that invoke the command to launch the integrational test scope:
+Anytime afther that invoke the command to launch the integrational test scope:
 
 `docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit`
 
