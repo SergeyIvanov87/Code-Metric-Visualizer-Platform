@@ -32,7 +32,9 @@ fi
 mkfifo -m 644 ${real_statistic_pipe_out}
 while :
 do
+    echo "MOCK FINISH: ${real_statistic_pipe_out}"
     cat ${fake_statistic_data_result} > ${real_statistic_pipe_out}
+    echo "MOCK CONSUMED: ${real_statistic_pipe_out}"
 done
 ) &
 WATCH_PID=$!
@@ -58,6 +60,7 @@ for f in ${test_files[@]}; do
     rm -f /mnt/${fname}
 done
 
+wait ${WATCH_PID}
 if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
 
 echo "wait for termination"
