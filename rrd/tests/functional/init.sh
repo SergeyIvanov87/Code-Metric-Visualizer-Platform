@@ -60,6 +60,7 @@ for f in ${test_files[@]}; do
     rm -f /mnt/${fname}
 done
 
+kill -15 ${WATCH_PID}
 wait ${WATCH_PID}
 if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
 
