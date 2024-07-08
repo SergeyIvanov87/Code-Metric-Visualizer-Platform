@@ -11,7 +11,7 @@ export MODULES="${WORK_DIR}/utils/modules"
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
-rm -f ${RRD_DATA_STORAGE_DIR}
+rm -rf ${RRD_DATA_STORAGE_DIR}
 mkdir -p ${RRD_DATA_STORAGE_DIR}
 
 # inject test files into project directory
@@ -33,9 +33,10 @@ mkfifo -m 644 ${real_statistic_pipe_out}
 (
 while :
 do
-    echo "MOCK FINISH: ${real_statistic_pipe_out}"
+    echo "date +%H:%M:%S:%3N\tSTART:`cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec`"
+    echo "`date +%H:%M:%S:%3N`\tMOCK FINISH: ${real_statistic_pipe_out}"
     cat ${fake_statistic_data_result} > ${real_statistic_pipe_out}
-    echo "MOCK CONSUMED: ${real_statistic_pipe_out}"
+    echo "`date +%H:%M:%S:%3N`\tMOCK CONSUMED: ${real_statistic_pipe_out}"
 done
 ) &
 WATCH_PID=$!
