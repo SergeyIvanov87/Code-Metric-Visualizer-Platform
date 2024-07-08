@@ -121,6 +121,18 @@ jobs:
       run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit
     - name: Start Integrational Tests on running Analysis UC one more time
       run: docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit
+    - name: Stop Analysis UC
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop
+    - name: Restart Analysis UC attempt 1
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
+    - name: Retart Integrational Tests on running Analysis UC attempt 1
+      run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit
+    - name: Stop Analysis UC attempt 1
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop
+    - name: Restart Analysis UC attempt 2
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
+    - name: Retart Integrational Tests on running Analysis UC attempt 2
+      run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit
 
   analytic_use-case:
 
