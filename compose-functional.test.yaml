@@ -6,7 +6,7 @@ services:
     extends:
       file: cyclomatic_complexity/compose-functional.test.yaml
       service: cc_visualizer
-    depends_on:
+    depends_on:             # explicit dependency
       test_aggregator:
         condition: service_healthy
     logging:
@@ -78,6 +78,9 @@ services:
     extends:
       file: rest_api/tests/functional/api_initializer/compose-functional.test.yaml
       service: rest_api_functional_api_initializer
+    depends_on:
+      test_aggregator:      # explicit dependency
+        condition: service_healthy
     environment:
       - EXIT_ONCE_DONE=false
     logging:
@@ -92,6 +95,9 @@ services:
     extends:
       file: rest_api/tests/functional/service_tester/compose-functional.test.yaml
       service: rest_api_functional_service_tester
+    depends_on:             # explicit dependency
+      test_aggregator:
+        condition: service_healthy
     environment:
       - EXIT_ONCE_DONE=false
     logging:
