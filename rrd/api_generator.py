@@ -59,7 +59,7 @@ def make_script_rrd_collect(script, desired_file_ext=""):
         r'echo ${IN_ARGS[@]} > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/PUT/exec',
         api_fs_bash_utils.wait_until_pipe_exist() + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/PUT/${MULTISESSION_PIPE_OUT_RRD}",
         r'RRD_DB_PARAMS=`cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/PUT/${MULTISESSION_PIPE_OUT_RRD}`',
-        r'echo "{IN_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/exec; fi',
+        r'echo "{IN_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/exec',
         api_fs_bash_utils.wait_until_pipe_exist() + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/${MULTISESSION_PIPE_OUT_RRD}",
         r'ONLY_METRICS_IN_RANGE=`cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/${MULTISESSION_PIPE_OUT_RRD}`',
         r'if [ ! -z ${SESSION_ID_VALUE} ]; then echo "SESSION_ID=`hostname`_${SESSION_ID_VALUE} $(replace_space_in_even_position "${ONLY_METRICS_IN_RANGE}")" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec; fi',
