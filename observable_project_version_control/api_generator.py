@@ -14,7 +14,7 @@ def make_script_git(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'cd ${INITIAL_PROJECT_LOCATION} && echo "${brr[@]}" | xargs git',
+        r'cd ${INITIAL_PROJECT_LOCATION} && echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs git',
     )
     script.writelines(line + "\n" for line in body)
 

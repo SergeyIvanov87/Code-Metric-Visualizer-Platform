@@ -5,7 +5,7 @@ WORKDIR package
 ARG SCRIPT_GEN_LOC=services
 
 # install app dependencies
-RUN apk add --no-cache python3 dos2unix
+RUN apk add --no-cache coreutils python3 dos2unix
 RUN apk add --no-cache inotify-tools bash
 RUN apk add --no-cache rrdtool librsvg potrace imagemagick ghostscript-fonts terminus-font
 

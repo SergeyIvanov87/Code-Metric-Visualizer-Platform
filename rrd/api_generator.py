@@ -14,7 +14,7 @@ def make_script_analytic(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${brr[@]}"',
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -32,7 +32,7 @@ def make_script_rrd(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${brr[@]}"',
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -56,18 +56,17 @@ def make_script_rrd_collect(script, desired_file_ext=""):
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         api_fs_bash_utils.add_suffix_if_exist() + " \"${SESSION_ID_VALUE}\" \"result\" MULTISESSION_PIPE_OUT_RRD", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo ${IN_ARGS[@]} > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/PUT/exec',
+        r'echo ${IN_SERVER_REQUEST_ARGS[@]} > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/PUT/exec',
         api_fs_bash_utils.wait_until_pipe_exist() + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/PUT/${MULTISESSION_PIPE_OUT_RRD}",
         r'RRD_DB_PARAMS=`cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/PUT/${MULTISESSION_PIPE_OUT_RRD}`',
-        r'if [ ! -z ${SESSION_ID_VALUE} ]; then echo "SESSION_ID=${SESSION_ID_VALUE}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/exec; fi',
-        r'if [ -z ${SESSION_ID_VALUE} ]; then echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/exec; fi',
+        r'echo "${IN_SERVER_REQUEST_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/exec',
         api_fs_bash_utils.wait_until_pipe_exist() + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/${MULTISESSION_PIPE_OUT_RRD}",
         r'ONLY_METRICS_IN_RANGE=`cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/${MULTISESSION_PIPE_OUT_RRD}`',
         r'if [ ! -z ${SESSION_ID_VALUE} ]; then echo "SESSION_ID=`hostname`_${SESSION_ID_VALUE} $(replace_space_in_even_position "${ONLY_METRICS_IN_RANGE}")" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec; fi',
         r'if [ -z ${SESSION_ID_VALUE} ]; then echo "SESSION_ID=`hostname` $(replace_space_in_even_position "${ONLY_METRICS_IN_RANGE}")" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec; fi',
         api_fs_bash_utils.add_suffix_if_exist() + " \"${SESSION_ID_VALUE}\" \"result.xml_`hostname`\" MULTISESSION_PIPE_OUT_STATISTIC", r"",
         api_fs_bash_utils.wait_until_pipe_exist() + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/${MULTISESSION_PIPE_OUT_STATISTIC}",
-        r'cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/${MULTISESSION_PIPE_OUT_STATISTIC} | ${WORK_DIR}/build_rrd.py "${RRD_DB_PARAMS}" ${RRD_DATA_STORAGE_DIR} ${brr[@]}',
+        r'cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/${MULTISESSION_PIPE_OUT_STATISTIC} | ${WORK_DIR}/build_rrd.py "${RRD_DB_PARAMS}" ${RRD_DATA_STORAGE_DIR} ${OVERRIDEN_CMD_ARGS[@]}',
         r'if [ ! -z ${SESSION_ID_VALUE} ]; then',
         r'    rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/PUT/${MULTISESSION_PIPE_OUT_RRD}',
         r'    rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/${MULTISESSION_PIPE_OUT_RRD}',
@@ -89,7 +88,7 @@ def make_script_rrd_select(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${brr[@]}" | xargs find ${RRD_DATA_STORAGE_DIR}',
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs find ${RRD_DATA_STORAGE_DIR}',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -112,7 +111,7 @@ def make_script_rrd_view(script, desired_file_ext=""):
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         api_fs_bash_utils.add_suffix_if_exist() + " \"${SESSION_ID_VALUE}\" \"result.txt\" MULTISESSION_PIPE_OUT", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/select/GET/exec',
+        r'echo "${IN_SERVER_REQUEST_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/select/GET/exec',
         api_fs_bash_utils.wait_until_pipe_exist() + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/select/GET/${MULTISESSION_PIPE_OUT}",
         r'cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/select/GET/${MULTISESSION_PIPE_OUT} | ${WORK_DIR}/fetch_rrd.py ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/select/view',
         r'if [ ! -z ${SESSION_ID_VALUE} ]; then',
@@ -140,7 +139,7 @@ def make_script_rrd_plot_view(script, desired_file_ext=""):
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         api_fs_bash_utils.add_suffix_if_exist() + " \"${SESSION_ID_VALUE}\" \"result.txt\" MULTISESSION_PIPE_OUT", r"",
         r"RESULT_FILE=`mktemp -u`",
-        r'echo "${IN_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/select/GET/exec',
+        r'echo "${IN_SERVER_REQUEST_ARGS[@]}" > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/select/GET/exec',
         api_fs_bash_utils.wait_until_pipe_exist() + " ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/select/GET/${MULTISESSION_PIPE_OUT}",
         r'cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/select/GET/${MULTISESSION_PIPE_OUT} | ${WORK_DIR}/graph_rrd.py ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd/select/plot_view ${RESULT_FILE}',
         r'cat ${RESULT_FILE}.png',

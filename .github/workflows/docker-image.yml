@@ -57,10 +57,6 @@ jobs:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the Service Broker Docker image
       run: docker compose -f service_broker/compose-functional.test.yaml up --abort-on-container-exit
-    - name: Create Shared network
-      run: docker network create -d bridge api.pmccabe_collector.network
-    - name: All together functional tests
-      run: docker compose -f compose-functional.test.yaml up --abort-on-container-exit
     - name: Create API volume
       run: mkdir -p api && chmod 777 api && docker volume create -d local -o type=none -o device=api -o o=bind api.pmccabe_collector.restapi.org
     - name: Run VCS Docker
@@ -87,6 +83,20 @@ jobs:
         DATE: ${{ steps.date.outputs.date }}
     - name: Stop Standalone Containers
       run: docker stop vcs_project cc_visualizer rrd_analytic rest_api service_broker
+
+  functional_tests_all_isolated_microservices:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Create Shared network
+      run: docker network create -d bridge api.pmccabe_collector.network
+    - name: All together functional tests
+      run: docker compose -f compose-functional.test.yaml up --abort-on-container-exit
 
   analysis_use-case:
 

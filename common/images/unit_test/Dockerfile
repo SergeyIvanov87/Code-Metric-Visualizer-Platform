@@ -4,7 +4,7 @@ FROM alpine:latest
 WORKDIR tests
 
 # install app dependencies
-RUN apk add --no-cache python3 pytest dos2unix bash inotify-tools
+RUN apk add --no-cache coreutils python3 pytest dos2unix bash inotify-tools
 
 COPY common/tests/*.py /tests/
 

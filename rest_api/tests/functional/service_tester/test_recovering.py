@@ -9,6 +9,7 @@ import service_tester_utils
 
 from api_schema_utils import deserialize_api_request_from_schema_file
 from settings import Settings
+from time_utils import get_timestamp
 from utils import get_api_queries
 from utils import get_files
 from utils import get_api_schema_files
@@ -36,9 +37,9 @@ def all_api_query_files():
     return get_api_schema_files(os.path.join(global_settings.work_dir, "restored_API"))
 
 def tear_down(main_readme_file, main_query_file):
-    print(f"retrieve back {main_query_file}")
+    print(f"{get_timestamp()}\tretrieve back {main_query_file}")
     shutil.move(main_query_file + "_bk", main_query_file)
-    print(f"retrieve back {main_readme_file}")
+    print(f"{get_timestamp()}\tretrieve back {main_readme_file}")
     shutil.move(main_readme_file + "_bk", main_readme_file)
 
 @pytest.mark.parametrize("name_query_2_turn_off,query_2_turn_off", testdata)
@@ -49,7 +50,7 @@ def test_api_queries_lietening(name_query_2_turn_off, query_2_turn_off, all_api_
     # backup initial readme, which is used for backing an entrypoint of REST_API
     initial_readme_file = os.path.join(shared_api_dir, main_service_name, "README-API-MOCK.md")
     shutil.copy(initial_readme_file, initial_readme_file + "_bk")
-    print(f"Execute test: {name_query_2_turn_off}. original README: {initial_readme_file}")
+    print(f"{get_timestamp()}\tExecute test: {name_query_2_turn_off}. original README: {initial_readme_file}")
     global global_settings
 
     # remove query from `restored_API` and regenerate new initial_readme_file without that query
@@ -59,7 +60,7 @@ def test_api_queries_lietening(name_query_2_turn_off, query_2_turn_off, all_api_
         if name_query == name_query_2_turn_off:
             with open(initial_readme_file, "w") as mock_readme_stream:
                 query_to_disable_file = query_file
-                print (f"temporary remove the schema file: {query_to_disable_file} to the new place: {query_to_disable_file + '_bk'}")
+                print (f"{get_timestamp()}\ttemporary remove the schema file: {query_to_disable_file} to the new place: {query_to_disable_file + '_bk'}")
                 shutil.move(query_to_disable_file, query_to_disable_file + "_bk")
                 make_api_readme(os.path.join(global_settings.work_dir, "restored_API"), mock_readme_stream)
             break
@@ -71,7 +72,7 @@ def test_api_queries_lietening(name_query_2_turn_off, query_2_turn_off, all_api_
 
     turned_off_query_result = check_if_query_available("api.pmccabe_collector.restapi.org", query_2_turn_off)
     if turned_off_query_result:
-        print(f"Service must not serve query anymore: ${name_query_2_turn_off}. Test ${name_query_2_turn_off} failed!")
+        print(f"{get_timestamp()}\tService must not serve query anymore: ${name_query_2_turn_off}. Test ${name_query_2_turn_off} failed!")
         tear_down(initial_readme_file, query_to_disable_file)
         assert not turned_off_query_result
 
@@ -85,5 +86,5 @@ def test_api_queries_lietening(name_query_2_turn_off, query_2_turn_off, all_api_
 
     expected_query_result = check_if_query_available("api.pmccabe_collector.restapi.org", query_2_turn_off)
     if not expected_query_result:
-        print(f"Service must serve query: ${name_query_2_turn_off} after its retrieval. Test ${name_query_2_turn_off} failed!")
+        print(f"{get_timestamp()}\tService must serve query: ${name_query_2_turn_off} after its retrieval. Test ${name_query_2_turn_off} failed!")
         assert expected_query_result

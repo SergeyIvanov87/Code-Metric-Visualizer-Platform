@@ -8,6 +8,7 @@ import service_tester_utils
 import time
 
 from settings import Settings
+from time_utils import get_timestamp
 from utils import get_api_queries
 from utils import get_files
 
@@ -20,7 +21,7 @@ def execute_query(name, query):
     iteration_number=0
     wait_for_restart_iteration_limit=30
     while not service_tester_utils.ping_service("rest_api", 5000) and iteration_number <= wait_for_restart_iteration_limit:
-        print(f"Waiting for service up, iteration: {iteration_number}/{wait_for_restart_iteration_limit}")
+        print(f"{get_timestamp()}\tWaiting for service up, iteration: {iteration_number}/{wait_for_restart_iteration_limit}")
         time.sleep(1)
         iteration_number+=1
 
@@ -37,7 +38,7 @@ def execute_query(name, query):
 
 @pytest.mark.parametrize("name,query", testdata)
 def test_api_queries_lietening(name, query):
-    print(f"Execute test: {name}")
+    print(f"{get_timestamp()}\tExecute test: {name}")
     global global_settings
 
     execute_query(name,query)

@@ -4,7 +4,7 @@ WORKDIR package
 ENV CRON_REPO_UPDATE_SCHEDULE="0 0 * * *"
 
 # install app dependencies
-RUN apk add --no-cache python3 dos2unix bash
+RUN apk add --no-cache coreutils python3 dos2unix bash
 RUN apk add --no-cache apk-cron
 
 COPY service_broker/*.sh /package/

@@ -6,6 +6,7 @@ import shutil
 
 import rrd_utils
 
+from time_utils import get_timestamp
 from settings import Settings
 from heartbeat import Heartbeat
 from queries import FS_API_Executor
@@ -19,19 +20,19 @@ executor = FS_API_Executor("/API", global_settings.api_dir, global_settings.doma
 testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).items())
 
 def check_analytic_api(query, pipes, expected_files):
-    print(f"initiate test query: {query["Query"]}")
+    print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
     api_query.execute()
-    print(f"getting result of query: {query["Query"]}")
+    print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     xml = api_query.wait_result("", 0.1, 30, True)
     assert len(xml)
 
 
 def check_rrd_api(query, pipes, expected_files):
-    print(f"initiate test query: {query["Query"]}")
+    print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
     api_query.execute()
-    print(f"getting result of query: {query["Query"]}")
+    print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     xml = api_query.wait_result("", 0.1, 30, True)
     assert len(xml)
 
@@ -55,10 +56,10 @@ def check_rrd_collect_api(query, pipes, project_cpp_files):
         assert not os.path.isfile(f)
 
     h = Heartbeat()
-    h.run(f"Test 'check_rrd_collect_api' is in progress...")
+    h.run(f"{get_timestamp()}\tTest 'check_rrd_collect_api' is in progress...")
     api_query = APIQuery(pipes)
     api_query.execute()
-    print(f"getting result of query: {query["Query"]}")
+    print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     out = api_query.wait_result("", 0.1, 30, True)
     assert len(out) == 0
     h.stop()
@@ -74,15 +75,16 @@ def check_rrd_select_api(query, pipes, project_cpp_files):
     # prepare RRD files
     global executor
     h = Heartbeat()
-    h.run(f"Test 'check_rrd_select_api' is in progress...")
-    executor.execute("rrd_collect")
+    h.run(f"{get_timestamp()}\tTest 'check_rrd_select_api' is in progress...")
+    out = executor.execute("rrd_collect", "TRACER_ID=check_rrd_select_api_rrd_collect_helper")
     h.stop()
+    assert len(out) == 0, "check_rrd_select_api_rrd_collect_helper has been failed"
 
     # seach appropriated RRD files using `rrd_select` api
-    print(f"initiate test query: {query["Query"]}")
+    print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
     api_query.execute()
-    print(f"getting result of query: {query["Query"]}")
+    print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     out = api_query.wait_result("", 0.1, 30, True)
     rrd_storage = os.getenv('RRD_DATA_STORAGE_DIR', '')
     shutil.rmtree(os.path.join(rrd_storage, "mnt"), ignore_errors=True)
@@ -94,14 +96,15 @@ def check_rrd_view_api(query, pipes):
     # prepare RRD files
     global executor
     h = Heartbeat()
-    h.run(f"Test 'check_rrd_select_api' is in progress...")
-    executor.execute("rrd_collect")
+    h.run(f"{get_timestamp()}\tTest 'check_rrd_view_api' is in progress...")
+    out = executor.execute("rrd_collect", "TRACER_ID=check_rrd_view_api_rrd_collect_helper")
     h.stop()
+    assert len(out) == 0, "check_rrd_view_api_rrd_collect_helper has been failed"
 
-    print(f"initiate test query: {query["Query"]}")
+    print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
     api_query.execute()
-    print(f"getting result of query: {query["Query"]}")
+    print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     out = api_query.wait_result("", 0.1, 30, True)
     rrd_storage = os.getenv('RRD_DATA_STORAGE_DIR', '')
     shutil.rmtree(os.path.join(rrd_storage, "mnt"), ignore_errors=True)
@@ -119,14 +122,15 @@ def check_rrd_plot_view_api(query, pipes):
     # prepare RRD files
     global executor
     h = Heartbeat()
-    h.run(f"Test 'check_rrd_plot_view_api' is in progress...")
-    executor.execute("rrd_collect")
+    h.run(f"{get_timestamp()}\tTest 'check_rrd_plot_view_api' is in progress...")
+    out = executor.execute("rrd_collect", "TRACER_ID=check_rrd_plot_view_api_rrd_collect_helper")
     h.stop()
+    assert len(out) == 0, "check_rrd_view_api_rrd_collect_helper has been failed"
 
-    print(f"initiate test query: {query["Query"]}")
+    print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
     api_query.execute()
-    print(f"getting result of query: {query["Query"]}")
+    print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     out = api_query.wait_binary_result("", 0.1, 30, True)
     rrd_storage = os.getenv('RRD_DATA_STORAGE_DIR', '')
     shutil.rmtree(os.path.join(rrd_storage, "mnt"), ignore_errors=True)
@@ -140,7 +144,7 @@ def project_cpp_files():
 
 @pytest.mark.parametrize("name,query", testdata)
 def test_filesystem_api_nodes(name, query, project_cpp_files):
-    print(f"Execute test: {name}")
+    print(f"{get_timestamp()}\tExecute test: {name}")
     global global_settings
 
     # compose expected pipe names, based on query data

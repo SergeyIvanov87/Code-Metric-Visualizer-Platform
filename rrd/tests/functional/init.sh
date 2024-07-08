@@ -11,28 +11,33 @@ export MODULES="${WORK_DIR}/utils/modules"
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+rm -rf ${RRD_DATA_STORAGE_DIR}
 mkdir -p ${RRD_DATA_STORAGE_DIR}
 
 # inject test files into project directory
 test_files=(/package/test_data/*.cpp)
 for f in ${test_files[@]}; do
-    cp ${f} /mnt/
+    cp ${f} ${INITIAL_PROJECT_LOCATION}/
 done
 echo "Create CC API which RRD depends on"
 ${UTILS}/build_api_pseudo_fs.py /cc_API ${SHARED_API_DIR}
 echo "Mock CC API for standalone functional tests only"
-rm -f /api/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_fake_data
-fake_statistic_data_result=/api/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_fake_data
-find /mnt -regex ".*\\.\\(hpp\\|cpp\\|c\\|h\\)" -type f | /package/pmccabe_visualizer/pmccabe_build.py > ${fake_statistic_data_result}
-(
-real_statistic_pipe_out=/api/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_${RRD_TESTABLE_CONTAINER_HOSTNAME}
+rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_fake_data
+fake_statistic_data_result=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_fake_data
+find ${INITIAL_PROJECT_LOCATION} -regex ".*\\.\\(hpp\\|cpp\\|c\\|h\\)" -type f | /package/pmccabe_visualizer/pmccabe_build.py > ${fake_statistic_data_result}
+real_statistic_pipe_out=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_${RRD_TESTABLE_CONTAINER_HOSTNAME}
 if [ -e ${real_statistic_pipe_out} ]; then
     rm -f ${real_statistic_pipe_out}
 fi
 mkfifo -m 644 ${real_statistic_pipe_out}
+echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
+(
 while :
 do
+    echo "`date +%H:%M:%S:%3N`    START:`cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec`"
+    echo "`date +%H:%M:%S:%3N`    MOCK FINISH: ${real_statistic_pipe_out}"
     cat ${fake_statistic_data_result} > ${real_statistic_pipe_out}
+    echo "`date +%H:%M:%S:%3N`    MOCK CONSUMED: ${real_statistic_pipe_out}"
 done
 ) &
 WATCH_PID=$!
@@ -55,9 +60,11 @@ done
 # remove test files from project directory
 for f in ${test_files[@]}; do
     fname=`basename ${f}`
-    rm -f /mnt/${fname}
+    rm -f ${INITIAL_PROJECT_LOCATION}/${fname}
 done
 
+kill -15 ${WATCH_PID}
+wait ${WATCH_PID}
 if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
 
 echo "wait for termination"

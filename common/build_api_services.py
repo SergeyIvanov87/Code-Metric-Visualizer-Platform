@@ -86,6 +86,7 @@ api_cli_schema = [
     "api_exec_node_directory={}\n",
     "shopt -s extglob\n",
     "EXT=`${0}/{1} --result_type`\n",
+    'ME=$(basename "$0")\n',
     "pipe_result=${api_exec_node_directory}/result${EXT}\n",
     "pipe_request=${api_exec_node_directory}/exec\n",
     "pipe_result_consumer=${pipe_result}\n",
@@ -115,7 +116,7 @@ api_cli_schema = [
     '        if [[ -f "${api_exec_node_directory}/in_progress" ]]; then\n',
     '            rm -f "${api_exec_node_directory}/in_progress"\n',
     "        fi\n",
-    '        echo "`date +%H:%M:%S:%3N` request ${REQUEST_NUM}"\n',
+    '        echo "`date +%H:%M:%S:%3N`\t${ME}\trequest ${REQUEST_NUM}"\n',
     "        " + extract_attr_value_from_string() + " ${SESSION_ID_ATTR} \"${CMD_READ}\" \"#####\" '=' SESSION_ID_VALUE\n",
     "        if [ -z ${pipe_result_array[${SESSION_ID_VALUE}]} ]; then\n",
     '            pipe_result_consumer="${pipe_result}_${SESSION_ID_VALUE}"\n',
@@ -136,11 +137,11 @@ api_cli_schema = [
     "        fi\n",
     '        ' + exec_watchdog_function() + " ${WATCH_PID_ARRAY[${SESSION_ID_VALUE}]} ${pipe_result_consumer}\n",
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=0\n",
-    '        echo "`date +%H:%M:%S:%3N`\t`hostname`\tSTART    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}"\n',
+    '        echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tSTART    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}"\n',
     '        touch "${api_exec_node_directory}/in_progress"\n',
     '        RESULT_OUT=$(${0}/{1} {2} ', '"${CMD_READ}" | base64)\n',
     '        rm -f ${api_exec_node_directory}/in_progress\n',
-    '        (touch ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t`hostname`\tFINISH    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ} " && echo "${RESULT_OUT}" | base64 -d >$pipe_result_consumer && rm -rf ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t`hostname`\tCONSUMED [${SESSION_ID_VALUE}]: ${api_exec_node_directory} <--- ${pipe_result_consumer}") &\n',
+    '        (touch ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tFINISH    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ} " && echo "${RESULT_OUT}" | base64 -d >$pipe_result_consumer && rm -rf ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tCONSUMED [${SESSION_ID_VALUE}]: ${api_exec_node_directory} <--- ${pipe_result_consumer}") &\n',
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=$!\n",
     "        let REQUEST_NUM=${REQUEST_NUM}+1\n",
     "    done <<< `cat $pipe_request`\n",
@@ -239,7 +240,7 @@ def build_api_services(api_schema_path, executor_generated_scripts_path, output_
             else:
                 api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format("{WORK_DIR}",req_executor_name)
 
-            template_schema_row_index += 53
+            template_schema_row_index += 54
             api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(
                 "{WORK_DIR}",
                 req_executor_name,

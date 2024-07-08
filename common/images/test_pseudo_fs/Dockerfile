@@ -3,7 +3,7 @@ FROM alpine:latest
 WORKDIR tests
 
 # install app dependencies
-RUN apk add --no-cache python3 pytest dos2unix bash
+RUN apk add --no-cache coreutils python3 pytest dos2unix bash
 
 COPY common/tests/*.py /tests/
 
