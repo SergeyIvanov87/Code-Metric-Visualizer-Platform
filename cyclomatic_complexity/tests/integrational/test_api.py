@@ -5,6 +5,7 @@ import pytest
 import socket
 
 from settings import Settings
+from time_utils import get_timestamp
 from queries import FS_API_Executor
 from utils import get_api_queries
 from utils import get_files
@@ -17,10 +18,10 @@ executor = FS_API_Executor("/API", global_settings.api_dir, global_settings.doma
 testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).items())
 
 def check_watch_list_api(query, pipes, exec_params, session_id_value):
-    print(f"initiate test query: {query["Query"]}")
+    print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
     api_query.execute(exec_params)
-    print(f"getting result of query: {query["Query"]}")
+    print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     files_list = api_query.wait_result(session_id_value, 0.1, 30, True).split()
     assert len(files_list)
 
@@ -30,10 +31,10 @@ def check_statistic_api(query, pipes, exec_params, session_id_value):
     watch_files_list = watch_list_result.split()
     assert len(watch_files_list)
 
-    print(f"initiate test query: {query["Query"]}")
+    print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
     api_query.execute(exec_params)
-    print(f"getting result of query: {query["Query"]}")
+    print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     xml = api_query.wait_result(session_id_value, 0.1, 30, True)
     assert len(xml)
     found_metrics=[]
@@ -43,18 +44,18 @@ def check_statistic_api(query, pipes, exec_params, session_id_value):
     assert len(found_metrics) != 0
 
 def check_view_api(query, pipes, exec_params, session_id_value):
-    print(f"initiate test query: {query["Query"]}")
+    print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
     api_query.execute(exec_params)
-    print(f"getting result of query: {query["Query"]}")
+    print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     view = api_query.wait_binary_result(session_id_value, 0.1, 30, True)
     assert len(view)
 
 def check_flamegraph_api(query, pipes, exec_params, session_id_value):
-    print(f"initiate test query: {query["Query"]}")
+    print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
     api_query.execute(exec_params)
-    print(f"getting result of query: {query["Query"]}")
+    print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     svg = api_query.wait_binary_result(session_id_value, 0.1, 30, True)
     assert svg
 
@@ -63,7 +64,7 @@ def check_flamegraph_api(query, pipes, exec_params, session_id_value):
 def test_filesystem_api_nodes(name, query):
     # compose expected pipe names, based on query data
     session_id_value = socket.gethostname() + "_" + name
-    print(f"Execute test: {name}, session: {session_id_value}")
+    print(f"{get_timestamp()}\tExecute test: {name}, session: {session_id_value}")
     global global_settings
 
     pipes = compose_api_queries_pipe_names(global_settings.api_dir, query, session_id_value)

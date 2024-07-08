@@ -9,6 +9,7 @@ import socket
 import service_tester_utils
 
 from settings import Settings
+from time_utils import get_timestamp
 from utils import get_api_queries
 from utils import get_files
 
@@ -24,7 +25,7 @@ def execute_query(name, query):
     service_is_up = service_tester_utils.if_service_started_up_until("rest_api", 5000, 60, 1)
     assert service_is_up
 
-    print(f"send query: {url}")
+    print(f"{get_timestamp()}\tsend query: {url}")
     params = query["Params"]
     params["SESSION_ID"] = socket.gethostname() + "_" + name
     match query["Method"].lower():
@@ -38,7 +39,7 @@ def execute_query(name, query):
 
 @pytest.mark.parametrize("name,query", testdata)
 def test_api_queries_lietening(name, query):
-    print(f"Execute test: {name}")
+    print(f"{get_timestamp()}\tExecute test: {name}")
     global global_settings
 
     execute_query(name,query)

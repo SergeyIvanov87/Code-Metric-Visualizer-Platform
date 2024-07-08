@@ -7,6 +7,7 @@ import time
 
 from heartbeat import Heartbeat
 from settings import Settings
+from time_utils import get_timestamp
 from utils import get_api_queries
 from utils import get_files
 
@@ -49,5 +50,5 @@ testdata = list(get_api_queries(os.path.join(global_settings.work_dir, "API"), g
 def test_api_queries_lietening(name, query):
     global global_settings
 
-    print(f"Execute test: {name}")
+    print(f"{get_timestamp()}\tExecute test: {name}")
     check_query_counter(name)
