@@ -14,7 +14,7 @@ def make_script_req_1(script, desired_file_ext):
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${brr[@]}"',
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -29,7 +29,7 @@ def make_script_req_2(script, desired_file_ext):
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${brr[@]}"',
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -44,7 +44,7 @@ def make_script_req_3(script, desired_file_ext):
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${brr[@]}"',
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
