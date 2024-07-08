@@ -45,6 +45,8 @@ def __extract_attr_value_from_string_function__():
         "        then\n",
         '            readarray -d ${AVP_DELIM} -t AVP <<< "${arg}"\n',
         "            VALUE=${AVP[1]}\n",
+        #            stop on first value
+        "            break\n",
         "        fi\n",
         "    done\n",
         "    if [ -z ${VALUE} ]; then\n",
