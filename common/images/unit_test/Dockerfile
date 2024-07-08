@@ -3,6 +3,9 @@ FROM alpine:latest
 
 WORKDIR tests
 
+ARG PYTEST_FILTER=
+ENV PYTEST_FILTER=$PYTEST_FILTER
+
 # install app dependencies
 RUN apk add --no-cache coreutils python3 pytest dos2unix bash inotify-tools
 

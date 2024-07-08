@@ -25,3 +25,14 @@ def read_files_from_path(path, file_match_regex):
     matched_files = [ os.path.join(path,f) for f in files if p.match(f) ]
 
     return matched_files
+
+
+def read_pipes_from_path(path, pipe_match_regex):
+    p = re.compile(pipe_match_regex)
+    if os.path.isfile(path) and stat.S_ISFIFO(os.stat(path).st_mode) and p.match(path):
+        return [path]
+
+    pipes = [f for f in os.listdir(path) if stat.S_ISFIFO(os.stat(os.path.join(path,f)).st_mode)]
+    matched_pipes = [ os.path.join(path,f) for f in pipes if p.match(f) ]
+
+    return matched_pipes

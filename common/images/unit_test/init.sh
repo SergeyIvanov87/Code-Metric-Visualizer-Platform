@@ -17,7 +17,11 @@ RET=0
 # TODO
 rm -f ${WORK_DIR}/test_0_pseudo_fs_api_conformance.py
 for s in ${WORK_DIR}/test_*.py; do
-    pytest -x -r 'A' -s --verbose ${s}
+    if [ -z ${PYTEST_FILTER} ]; then
+        pytest -x -r 'A' -s --verbose ${s}
+    else
+        pytest -x -r 'A' -s --verbose -k "${PYTEST_FILTER}" ${s}
+    fi
     VAL=$?
     if [ $VAL != 0 ]
     then

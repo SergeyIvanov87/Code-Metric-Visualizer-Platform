@@ -14,9 +14,19 @@ echo -e "export WORK_DIR=${WORK_DIR}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_
 # allow pmccabe_collector to access reposiroty
 git config --global --add safe.directory ${INITIAL_PROJECT_LOCATION}
 
+declare -A SERVICE_WATCH_PIDS
 termination_handler(){
-   echo "***Stopping"
-   exit 0
+    echo "***Stopping"
+    for server_script_path in "${!SERVICE_WATCH_PIDS[@]}"
+    do
+        echo "Kill ${server_script_path}"
+        kill -9 ${SERVICE_WATCH_PIDS[$server_script_path]}
+        wait ${SERVICE_WATCH_PIDS[$server_script_path]}
+    done
+    #find ${SHARED_API_DIR} -regex ".*\(GET\|PUT\|POST\)/result.*" | xargs rm -f
+    ${OPT_DIR}/renew_pseudo_fs_pipes.py ${WORK_DIR}/API ${SHARED_API_DIR}
+
+    exit 0
 }
 
 # Setup signal handlers
@@ -47,7 +57,8 @@ ${OPT_DIR}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/${MAIN_SERVICE
 echo "run API listeners:"
 for s in ${WORK_DIR}/services/*.sh; do
     ${s} ${OPT_DIR} &
-    echo "${s} has been started"
+    SERVICE_WATCH_PIDS[${s}]=$!
+    echo "${s} has been started, PID ${SERVICE_WATCH_PIDS[${s}]}"
 done
 
 sleep infinity &
