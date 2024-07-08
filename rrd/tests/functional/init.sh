@@ -30,14 +30,14 @@ if [ -e ${real_statistic_pipe_out} ]; then
     rm -f ${real_statistic_pipe_out}
 fi
 mkfifo -m 644 ${real_statistic_pipe_out}
-echo "echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec"
+echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
 (
 while :
 do
-    echo "`date +%H:%M:%S:%3N`\tSTART:`cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec`"
-    echo "`date +%H:%M:%S:%3N`\tMOCK FINISH: ${real_statistic_pipe_out}"
+    echo "`date +%H:%M:%S:%3N`    START:`cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec`"
+    echo "`date +%H:%M:%S:%3N`    MOCK FINISH: ${real_statistic_pipe_out}"
     cat ${fake_statistic_data_result} > ${real_statistic_pipe_out}
-    echo "`date +%H:%M:%S:%3N`\tMOCK CONSUMED: ${real_statistic_pipe_out}"
+    echo "`date +%H:%M:%S:%3N`    MOCK CONSUMED: ${real_statistic_pipe_out}"
 done
 ) &
 WATCH_PID=$!
