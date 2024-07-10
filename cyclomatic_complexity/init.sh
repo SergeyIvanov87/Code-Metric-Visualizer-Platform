@@ -8,11 +8,10 @@ export PYTHONPATH="${3}:${3}/modules"
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-STATISTIC.md
+
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
-
-# allow pmccabe_collector to access reposiroty
-git config --global --add safe.directory ${INITIAL_PROJECT_LOCATION}
 
 declare -A SERVICE_WATCH_PIDS
 termination_handler(){
@@ -24,6 +23,7 @@ termination_handler(){
         wait ${SERVICE_WATCH_PIDS[$server_script_path]}
     done
     #find ${SHARED_API_DIR} -regex ".*\(GET\|PUT\|POST\)/result.*" | xargs rm -f
+    rm -f ${README_FILE_PATH}
     ${OPT_DIR}/renew_pseudo_fs_pipes.py ${WORK_DIR}/API ${SHARED_API_DIR}
 
     exit 0
@@ -41,7 +41,7 @@ rm -rf $TMPDIR
 ${OPT_DIR}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
 ${OPT_DIR}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
 ${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
-${OPT_DIR}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-STATISTIC.md
+${OPT_DIR}/make_api_readme.py ${WORK_DIR}/API > ${README_FILE_PATH}
 
 # TODO think about necessity in creating any pivot metrics
 # There are few disadvantages about it:

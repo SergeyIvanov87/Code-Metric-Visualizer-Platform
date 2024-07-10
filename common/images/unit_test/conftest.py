@@ -9,6 +9,7 @@ import sys
 import time
 
 import console_server
+import ut_utils
 
 from settings import Settings
 from build_api_executors import build_api_executors
@@ -29,6 +30,7 @@ def run_around_tests():
     os.mkdir(generated_api_path)
 
     build_api_executors("/API", global_settings.work_dir, generated_api_path)
+    ut_utils.create_executable_file([generated_api_path], "req_cmd.sh", ["#!/usr/bin/env bash\n", "sleep 1\n"])
 
     generated_api_services_rel_path = "services"
     generated_api_services_path = os.path.join(
@@ -51,7 +53,9 @@ def run_around_tests():
     server_env["WORK_DIR"] = generated_api_path
     servers = []
     for s in server_scripts:
-        servers.append(console_server.launch_detached(s, server_env, ""))
+        server = console_server.launch_detached(s, server_env, "")
+        print(f"Launched server PID: {server.pid}, PGID : {os.getpgid(server.pid)}")
+        servers.append(server)
 
     yield servers
     print("Stop console servers", file=sys.stdout, flush=True)

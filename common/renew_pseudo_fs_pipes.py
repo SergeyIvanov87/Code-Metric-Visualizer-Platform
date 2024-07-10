@@ -4,6 +4,7 @@
 import argparse
 import errno
 import os
+import subprocess
 import stat
 import sys
 
@@ -28,11 +29,36 @@ def remove_pipe(filename):
     if (os.path.exists(filename) and stat.S_ISFIFO(os.stat(filename).st_mode)):
         remove_file(filename)
 
+def write_pipe(pipe_filepath):
+    try:
+        with open(pipe_filepath, "w") as pout:
+            pout.write("<cancelled>")
+            print(f"Canceled {pipe_filepath}")
+    except Exception:
+        pass
+
+def unblock_result_pipe_reader(pipe_filepath):
+    print(f"Unlock consumer pipe: {pipe_filepath}")
+    unlocking_script = 'bash -c "echo \"[cancelled]\" > ' + pipe_filepath +'"'
+    print(f"execute unlocking script: {unlocking_script}")
+    proc=subprocess.Popen(unlocking_script, shell=True)
+#    proc = multiprocessing.Process(target=write_pipe, args=[pipe_filepath])
+    try:
+        proc.wait(5)
+    except Exception:
+        print(f"No one was listening to: {pipe_filepath}. Skip it")
+        proc.kill()
+     else:
+        print(f"Unblocked: {pipe_filepath}")
+
 def remove_api_fs_pipes_node(api_root_path, req, rtype):
     api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(api_root_path, req, rtype)
     api_gui_exec_filename = os.path.join(api_exec_node_directory, api_gui_exec_filename_from_req_type(rtype))
     cli_exec_filename = os.path.join(api_exec_node_directory, "exec")
     result_pipes = filesystem_utils.read_pipes_from_path(api_exec_node_directory, r"^result.*$")
+
+    for p in result_pipes:
+        unblock_result_pipe_reader(p)
 
     pipes_to_delete = [cli_exec_filename, api_gui_exec_filename, *result_pipes]
     for p in pipes_to_delete:
