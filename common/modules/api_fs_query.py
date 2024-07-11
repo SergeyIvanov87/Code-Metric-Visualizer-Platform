@@ -64,6 +64,8 @@ class APIQuery:
 
             if (cycles_count % 10) == 0 and console_ping:
                 print(f"pipes '{self.command_pipes}' readiness awaiting is in progress[{cycles_count}]...", file=sys.stdout, flush=True)
+            if cycles_count >= max_cycles_count:
+                break;
 
         return cycles_count <  max_cycles_count
 

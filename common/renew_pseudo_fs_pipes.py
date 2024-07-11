@@ -48,7 +48,7 @@ def unblock_result_pipe_reader(pipe_filepath):
     except Exception:
         print(f"No one was listening to: {pipe_filepath}. Skip it")
         proc.kill()
-     else:
+    else:
         print(f"Unblocked: {pipe_filepath}")
 
 def remove_api_fs_pipes_node(api_root_path, req, rtype):

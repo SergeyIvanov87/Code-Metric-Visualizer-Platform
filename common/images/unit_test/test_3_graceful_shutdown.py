@@ -8,6 +8,7 @@ import socket
 import stat
 import sys
 import time
+import threading
 import ut_utils
 
 from settings import Settings
@@ -20,16 +21,45 @@ from renew_pseudo_fs_pipes import remove_api_fs_pipes_node
 global_settings = Settings()
 testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).items())
 
+query_counter_lock = threading.Lock()
+query_counter = 0
+
+def get_query_counter():
+    global query_counter_lock
+    global query_counter
+
+    value = 0
+    query_counter_lock.acquire()
+    value = query_counter
+    query_counter_lock.release()
+    return value
+
+def set_query_counter(value):
+    global query_counter_lock
+    global query_counter
+
+    old_value = 0
+    query_counter_lock.acquire()
+    old_value = query_counter
+    query_counter += value
+    query_counter_lock.release()
+    return old_value
+
+def onQueryPostExecute(api_exec_object, in_exec_param, additional_params):
+    print(f"onQueryPostExecute: {in_exec_param}", file=sys.stdout, flush=True)
+    set_query_counter(1)
+
 
 @pytest.mark.parametrize("name,query", testdata)
 def test_filesystem_api_graceful_shutdown_pipes(name, query, run_around_tests):
     global global_settings
     print(f"Test start: {name}", file=sys.stdout, flush=True)
 
+    current_query_counter_value = get_query_counter()
+
     # compose expected pipe names, based on query data
     communication_pipes = compose_api_queries_pipe_names(global_settings.api_dir, query)
-    # pipes exist
-    print(f"Check base API pipes: {communication_pipes}", file=sys.stdout, flush=True)
+    print(f"Check base API pipes creation: {communication_pipes}", file=sys.stdout, flush=True)
     for p in communication_pipes:
         api_result_pipe_timeout_cycles = 0
         while not (os.path.exists(p) and stat.S_ISFIFO(os.stat(p).st_mode)):
@@ -37,28 +67,34 @@ def test_filesystem_api_graceful_shutdown_pipes(name, query, run_around_tests):
             api_result_pipe_timeout_cycles += 1
             assert api_result_pipe_timeout_cycles <= 30
 
-    # trigger result pipes waiting
+    # stub API executable to and send requesto to it simulate stucking on a dead-end pipes
     generated_api_rel_path = "generated"
     ut_utils.create_executable_file([global_settings.work_dir, generated_api_rel_path], "req_cmd.sh", ["#!/usr/bin/env bash\n", "sleep infinity &\n", "wait $!"])
     executors = []
     session_id = 0
-    executor = ut_utils.APIExecutor(global_settings.api_dir, query, session_id)
-    executor.run(session_id)
+    executor = ut_utils.APIExecutor(global_settings.api_dir, query, session_id, None, None, onQueryPostExecute)
+    executor.run(1)
     executors.append(executor)
 
-    # TODO wait for some event designated to reflect that thread have started and wait for an answer
-    time.sleep(5)
-    req_type = query["Method"]
-    req_api = query["Query"]
+    # wait for query executed to reflect that thread have started and wait for an answer
+    new_query_counter_value = current_query_counter_value
+    query_waiting_timeout_cycles = 0
+    while new_query_counter_value == current_query_counter_value:
+        time.sleep(0.1)
+        new_query_counter_value = get_query_counter()
+        print(f"waiting for query execution[{query_waiting_timeout_cycles}]", file=sys.stdout, flush=True)
+        assert query_waiting_timeout_cycles <= 30
+    current_query_counter_value = new_query_counter_value
+
+    # Remove dead-nodes and unblock waiting threads
     deleted_files = remove_api_fs_pipes_node(global_settings.api_dir, query["Query"], query["Method"])
     assert len(deleted_files)
 
-    print("waiting threads must be unblocked")
+    print("waiting threads must be unblocked", file=sys.stdout, flush=True)
     for e in executors:
         e.join()
 
-
-    # pipes do not exist
+    # pipes do not exist anymore
     for p in communication_pipes:
         assert not os.path.exists(p)
 
