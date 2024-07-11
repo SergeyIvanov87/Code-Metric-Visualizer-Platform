@@ -65,6 +65,7 @@ class APIExecutor(AsyncExecutor):
 
             if obj.onPreExecute :
                 exec_params = obj.onPreExecute(obj, exec_params, additional_params)
+            print(f"APIExecutor[{obj.index}] is about to write: {exec_params}", file=sys.stdout, flush=True)
             query.execute(exec_params)
             if obj.onPostExecute :
                 obj.onPostExecute(obj, exec_params, additional_params)
@@ -80,13 +81,13 @@ class APIExecutor(AsyncExecutor):
                 if obj.onPostWaitResultFailed :
                     obj.onPostWaitResultFailed(obj, exec_params, additional_params, result)
 
-                obj.error_message += f'ERROR: Response pipe for session "{session_id_value_base}" hasn\'t been created in designated interval {0.1 * float(100)}sec'
+                obj.error_message += f'ERROR: Response pipe for session "{session_id_value}" hasn\'t been created in designated interval {0.1 * float(100)}sec'
 
             if obj.onPostWaitResultSuccess :
                 obj.onPostWaitResultSuccess(obj, exec_params, additional_params, result)
 
             if result == "":
-                obj.error_message += f'ERROR: Got empty result from the session "{session_id_value_base}"'
+                obj.error_message += f'ERROR: Got empty result from the session "{session_id_value}"'
 
             if len(obj.error_message):
                 break
