@@ -83,6 +83,9 @@ jobs:
         DATE: ${{ steps.date.outputs.date }}
     - name: Stop Standalone Containers
       run: docker stop vcs_project cc_visualizer rrd_analytic rest_api service_broker
+    - name: Check filsystem API artefacts
+      run: if [ `find /api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)" | wc -l` != 0 ]; then exit -1; fi
+
 
   functional_tests_all_isolated_microservices:
 
@@ -123,16 +126,22 @@ jobs:
       run: docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator
     - name: Stop Analysis UC
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop
+    - name: Check filsystem API artefacts
+      run: if [ `find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)" | wc -l` != 0 ]; then exit -1; fi
     - name: Restart Analysis UC attempt 1
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
-    - name: Retart Integrational Tests on running Analysis UC attempt 1
+    - name: Restart Integrational Tests on running Analysis UC attempt 1
       run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator
     - name: Stop Analysis UC attempt 1
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop
+    - name: Check filsystem API artefacts attempt 1
+      run: if [ `find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)" | wc -l` != 0 ]; then exit -1; fi
     - name: Restart Analysis UC attempt 2
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
-    - name: Retart Integrational Tests on running Analysis UC attempt 2
+    - name: Restart Integrational Tests on running Analysis UC attempt 2
       run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator
+    - name: Check filsystem API artefacts attempt 2
+      run: if [ `find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)" | wc -l` != 0 ]; then exit -1; fi
 
   analytic_use-case:
 
@@ -149,7 +158,11 @@ jobs:
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Create RRD snapshots volume
       run: LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=${GITHUB_WORKSPACE}/rrd_snapshots && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd_analytic
-    - name: Start Analysis UC
+    - name: Start Analytic UC
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml up -d
-    - name: Start Integrational Tests on running Analysis UC
+    - name: Start Integrational Tests on running Analytic UC
       run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator
+    - name: Stop Analytic UC attempt
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analytic.yaml stop
+    - name: Check filsystem API artefacts
+      run: if [ `find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)" | wc -l` != 0 ]; then exit -1; fi
