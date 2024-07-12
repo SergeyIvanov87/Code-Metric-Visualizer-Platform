@@ -44,7 +44,7 @@ def unblock_result_pipe_reader(pipe_filepath):
     proc=subprocess.Popen(unlocking_script, shell=True)
 #    proc = multiprocessing.Process(target=write_pipe, args=[pipe_filepath])
     try:
-        proc.wait(5)
+        proc.wait(0.5)
     except Exception:
         print(f"No one was listening to: {pipe_filepath}. Skip it")
         proc.kill()
@@ -53,12 +53,12 @@ def unblock_result_pipe_reader(pipe_filepath):
 
 def unblock_result_pipe_writer(pipe_filepath):
     print(f"Unlock producer pipe: {pipe_filepath}")
-    unlocking_script = 'bash -c "echo \"Canceled: `cat ' + pipe_filepath +'`\""'
+    unlocking_script = 'bash -c "cat ' + pipe_filepath +'"'
     print(f"execute unlocking script: {unlocking_script}")
     proc=subprocess.Popen(unlocking_script, shell=True)
 #    proc = multiprocessing.Process(target=write_pipe, args=[pipe_filepath])
     try:
-        proc.wait(1)
+        proc.wait(0.5)
     except Exception:
         print(f"No one was writing to: {pipe_filepath}. Skip it")
         proc.kill()

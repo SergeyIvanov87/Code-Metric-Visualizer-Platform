@@ -28,6 +28,7 @@ COPY --from=build /package/pmccabe_visualizer/*.py pmccabe_visualizer/
 
 RUN mkdir -p /opt
 COPY common/modules /opt/modules
+COPY common/api_management.py /opt/
 COPY common/build_api_executors.py /opt/
 COPY common/build_api_services.py /opt/
 COPY common/build_api_pseudo_fs.py /opt/
