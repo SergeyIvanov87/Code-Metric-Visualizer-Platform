@@ -15,15 +15,18 @@ echo -e "export WORK_DIR=${WORK_DIR}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_
 
 declare -A SERVICE_WATCH_PIDS
 termination_handler(){
-    echo "***Stopping"
+    trap - SIGTERM
+    echo "***Shutdown servers***"
+    ps -ef
     rm -f ${README_FILE_PATH}
     for server_script_path in "${!SERVICE_WATCH_PIDS[@]}"
     do
-        echo "Kill ${server_script_path}"
+        echo "Kill ${server_script_path} by PID: {${SERVICE_WATCH_PIDS[$server_script_path]}}"
+        pkill -KILL -e -P ${SERVICE_WATCH_PIDS[$server_script_path]}
         kill -9 ${SERVICE_WATCH_PIDS[$server_script_path]}
-        wait ${SERVICE_WATCH_PIDS[$server_script_path]}
+        ps -ef
     done
-    #find ${SHARED_API_DIR} -regex ".*\(GET\|PUT\|POST\)/result.*" | xargs rm -f
+    echo "***Clear pipes****"
     ${OPT_DIR}/renew_pseudo_fs_pipes.py ${WORK_DIR}/API "server" ${SHARED_API_DIR}
     ${OPT_DIR}/renew_pseudo_fs_pipes.py ${WORK_DIR}/API "client" ${SHARED_API_DIR}
 
@@ -31,7 +34,7 @@ termination_handler(){
 }
 
 # Setup signal handlers
-trap 'termination_handler' SIGTERM
+trap termination_handler SIGTERM
 
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
@@ -64,3 +67,4 @@ done
 
 sleep infinity &
 wait $!
+termination_handler()

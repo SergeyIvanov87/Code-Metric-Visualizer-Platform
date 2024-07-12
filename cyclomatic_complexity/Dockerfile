@@ -26,12 +26,6 @@ COPY --from=build /package/FlameGraph/flamegraph.pl FlameGraph/flamegraph.pl
 COPY --from=build /package/pmccabe_visualizer/*.py pmccabe_visualizer/
 
 
-COPY cyclomatic_complexity/*.sh /package/
-COPY cyclomatic_complexity/*.py /package/
-COPY cyclomatic_complexity/API /package/API
-
-COPY cyclomatic_complexity/$SCRIPT_GEN_LOC/*.sh /package/
-
 RUN mkdir -p /opt
 COPY common/modules /opt/modules
 COPY common/build_api_executors.py /opt/
@@ -41,6 +35,12 @@ COPY common/make_api_readme.py /opt/
 COPY common/renew_pseudo_fs_pipes.py /opt/
 RUN dos2unix /opt/*
 RUN dos2unix /opt/modules*
+
+COPY cyclomatic_complexity/*.sh /package/
+COPY cyclomatic_complexity/*.py /package/
+COPY cyclomatic_complexity/API /package/API
+
+COPY cyclomatic_complexity/$SCRIPT_GEN_LOC/*.sh /package/
 
 RUN dos2unix /package/*
 

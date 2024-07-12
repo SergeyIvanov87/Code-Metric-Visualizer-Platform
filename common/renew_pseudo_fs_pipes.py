@@ -58,7 +58,7 @@ def unblock_result_pipe_writer(pipe_filepath):
     proc=subprocess.Popen(unlocking_script, shell=True)
 #    proc = multiprocessing.Process(target=write_pipe, args=[pipe_filepath])
     try:
-        proc.wait(5)
+        proc.wait(1)
     except Exception:
         print(f"No one was writing to: {pipe_filepath}. Skip it")
         proc.kill()
@@ -108,10 +108,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     communication_types = ("server", "client")
-    if arg.communication_type not in communication_types:
+    if args.communication_type not in communication_types:
         sys.exit(f"Incorrect 'communication_type', must be one of: {','.join(communication_types)}")
 
-    deleted_files = renew_api_pseudo_fs(args.api_root_dir, arg.communication_type, args.mount_point)
+    deleted_files = renew_api_pseudo_fs(args.api_root_dir, args.communication_type, args.mount_point)
     if len(deleted_files):
         print(f"API entry terminated:\n")
         for f in deleted_files:
