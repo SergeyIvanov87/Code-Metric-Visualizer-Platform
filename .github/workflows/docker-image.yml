@@ -83,8 +83,8 @@ jobs:
         DATE: ${{ steps.date.outputs.date }}
     - name: Stop Standalone Containers
       run: docker stop vcs_project cc_visualizer rrd_analytic rest_api service_broker
-    - name: Check filsystem API artefacts
-      run: ARTEFACTS=`find /api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
+    - name: Check filesystem API artefacts
+      run: ARTEFACTS=`find api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
 
 
   functional_tests_all_isolated_microservices:
@@ -166,5 +166,5 @@ jobs:
       run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator
     - name: Stop Analytic UC attempt
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml stop
-    - name: Check filsystem API artefacts
+    - name: Check filesystem API artefacts
       run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
