@@ -7,6 +7,8 @@ export PYTHONPATH="${3}:${3}/modules"
 export SHARED_API_DIR=${4}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/project/README-API-VCS.md
+
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
@@ -58,7 +60,7 @@ mkdir -p ${SHARED_API_DIR}
 ${OPT_DIR}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
 ${OPT_DIR}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
 ${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
-${OPT_DIR}/make_api_readme.py ${WORK_DIR}/API > ${SHARED_API_DIR}/api.pmccabe_collector.restapi.org/project/README-API-STATISTIC.md
+${OPT_DIR}/make_api_readme.py ${WORK_DIR}/API > ${README_FILE_PATH}
 
 echo "run API listeners:"
 for s in ${WORK_DIR}/services/*.sh; do
