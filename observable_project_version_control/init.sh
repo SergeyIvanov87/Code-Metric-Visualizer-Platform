@@ -6,6 +6,10 @@ export OPT_DIR=${3}
 export PYTHONPATH="${3}:${3}/modules"
 export SHARED_API_DIR=${4}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
+
+# use source this script as fast way to setup environment for debugging
+echo -e "export WORK_DIR=${WORK_DIR}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
+
 # I use standalone python-based process here to listen to SIGNAL and make PIPEs clearance.
 # For any reason, if I just esecute new python process in a trap handler then it will hangs for a long time until executed.
 # The default timeour for graceful termination in docker compose exceeds this interval and the container would be killed ungracefully,
@@ -47,7 +51,7 @@ termination_handler(){
 trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
 
 # allow pmccabe_collector to access reposiroty
-git clone ${PROJECT_URL} -b ${PROJECT_BRANCH} ${INITIAL_PROJECT_LOCATION}
+git -C ${INITIAL_PROJECT_LOCATION} pull || git clone ${PROJECT_URL} -b ${PROJECT_BRANCH} ${INITIAL_PROJECT_LOCATION}
 
 # create API directory and initialize API nodes
 mkdir -p ${SHARED_API_DIR}
@@ -63,4 +67,5 @@ for s in ${WORK_DIR}/services/*.sh; do
     echo "${s} has been started, PID ${SERVICE_WATCH_PIDS[${s}]}"
 done
 
-sleep infinity
+sleep infinity &
+wait $!

@@ -84,7 +84,7 @@ jobs:
     - name: Stop Standalone Containers
       run: docker stop vcs_project cc_visualizer rrd_analytic rest_api service_broker
     - name: Check filsystem API artefacts
-      run: if [ `find /api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)" | wc -l` != 0 ]; then exit -1; fi
+      run: ARTEFACTS=`find /api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
 
 
   functional_tests_all_isolated_microservices:
@@ -127,7 +127,7 @@ jobs:
     - name: Stop Analysis UC
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop
     - name: Check filesystem API artefacts
-      run: if [ `find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)" | wc -l` != 0 ]; then exit -1; fi
+      run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
     - name: Restart Analysis UC attempt 1
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
     - name: Restart Integrational Tests on running Analysis UC attempt 1
@@ -135,7 +135,7 @@ jobs:
     - name: Stop Analysis UC attempt 1
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop
     - name: Check filesystem API artefacts attempt 1
-      run: if [ `find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)" | wc -l` != 0 ]; then exit -1; fi
+      run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
     - name: Restart Analysis UC attempt 2
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
     - name: Restart Integrational Tests on running Analysis UC attempt 2
@@ -143,7 +143,7 @@ jobs:
     - name: Stop Analysis UC attempt 2
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop
     - name: Check filesystem API artefacts attempt 2
-      run: if [ `find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)" | wc -l` != 0 ]; then exit -1; fi
+      run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
 
   analytic_use-case:
 
