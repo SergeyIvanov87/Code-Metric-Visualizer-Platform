@@ -29,13 +29,29 @@ def remove_pipe(filename):
     if (os.path.exists(filename) and stat.S_ISFIFO(os.stat(filename).st_mode)):
         remove_file(filename)
 
+def check_pipe(pipe_filepath):
+    if not os.path.exists(pipe_filepath):
+        print(f"Doesn't exist: {pipe_filepath}, skip")
+        return False
+
+    if not stat.S_ISFIFO(os.stat(pipe_filepath).st_mode):
+        print(f"Isn't pipe: {pipe_filepath}, remove it")
+        os.remove(pipe_filepath)
+        return False
+    return True
 
 def unblock_result_pipe_reader(pipe_filepath):
     print(f"Unlock consumer pipe: {pipe_filepath}")
+    if not check_pipe(pipe_filepath):
+        return
+
     unlocking_script = 'bash -c "echo \"[cancelled]\" > ' + pipe_filepath +'"'
     unblocked_readers_count = 0
     unblocked_attempt_count = 0
     while unblocked_readers_count == unblocked_attempt_count:
+        if not check_pipe(pipe_filepath):
+            return
+
         unblocked_attempt_count += 1
         print(f"execute unlocking script: {unlocking_script}, attempt: {unblocked_attempt_count}")
         proc=subprocess.Popen(unlocking_script, shell=True)
@@ -50,10 +66,16 @@ def unblock_result_pipe_reader(pipe_filepath):
 
 def unblock_result_pipe_writer(pipe_filepath):
     print(f"Unlock producer pipe: {pipe_filepath}")
+    if not check_pipe(pipe_filepath):
+        return
+
     unlocking_script = 'bash -c "cat ' + pipe_filepath +'"'
     unblocked_writers_count = 0
     unblocked_attempt_count = 0
     while unblocked_writers_count == unblocked_attempt_count:
+        if not check_pipe(pipe_filepath):
+            return
+
         unblocked_attempt_count += 1
         print(f"execute unlocking script: {unlocking_script}, attempt: {unblocked_attempt_count}")
         proc=subprocess.Popen(unlocking_script, shell=True)
@@ -78,7 +100,7 @@ def remove_api_fs_pipes_node(api_root_path, communication_type, req, rtype):
         for p in pipes_to_unblock:
             unblock_result_pipe_reader(p)
     elif communication_type == "client":
-        pipes_to_unblock = [cli_exec_filename, api_gui_exec_filename]
+        pipes_to_unblock = [cli_exec_filename, api_gui_exec_filename] # api_gui_exec_filename is not pipe, must be skipped
         for p in pipes_to_unblock:
             unblock_result_pipe_writer(p)
 

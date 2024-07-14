@@ -67,14 +67,17 @@ class APIExecutor(AsyncExecutor):
                 exec_params = obj.onPreExecute(obj, exec_params, additional_params)
             print(f"APIExecutor[{obj.index}] is about to write: {exec_params}", file=sys.stdout, flush=True)
             query.execute(exec_params)
-            if obj.onPostExecute :
-                obj.onPostExecute(obj, exec_params, additional_params)
+            print(f"APIExecutor[{obj.index}] has written: {exec_params}", file=sys.stdout, flush=True)
             # wait for output pipe creation
             # wating timeout  might be increased here, because multiple threads
             # occupies more CPU time and a scheduler might supercede a pipe creation server process errand
             # by other activity
             result = ""
             try:
+                print(f"APIExecutor[{obj.index}] waiting", file=sys.stdout, flush=True)
+                query.__wait_result_pipe_creation__(session_id_value, 0.1, 100, True)
+                if obj.onPostExecute :
+                    obj.onPostExecute(obj, exec_params, additional_params)
                 result = query.wait_result(session_id_value, 0.1, 100, True)
                 obj.error_message=""
             except RuntimeError as timeout:

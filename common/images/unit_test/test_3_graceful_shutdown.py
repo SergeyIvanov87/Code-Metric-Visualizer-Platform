@@ -84,6 +84,7 @@ def test_filesystem_api_graceful_shutdown_pipes_client(name, query, run_around_t
         time.sleep(0.1)
         new_query_counter_value = get_query_counter()
         print(f"waiting for query execution[{query_waiting_timeout_cycles}]", file=sys.stdout, flush=True)
+        query_waiting_timeout_cycles += 1
         assert query_waiting_timeout_cycles <= 30
     current_query_counter_value = new_query_counter_value
 
@@ -199,6 +200,7 @@ def test_filesystem_api_graceful_shutdown_pipes_client_server(name, query, run_a
         new_query_counter_value = get_query_counter()
         print(f"waiting for server bloking query execution[{query_waiting_timeout_cycles}]", file=sys.stdout, flush=True)
         assert query_waiting_timeout_cycles <= 30
+        query_waiting_timeout_cycles += 1
     current_query_counter_value = new_query_counter_value
 
     print(f"Server must be blocked, release the blocked client")
@@ -214,6 +216,7 @@ def test_filesystem_api_graceful_shutdown_pipes_client_server(name, query, run_a
         new_query_counter_value = get_query_counter()
         print(f"waiting for blocking in client before query execution[{query_waiting_timeout_cycles}]", file=sys.stdout, flush=True)
         assert query_waiting_timeout_cycles <= 30
+        query_waiting_timeout_cycles += 1
     current_query_counter_value = new_query_counter_value
 
     print(f"Kill server {name}_server.sh", file=sys.stdout, flush=True)
