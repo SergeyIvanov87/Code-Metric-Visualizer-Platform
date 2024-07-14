@@ -66,3 +66,16 @@ triggers an inotify-event, and as soon as the request finishes you will find the
 
 No any transactions in this case is meaning.
 It is realy simple as it sounds! Regardless the approach you use (CLI or GUI).
+
+## API stucks & recoverigng
+
+Sometimes malfunction occurs and services become inoperable. Although data loss is not very critical here, the filesystem API processing might stuck due to impossibility for finishing any current transaction. As any pipe requires both sides opening for reading and writing to proceed, it means that half-opened pipe may keep such a one-sided process "on a hold" without progressing.
+Please check a sequnce diagram of API services invocation:
+![alt text](assets/filesystem_API_execution_sequence.png)
+
+The situation the more accute the more "Delegated API" engaged in that communication. The "hang on"  mechanism depicted on the following sequence diagram:
+![alt text](assets/filesystem_API_execution_stuck.png)
+
+To endure this situation a recover routine was introduces. At the moment this routine as a part of gracefull shutdown mechanis of any API-producing services and may be expanded later as a standalone service.
+The interactions in case of recovery execution are showed in the diagram below:
+![alt text](assets/filesystem_API_execution_recovery.png)

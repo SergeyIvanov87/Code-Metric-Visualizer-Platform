@@ -1,0 +1,183 @@
+<mxfile host="Electron" modified="2024-07-14T22:09:16.356Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.4.0 Chrome/120.0.6099.291 Electron/28.3.3 Safari/537.36" etag="rlwQvKPFQXbryCSbtNvr" version="24.3.1" type="device">
+  <diagram name="Page-1" id="C0pvAP6BNhB3JPs4-Luy">
+    <mxGraphModel dx="1103" dy="635" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="583" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-48" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;dashed=1;" edge="1" parent="1" source="iBO3Yx3Mi-qXOeU1G9Ih-47" target="iBO3Yx3Mi-qXOeU1G9Ih-45">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="95" y="767" as="targetPoint" />
+            <mxPoint x="59" y="227" as="sourcePoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-1" value="t" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;dashed=1;entryX=0.4;entryY=0.833;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="iBO3Yx3Mi-qXOeU1G9Ih-41">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="49" y="657.6400000000001" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-2" value="&amp;lt;API&amp;gt;/exec" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="141" y="135" width="119" height="576" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-3" value="PIPE" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.direct_data;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="iBO3Yx3Mi-qXOeU1G9Ih-2">
+          <mxGeometry x="25" y="70" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-49" value="PIPE" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.direct_data;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="iBO3Yx3Mi-qXOeU1G9Ih-2">
+          <mxGeometry x="24" y="360" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-4" value="&amp;lt;API_Server&amp;gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="385" y="135" width="116" height="586" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-51" value="" style="shape=umlDestroy;whiteSpace=wrap;html=1;strokeWidth=6;targetShapes=umlLifeline;strokeColor=#FF0000;" vertex="1" parent="iBO3Yx3Mi-qXOeU1G9Ih-4">
+          <mxGeometry x="44" y="365" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-54" value="&lt;b&gt;Client-side STUCK&lt;/b&gt;:&lt;br&gt;client can&#39;t proceed" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fontColor=#FF0000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;fontSize=17;" vertex="1" parent="iBO3Yx3Mi-qXOeU1G9Ih-4">
+          <mxGeometry x="-57" y="400" width="110" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-5" value="&amp;lt;API_Executor&amp;gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="534" y="135" width="100" height="586" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-6" value="&amp;lt;Delegated_&lt;span style=&quot;background-color: initial;&quot;&gt;API&amp;gt;&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;/exec&lt;/span&gt;&lt;/div&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;fillColor=#00D66C;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="790" y="135" width="100" height="586" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-7" value="PIPE" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.direct_data;whiteSpace=wrap;fillColor=#00D66C;strokeColor=#82b366;" vertex="1" parent="iBO3Yx3Mi-qXOeU1G9Ih-6">
+          <mxGeometry x="25" y="225" width="50" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-8" value="&amp;lt;Delegated&lt;div&gt;API_Server&amp;gt;&lt;/div&gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;fillColor=#CDA2BE;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="135" width="100" height="586" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-9" value="&lt;b&gt;consume&lt;/b&gt;: Args_xyz" style="html=1;verticalAlign=bottom;endArrow=none;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;edgeStyle=elbowEdgeStyle;elbow=vertical;startArrow=classicThin;startFill=0;startSize=12;endFill=0;endSize=6;sourcePerimeterSpacing=0;jumpStyle=none;shadow=1;exitX=0.98;exitY=0.775;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="iBO3Yx3Mi-qXOeU1G9Ih-8" target="iBO3Yx3Mi-qXOeU1G9Ih-8">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-130" y="255.5" as="sourcePoint" />
+            <mxPoint x="93" y="254.5" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="-130" y="256" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-43" value="" style="shape=umlDestroy;whiteSpace=wrap;html=1;strokeWidth=6;targetShapes=umlLifeline;strokeColor=#FF0000;" vertex="1" parent="iBO3Yx3Mi-qXOeU1G9Ih-8">
+          <mxGeometry x="35" y="240" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-53" value="&lt;b&gt;Server-side STUCK&lt;/b&gt;:&lt;div&gt;server can&#39;t proceed&lt;/div&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;fontColor=#FF0000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;fontSize=17;" vertex="1" parent="iBO3Yx3Mi-qXOeU1G9Ih-8">
+          <mxGeometry x="-10" y="280" width="110" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-10" value="Actor:&lt;div&gt;&lt;br&gt;&lt;div&gt;Execute API request &amp;amp; wait for result by using I/O PIPEs&lt;/div&gt;&lt;/div&gt;" style="shape=note;whiteSpace=wrap;html=1;size=14;verticalAlign=top;align=left;spacingTop=-6;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12" vertex="1" parent="1">
+          <mxGeometry y="1" width="100" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-11" value="Input PIPE:&lt;div&gt;&lt;br&gt;&lt;div&gt;Once get written receives CMD arguments&lt;br&gt;from an actor or just detect writing event&lt;/div&gt;&lt;/div&gt;" style="shape=note;whiteSpace=wrap;html=1;size=14;verticalAlign=top;align=left;spacingTop=-6;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="140" y="1" width="100" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-12" value="API Server:&lt;div&gt;&lt;br&gt;&lt;div&gt;waits for I-PIPE get written,&lt;/div&gt;&lt;div&gt;fills O-PIPE &amp;amp; manages PIPEs&lt;/div&gt;&lt;/div&gt;" style="shape=note;whiteSpace=wrap;html=1;size=14;verticalAlign=top;align=left;spacingTop=-6;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="394" y="1" width="100" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-13" value="Executor:&lt;div&gt;&lt;br&gt;&lt;div&gt;process API query logic, possibly delegates exec to other APIs&lt;/div&gt;&lt;/div&gt;" style="shape=note;whiteSpace=wrap;html=1;size=14;verticalAlign=top;align=left;spacingTop=-6;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="534" y="1" width="100" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-14" value="Delegated API Input PIPE:&lt;div&gt;&lt;br&gt;&lt;div&gt;If upstream query execution requies additional processing or subsequent data&lt;/div&gt;&lt;/div&gt;" style="shape=note;whiteSpace=wrap;html=1;size=14;verticalAlign=top;align=left;spacingTop=-6;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="785" y="1" width="110" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-15" value="Delegated API Server:&lt;br&gt;&lt;br&gt;Used as regular API Server or delegated entry if another API query leverages it" style="shape=note;whiteSpace=wrap;html=1;size=14;verticalAlign=top;align=left;spacingTop=-6;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="1000" y="1" width="100" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-16" value="&amp;lt;API&amp;gt;/result" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="265" y="135" width="100" height="586" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-52" value="&lt;b&gt;consume&lt;/b&gt;: Args_xyz" style="html=1;verticalAlign=bottom;endArrow=none;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;edgeStyle=elbowEdgeStyle;elbow=vertical;startArrow=classicThin;startFill=0;startSize=12;endFill=0;endSize=6;sourcePerimeterSpacing=0;jumpStyle=none;shadow=1;exitX=0.98;exitY=0.775;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.367;entryY=0.633;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="iBO3Yx3Mi-qXOeU1G9Ih-16" target="iBO3Yx3Mi-qXOeU1G9Ih-51">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-51" y="382" as="sourcePoint" />
+            <mxPoint x="129" y="382.5" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="-51" y="382.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-18" value="Ouput PIPE:&lt;div&gt;&lt;br&gt;&lt;div&gt;Empty in the beginning,&lt;br&gt;Filled by RESP data in the end&lt;/div&gt;&lt;/div&gt;" style="shape=note;whiteSpace=wrap;html=1;size=14;verticalAlign=top;align=left;spacingTop=-6;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="260" y="1" width="110" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-19" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;rounded=0;shadow=1;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="438" y="235" width="10" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-20" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=right;" vertex="1" parent="1">
+          <mxGeometry x="44" y="215" width="10" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-21" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;rounded=0;shadow=1;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="578" y="255" width="10" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-22" value="&lt;b&gt;invoke&lt;/b&gt;: Args_xyz" style="html=1;verticalAlign=bottom;endArrow=block;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;edgeStyle=elbowEdgeStyle;elbow=vertical;startArrow=oval;startFill=1;startSize=12;shadow=1;endSize=12;" edge="1" parent="1" source="iBO3Yx3Mi-qXOeU1G9Ih-19" target="iBO3Yx3Mi-qXOeU1G9Ih-21">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="503" y="255" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="453" y="255" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-23" value="&lt;b style=&quot;font-size: 12px;&quot;&gt;produce&lt;/b&gt;:&lt;div&gt;&amp;nbsp;&quot;Agrs_xyz&quot;&lt;/div&gt;" style="html=1;verticalAlign=bottom;endArrow=block;entryX=0.02;entryY=0.3;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;edgeStyle=elbowEdgeStyle;elbow=vertical;shadow=1;endSize=12;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="iBO3Yx3Mi-qXOeU1G9Ih-20" target="iBO3Yx3Mi-qXOeU1G9Ih-3">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="119" y="225" as="sourcePoint" />
+            <mxPoint x="171" y="215" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-24" value="&lt;b&gt;consume&lt;/b&gt;: Args_xyz" style="html=1;verticalAlign=bottom;endArrow=none;entryX=0;entryY=0;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;edgeStyle=elbowEdgeStyle;elbow=vertical;startArrow=classicThin;startFill=0;startSize=12;endFill=0;endSize=6;sourcePerimeterSpacing=0;jumpStyle=none;shadow=1;exitX=0.98;exitY=0.775;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="iBO3Yx3Mi-qXOeU1G9Ih-3" target="iBO3Yx3Mi-qXOeU1G9Ih-19">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="211" y="235" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-25" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;rounded=0;shadow=1;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="583" y="275" width="10" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-30" value="&lt;b&gt;produce&lt;/b&gt;: ARG_xyz + FS_Args_abc" style="html=1;verticalAlign=bottom;endArrow=block;entryX=0;entryY=0.5;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;edgeStyle=elbowEdgeStyle;elbow=vertical;startArrow=oval;startFill=1;startSize=12;endSize=12;entryDx=0;entryDy=0;entryPerimeter=0;shadow=1;" edge="1" parent="1" source="iBO3Yx3Mi-qXOeU1G9Ih-21" target="iBO3Yx3Mi-qXOeU1G9Ih-7">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="643" y="265" as="sourcePoint" />
+            <mxPoint x="834" y="375" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-31" value="&amp;lt;API_FS_Args&amp;gt;" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;" vertex="1" parent="1">
+          <mxGeometry x="660" y="135" width="120" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-32" value="&lt;span style=&quot;background-color: initial;&quot;&gt;&lt;b&gt;Superposition&lt;/b&gt;&lt;/span&gt;" style="rhombus;whiteSpace=wrap;html=1;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;align=center;" vertex="1" parent="iBO3Yx3Mi-qXOeU1G9Ih-31">
+          <mxGeometry x="5" y="110" width="110" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-33" value="API predefined&amp;nbsp;&lt;div&gt;arguments:&lt;/div&gt;&lt;div&gt;Are used as default qurie arguments unless I-PIPE get them from an actor explicilty&lt;/div&gt;" style="shape=note;whiteSpace=wrap;html=1;size=14;verticalAlign=top;align=left;spacingTop=-6;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="660" y="1" width="110" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-34" value="Args_xyz + FS_Args_abc" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="iBO3Yx3Mi-qXOeU1G9Ih-32" target="iBO3Yx3Mi-qXOeU1G9Ih-25">
+          <mxGeometry x="0.9883" y="-20" relative="1" as="geometry">
+            <mxPoint x="634" y="325" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="664" y="335" />
+              <mxPoint x="664" y="355" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-35" value="ARG_xyz" style="html=1;align=left;verticalAlign=middle;endArrow=baseDash;strokeColor=#ff0000;rounded=0;entryX=0.8;entryY=0.029;entryDx=0;entryDy=0;entryPerimeter=0;endFill=0;startArrow=classic;startFill=1;" edge="1" parent="1" source="iBO3Yx3Mi-qXOeU1G9Ih-32" target="iBO3Yx3Mi-qXOeU1G9Ih-25">
+          <mxGeometry x="0.5555" y="-16" relative="1" as="geometry">
+            <mxPoint x="494" y="405" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-36" value="&amp;lt;Delegated_API&amp;gt; /result" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;rounded=1;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=center;fillColor=#FFC8C2;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="896" y="135" width="100" height="586" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-38" value="Delegated API Output PIPE:&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Delegated API O-PIPE serves as full functional&amp;nbsp; API O-PIPE as well&lt;/div&gt;" style="shape=note;whiteSpace=wrap;html=1;size=14;verticalAlign=top;align=left;spacingTop=-6;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="900" y="1" width="95" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-41" value="&lt;b&gt;Stucker&lt;/b&gt;&lt;br&gt;Actor 1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fontSize=14;fontColor=default;" vertex="1" parent="1">
+          <mxGeometry x="34" y="108" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-45" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;rounded=0;shadow=0;comic=0;labelBackgroundColor=none;strokeWidth=1;fontFamily=Verdana;fontSize=12;align=right;" vertex="1" parent="1">
+          <mxGeometry x="90" y="517" width="10" height="138" as="geometry" />
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-46" value="&lt;b style=&quot;font-size: 12px;&quot;&gt;produce&lt;/b&gt;" style="html=1;verticalAlign=bottom;endArrow=block;labelBackgroundColor=none;fontFamily=Verdana;fontSize=12;edgeStyle=elbowEdgeStyle;elbow=vertical;shadow=1;endSize=12;" edge="1" parent="1" source="iBO3Yx3Mi-qXOeU1G9Ih-45">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="165" y="527" as="sourcePoint" />
+            <mxPoint x="170" y="519" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iBO3Yx3Mi-qXOeU1G9Ih-47" value="&lt;b&gt;Stucked&lt;/b&gt;&amp;nbsp;&amp;nbsp;&lt;div&gt;Actor 2&lt;/div&gt;" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="408" width="30" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
