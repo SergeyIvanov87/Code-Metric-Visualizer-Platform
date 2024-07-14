@@ -64,6 +64,8 @@ class APIQuery:
 
             if (cycles_count % 10) == 0 and console_ping:
                 print(f"pipes '{self.command_pipes}' readiness awaiting is in progress[{cycles_count}]...", file=sys.stdout, flush=True)
+            if cycles_count >= max_cycles_count:
+                break;
 
         return cycles_count <  max_cycles_count
 
@@ -74,7 +76,7 @@ class APIQuery:
         with open(exec_pipe_path, "w") as pin:
             pin.write(canonize_args(exec_args_str))
 
-    def __wait_result_with_pipe_mode__(self, mode, session_id, sleep_between_cycles, max_cycles_count, console_ping):
+    def __wait_result_pipe_creation__(self, session_id, sleep_between_cycles, max_cycles_count, console_ping):
         cycles_count = 0
         pipe_to_read = ""
         if session_id == "":
@@ -88,6 +90,7 @@ class APIQuery:
         if pipe_to_read == "":
             pipe_to_read = APIQuery.__get_main_result_pipe__(self.command_pipes) + "_" + session_id
 
+
         while not (os.path.exists(pipe_to_read) and stat.S_ISFIFO(os.stat(pipe_to_read).st_mode)):
             time.sleep(sleep_between_cycles)
             cycles_count += 1
@@ -97,6 +100,10 @@ class APIQuery:
 
             if cycles_count >= max_cycles_count:
                 raise RuntimeError(f"Pipe: {pipe_to_read} - hasn't been created during expected timeout: sleep {sleep_between_cycles}, cycles {max_cycles_count}")
+        return pipe_to_read
+
+    def __wait_result_with_pipe_mode__(self, mode, session_id, sleep_between_cycles, max_cycles_count, console_ping):
+        pipe_to_read = self.__wait_result_pipe_creation__(session_id, sleep_between_cycles, max_cycles_count, console_ping)
 
         with open(pipe_to_read, mode) as pout:
             result = pout.read()

@@ -8,4 +8,7 @@ def launch_detached(server_script_path, server_env, args):
     return server
 
 def kill_detached(server_subprocess):
-    os.killpg(os.getpgid(server_subprocess.pid), signal.SIGKILL)
+    try:
+        os.killpg(os.getpgid(server_subprocess.pid), signal.SIGKILL)
+    except Exception:
+        pass
