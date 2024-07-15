@@ -104,6 +104,15 @@ def generate_cgi_schema(filesystem_api_mount_point, req_api, req_type, output_pi
     return cgi_schema
 
 
+# print the main portal page
+cgi_portal_main = [ r'@app.route("/", methods=["GET"])',
+             r'def portal():',
+             r'    return redirect("/api.pmccabe_collector.restapi.org")'
+]
+print("\n".join(cgi_portal_main))
+print("")
+
+
 # print the main page
 cgi_main = [ r'@app.route("/api.pmccabe_collector.restapi.org", methods=["GET"])',
              r'def index():',

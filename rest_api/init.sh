@@ -9,13 +9,30 @@ export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
+HOSTNAME_IP_FILE=/package/hostname_ip
+POPULATED_HOSTNAME_IP_FILE=${SHARED_API_DIR}/rest_api_addr
+
+remove_populated_host_ip_file(){
+    trap - EXIT
+
+    echo "${LOG_PREFIX}Cleanup: ${POPULATED_HOSTNAME_IP_FILE}"
+    if [ -f ${POPULATED_HOSTNAME_IP_FILE} ] ; then
+        rm -f ${POPULATED_HOSTNAME_IP_FILE}
+    fi
+}
+
+populate_host_ip_file(){
+    ln -sf ${HOSTNAME_IP_FILE} ${POPULATED_HOSTNAME_IP_FILE}
+}
+
 termination_handler(){
    echo "***Stopping"
+   remove_populated_host_ip_file
    exit 0
 }
 
 echo "Setup signal handlers"
-trap 'termination_handler' SIGTERM
+trap 'termination_handler' SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
 
 echo "DEBUG CMD:"
 echo "cp ../rest_api_server/rest_api_server/cgi_template.py ../rest_api_server/rest_api_server/cgi.py && ../build_api_cgi.py ../restored_API /api api.pmccabe_collector.restapi.org >> ../rest_api_server/rest_api_server/cgi.py"
@@ -25,7 +42,7 @@ echo "flask --app rest_api_server run --host 0.0.0.0"
 # It must be started before any inotify event has been listened,
 # so when earlier event was arrived, we would process that
 export REST_API_INSTANCE_PIDFILE=${MY_FLASK_INSTANCE_PIDFILE}
-/package/watchdog_server.sh ${REST_API_INSTANCE_PIDFILE} ${FLASK_RUN_HOST} ${FLASK_RUN_PORT} &
+/package/watchdog_server.sh ${REST_API_INSTANCE_PIDFILE} ${FLASK_RUN_HOST} ${FLASK_RUN_PORT} ${HOSTNAME_IP_FILE} &
 WATCHDOG_PID=$!
 
 shopt -s extglob
@@ -89,12 +106,15 @@ while [ $RETURN_STATUS -eq 0 ]; do
             fi
             echo "The server hasn't started yet..."
             continue
+        else
+            populate_host_ip_file
         fi
 
         # Restart the running service instance only if API has been changed
         if [ ${HAS_GOT_API_UPDATE_EVENT} -gt 0 ]; then
             echo "Got ${HAS_GOT_API_UPDATE_EVENT} API events. Restart REST_API service will be scheduled..."
             # kill an old instance
+            remove_populated_host_ip_file
             REST_API_INSTANCE_PIDFILE_PID=`cat ${REST_API_INSTANCE_PIDFILE}`
             kill -s SIGTERM ${REST_API_INSTANCE_PIDFILE_PID}
             while [ -f ${REST_API_INSTANCE_PIDFILE} ]; do
@@ -112,5 +132,7 @@ if [ ! -z ${WATCHDOG_PID} ] && [ ${WATCHDOG_PID} != 0 ]; then
     echo "Wait for watchdog finished"
     wait ${WATCHDOG_PID}
 fi
+
+remove_populated_host_ip_file
 echo "Exit with code: ${RETURN_STATUS}"
 exit ${RETURN_STATUS}
