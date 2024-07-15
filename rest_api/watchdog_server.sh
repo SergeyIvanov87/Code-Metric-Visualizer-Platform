@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 LOG_PREFIX="[WATCHDOG]: "
 # file for storing a PID of a server instance
@@ -24,6 +24,36 @@ if [ -z ${MY_FLASK_RUN_PORT} ]; then
     fi
     MY_FLASK_RUN_PORT=${FLASK_RUN_PORT}
 fi
+
+HOSTNAME_IP_FILE=${4}
+if [ -z ${HOSTNAME_IP_FILE} ]; then
+    HOSTNAME_IP_FILE=/package/hostsname_ip
+fi
+
+
+remove_host_ip_file(){
+    trap - EXIT
+
+    echo "${LOG_PREFIX}Remove server-ip mapping file: ${HOSTNAME_IP_FILE}"
+    if [ -f ${HOSTNAME_IP_FILE} ] ; then
+        rm -f ${HOSTNAME_IP_FILE}
+    fi
+}
+
+generate_host_ip_file(){
+    SERVER_PORT=${1}
+    DST_FILE_PATH=${2}
+    unset OVERRIDEN_ADDR
+    readarray -d $'\t' -t ADDR_PAIR <<< `cat /etc/hosts | grep \`hostname\``
+    for a in ${ADDR_PAIR[@]}
+    do
+        OVERRIDEN_ADDR+=("${a%$'\n'}:${SERVER_PORT}")
+    done
+    echo "${LOG_PREFIX}Create  server-ip mapping file: ${DST_FILE_PATH}"
+    echo "${OVERRIDEN_ADDR[@]}" > ${DST_FILE_PATH}
+}
+
+trap "remove_host_ip_file" EXIT
 
 let wait_for_file_API_counter=0
 let wait_for_file_API_limit=4
@@ -129,5 +159,7 @@ do
 
     echo ${SERVER_INSTANCE_PID} > ${MY_REST_API_INSTANCE_PIDFILE}
     echo "${LOG_PREFIX}The new server instance has been started, PID: ${SERVER_INSTANCE_PID}"
+    generate_host_ip_file ${MY_FLASK_RUN_PORT} ${HOSTNAME_IP_FILE}
+
     wait ${SERVER_INSTANCE_PID}
 done
