@@ -71,18 +71,20 @@ def create_api_fs_node(api_root_path, req, rtype, rparams):
     write_args(api_req_directory, rparams)
     return api_req_directory, api_exec_node_directory
 
+def build_api_pseudo_fs_from_schema(api_schema_file, mount_point):
+    req_name, request_data = deserialize_api_request_from_schema_file(api_schema_file)
+    req_type = request_data["Method"]
+    req_api = request_data["Query"]
+    req_params = get_api_request_plain_params(request_data["Params"])
+
+    """re-create pseudo-filesystem directory structure based on API query"""
+    create_api_fs_node(mount_point, req_api, req_type, req_params)
+
+
 def build_api_pseudo_fs(api_schema_path, mount_point):
     schemas_file_list = get_api_schema_files(api_schema_path)
     for schema_file in schemas_file_list:
-        req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
-        req_type = request_data["Method"]
-        req_api = request_data["Query"]
-        req_params = get_api_request_plain_params(request_data["Params"])
-
-        """re-create pseudo-filesystem directory structure based on API query"""
-        create_api_fs_node(mount_point, req_api, req_type, req_params)
-
-
+        build_api_pseudo_fs_from_schema(schema_file, mount_point)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

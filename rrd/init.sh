@@ -62,6 +62,17 @@ rm -rf $TMPDIR
 mkdir -p ${RRD_DATA_STORAGE_DIR}
 if [ $? -ne 0 ]; then echo "Cannot create ${RRD_DATA_STORAGE_DIR}. Please check access rights to the VOLUME '/rrd_data' and grant the container all of them"; exit -1; fi
 
+
+${OPT_DIR}/build_common_api_services.py ${WORK_DIR}/API/deps ${MAIN_SERVICE_NAME}/rrd -os ${WORK_DIR}/aux_services -oe ${WORK_DIR}
+${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API/deps/ ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/rrd
+echo "run aux API listeners:"
+for s in ${WORK_DIR}/aux_services/*.sh; do
+    /bin/bash ${s} &
+    SERVICE_WATCH_PIDS[${s}]=$!
+    echo "${s} has been started, PID ${SERVICE_WATCH_PIDS[${s}]}"
+done
+
+
 ${OPT_DIR}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
 ${OPT_DIR}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
 ${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}

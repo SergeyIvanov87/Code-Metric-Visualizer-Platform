@@ -1,0 +1,104 @@
+#!/usr/bin/python
+
+
+import argparse
+from math import log10
+import os
+import pathlib
+import sys
+import stat
+
+sys.path.append('modules')
+
+import filesystem_utils
+import build_api_services
+
+from api_fs_conventions import api_gui_exec_filename_from_req_type
+from api_fs_conventions import compose_api_fs_request_location_paths
+from api_fs_conventions import compose_api_exec_script_name
+from api_fs_conventions import compose_api_help_script_name
+from api_fs_conventions import get_api_cli_service_script_path
+from api_fs_conventions import get_api_schema_files
+from api_fs_conventions import get_api_gui_service_script_path
+from api_fs_conventions import get_generated_scripts_path
+
+from api_schema_utils import deserialize_api_request_from_schema_file
+from api_schema_utils import file_extension_from_content_type
+
+from api_fs_bash_utils import generate_exec_watchdog_function
+from api_fs_bash_utils import exec_watchdog_function
+from api_fs_bash_utils import generate_extract_attr_value_from_string
+from api_fs_bash_utils import extract_attr_value_from_string
+
+import api_fs_exec_utils
+import api_fs_bash_utils
+
+def make_script_dependencies(script):
+    file_extension = ".json"
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), r"",
+        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
+        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
+        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
+        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
+        *api_fs_exec_utils.generate_api_node_env_init(), r"",
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
+        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${OPT_DIR}/modules/api_deps_utils.py "/package/API"',
+
+    )
+    script.writelines(line + "\n" for line in body)
+
+
+def build_ask_dependency_api_service(dep_api_schema_file, service_full_name, output_services_path, output_exec_script_path):
+    generated_api_server_scripts_path = output_services_path
+    os.makedirs(generated_api_server_scripts_path, exist_ok=True)
+
+    req_name, request_data = deserialize_api_request_from_schema_file(dep_api_schema_file)
+    request_data["Query"] = os.path.join(service_full_name, request_data["Query"])
+
+    #generate CLI API server only
+    cli_server_content = build_api_services.create_cli_server_content_from_schema(req_name, request_data)
+    api_server_script_file_path = build_api_services.get_api_cli_service_script_path(generated_api_server_scripts_path, req_name)
+    with open(api_server_script_file_path, "w") as server_file:
+        server_file.write("#!/bin/bash\n\n")
+        server_file.writelines(cli_server_content)
+    filesystem_utils.make_file_executable(api_server_script_file_path)
+
+    # generate execution script
+    try:
+        script_name_generated = compose_api_exec_script_name(req_name)
+        script_generated_path = os.path.join(output_exec_script_path, script_name_generated)
+
+        with open(script_generated_path, "x") as script:
+            make_script_dependencies(script)
+        filesystem_utils.make_file_executable(script_generated_path)
+
+    except FileExistsError as e:
+        print(
+            f'Skipping the script "{req_name}":\n\t"{e}"'
+        )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="Build file-system API nodes based on pseudo-REST API from cfg file"
+    )
+
+    parser.add_argument("api_schema_dir", help="Path to the root directory incorporated JSON API schema descriptions")
+    parser.add_argument("service_full_name", help="")
+    parser.add_argument("-os", "--output_server_dir",
+                        help='Output directory where the generated server scripts will be placed. Default=\"./{}\"'.format(get_generated_scripts_path()),
+                        default=get_generated_scripts_path())
+    parser.add_argument("-oe", "--output_exec_dir",
+                        help='Output directory where the generated execution scripts will be placed. Default=\"./\"',
+                        default="./")
+
+
+
+    args = parser.parse_args()
+
+    schemas_file_list = get_api_schema_files(args.api_schema_dir)
+    for schema_file in schemas_file_list:
+        if schema_file.endswith("dependencies.json") != -1:
+            build_ask_dependency_api_service(schema_file, args.service_full_name, args.output_server_dir, args.output_exec_dir)

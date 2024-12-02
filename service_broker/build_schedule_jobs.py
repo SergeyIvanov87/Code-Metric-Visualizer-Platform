@@ -39,7 +39,7 @@ args = parser.parse_args()
 def intersection(list_lhs, list_rhs):
     return [ i for i in list_lhs if i in list_rhs ]
 
-service_api_deps = get_api_service_deps(os.path.join(args.api_schemas_input_dir, r".*\.json$")
+service_api_deps = get_api_service_deps(os.path.join(args.api_schemas_input_dir, r".*", r".*\.json$")
 
 schemas_file_list = service_api_deps.values()
 main_api_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, r".*\.json$")

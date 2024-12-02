@@ -7,7 +7,7 @@ from settings import Settings
 from time_utils import get_timestamp
 from utils import get_api_queries
 from utils import get_files
-from utils import compose_api_queries_pipe_names
+from api_schema_utils import compose_api_queries_pipe_names
 from api_fs_query import APIQuery
 
 global_settings = Settings()

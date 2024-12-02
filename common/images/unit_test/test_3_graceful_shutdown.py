@@ -13,7 +13,7 @@ import ut_utils
 
 from settings import Settings
 from utils import get_api_queries
-from utils import compose_api_queries_pipe_names
+from api_schema_utils import compose_api_queries_pipe_names
 from async_executor import AsyncExecutor
 from api_fs_query import APIQuery
 from renew_pseudo_fs_pipes import remove_api_fs_pipes_node

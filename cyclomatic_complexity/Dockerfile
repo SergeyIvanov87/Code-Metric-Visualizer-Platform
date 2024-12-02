@@ -16,7 +16,7 @@ ARG SCRIPT_GEN_LOC=services
 
 # install app dependencies
 RUN apk add --no-cache coreutils python3 dos2unix
-RUN apk add --no-cache inotify-tools bash
+RUN apk add --no-cache inotify-tools bash jq
 RUN apk add --no-cache perl
 
 COPY --from=build /usr/bin/pmccabe /usr/bin/pmccabe
@@ -32,6 +32,7 @@ COPY common/api_management.py /opt/
 COPY common/build_api_executors.py /opt/
 COPY common/build_api_services.py /opt/
 COPY common/build_api_pseudo_fs.py /opt/
+COPY common/build_common_api_services.py /opt/
 COPY common/make_api_readme.py /opt/
 COPY common/renew_pseudo_fs_pipes.py /opt/
 RUN dos2unix /opt/*

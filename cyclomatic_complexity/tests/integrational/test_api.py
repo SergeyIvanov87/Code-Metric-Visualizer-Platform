@@ -9,7 +9,7 @@ from time_utils import get_timestamp
 from queries import FS_API_Executor
 from utils import get_api_queries
 from utils import get_files
-from utils import compose_api_queries_pipe_names
+from api_schema_utils import compose_api_queries_pipe_names
 from utils import wait_until_pipe_exist
 from api_fs_query import APIQuery
 
