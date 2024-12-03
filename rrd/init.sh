@@ -8,6 +8,7 @@ export RRD_DATA_STORAGE_DIR=${4}/api.pmccabe_collector.restapi.org
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+##### why cc instead of rrd?
 README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-ANALYTIC.md
 
 # use source this script as fast way to setup environment for debugging
@@ -21,7 +22,8 @@ echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_A
 # So, to speed up this termination time until being ungracefully killed,
 # I just launch this signal listener in background and then resend any signal being catched in the `trap`-handler
 # It works as expected
-${OPT_DIR}/api_management.py ${WORK_DIR}/API/ ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
+${OPT_DIR}/canonize_internal_api.py ${WORK_DIR}/API/deps ${MAIN_SERVICE_NAME}/rrd
+${OPT_DIR}/api_management.py "${WORK_DIR}/API/|${WORK_DIR}/API/deps" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
 API_MANAGEMENT_PID=$!
 
 declare -A SERVICE_WATCH_PIDS
@@ -63,8 +65,8 @@ mkdir -p ${RRD_DATA_STORAGE_DIR}
 if [ $? -ne 0 ]; then echo "Cannot create ${RRD_DATA_STORAGE_DIR}. Please check access rights to the VOLUME '/rrd_data' and grant the container all of them"; exit -1; fi
 
 
-${OPT_DIR}/build_common_api_services.py ${WORK_DIR}/API/deps ${MAIN_SERVICE_NAME}/rrd -os ${WORK_DIR}/aux_services -oe ${WORK_DIR}
-${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API/deps/ ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/rrd
+${OPT_DIR}/build_common_api_services.py ${WORK_DIR}/API/deps -os ${WORK_DIR}/aux_services -oe ${WORK_DIR}
+${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API/deps/ ${SHARED_API_DIR}
 echo "run aux API listeners:"
 for s in ${WORK_DIR}/aux_services/*.sh; do
     /bin/bash ${s} &

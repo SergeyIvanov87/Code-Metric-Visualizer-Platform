@@ -24,8 +24,10 @@ parser.add_argument("domain_name_api_entry", help="build API queries processor f
 parser.add_argument("mount_point", help="destination to build file-system nodes")
 args = parser.parse_args()
 
-directory_str = os.fsdecode(args.api_schemas_location)
-schema_files =  [os.path.join(directory_str, os.fsdecode(file)) for file in os.listdir(args.api_schemas_location) if os.fsdecode(file).endswith(".json")]
+schema_files = []
+for api_schema_dir in args.api_schemas_location.split("|"):
+    directory_str = os.fsdecode(api_schema_dir)
+    schema_files.extend([os.path.join(directory_str, os.fsdecode(file)) for file in os.listdir(api_schema_dir) if os.fsdecode(file).endswith(".json")])
 
 valid_queries_dict = {}
 for schema_file in schema_files:
@@ -35,12 +37,13 @@ for schema_file in schema_files:
     assert "Method" in request_data.keys()
     assert "Query" in request_data.keys()
     assert "Params" in request_data.keys()
-    valid_queries_dict[req_name] = request_data
 
     # filter out non-related queries
     domain_entry_pos = request_data["Query"].find(args.domain_name_api_entry)
     if domain_entry_pos == -1:
         continue
+    valid_queries_dict[req_name] = request_data
+
 
 def unblock_pipes_signal_handler(sig, frame):
     global valid_queries_dict

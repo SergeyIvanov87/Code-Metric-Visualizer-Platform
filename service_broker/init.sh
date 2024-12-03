@@ -5,6 +5,9 @@ export OPT_DIR=${2}
 export PYTHONPATH="${2}:${2}/modules"
 
 export SHARED_API_DIR=${3}
+export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
+
+${OPT_DIR}/canonize_internal_api.py ${WORK_DIR}/API/deps ${MAIN_SERVICE_NAME}/service_broker
 
 termination_handler(){
    echo "***Stopping"

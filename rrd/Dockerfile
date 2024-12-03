@@ -23,6 +23,7 @@ COPY common/build_api_executors.py /opt/
 COPY common/build_api_services.py /opt/
 COPY common/build_api_pseudo_fs.py /opt/
 COPY common/build_common_api_services.py /opt/
+COPY common/canonize_internal_api.py /opt/
 COPY common/make_api_readme.py /opt/
 COPY common/renew_pseudo_fs_pipes.py /opt/
 RUN dos2unix /opt/*

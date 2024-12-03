@@ -7,6 +7,10 @@ import stat
 
 from api_schema_utils import compose_api_queries_pipe_names
 
+def canonize_relative_api_req(full_service_name, common_api_req):
+    return os.path.join(full_service_name, common_api_req.removeprefix("+/")) if common_api_req.startswith("+/") else common_api_req
+
+
 def get_api_service_deps(api_schemas_input_dir, file_match_regex = r".*\.json$"):
     services_dependencies = {}
     p = re.compile(file_match_regex)

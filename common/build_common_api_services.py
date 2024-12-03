@@ -2,33 +2,20 @@
 
 
 import argparse
-from math import log10
 import os
-import pathlib
 import sys
-import stat
 
 sys.path.append('modules')
 
 import filesystem_utils
 import build_api_services
 
-from api_fs_conventions import api_gui_exec_filename_from_req_type
-from api_fs_conventions import compose_api_fs_request_location_paths
 from api_fs_conventions import compose_api_exec_script_name
-from api_fs_conventions import compose_api_help_script_name
 from api_fs_conventions import get_api_cli_service_script_path
 from api_fs_conventions import get_api_schema_files
-from api_fs_conventions import get_api_gui_service_script_path
 from api_fs_conventions import get_generated_scripts_path
 
 from api_schema_utils import deserialize_api_request_from_schema_file
-from api_schema_utils import file_extension_from_content_type
-
-from api_fs_bash_utils import generate_exec_watchdog_function
-from api_fs_bash_utils import exec_watchdog_function
-from api_fs_bash_utils import generate_extract_attr_value_from_string
-from api_fs_bash_utils import extract_attr_value_from_string
 
 import api_fs_exec_utils
 import api_fs_bash_utils
@@ -50,12 +37,11 @@ def make_script_dependencies(script):
     script.writelines(line + "\n" for line in body)
 
 
-def build_ask_dependency_api_service(dep_api_schema_file, service_full_name, output_services_path, output_exec_script_path):
+def build_ask_dependency_api_service(dep_api_schema_file, output_services_path, output_exec_script_path):
     generated_api_server_scripts_path = output_services_path
     os.makedirs(generated_api_server_scripts_path, exist_ok=True)
 
     req_name, request_data = deserialize_api_request_from_schema_file(dep_api_schema_file)
-    request_data["Query"] = os.path.join(service_full_name, request_data["Query"])
 
     #generate CLI API server only
     cli_server_content = build_api_services.create_cli_server_content_from_schema(req_name, request_data)
@@ -86,7 +72,6 @@ if __name__ == "__main__":
     )
 
     parser.add_argument("api_schema_dir", help="Path to the root directory incorporated JSON API schema descriptions")
-    parser.add_argument("service_full_name", help="")
     parser.add_argument("-os", "--output_server_dir",
                         help='Output directory where the generated server scripts will be placed. Default=\"./{}\"'.format(get_generated_scripts_path()),
                         default=get_generated_scripts_path())
@@ -101,4 +86,4 @@ if __name__ == "__main__":
     schemas_file_list = get_api_schema_files(args.api_schema_dir)
     for schema_file in schemas_file_list:
         if schema_file.endswith("dependencies.json") != -1:
-            build_ask_dependency_api_service(schema_file, args.service_full_name, args.output_server_dir, args.output_exec_dir)
+            build_ask_dependency_api_service(schema_file, args.output_server_dir, args.output_exec_dir)
