@@ -6,7 +6,7 @@ ENV PROJECT_BRANCH="this must be a project branch"
 
 # install app dependencies
 RUN apk add --no-cache coreutils python3 dos2unix
-RUN apk add --no-cache inotify-tools bash jq
+RUN apk add --no-cache inotify-tools bash
 RUN apk add --no-cache git apk-cron
 
 RUN mkdir -p /opt

@@ -20,7 +20,7 @@ sys.path.append('modules')
 
 import filesystem_utils
 
-from api_deps_utils import get_api_service_deps
+from api_deps_utils import get_api_service_dependency_files
 from api_schema_utils import deserialize_api_request_from_schema_file
 from api_schema_utils import file_extension_from_content_type
 
@@ -39,9 +39,12 @@ args = parser.parse_args()
 def intersection(list_lhs, list_rhs):
     return [ i for i in list_lhs if i in list_rhs ]
 
-service_api_deps = get_api_service_deps(os.path.join(args.api_schemas_input_dir, r".*", r".*\.json$")
+service_api_deps = get_api_service_dependency_files(os.path.join(args.api_schemas_input_dir,"deps"), r".*", r".*\.json$")
 
-schemas_file_list = service_api_deps.values()
+schemas_file_list = []
+for schemas_file_array in service_api_deps.values():
+    schemas_file_list.extend(schemas_file_array)
+
 main_api_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, r".*\.json$")
 order_list_file_path = os.path.join(args.api_schemas_input_dir, "service_broker_queries_order_list.json")
 if order_list_file_path not in main_api_file_list:
@@ -59,9 +62,10 @@ with open(order_list_file_path, "r") as order_list_file:
         for item in order_list_file_data["jobs"]:
             if "source" not in item.keys():
                 raise Exception(f"In file \"{order_list_file_path}\" \"jobs\" an array item must contain MAJOR field \"source\" with query file location, got:\n {item}")
-            full_path_source = os.path.join(args.api_schemas_input_dir,item["source"])
-            ordered_schemas_file_list.append(full_path_source)
-            jobs_call_condition_table[full_path_source] = item
+            for schema_file in schemas_file_list:
+                if schema_file.endswith(item["source"]):
+                    ordered_schemas_file_list.append(schema_file)
+                    jobs_call_condition_table[schema_file] = item
     except json.decoder.JSONDecodeError as e:
         raise Exception(f"Error: {str(e)} in file: {order_list_file_path}")
 
