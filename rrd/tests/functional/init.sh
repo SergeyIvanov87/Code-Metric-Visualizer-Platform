@@ -53,7 +53,7 @@ for s in ${WORK_DIR}/test_*.py; do
     # '-s' argument repeals console output capturing by pytest, which allow us
     # to use heartbeat mechanism to keep `test_aggregator` alive during
     # long test cases execution (likewise RRDs collecting)
-    pytest -svv ${s}
+    pytest -s ${s}
     VAL=$?
     if [ $VAL != 0 ]
     then
