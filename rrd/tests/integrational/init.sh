@@ -10,6 +10,8 @@ export MODULES="${WORK_DIR}/utils/modules"
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+${UTILS}/canonize_internal_api.py /API/deps ${MAIN_SERVICE_NAME}/rrd
+
 echo "Run tests:"
 RET=0
 for s in ${WORK_DIR}/test_*.py; do
