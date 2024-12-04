@@ -10,12 +10,18 @@ export MODULES="${WORK_DIR}/utils/modules"
 
 echo "Generate Mock API"
 mv ${WORK_DIR}/API/service_broker_queries_order_list.json service_broker_queries_order_list.json
-${UTILS}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
-${UTILS}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
-
 rm -rf ${SHARED_API_DIR}/*
 mkdir -p ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
-${UTILS}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
+for deps_service in ${WORK_DIR}/API/deps/*; do
+    echo "Mock API from ${deps_service}"
+    if [ -d ${deps_service} ];
+    then
+        echo "Mocking..."
+        ${UTILS}/build_api_executors.py ${deps_service} ${WORK_DIR} -o ${WORK_DIR}
+        ${UTILS}/build_api_services.py ${deps_service} ${WORK_DIR} -o ${WORK_DIR}/services
+        ${UTILS}/build_api_pseudo_fs.py ${deps_service} ${SHARED_API_DIR}
+    fi
+done
 
 echo "run Mock API servers:"
 if [ -d /tmp/test ]; then rm -rf /tmp/test; fi

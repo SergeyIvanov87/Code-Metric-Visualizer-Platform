@@ -19,8 +19,12 @@ test_files=(/package/test_data/*.cpp)
 for f in ${test_files[@]}; do
     cp ${f} ${INITIAL_PROJECT_LOCATION}/
 done
+
+${UTILS}/canonize_internal_api.py /API/deps ${MAIN_SERVICE_NAME}/rrd
+
 echo "Create CC API which RRD depends on"
-${UTILS}/build_api_pseudo_fs.py /cc_API ${SHARED_API_DIR}
+${UTILS}/build_api_pseudo_fs.py /API/deps/cyclomatic_complexity ${SHARED_API_DIR}
+
 echo "Mock CC API for standalone functional tests only"
 rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_fake_data
 fake_statistic_data_result=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_fake_data
@@ -49,7 +53,7 @@ for s in ${WORK_DIR}/test_*.py; do
     # '-s' argument repeals console output capturing by pytest, which allow us
     # to use heartbeat mechanism to keep `test_aggregator` alive during
     # long test cases execution (likewise RRDs collecting)
-    pytest -s ${s}
+    pytest -svv ${s}
     VAL=$?
     if [ $VAL != 0 ]
     then
