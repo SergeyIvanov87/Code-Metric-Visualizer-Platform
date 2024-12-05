@@ -5,6 +5,8 @@ services:
       dockerfile: ./rrd/Dockerfile
     depends_on:
       - syslog-ng
+    environment:
+        - SKIP_API_DEPS_CHECK=${SKIP_API_DEPS_CHECK:-false}
     logging:
       driver: syslog
       options:

@@ -14,6 +14,8 @@ README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-ANALYTIC.m
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport RRD_DATA_STORAGE_DIR=${RRD_DATA_STORAGE_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
+source ${OPT_DIR}/shell_utils/init_utils.sh
+
 # I use standalone python-based process here to listen to SIGNAL and make PIPEs clearance.
 # For any reason, if I just esecute new python process in a trap handler then it will hangs for a long time until executed.
 # The default timeour for graceful termination in docker compose exceeds this interval and the container would be killed ungracefully,
@@ -65,6 +67,7 @@ mkdir -p ${RRD_DATA_STORAGE_DIR}
 if [ $? -ne 0 ]; then echo "Cannot create ${RRD_DATA_STORAGE_DIR}. Please check access rights to the VOLUME '/rrd_data' and grant the container all of them"; exit -1; fi
 
 
+# Launch internal API services
 ${OPT_DIR}/build_common_api_services.py ${WORK_DIR}/API/deps -os ${WORK_DIR}/aux_services -oe ${WORK_DIR}
 ${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API/deps/ ${SHARED_API_DIR}
 echo "run aux API listeners:"
@@ -100,5 +103,16 @@ done
 #    echo "Completed"
 #fi
 
+
+echo "Skip checking dependencies: ${SKIP_API_DEPS_CHECK}"
+if [ ! -z ${SKIP_API_DEPS_CHECK} ] && [ ${SKIP_API_DEPS_CHECK} == false ]; then
+    get_unavailable_services ${WORK_DIR}/API/deps ANY_SERVICE_UNAVAILABLE_COUNT "${OPT_DIR}/check_missing_pseudo_fs_from_schema.py ${SHARED_API_DIR} ${MAIN_SERVICE_NAME}"
+    if [ ! -z ${ANY_SERVICE_UNAVAILABLE} ]; then
+        echo "ERROR: As required APIs are missing, the service considered as inoperable. Abort"
+        exit 255
+    fi
+fi
+
+echo "The service is ready"
 sleep infinity &
 wait $!
