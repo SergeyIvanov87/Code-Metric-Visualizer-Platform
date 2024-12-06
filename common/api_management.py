@@ -56,7 +56,7 @@ def unblock_pipes_signal_handler(sig, frame):
         req_api = query["Query"]
         deleted_pipes.extend(remove_api_fs_pipes_node(args.mount_point, "server", req_api, req_type))
 
-    print(f"unblock clien pipes")
+    print(f"unblock client pipes")
     for req_name,query in valid_queries_dict.items():
         req_type = query["Method"]
         req_api = query["Query"]

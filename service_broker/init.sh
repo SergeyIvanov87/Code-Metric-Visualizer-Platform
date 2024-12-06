@@ -78,7 +78,11 @@ ${WORK_DIR}/build_schedule_jobs.py ${WORK_DIR}/API ${SHARED_API_DIR} api.pmccabe
 crontab jobs_schedule
 
 echo "The service is ready"
-while true; do crond -f -l 0 -d 0; done
+while true;
+do
+    crond -f -l 0 -d 0 &
+    wait $!
+done
 
 sleep infinity &
 wait $!
