@@ -17,13 +17,13 @@ from api_fs_conventions import get_api_schema_files
 
 
 parser = argparse.ArgumentParser(
-    prog="Traverse across file-system API and check requested API existence"
+    prog="Traverse across file-system API and check availability of requested API set"
 )
 
-parser.add_argument("mount_point", help="A project location directory")
+parser.add_argument("mount_point", help="Root pseudo fs API mount point")
 parser.add_argument("domain_name_api_entry", help="build API queries processor for that particular domain")
 parser.add_argument(
-    "api_schema_dir_to_find", help="Check this API on existence"
+    "api_schema_dir_to_find", help="Check presence of this API set"
 )
 args = parser.parse_args()
 

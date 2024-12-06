@@ -104,7 +104,7 @@ done
 #fi
 
 
-echo "Skip checking dependencies: ${SKIP_API_DEPS_CHECK}"
+echo "Skip checking  API dependencies: ${SKIP_API_DEPS_CHECK}"
 if [ ! -z ${SKIP_API_DEPS_CHECK} ] && [ ${SKIP_API_DEPS_CHECK} == false ]; then
     get_unavailable_services ${WORK_DIR}/API/deps ANY_SERVICE_UNAVAILABLE_COUNT "${OPT_DIR}/check_missing_pseudo_fs_from_schema.py ${SHARED_API_DIR} ${MAIN_SERVICE_NAME}"
     if [ ! -z ${ANY_SERVICE_UNAVAILABLE} ]; then

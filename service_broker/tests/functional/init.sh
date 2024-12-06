@@ -8,9 +8,12 @@ export PYTHONPATH="${WORK_DIR}:${WORK_DIR}/utils:${WORK_DIR}/utils/modules"
 UTILS="${WORK_DIR}/utils"
 export MODULES="${WORK_DIR}/utils/modules"
 
+${UTILS}/canonize_internal_api.py ${WORK_DIR}/API/deps ${MAIN_SERVICE_NAME}/service_broker
+mkdir -p /API
+cp -r ${WORK_DIR}/API/deps /API/deps
+
 echo "Generate Mock API"
 mv ${WORK_DIR}/API/service_broker_queries_order_list.json service_broker_queries_order_list.json
-rm -rf ${SHARED_API_DIR}/*
 mkdir -p ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
 for deps_service in ${WORK_DIR}/API/deps/*; do
     echo "Mock API from ${deps_service}"
@@ -38,7 +41,7 @@ for s in ${WORK_DIR}/test_*.py; do
     pytest -s ${s}
 done
 
-
+rm -rf ${SHARED_API_DIR}/*
 if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
 
 echo "wait for termination"
