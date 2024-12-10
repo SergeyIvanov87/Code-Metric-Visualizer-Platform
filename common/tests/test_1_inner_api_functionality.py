@@ -15,7 +15,7 @@ from api_deps_utils import get_api_service_dependency_files
 from api_fs_conventions import compose_api_fs_request_location_paths
 from api_fs_query import APIQuery
 from api_schema_utils import compose_api_queries_pipe_names
-from api_schema_utils import file_extension_from_content_type
+from api_schema_utils import file_extension_from_content_type_or_default
 from queries import FS_API_Executor
 
 global_settings = Settings()
@@ -63,19 +63,18 @@ def check_unmet_dependencies_api(query, pipes):
     service_api_deps = get_api_service_dependencies("/API/deps", r".*", r".*\.json$")
     for dep_on_service, dep_request_schemas in service_api_deps.items():
         for req_name, req_schema in dep_request_schemas.items():
+            print(f"{get_timestamp()}\texclude pipes of query: {req_schema["Query"]} from API fs to simulate unmet deps")
             req_type = req_schema["Method"]
             req_api = req_schema["Query"]
 
-            content_type=""
-            if "Content-Type" in req_schema:
-                content_type = req_schema["Content-Type"]
-
-            result_pipe_ext = file_extension_from_content_type(content_type)
+            result_pipe_ext = file_extension_from_content_type_or_default(req_schema,"")
             api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
                 "/api", req_api, req_type)
 
-            temporary_replaced_result_pipe_file_path = os.path.join(api_exec_node_directory, "..")
-            for file in glob.glob(os.path.join(api_exec_node_directory, "result." + result_pipe_ext + "*")):
+            temporary_replaced_result_pipe_file_path = os.path.join(api_exec_node_directory, "../")
+            pipes_to_move_search_glob = ("result." + result_pipe_ext + "*") if result_pipe_ext != "" else "result*"
+            for file in glob.glob(os.path.join(api_exec_node_directory,pipes_to_move_search_glob)):
+                print(f"{get_timestamp()}\tmove pipe {file} temporary to a new place {temporary_replaced_result_pipe_file_path}")
                 shutil.move(file, temporary_replaced_result_pipe_file_path)
 
             # removed API service must be unmet
@@ -85,8 +84,9 @@ def check_unmet_dependencies_api(query, pipes):
             print(f"{get_timestamp()}\tgetting result of sebsequent query: {query["Query"]}")
             after_deps_json_str = api_query.wait_result("", 0.1, 30, True)
 
-            # retrieve API pipe back
-            for file in glob.glob(os.path.join(temporary_replaced_result_pipe_file_path, "result." + result_pipe_ext + "*")):
+            print(f"{get_timestamp()}\tretrieve pipes of query: {req_schema['Query']} into API fs back")
+            for file in glob.glob(os.path.join(temporary_replaced_result_pipe_file_path, pipes_to_move_search_glob)):
+                print(f"{get_timestamp()}\tmove pipe {file} back to an old place {api_exec_node_directory}")
                 shutil.move(file, api_exec_node_directory)
 
             assert len(after_deps_json_str)

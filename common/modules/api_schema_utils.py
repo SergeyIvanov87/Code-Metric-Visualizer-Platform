@@ -204,7 +204,8 @@ def gather_api_schemas_from_mount_point(mount_point, domain_name_api_entry):
             current_dir, fs_tree, fs_args_tree, directories_for_markdown
         )
         api_pipes = get_api_leaf_dir_pipes(current_dir)
-        if len(api_pipes) >= 2: # take into account multisessional output pipes. They number might be more than 2
+        if len(api_pipes) >= 2 and len([p for p in api_pipes if os.path.basename(p) == "exec"]) == 1: # take into account multisessional output pipes. They number might be more than 2
+
             # it must be API leaf dir
             API_query_name, API_query = restore_api(current_dir, fs_tree, fs_args_tree, api_pipes, domain_name_api_entry)
             if API_query_name != "" and len(API_query) != 0:

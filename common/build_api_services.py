@@ -146,6 +146,7 @@ api_cli_schema = [
     "        let REQUEST_NUM=${REQUEST_NUM}+1\n",
     "    done <<< `cat $pipe_request`\n",
     "done\n",
+    "echo 'Server {0} stopped'\n",
 ]
 
 def generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type):
@@ -215,6 +216,7 @@ def generate_cli_server_content(req_name, req_type, api_req_directory, api_exec_
         req_executor_name,
         api_req_directory
     )
+    api_cli_schema_concrete[-1] = api_cli_schema_concrete[-1].format(req_name)
     return api_cli_schema_concrete
 
 def create_gui_server_content_from_schema(req_name, req_schema):

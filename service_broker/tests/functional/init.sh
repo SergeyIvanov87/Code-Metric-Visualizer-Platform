@@ -35,10 +35,16 @@ for s in ${WORK_DIR}/services/*_server.sh; do
 done
 
 echo "Run tests:"
+RET=0
 echo "EXCLUDE test_0_pseudo_fs_api_conformance.py"
 rm -f ${WORK_DIR}/test_0_pseudo_fs_api_conformance.py
 for s in ${WORK_DIR}/test_*.py; do
     pytest -s ${s}
+    VAL=$?
+    if [ $VAL != 0 ]
+    then
+        RET=$VAL
+    fi
 done
 
 rm -rf ${SHARED_API_DIR}/*
