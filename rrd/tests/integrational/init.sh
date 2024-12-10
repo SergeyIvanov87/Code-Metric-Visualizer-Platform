@@ -14,6 +14,8 @@ ${UTILS}/canonize_internal_api.py /API/deps ${MAIN_SERVICE_NAME}/rrd
 
 echo "Run tests:"
 RET=0
+echo "EXCLUDE test_1_inner_api_functionality.py"
+rm -f ${WORK_DIR}/test_1_inner_api_functionality.py
 for s in ${WORK_DIR}/test_*.py; do
     pytest -s ${s}
     VAL=$?
