@@ -1,0 +1,13 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "GET",
+    "Query": "+/all_dependencies",
+    "Params": {
+        "--service" : ".*"
+    },
+    "Description": {
+        "header": "Ask for external API and services which a current service depends on ",
+        "body": "To make a query:\n\n`echo \"0\" > <YOUR SERVICE>/all_dependencies/GET/exec`\n\nTo wait and extract the query result:\n\n`cat <YOUR SERVICE>/all_dependencies/GET/result.json > <your_filename>.json`\n\n",
+        "footer": "The generated result of this command represents a JSON report, which describes a dictionary, where a key is a service and a value is a service API which a current service depends on."
+    }
+}

@@ -31,13 +31,29 @@ def make_script_dependencies(script):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${OPT_DIR}/modules/api_deps_utils.py "/package/API"',
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${OPT_DIR}/get_service_api_deps.py "/package/API"',
 
     )
     script.writelines(line + "\n" for line in body)
 
 
-def build_ask_dependency_api_service(dep_api_schema_file, output_services_path, output_exec_script_path):
+def make_script_unmet_dependencies(script):
+    file_extension = ".json"
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), r"",
+        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
+        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
+        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
+        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
+        *api_fs_exec_utils.generate_api_node_env_init(), r"",
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
+        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${OPT_DIR}/check_missing_pseudo_fs_from_schema.py ${SHARED_API_DIR} "api.pmccabe_collector.restapi.org" "/package/API/deps"',
+
+    )
+    script.writelines(line + "\n" for line in body)
+
+def build_ask_dependency_api_service(dep_api_schema_file, output_services_path, output_exec_script_path, make_script):
     generated_api_server_scripts_path = output_services_path
     os.makedirs(generated_api_server_scripts_path, exist_ok=True)
 
@@ -57,7 +73,7 @@ def build_ask_dependency_api_service(dep_api_schema_file, output_services_path, 
         script_generated_path = os.path.join(output_exec_script_path, script_name_generated)
 
         with open(script_generated_path, "x") as script:
-            make_script_dependencies(script)
+            make_script(script)
         filesystem_utils.make_file_executable(script_generated_path)
 
     except FileExistsError as e:
@@ -85,5 +101,7 @@ if __name__ == "__main__":
 
     schemas_file_list = get_api_schema_files(args.api_schema_dir)
     for schema_file in schemas_file_list:
-        if schema_file.endswith("dependencies.json") != -1:
-            build_ask_dependency_api_service(schema_file, args.output_server_dir, args.output_exec_dir)
+        if schema_file.endswith("all_dependencies.json"):
+            build_ask_dependency_api_service(schema_file, args.output_server_dir, args.output_exec_dir, make_script_dependencies)
+        if schema_file.endswith("unmet_dependencies.json"):
+            build_ask_dependency_api_service(schema_file, args.output_server_dir, args.output_exec_dir, make_script_unmet_dependencies)

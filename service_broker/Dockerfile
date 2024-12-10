@@ -24,6 +24,7 @@ COPY common/build_api_pseudo_fs.py /opt/
 COPY common/build_common_api_services.py /opt/
 COPY common/canonize_internal_api.py /opt/
 COPY common/check_missing_pseudo_fs_from_schema.py /opt/
+COPY common/get_service_api_deps.py /opt/
 COPY common/make_api_readme.py /opt/
 
 RUN dos2unix /opt/*
