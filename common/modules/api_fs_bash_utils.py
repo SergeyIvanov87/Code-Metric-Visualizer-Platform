@@ -14,6 +14,7 @@ def __exec_watchdog_function__():
         "        if [ $WATCHDOG_RESULT == 0 ]; then\n",
         "            #its alive: nobody has read ${OUT_PIPE} yet. Initiate reading intentionally\n",
         "            timeout 2 cat ${OUT_PIPE} > /dev/null 2>&1\n",
+        '            if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`\t`hostname`\tRESET:\t${OUT_PIPE}"; fi\n',
         "        fi\n",
         "        # avoid zombie\n",
         "        wait ${WATCH_PID}\n",
