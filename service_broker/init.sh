@@ -18,28 +18,7 @@ API_MANAGEMENT_PID=$!
 
 declare -A SERVICE_WATCH_PIDS
 termination_handler(){
-    trap - SIGTERM
-    echo "`date +%H:%M:%S:%3N`    ***Shutdown servers***"
-    ps -ef
-    for server_script_path in "${!SERVICE_WATCH_PIDS[@]}"
-    do
-        echo "Kill ${server_script_path} by PID: {${SERVICE_WATCH_PIDS[$server_script_path]}}"
-        pkill -KILL -e -P ${SERVICE_WATCH_PIDS[$server_script_path]}
-        kill -9 ${SERVICE_WATCH_PIDS[$server_script_path]}
-        ps -ef
-    done
-    echo "`date +%H:%M:%S:%3N`    ***Clear pipes****"
-    kill -s SIGTERM ${API_MANAGEMENT_PID}
-    while true
-    do
-        kill -s 0 ${API_MANAGEMENT_PID}
-        RESULT=$?
-        if [ $RESULT == 0 ]; then
-            continue
-        fi
-        break
-    done
-    echo "`date +%H:%M:%S:%3N`    ***Done****"
+    gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
     exit 0
 }
 trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
@@ -50,19 +29,15 @@ mkdir -p ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
 # Launch internal API services
 ${OPT_DIR}/build_common_api_services.py ${WORK_DIR}/API/deps -os ${WORK_DIR}/aux_services -oe ${WORK_DIR}
 ${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API/deps/ ${SHARED_API_DIR}
-echo "Run internal API listeners:"
-for s in ${WORK_DIR}/aux_services/*.sh; do
-    /bin/bash ${s} &
-    SERVICE_WATCH_PIDS[${s}]=$!
-    echo "${s} has been started, PID ${SERVICE_WATCH_PIDS[${s}]}"
-done
 
+launch_fs_api_services SERVICE_WATCH_PIDS "${WORK_DIR}/aux_services"
 
-echo "Skip checking  API dependencies: ${SKIP_API_DEPS_CHECK}"
+echo -e "${Blue}Skip checking API dependencies${Color_Off}: ${BBlack}${SKIP_API_DEPS_CHECK}${Color_Off}"
 if [ ! -z ${SKIP_API_DEPS_CHECK} ] && [ ${SKIP_API_DEPS_CHECK} == false ]; then
-    get_unavailable_services ${WORK_DIR}/API/deps ANY_SERVICE_UNAVAILABLE_COUNT "${OPT_DIR}/check_missing_pseudo_fs_from_schema.py ${SHARED_API_DIR} ${MAIN_SERVICE_NAME}"
-    if [ ! -z ${ANY_SERVICE_UNAVAILABLE} ]; then
-        echo "ERROR: As required APIs are missing, the service considered as inoperable. Abort"
+    wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/service_broker" ANY_SERVICE_UNAVAILABLE_COUNT
+    if [ ! -z ${ANY_SERVICE_UNAVAILABLE_COUNT} ]; then
+        echo -e "{BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort{Color_Off}"
+        gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
         exit 255
     fi
 fi
@@ -77,7 +52,7 @@ ${WORK_DIR}/build_schedule_jobs.py ${WORK_DIR}/API ${SHARED_API_DIR} api.pmccabe
 )
 crontab jobs_schedule
 
-echo "The service is ready"
+echo -e "${BGreen}The service is ready${Color_Off}"
 while true;
 do
     crond -f -l 0 -d 0 &
