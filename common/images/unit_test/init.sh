@@ -16,6 +16,7 @@ echo "Run tests:"
 RET=0
 # TODO
 rm -f ${WORK_DIR}/test_0_pseudo_fs_api_conformance.py
+rm -f ${WORK_DIR}/test_1_inner_api_functionality.py
 for s in ${WORK_DIR}/test_*.py; do
     if [ -z ${PYTEST_FILTER} ]; then
         pytest -x -r 'A' -s --verbose ${s}
@@ -27,7 +28,12 @@ for s in ${WORK_DIR}/test_*.py; do
     then
         RET=$VAL
     fi
+    echo "API fs snapshot after test execution: ${s}, result: ${VAL}"
+    ls -laR ${SHARED_API_DIR}
 done
+
+echo "Final API fs snapshot, result ${RET}:"
+ls -laR ${SHARED_API_DIR}
 
 if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
 
