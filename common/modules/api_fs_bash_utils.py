@@ -2,15 +2,15 @@ def __exec_watchdog_function__():
     function_name = "exec_watchdog"
     return function_name, [
         "{}() ".format(function_name) + " {\n",
-        "    WATCH_PID=${1}\n",
-        "    OUT_PIPE=${2}\n",
+        "    local WATCH_PID=${1}\n",
+        "    local OUT_PIPE=${2}\n",
         "    if [ -z ${WATCH_PID} ]; then\n",
         "        return\n",
         "    fi\n",
         "    if [ ${WATCH_PID} != 0 ]; then\n",
         "        # check if a WATCHDOG child-process is alive\n",
         "        kill -s 0 ${WATCH_PID} > /dev/null 2>&1\n",
-        "        WATCHDOG_RESULT=$?\n",
+        "        local WATCHDOG_RESULT=$?\n",
         "        if [ $WATCHDOG_RESULT == 0 ]; then\n",
         "            #its alive: nobody has read ${OUT_PIPE} yet. Initiate reading intentionally\n",
         "            timeout 2 cat ${OUT_PIPE} > /dev/null 2>&1\n",
@@ -35,10 +35,11 @@ def __extract_attr_value_from_string_function__():
     function_name = "extract_avp_from_string_or_default"
     return function_name, [
         "{}()".format(function_name) + " {\n",
-        '    ATTR="${1}"\n',
-        '    STR="${2}"\n',
-        '    DEFAULT="${3}"\n',
-        '    AVP_DELIM="${4}"\n',
+        '    local ATTR="${1}"\n',
+        '    local STR="${2}"\n',
+        '    local DEFAULT="${3}"\n',
+        '    local AVP_DELIM="${4}"\n',
+        '    local VALUE=\n',
         '    readarray -t IN_SERVER_REQUEST_ARGS <<< "${STR}"\n',
         "    for arg in ${IN_SERVER_REQUEST_ARGS[@]}\n",
         "    do\n",
@@ -70,9 +71,9 @@ def __add_suffix_if_exist_function__():
     function_name = "add_suffix_if_exist"
     return function_name, [
         "{}()".format(function_name) + " {\n",
-        '   SUFFIX=${1}\n',
-        '   STR_TO_UPDATE=${2}\n',
-        '   OUT=${2}\n',
+        '   local SUFFIX=${1}\n',
+        '   local STR_TO_UPDATE=${2}\n',
+        '   local OUT=${2}\n',
         '   if [ ! -z ${SUFFIX} ]; then OUT="${STR_TO_UPDATE}_${SUFFIX}"; fi\n',
         "   eval ${3}='$OUT'\n",
         "}\n"

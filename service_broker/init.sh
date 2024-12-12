@@ -36,7 +36,7 @@ echo -e "${Blue}Skip checking API dependencies${Color_Off}: ${BBlack}${SKIP_API_
 if [ ! -z ${SKIP_API_DEPS_CHECK} ] && [ ${SKIP_API_DEPS_CHECK} == false ]; then
     wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/service_broker" ANY_SERVICE_UNAVAILABLE_COUNT
     if [ ! -z ${ANY_SERVICE_UNAVAILABLE_COUNT} ]; then
-        echo -e "{BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort{Color_Off}"
+        echo -e "${BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort${Color_Off}"
         gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
         exit 255
     fi

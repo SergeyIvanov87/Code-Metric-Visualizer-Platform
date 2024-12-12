@@ -4,7 +4,7 @@ source ${OPT_DIR}/shell_utils/color_codes.sh
 
 gracefull_shutdown() {
     local -n SERVICE_WATCH_PIDS_TO_STOP=${1}
-    API_MANAGEMENT_PID=${2}
+    local API_MANAGEMENT_PID=${2}
 
     echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Shutdown servers***${Color_Off}"
     ps -ef
@@ -31,7 +31,7 @@ gracefull_shutdown() {
 
 launch_fs_api_services() {
     local -n service_pids_arr=${1}
-    SERVICES_SCRIPTS_PATH=${2}
+    local SERVICES_SCRIPTS_PATH=${2}
     echo -e "${BBlue}Run API services from ${SERVICES_SCRIPTS_PATH}:${Color_Off}"
     for s in ${SERVICES_SCRIPTS_PATH}/*.sh; do
         /bin/bash ${s} &
@@ -41,21 +41,21 @@ launch_fs_api_services() {
 }
 
 wait_for_unavailable_services() {
-    SHARED_API_MOUNT_DIR=${1}
-    OWN_SERVICE_NAME=${2}
-    let wait_dependencies_counter=0
-    wait_dependencies_counter_limit=${4}
+    local SHARED_API_MOUNT_DIR=${1}
+    local OWN_SERVICE_NAME=${2}
+    local let wait_dependencies_counter=0
+    local wait_dependencies_counter_limit=${4}
     if [ -z ${wait_dependencies_counter_limit} ]; then
         echo "as wait_dependencies_counter_limit is not set use default value 30"
         wait_dependencies_counter_limit=30
     fi
     let wait_dependencies_counter_limit=${wait_dependencies_counter_limit}
 
-    let wait_dependencies_sec=1
-    ANY_SERVICE_UNAVAILABLE=1
-    SESSION_ID="`hostname`_watchdog"
-    pipe_in="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/exec"
-    pipe_out="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/result.json_${SESSION_ID}"
+    local let wait_dependencies_sec=1
+    local ANY_SERVICE_UNAVAILABLE=1
+    local SESSION_ID="`hostname`_watchdog"
+    local pipe_in="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/exec"
+    local pipe_out="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/result.json_${SESSION_ID}"
 
     while [ ! -p ${pipe_in} ]; do sleep 0.1; done
     while true :
@@ -63,7 +63,7 @@ wait_for_unavailable_services() {
         ANY_SERVICE_UNAVAILABLE=
         echo "SESSION_ID=${SESSION_ID}"> ${pipe_in}
         while [ ! -p ${pipe_out} ]; do sleep 0.1; done
-        MISSING_API_QUERIES=`cat ${pipe_out}`
+        local MISSING_API_QUERIES=`cat ${pipe_out}`
 
         if [ ! -z "${MISSING_API_QUERIES}" ]; then
             echo -e "${Blue}One or more services are unavailable using this API:${Color_Off}"
@@ -85,17 +85,17 @@ wait_for_unavailable_services() {
 }
 
 get_unavailable_services() {
-    API_DEPS_PATH=${1}
-    let wait_dependencies_counter=0
-    let wait_dependencies_counter_limit=30
-    let wait_dependencies_sec=1
-    ANY_SERVICE_UNAVAILABLE=1
+    local API_DEPS_PATH=${1}
+    local let wait_dependencies_counter=0
+    local let wait_dependencies_counter_limit=30
+    local let wait_dependencies_sec=1
+    local ANY_SERVICE_UNAVAILABLE=1
     while :
     do
         ANY_SERVICE_UNAVAILABLE=
         for deps_service in ${API_DEPS_PATH}/*; do
             if [ -d ${deps_service} ]; then
-                MISSING_API_QUERIES=`${3} ${deps_service}`
+                local MISSING_API_QUERIES=`${3} ${deps_service}`
                 if [ ! -z "${MISSING_API_QUERIES}" ]; then
                     echo "The service \"${deps_service}\" is unavailable using this API:"
                     echo "${MISSING_API_QUERIES}"

@@ -67,6 +67,8 @@ for s in ${WORK_DIR}/test_*.py; do
     then
         RET=$VAL
     fi
+    echo "API fs snapshot after test execution: ${s}, result: ${VAL}"
+    ls -laR ${SHARED_API_DIR}
 done
 
 # remove test files from project directory
@@ -77,6 +79,11 @@ done
 
 kill -15 ${WATCH_PID}
 wait ${WATCH_PID}
+rm -f ${real_statistic_pipe_in}
+rm -f ${real_statistic_pipe_out}
+echo "Final API fs snapshot, result ${RET}:"
+ls -laR ${SHARED_API_DIR}
+
 if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
 
 echo "wait for termination"
