@@ -11,6 +11,8 @@ export MODULES="${WORK_DIR}/utils/modules"
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+echo -e "export WORK_DIR=${WORK_DIR}\nexport UTILS=${UTILS}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport RRD_DATA_STORAGE_DIR=${RRD_DATA_STORAGE_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
+
 rm -rf ${RRD_DATA_STORAGE_DIR}
 mkdir -p ${RRD_DATA_STORAGE_DIR}
 
@@ -19,8 +21,12 @@ test_files=(/package/test_data/*.cpp)
 for f in ${test_files[@]}; do
     cp ${f} ${INITIAL_PROJECT_LOCATION}/
 done
+
+${UTILS}/canonize_internal_api.py /API/deps ${MAIN_SERVICE_NAME}/rrd
+
 echo "Create CC API which RRD depends on"
-${UTILS}/build_api_pseudo_fs.py /cc_API ${SHARED_API_DIR}
+${UTILS}/build_api_pseudo_fs.py /API/deps/cyclomatic_complexity ${SHARED_API_DIR}
+
 echo "Mock CC API for standalone functional tests only"
 rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_fake_data
 fake_statistic_data_result=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_fake_data
@@ -30,7 +36,13 @@ if [ -e ${real_statistic_pipe_out} ]; then
     rm -f ${real_statistic_pipe_out}
 fi
 mkfifo -m 644 ${real_statistic_pipe_out}
-echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
+
+real_statistic_pipe_in=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
+if [ -e ${real_statistic_pipe_in} ]; then
+    rm -f ${real_statistic_pipe_in}
+fi
+mkfifo -m 644 ${real_statistic_pipe_in}
+#echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
 (
 while :
 do
@@ -41,7 +53,7 @@ do
 done
 ) &
 WATCH_PID=$!
-cat ${real_statistic_pipe_out}
+#cat ${real_statistic_pipe_out}
 
 echo "Run tests:"
 RET=0
@@ -55,6 +67,8 @@ for s in ${WORK_DIR}/test_*.py; do
     then
         RET=$VAL
     fi
+    #echo "API fs snapshot after test execution: ${s}, result: ${VAL}"
+    #ls -laR ${SHARED_API_DIR}
 done
 
 # remove test files from project directory
@@ -65,6 +79,11 @@ done
 
 kill -15 ${WATCH_PID}
 wait ${WATCH_PID}
+rm -f ${real_statistic_pipe_in}
+rm -f ${real_statistic_pipe_out}
+echo "Final API fs snapshot, result ${RET}:"
+ls -laR ${SHARED_API_DIR}
+
 if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
 
 echo "wait for termination"

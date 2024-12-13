@@ -7,7 +7,7 @@ import sys
 
 from subprocess import check_output
 from async_executor import AsyncExecutor
-from utils import compose_api_queries_pipe_names
+from api_schema_utils import compose_api_queries_pipe_names
 
 from api_fs_query import APIQuery
 

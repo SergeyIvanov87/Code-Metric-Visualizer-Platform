@@ -1,7 +1,7 @@
 import json
 import os
 
-from utils import compose_api_queries_pipe_names
+from api_schema_utils import compose_api_queries_pipe_names
 from utils import get_api_queries
 from utils import wait_until_pipe_exist
 from api_fs_query import APIQuery

@@ -59,11 +59,11 @@ def generate_read_api_fs_args():
 
 def generate_bypassed_params_formatting():
     return [ r'replace_space_in_even_position() {',
-             r'    output_string=""',
-             r'    let space_counter=0',
-             r'    str="${1}"',
+             r'    local output_string=""',
+             r'    local let space_counter=0',
+             r'    local str="${1}"',
              r'    for (( i=0; i<${#str}; i++ )); do',
-             r'        symbol="${str:$i:1}"',
+             r'        local symbol="${str:$i:1}"',
              r'        if [ " " == "${symbol}" ]',
              r'        then',
              r'            if [ "$(( $space_counter % 2 ))" -eq 0 ]; then',

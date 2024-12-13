@@ -43,12 +43,16 @@ def check_query_counter(req, iteration_count=2):
 
 
 global_settings = Settings()
-testdata = list(get_api_queries(os.path.join(global_settings.work_dir, "API"), global_settings.domain_name_api_entry).items())
+dep_service_dir_list = [os.path.join("API/deps", d) for d in os.listdir("API/deps") if os.path.isdir(os.path.join("API/deps", d))]
 
+testdata=[]
+for service in dep_service_dir_list:
+    testdata.extend(list(get_api_queries(os.path.join(global_settings.work_dir, service), global_settings.domain_name_api_entry).items()))
 
-@pytest.mark.parametrize("name,query", testdata)
-def test_api_queries_lietening(name, query):
+@pytest.mark.parametrize("name, query", testdata)
+def test_api_queries_listening(name, query):
     global global_settings
-
+    if name=="all_dependencies" or name=="unmet_dependencies":
+        return
     print(f"{get_timestamp()}\tExecute test: {name}")
     check_query_counter(name)

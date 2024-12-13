@@ -17,8 +17,6 @@ COPY --from=build /usr/bin/pmccabe /usr/bin/pmccabe
 RUN mkdir -p /package/pmccabe_visualizer
 COPY --from=build /package/pmccabe_visualizer/*.py /package/pmccabe_visualizer/
 
-COPY cyclomatic_complexity/API/statistic.json /cc_API/
-# TODO think about sending those via ssh
 COPY rrd/tests/functional/data /package/test_data
 
 COPY rrd/API /API

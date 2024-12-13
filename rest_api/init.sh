@@ -9,6 +9,8 @@ export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
+source ${OPT_DIR}/shell_utils/init_utils.sh
+
 HOSTNAME_IP_FILE=/package/hostname_ip
 POPULATED_HOSTNAME_IP_FILE=${SHARED_API_DIR}/rest_api_addr
 
@@ -26,7 +28,7 @@ populate_host_ip_file(){
 }
 
 termination_handler(){
-   echo "***Stopping"
+   echo -e "${BRed}***Stopping${Color_Off}"
    remove_populated_host_ip_file
    exit 0
 }
@@ -76,7 +78,7 @@ while [ $RETURN_STATUS -eq 0 ]; do
 
                         # reset timeout counter upon event emerging
                         let API_UPDATE_EVENT_TIMEOUT_COUNTER=0
-                        echo "Event has been detected: ${file}, action; ${action}, dir: ${dir}. Reconfigure REST_API Service...."
+                        echo -e "${BBlue}Event has been detected:${Color_Off} ${file}, action; ${action}, dir: ${dir}. ${BBlue}Reconfigure REST_API Service....${Color_Off}"
                         ;;
                     *)
                         # do not spam air by any timeout info here!
@@ -100,7 +102,8 @@ while [ $RETURN_STATUS -eq 0 ]; do
             kill -s 0 ${WATCHDOG_PID} > /dev/null 2>&1
             WATCHDOG_TEST_RESULT=$?
             if [ $WATCHDOG_TEST_RESULT != 0 ]; then
-                echo "Unrecoverable error has occured. Container is inoperable. Abort."
+                echo -e "${BRed}Unrecoverable error has occured. Container is inoperable. Abort.${Color_Off}"
+                remove_populated_host_ip_file
                 RETURN_STATUS=255
                 break
             fi
@@ -112,7 +115,7 @@ while [ $RETURN_STATUS -eq 0 ]; do
 
         # Restart the running service instance only if API has been changed
         if [ ${HAS_GOT_API_UPDATE_EVENT} -gt 0 ]; then
-            echo "Got ${HAS_GOT_API_UPDATE_EVENT} API events. Restart REST_API service will be scheduled..."
+            echo "Got ${HAS_GOT_API_UPDATE_EVENT} API events. ${BBlue}Restart REST_API service will be scheduled...${Color_Off}"
             # kill an old instance
             remove_populated_host_ip_file
             REST_API_INSTANCE_PIDFILE_PID=`cat ${REST_API_INSTANCE_PIDFILE}`

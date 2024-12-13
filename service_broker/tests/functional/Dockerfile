@@ -10,4 +10,3 @@ RUN dos2unix /tests/*
 VOLUME ["/api"]
 
 ENTRYPOINT ["/tests/init.sh", "/tests", "/api"]
-

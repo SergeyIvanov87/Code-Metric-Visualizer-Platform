@@ -137,16 +137,119 @@ api_cli_schema = [
     "        fi\n",
     '        ' + exec_watchdog_function() + " ${WATCH_PID_ARRAY[${SESSION_ID_VALUE}]} ${pipe_result_consumer}\n",
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=0\n",
-    '        echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tSTART    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}"\n',
+    '        echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tSTART    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}"\treqNum:\t${REQUEST_NUM}\n',
     '        touch "${api_exec_node_directory}/in_progress"\n',
     '        RESULT_OUT=$(${0}/{1} {2} ', '"${CMD_READ}" | base64)\n',
     '        rm -f ${api_exec_node_directory}/in_progress\n',
-    '        (touch ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tFINISH    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ} " && echo "${RESULT_OUT}" | base64 -d >$pipe_result_consumer && rm -rf ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tCONSUMED [${SESSION_ID_VALUE}]: ${api_exec_node_directory} <--- ${pipe_result_consumer}") &\n',
+    '        (touch ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tFINISH    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}\treqNum:\t${REQUEST_NUM} " && echo "${RESULT_OUT}" | base64 -d >$pipe_result_consumer && rm -rf ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tCONSUMED [${SESSION_ID_VALUE}]: ${api_exec_node_directory} <--- ${pipe_result_consumer}") &\n',
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=$!\n",
     "        let REQUEST_NUM=${REQUEST_NUM}+1\n",
     "    done <<< `cat $pipe_request`\n",
     "done\n",
+    "echo 'Server {0} stopped'\n",
 ]
+
+def generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type):
+    req_executor_name = compose_api_exec_script_name(req_name)
+    api_gui_schema_concrete = api_gui_schema.copy()
+    template_schema_row_index = 0
+    api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
+        "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_req_directory
+    )
+
+    # determine result type: either from JSON or from script renerated
+    template_schema_row_index += 2
+    if len(content_type) != 0:
+        api_gui_schema_concrete[template_schema_row_index] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
+    else:
+        api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format("{WORK_DIR}",req_executor_name)
+
+    template_schema_row_index += 1
+    api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
+        api_exec_node_directory, get_fs_watch_event_for_request_type(req_type), api_gui_exec_filename_from_req_type(req_type) + "$"
+    )
+
+    template_schema_row_index += 6
+    api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
+        api_exec_node_directory)
+
+    template_schema_row_index += 1
+    api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
+        "{WORK_DIR}",
+        req_executor_name,
+        api_req_directory,
+        os.path.join(api_exec_node_directory, "result_${date}"),
+        "{EXT}"
+    )
+
+    template_schema_row_index += 1
+    api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
+        os.path.join(api_exec_node_directory, "result_${date}"),
+        "{EXT}"
+    )
+
+    template_schema_row_index += 1
+    api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
+        api_exec_node_directory)
+
+    return api_gui_schema_concrete
+
+def generate_cli_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type):
+    req_executor_name = compose_api_exec_script_name(req_name)
+    api_cli_schema_concrete = api_cli_schema.copy()
+
+    template_schema_row_index = len(generate_exec_watchdog_function())
+    template_schema_row_index += len(generate_extract_attr_value_from_string())
+    api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(api_exec_node_directory
+    )
+
+    # determine result type: either from JSON or from script renerated
+    template_schema_row_index += 2
+    if len(content_type) != 0:
+        api_cli_schema_concrete[template_schema_row_index] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
+    else:
+        api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format("{WORK_DIR}",req_executor_name)
+
+    template_schema_row_index += 54
+    api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(
+        "{WORK_DIR}",
+        req_executor_name,
+        api_req_directory
+    )
+    api_cli_schema_concrete[-1] = api_cli_schema_concrete[-1].format(req_name)
+    return api_cli_schema_concrete
+
+def create_gui_server_content_from_schema(req_name, req_schema):
+    req_type = req_schema["Method"]
+    req_api = req_schema["Query"]
+    req_params = req_schema["Params"]
+
+    content_type=""
+    if "Content-Type" in req_schema:
+        content_type = req_schema["Content-Type"]
+
+    api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
+            "${SHARED_API_DIR}", req_api, req_type
+    )
+
+    return generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type)
+
+
+def create_cli_server_content_from_schema(req_name, req_schema):
+    req_type = req_schema["Method"]
+    req_api = req_schema["Query"]
+    req_params = req_schema["Params"]
+
+    content_type=""
+    if "Content-Type" in req_schema:
+        content_type = req_schema["Content-Type"]
+
+    api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
+            "${SHARED_API_DIR}", req_api, req_type
+    )
+
+    return generate_cli_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type)
+
 
 def build_api_services(api_schema_path, executor_generated_scripts_path, output_services_path):
     generated_api_server_scripts_path = output_services_path
@@ -156,100 +259,28 @@ def build_api_services(api_schema_path, executor_generated_scripts_path, output_
     errors_detected = []
     for schema_file in schemas_file_list:
         req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
-        req_type = request_data["Method"]
-        req_api = request_data["Query"]
-        req_params = request_data["Params"]
-
-        content_type=""
-        if "Content-Type" in request_data:
-            content_type = request_data["Content-Type"]
-
-        api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
-                "${SHARED_API_DIR}", req_api, req_type
-        )
 
         try:
-            req_executor_name = check_script_valid(executor_generated_scripts_path, req_name)
+            check_script_valid(executor_generated_scripts_path, req_name)
         except Exception as e:
             errors_detected.append(str(e))
             continue
 
-        # generate GUI API listener
-        api_server_script_file_path = get_api_gui_service_script_path(generated_api_server_scripts_path, req_name)
-        with open(api_server_script_file_path, "w") as listener_file:
-            api_gui_schema_concrete = api_gui_schema.copy()
-            template_schema_row_index = 0
-            api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
-                "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_req_directory
-            )
-
-            # determine result type: either from JSON or from script renerated
-            template_schema_row_index += 2
-            if len(content_type) != 0:
-                api_gui_schema_concrete[template_schema_row_index] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
-            else:
-                api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format("{WORK_DIR}",req_executor_name)
-
-            template_schema_row_index += 1
-            api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
-                api_exec_node_directory, get_fs_watch_event_for_request_type(req_type), api_gui_exec_filename_from_req_type(req_type) + "$"
-            )
-
-            template_schema_row_index += 6
-            api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
-                api_exec_node_directory)
-
-            template_schema_row_index += 1
-            api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
-                "{WORK_DIR}",
-                req_executor_name,
-                api_req_directory,
-                os.path.join(api_exec_node_directory, "result_${date}"),
-                "{EXT}"
-            )
-
-            template_schema_row_index += 1
-            api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
-                os.path.join(api_exec_node_directory, "result_${date}"),
-                "{EXT}"
-            )
-
-            template_schema_row_index += 1
-            api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
-                api_exec_node_directory)
-
-            listener_file.write("#!/bin/bash\n\n")
-            listener_file.writelines(api_gui_schema_concrete)
-
-        filesystem_utils.make_file_executable(api_server_script_file_path)
-
         #generate CLI API server
+        cli_server_content = create_cli_server_content_from_schema(req_name, request_data)
         api_server_script_file_path = get_api_cli_service_script_path(generated_api_server_scripts_path, req_name)
         with open(api_server_script_file_path, "w") as server_file:
-            api_cli_schema_concrete = api_cli_schema.copy()
-
-            template_schema_row_index = len(generate_exec_watchdog_function())
-            template_schema_row_index += len(generate_extract_attr_value_from_string())
-            api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(api_exec_node_directory
-            )
-
-            # determine result type: either from JSON or from script renerated
-            template_schema_row_index += 2
-            if len(content_type) != 0:
-                api_cli_schema_concrete[template_schema_row_index] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
-            else:
-                api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format("{WORK_DIR}",req_executor_name)
-
-            template_schema_row_index += 54
-            api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(
-                "{WORK_DIR}",
-                req_executor_name,
-                api_req_directory
-            )
-
             server_file.write("#!/bin/bash\n\n")
-            server_file.writelines(api_cli_schema_concrete)
+            server_file.writelines(cli_server_content)
+        filesystem_utils.make_file_executable(api_server_script_file_path)
 
+
+        # generate GUI API listener
+        gui_server_content = create_gui_server_content_from_schema(req_name, request_data)
+        api_server_script_file_path = get_api_gui_service_script_path(generated_api_server_scripts_path, req_name)
+        with open(api_server_script_file_path, "w") as listener_file:
+            listener_file.write("#!/bin/bash\n\n")
+            listener_file.writelines(gui_server_content)
         filesystem_utils.make_file_executable(api_server_script_file_path)
 
     if len(errors_detected) != 0:

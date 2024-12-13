@@ -18,7 +18,6 @@ RUN mkdir -p /package/pmccabe_visualizer
 COPY --from=build /package/pmccabe_visualizer/*.py /package/pmccabe_visualizer/
 
 COPY rrd/API /API
-COPY cyclomatic_complexity/API/statistic.json /cc_API/
 
 COPY rrd/tests/integrational/*.py /tests/
 COPY rrd/tests/integrational/*.sh /tests/

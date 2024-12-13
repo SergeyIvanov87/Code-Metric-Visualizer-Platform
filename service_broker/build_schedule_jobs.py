@@ -20,6 +20,8 @@ sys.path.append('modules')
 
 import filesystem_utils
 
+from api_deps_utils import get_api_service_dependency_files
+from api_schema_utils import compose_api_queries_pipe_names
 from api_schema_utils import deserialize_api_request_from_schema_file
 from api_schema_utils import file_extension_from_content_type
 
@@ -38,13 +40,16 @@ args = parser.parse_args()
 def intersection(list_lhs, list_rhs):
     return [ i for i in list_lhs if i in list_rhs ]
 
-schemas_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, r".*\.json$")
-order_list_file_path = os.path.join(args.api_schemas_input_dir, "service_broker_queries_order_list.json")
-if order_list_file_path not in schemas_file_list:
-    raise Exception(f"Required file \"{order_list_file_path}\" is absent. It MUST contain an order of queries to build a schedule up. Please add it")
+service_api_deps = get_api_service_dependency_files(os.path.join(args.api_schemas_input_dir,"deps"), r".*", r".*\.json$")
 
-# remove `order_list_file` from `schemas_file_list` which will be sorted off according to order_list_file
-schemas_file_list.remove(order_list_file_path)
+schemas_file_list = []
+for schemas_file_array in service_api_deps.values():
+    schemas_file_list.extend(schemas_file_array)
+
+main_api_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, r".*\.json$")
+order_list_file_path = os.path.join(args.api_schemas_input_dir, "service_broker_queries_order_list.json")
+if order_list_file_path not in main_api_file_list:
+    raise Exception(f"Required file \"{order_list_file_path}\" is absent. It MUST contain an order of queries to build a schedule up. Please add it")
 
 # fill in queries call-order
 ordered_schemas_file_list = []
@@ -58,9 +63,10 @@ with open(order_list_file_path, "r") as order_list_file:
         for item in order_list_file_data["jobs"]:
             if "source" not in item.keys():
                 raise Exception(f"In file \"{order_list_file_path}\" \"jobs\" an array item must contain MAJOR field \"source\" with query file location, got:\n {item}")
-            full_path_source = os.path.join(args.api_schemas_input_dir,item["source"])
-            ordered_schemas_file_list.append(full_path_source)
-            jobs_call_condition_table[full_path_source] = item
+            for schema_file in schemas_file_list:
+                if schema_file.endswith(item["source"]):
+                    ordered_schemas_file_list.append(schema_file)
+                    jobs_call_condition_table[schema_file] = item
     except json.decoder.JSONDecodeError as e:
         raise Exception(f"Error: {str(e)} in file: {order_list_file_path}")
 
@@ -89,14 +95,13 @@ def get_query_params(params):
              r'    query_params_str=query_params_str.removesuffix(" ")'
     ]
 
-def generate_cron_jobs_schema(filesystem_api_mount_point, req_api, req_type, output_pipe, params, job_control):
+def generate_cron_jobs_schema(req_api, fs_pipes, job_control):
     # avoid isung any external scripts/command invocation in crond-scripts
     # it has no utter SHELL-support, hence many scrips/commands are unavaialbe
     # For example, ask `hostname` using python API. It will be able to extract real container hostname
     # as soon as this is used by `init.sh`
     hostname = socket.gethostname()
-    full_query_pipe_path = os.path.join(filesystem_api_mount_point, req_api, req_type, "exec")
-    full_result_pipe_path = os.path.join(filesystem_api_mount_point, output_pipe)
+    full_query_pipe_path, full_result_pipe_path = fs_pipes
     full_result_pipe_path = full_result_pipe_path + "_" + hostname
     job_generator_str = '{} && echo "SESSION_ID={}" > {} && while [ ! -p {} ]; do sleep 0.5; echo "wait for pipe {} ready"; done && cat {} && echo "\\"{}\\" completed" && {}'.format(job_control["pre"], hostname, full_query_pipe_path, full_result_pipe_path, full_result_pipe_path, full_result_pipe_path, req_api, job_control["post"])
     return job_generator_str
@@ -105,29 +110,16 @@ def generate_cron_jobs_schema(filesystem_api_mount_point, req_api, req_type, out
 jobs_content = []
 for schema_file in ordered_schemas_file_list:
     req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
-    req_type = request_data["Method"]
     req_api = request_data["Query"]
-    req_params = request_data["Params"]
 
     # filter unrelated API queries
     domain_entry_pos = req_api.find(args.domain_name_api_entry)
     if domain_entry_pos == -1:
         continue
 
-    # Content-Type is an optional field
-    content_type=""
-    if "Content-Type" in request_data:
-        content_type = request_data["Content-Type"]
-
-    # determine output PIPE name extension base on Content-Type
-    if content_type == "":
-        req_fs_output_pipe_name = os.path.join(req_api, req_type, "result")
-        content_type="text/plain"
-    else:
-        req_fs_output_pipe_name = os.path.join(req_api, req_type, "result." + file_extension_from_content_type(content_type))
-
+    req_fs_pipes = compose_api_queries_pipe_names(args.filesystem_api_mount_point, request_data)
     req_api = req_api[domain_entry_pos:]
-    jobs_content.append(generate_cron_jobs_schema(args.filesystem_api_mount_point, req_api, req_type, req_fs_output_pipe_name, req_params, jobs_call_condition_table[schema_file]))
+    jobs_content.append(generate_cron_jobs_schema(req_api, req_fs_pipes, jobs_call_condition_table[schema_file]))
 
 if len(jobs_content) != 0:
     print(" && ".join(jobs_content))

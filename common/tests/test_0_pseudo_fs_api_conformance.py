@@ -9,10 +9,13 @@ import stat
 
 from settings import Settings
 from utils import get_api_queries
-from utils import compose_api_queries_pipe_names
+from api_schema_utils import compose_api_queries_pipe_names
 
 global_settings = Settings()
 testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).items())
+
+if os.path.isdir("/API/deps"):
+    testdata.extend(list(get_api_queries("/API/deps", global_settings.domain_name_api_entry).items()))
 
 @pytest.mark.parametrize("name,query", testdata)
 def test_filesystem_api_nodes(name, query):
