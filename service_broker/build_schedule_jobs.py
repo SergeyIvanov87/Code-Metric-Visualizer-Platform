@@ -21,6 +21,7 @@ sys.path.append('modules')
 import filesystem_utils
 
 from api_deps_utils import get_api_service_dependency_files
+from api_schema_utils import compose_api_queries_pipe_names
 from api_schema_utils import deserialize_api_request_from_schema_file
 from api_schema_utils import file_extension_from_content_type
 
@@ -94,14 +95,13 @@ def get_query_params(params):
              r'    query_params_str=query_params_str.removesuffix(" ")'
     ]
 
-def generate_cron_jobs_schema(filesystem_api_mount_point, req_api, req_type, output_pipe, params, job_control):
+def generate_cron_jobs_schema(req_api, fs_pipes, job_control):
     # avoid isung any external scripts/command invocation in crond-scripts
     # it has no utter SHELL-support, hence many scrips/commands are unavaialbe
     # For example, ask `hostname` using python API. It will be able to extract real container hostname
     # as soon as this is used by `init.sh`
     hostname = socket.gethostname()
-    full_query_pipe_path = os.path.join(filesystem_api_mount_point, req_api, req_type, "exec")
-    full_result_pipe_path = os.path.join(filesystem_api_mount_point, output_pipe)
+    full_query_pipe_path, full_result_pipe_path = fs_pipes
     full_result_pipe_path = full_result_pipe_path + "_" + hostname
     job_generator_str = '{} && echo "SESSION_ID={}" > {} && while [ ! -p {} ]; do sleep 0.5; echo "wait for pipe {} ready"; done && cat {} && echo "\\"{}\\" completed" && {}'.format(job_control["pre"], hostname, full_query_pipe_path, full_result_pipe_path, full_result_pipe_path, full_result_pipe_path, req_api, job_control["post"])
     return job_generator_str
@@ -110,29 +110,16 @@ def generate_cron_jobs_schema(filesystem_api_mount_point, req_api, req_type, out
 jobs_content = []
 for schema_file in ordered_schemas_file_list:
     req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
-    req_type = request_data["Method"]
     req_api = request_data["Query"]
-    req_params = request_data["Params"]
 
     # filter unrelated API queries
     domain_entry_pos = req_api.find(args.domain_name_api_entry)
     if domain_entry_pos == -1:
         continue
 
-    # Content-Type is an optional field
-    content_type=""
-    if "Content-Type" in request_data:
-        content_type = request_data["Content-Type"]
-
-    # determine output PIPE name extension base on Content-Type
-    if content_type == "":
-        req_fs_output_pipe_name = os.path.join(req_api, req_type, "result")
-        content_type="text/plain"
-    else:
-        req_fs_output_pipe_name = os.path.join(req_api, req_type, "result." + file_extension_from_content_type(content_type))
-
+    req_fs_pipes = compose_api_queries_pipe_names(args.filesystem_api_mount_point, request_data)
     req_api = req_api[domain_entry_pos:]
-    jobs_content.append(generate_cron_jobs_schema(args.filesystem_api_mount_point, req_api, req_type, req_fs_output_pipe_name, req_params, jobs_call_condition_table[schema_file]))
+    jobs_content.append(generate_cron_jobs_schema(req_api, req_fs_pipes, jobs_call_condition_table[schema_file]))
 
 if len(jobs_content) != 0:
     print(" && ".join(jobs_content))

@@ -18,6 +18,7 @@ sys.path.append('modules')
 
 import filesystem_utils
 
+from api_schema_utils import compose_api_queries_pipe_names
 from api_schema_utils import deserialize_api_request_from_schema_file
 from api_schema_utils import file_extension_from_content_type
 
@@ -57,7 +58,7 @@ def get_query_params(params):
              r'    query_params_str=query_params_str.removesuffix(" ")'
     ]
 
-def generate_cgi_schema(filesystem_api_mount_point, req_api, req_type, output_pipe, params, content_type):
+def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
     canonize_api_method_name = req_api.replace(os.sep, "_")
     canonize_api_method_name = canonize_api_method_name.replace('.', '_')
 
@@ -86,10 +87,10 @@ def generate_cgi_schema(filesystem_api_mount_point, req_api, req_type, output_pi
     cgi_schema = [ r'@app.route("/{}",  methods=[{}])'.format(req_api, methods),
                    r'def {}():'.format(canonize_api_method_name),
                    *make_redirect_url,
-                   r'    api_query_pipe="/{}/{}/{}/exec"'.format(filesystem_api_mount_point, req_api, req_type),
+                   r'    api_query_pipe="/{}"'.format(fs_pipes[0]),
                    # rest_api always uses SESSION_ID
                    r'    session_id_value=socket.gethostname()',
-                   r'    api_result_pipe="/{}/{}_" + session_id_value'.format(filesystem_api_mount_point, output_pipe),
+                   r'    api_result_pipe="/{}_" + session_id_value'.format(fs_pipes[1]),
                    r'    query = APIQuery([api_query_pipe, api_result_pipe])',
                    *get_query_params(params), r'',
                    r'    query.execute(query_params_str)',
@@ -135,6 +136,8 @@ for schema_file in schemas_file_list:
     if domain_entry_pos == -1:
         continue
 
+    fs_pipes = compose_api_queries_pipe_names(args.filesystem_api_mount_point, request_data)
+
     # Content-Type is an optional field
     content_type=""
     if "Content-Type" in request_data:
@@ -142,12 +145,9 @@ for schema_file in schemas_file_list:
 
     # determine output PIPE name extension base on Content-Type
     if content_type == "":
-        req_fs_output_pipe_name = os.path.join(req_api, req_type, "result")
         content_type="text/plain"
-    else:
-        req_fs_output_pipe_name = os.path.join(req_api, req_type, "result." + file_extension_from_content_type(content_type))
 
     req_api = req_api[domain_entry_pos:]
-    cgi_content = generate_cgi_schema(args.filesystem_api_mount_point, req_api, req_type, req_fs_output_pipe_name, req_params, content_type)
+    cgi_content = generate_cgi_schema(req_api, req_type, fs_pipes, req_params, content_type)
     for l in cgi_content:
         print(l)

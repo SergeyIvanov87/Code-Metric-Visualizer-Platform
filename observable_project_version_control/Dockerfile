@@ -11,6 +11,7 @@ RUN apk add --no-cache git apk-cron
 
 RUN mkdir -p /opt
 COPY common/modules /opt/modules
+COPY common/shell_utils /opt/shell_utils
 COPY common/api_management.py /opt/
 COPY common/build_api_executors.py /opt/
 COPY common/build_api_services.py /opt/

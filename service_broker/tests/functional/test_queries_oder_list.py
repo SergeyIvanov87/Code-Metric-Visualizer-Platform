@@ -50,9 +50,9 @@ for service in dep_service_dir_list:
     testdata.extend(list(get_api_queries(os.path.join(global_settings.work_dir, service), global_settings.domain_name_api_entry).items()))
 
 @pytest.mark.parametrize("name, query", testdata)
-def test_api_queries_lietening(name, query):
+def test_api_queries_listening(name, query):
     global global_settings
-    if name=="dependencies":
+    if name=="all_dependencies" or name=="unmet_dependencies":
         return
     print(f"{get_timestamp()}\tExecute test: {name}")
     check_query_counter(name)

@@ -67,8 +67,8 @@ for s in ${WORK_DIR}/test_*.py; do
     then
         RET=$VAL
     fi
-    echo "API fs snapshot after test execution: ${s}, result: ${VAL}"
-    ls -laR ${SHARED_API_DIR}
+    #echo "API fs snapshot after test execution: ${s}, result: ${VAL}"
+    #ls -laR ${SHARED_API_DIR}
 done
 
 # remove test files from project directory

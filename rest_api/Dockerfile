@@ -28,6 +28,7 @@ RUN dos2unix /package/*
 
 RUN mkdir -p /opt
 COPY common/modules /opt/modules
+COPY common/shell_utils /opt/shell_utils
 COPY common/build_api_executors.py /opt/
 COPY common/build_api_services.py /opt/
 COPY common/build_api_pseudo_fs.py /opt/
