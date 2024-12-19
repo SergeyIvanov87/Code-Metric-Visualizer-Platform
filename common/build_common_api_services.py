@@ -56,6 +56,7 @@ def make_script_unmet_dependencies(script):
 def build_ask_dependency_api_service(dep_api_schema_file, output_services_path, output_exec_script_path, make_script):
     generated_api_server_scripts_path = output_services_path
     os.makedirs(generated_api_server_scripts_path, exist_ok=True)
+    os.makedirs(output_exec_script_path, exist_ok=True)
 
     req_name, request_data = deserialize_api_request_from_schema_file(dep_api_schema_file)
 

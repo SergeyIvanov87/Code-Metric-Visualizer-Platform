@@ -19,24 +19,20 @@ from build_api_pseudo_fs import build_api_pseudo_fs
 global_settings = Settings()
 
 
-@pytest.fixture(scope="function", autouse=True)
-def run_around_tests():
-    # Tear up
-    global global_settings
-
+def build_and_launch_services(service_schema_dirs, generated_api_scripts_dir, fs_api_root):
     generated_api_rel_path = "generated"
-    generated_api_path = os.path.join(global_settings.work_dir, generated_api_rel_path)
+    generated_api_path = os.path.join(generated_api_scripts_dir, generated_api_rel_path)
     shutil.rmtree(generated_api_path, ignore_errors=True)
     os.mkdir(generated_api_path)
 
-    build_api_executors("/API", global_settings.work_dir, generated_api_path)
+    build_api_executors(service_schema_dirs, generated_api_scripts_dir, generated_api_path)
     ut_utils.create_executable_file([generated_api_path], "req_cmd.sh", ["#!/usr/bin/env bash\n", "sleep 1\n"])
 
     generated_api_services_rel_path = "services"
     generated_api_services_path = os.path.join(
         generated_api_path, generated_api_services_rel_path
     )
-    build_api_services("/API", generated_api_path, generated_api_services_path)
+    build_api_services(service_schema_dirs, generated_api_path, generated_api_services_path)
     server_scripts = [
         os.path.join(generated_api_services_path, f)
         for f in os.listdir(generated_api_services_path)
@@ -44,9 +40,9 @@ def run_around_tests():
     assert len(server_scripts)
 
     print("Build pseudo-filesystem API", file=sys.stdout, flush=True)
-    generated_api_mount_point = global_settings.api_dir
+    generated_api_mount_point = fs_api_root
     shutil.rmtree(generated_api_mount_point, ignore_errors=True)
-    build_api_pseudo_fs("/API", generated_api_mount_point)
+    build_api_pseudo_fs(service_schema_dirs, generated_api_mount_point)
 
     print("Launch console servers", file=sys.stdout, flush=True)
     server_env = os.environ.copy()
@@ -57,7 +53,16 @@ def run_around_tests():
         print(f"Launched server PID: {server.pid}, PGID : {os.getpgid(server.pid)}")
         servers.append(server)
 
+    return servers
+
+
+@pytest.fixture(scope="function", autouse=True)
+def run_around_tests():
+    # Tear up
+    global global_settings
+    servers =vbuild_and_launch_services("/API", global_settings.work_dir, global_settings.api_dir)
     yield servers
+
     print("Stop console servers", file=sys.stdout, flush=True)
     # Tear down
     # stop servers
