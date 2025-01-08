@@ -11,6 +11,7 @@ import time
 import threading
 import ut_utils
 
+import filesystem_utils
 from settings import Settings
 from utils import get_api_queries
 from api_schema_utils import compose_api_queries_pipe_names
@@ -70,7 +71,7 @@ def test_filesystem_api_graceful_shutdown_pipes_client(name, query, run_around_t
 
     # stub API executable to and send requesto to it simulate stucking on a dead-end pipes
     generated_api_rel_path = "generated"
-    ut_utils.create_executable_file([global_settings.work_dir, generated_api_rel_path], "req_cmd.sh", ["#!/usr/bin/env bash\n", "sleep infinity &\n", "wait $!"])
+    filesystem_utils.create_executable_file([global_settings.work_dir, generated_api_rel_path], "req_cmd.sh", ["#!/usr/bin/env bash\n", "sleep infinity &\n", "wait $!"])
     executors = []
     session_id = 0
     executor = ut_utils.APIExecutor(global_settings.api_dir, query, session_id, None, None, onQueryPostExecute)
@@ -120,7 +121,7 @@ def test_filesystem_api_graceful_shutdown_processes(name, query, run_around_test
             assert api_result_pipe_timeout_cycles <= 30
 
     generated_api_rel_path = "generated"
-    ut_utils.create_executable_file([global_settings.work_dir, generated_api_rel_path], "req_cmd.sh", ["#!/usr/bin/env bash\n", "mkfifo -m 644 tmp_fifo\n", "echo 0 > tmp_fifo"])
+    filesystem_utils.create_executable_file([global_settings.work_dir, generated_api_rel_path], "req_cmd.sh", ["#!/usr/bin/env bash\n", "mkfifo -m 644 tmp_fifo\n", "echo 0 > tmp_fifo"])
 
     # execute multisession queries
     api_query = APIQuery(compose_api_queries_pipe_names(
@@ -185,7 +186,7 @@ def test_filesystem_api_graceful_shutdown_pipes_client_server(name, query, run_a
 
     # stub API executable to and send requesto to it simulate stucking on a dead-end pipes
     generated_api_rel_path = "generated"
-    ut_utils.create_executable_file([global_settings.work_dir, generated_api_rel_path], "req_cmd.sh", ["#!/usr/bin/env bash\n", "sleep infinity &\n", "wait $!"])
+    filesystem_utils.create_executable_file([global_settings.work_dir, generated_api_rel_path], "req_cmd.sh", ["#!/usr/bin/env bash\n", "sleep infinity &\n", "wait $!"])
     executors = []
     session_id = 0
     server_blocking_executor = ut_utils.APIExecutor(global_settings.api_dir, query, session_id, None, None, onQueryPostExecute)

@@ -20,7 +20,7 @@ from api_schema_utils import deserialize_api_request_from_schema_file
 import api_fs_exec_utils
 import api_fs_bash_utils
 
-def make_script_dependencies(script):
+def make_script_proxy_query(script):
     file_extension = ".json"
     body = (
         *api_fs_exec_utils.generate_exec_header(), r"",
@@ -31,29 +31,25 @@ def make_script_dependencies(script):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${OPT_DIR}/get_service_api_deps.py "/package/API"',
+        r'CURL_GET_PARAMS=""',
+        r'let i=0',
+        r'for a in ${OVERRIDEN_CMD_ARGS[@]}',
+        r'do',
+        r'  if [ $i -eq 0 ] ; then',
+        r'      CURL_GET_PARAMS="${CURL_GET_PARAMS} -d \"${a}"',
+        r'      let i=1',
+        r'  else',
+        r'      CURL_GET_PARAMS="${CURL_GET_PARAMS}=${a}\""',
+        r'      let i=0',
+        r'  fi',
+        r'done',
+        r'curl --get ${CURL_GET_PARAMS} ${DOWNSTREAM_SERVICE_NETWORK_ADDR}/${API_NODE}',
 
     )
     script.writelines(line + "\n" for line in body)
 
 
-def make_script_unmet_dependencies(script):
-    file_extension = ".json"
-    body = (
-        *api_fs_exec_utils.generate_exec_header(), r"",
-        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
-        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
-        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
-        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
-        *api_fs_exec_utils.generate_api_node_env_init(), r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
-        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${OPT_DIR}/check_missing_pseudo_fs_from_schema.py ${SHARED_API_DIR} "api.pmccabe_collector.restapi.org" ${DEPEND_ON_SERVICES_API_SCHEMA_DIR}',
-
-    )
-    script.writelines(line + "\n" for line in body)
-
-def build_ask_dependency_api_service(dep_api_schema_file, output_services_path, output_exec_script_path, make_script):
+def build_proxy_api_service(dep_api_schema_file, output_services_path, output_exec_script_path, make_script):
     generated_api_server_scripts_path = output_services_path
     os.makedirs(generated_api_server_scripts_path, exist_ok=True)
     os.makedirs(output_exec_script_path, exist_ok=True)
@@ -61,7 +57,7 @@ def build_ask_dependency_api_service(dep_api_schema_file, output_services_path, 
     req_name, request_data = deserialize_api_request_from_schema_file(dep_api_schema_file)
 
     #generate CLI API server only
-    cli_server_content = build_api_services.create_cli_server_content_from_schema(req_name, request_data)
+    cli_server_content = build_api_services.create_cli_server_content_from_schema(req_name, request_data, output_exec_script_path)
     api_server_script_file_path = build_api_services.get_api_cli_service_script_path(generated_api_server_scripts_path, req_name)
     with open(api_server_script_file_path, "w") as server_file:
         server_file.write("#!/bin/bash\n\n")
@@ -81,14 +77,14 @@ def build_ask_dependency_api_service(dep_api_schema_file, output_services_path, 
         print(
             f'Skipping the script "{req_name}":\n\t"{e}"'
         )
-    return api_server_script_file_path, script_generated_path
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="Build file-system API nodes based on pseudo-REST API from cfg file"
     )
 
-    parser.add_argument("api_schema_dir", help="Path to the root directory incorporated JSON API schema descriptions")
+    parser.add_argument("api_schema_dir", help="Path to the root directory incorporated services and their JSON API schema descriptions")
     parser.add_argument("-os", "--output_server_dir",
                         help='Output directory where the generated server scripts will be placed. Default=\"./{}\"'.format(get_generated_scripts_path()),
                         default=get_generated_scripts_path())
@@ -102,7 +98,4 @@ if __name__ == "__main__":
 
     schemas_file_list = get_api_schema_files(args.api_schema_dir)
     for schema_file in schemas_file_list:
-        if schema_file.endswith("all_dependencies.json"):
-            build_ask_dependency_api_service(schema_file, args.output_server_dir, args.output_exec_dir, make_script_dependencies)
-        if schema_file.endswith("unmet_dependencies.json"):
-            build_ask_dependency_api_service(schema_file, args.output_server_dir, args.output_exec_dir, make_script_unmet_dependencies)
+        build_proxy_api_service(schema_file, args.output_server_dir, args.output_exec_dir, make_script_proxy_query)

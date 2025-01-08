@@ -1,6 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-source ${OPT_DIR}/shell_utils/color_codes.sh
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+source ${SCRIPT_DIR}/color_codes.sh
 
 gracefull_shutdown() {
     local -n SERVICE_WATCH_PIDS_TO_STOP=${1}
@@ -10,12 +12,12 @@ gracefull_shutdown() {
     ps -ef
     for server_script_path in "${!SERVICE_WATCH_PIDS_TO_STOP[@]}"
     do
-        echo -e "${BRed}Kill ${server_script_path}${Color_Off} by PID: {${SERVICE_WATCH_PIDS_TO_STOP[$server_script_path]}}"
+        echo -e "${BRed}Kill ${server_script_path}${Color_Off} by PID: ${Red}${SERVICE_WATCH_PIDS_TO_STOP[$server_script_path]}${Color_Off}"
         pkill -KILL -e -P ${SERVICE_WATCH_PIDS_TO_STOP[$server_script_path]}
         kill -9 ${SERVICE_WATCH_PIDS_TO_STOP[$server_script_path]}
         ps -ef
     done
-    echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Clear pipes, killing PID: ${API_MANAGEMENT_PID}****${Color_Off}"
+    echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Clear pipes, killing PID: ${Red}${API_MANAGEMENT_PID}${BRed}****${Color_Off}"
     kill -s SIGTERM ${API_MANAGEMENT_PID}
     while true
     do
@@ -30,10 +32,41 @@ gracefull_shutdown() {
     echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Done****${Color_Off}"
 }
 
+gracefull_shutdown_bunch() {
+    local -n service_watch_pids_to_stop=${1}
+    local -n api_management_pids=${2}
+
+    echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Shutdown servers***${Color_Off}"
+    ps -ef
+    for server_script_path in "${!service_watch_pids_to_stop[@]}"
+    do
+        echo -e "${BRed}Kill ${server_script_path}${Color_Off} by PID: ${Red}${service_watch_pids_to_stop[$server_script_path]}${Color_Off}"
+        pkill -KILL -e -P ${service_watch_pids_to_stop[$server_script_path]}
+        kill -9 ${service_watch_pids_to_stop[$server_script_path]}
+        ps -ef
+    done
+    for api_management_pid in ${api_management_pids[@]}
+    do
+        echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Clear pipes, killing PID: ${Red}${api_management_pid}${BRed}****${Color_Off}"
+        kill -s SIGTERM ${api_management_pid}
+        while true
+        do
+            kill -s 0 ${api_management_pid}
+            RESULT=$?
+            if [ $RESULT == 0 ]; then
+                echo -e "`date +%H:%M:%S:%3N`    ${Blue}***api_management_pid: ${api_management_pid} still exist****${Color_Off}"
+                continue
+            fi
+            break
+        done
+    done
+    echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Done****${Color_Off}"
+}
+
 wait_for_pipe_exist() {
-    local pipe = ${1}
+    local pipe=${1}
     local pipe_wait_timeout_sec=0.1
-    local pipe_wait_timeout_limit=3
+    local pipe_wait_timeout_limit=${3}
     local pipe_wait_timeout_counter=0
     local ret_code=0
     while [ ! -p ${pipe} ];

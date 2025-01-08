@@ -36,3 +36,10 @@ def read_pipes_from_path(path, pipe_match_regex):
     matched_pipes = [ os.path.join(path,f) for f in pipes if p.match(f) ]
 
     return matched_pipes
+
+
+def create_executable_file(path_nodes_list, filename, lines_to_write):
+    executable_filepath = os.path.join(*path_nodes_list, filename)
+    with open(executable_filepath, "w") as executable_file:
+        executable_file.writelines(lines_to_write)
+    make_file_executable(executable_filepath)

@@ -1,0 +1,21 @@
+include:
+  - ../../../../../common/images/test_pseudo_fs/compose.yaml
+
+services:
+  fs_api_http_proxy_functional_tester_service_a:
+    build:
+      context: ../../../../../
+      dockerfile: fs_api_proxy/http_proxy/tests/functional/mock_upstream_service/Dockerfile
+    environment:
+        - UPSTREAM_SERVICE=mock_upstream_service
+        - DOWNSTREAM_SERVICE=service_a
+        - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub_downstream_service_network_addr
+        - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}
+        - PYTEST_FILTER=${PYTEST_FILTER:-}
+    volumes:
+      - api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:/api
+    depends_on:
+      - http_proxy_service_a
+
+volumes:
+  api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:

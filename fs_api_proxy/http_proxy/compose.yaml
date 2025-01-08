@@ -1,0 +1,24 @@
+services:
+  http_proxy:
+    build:
+      context: ../../
+      dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
+    depends_on:
+      - syslog-ng
+    hostname: http_proxy
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+    ports:
+      - 5000:5000
+
+volumes:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    #external: true
