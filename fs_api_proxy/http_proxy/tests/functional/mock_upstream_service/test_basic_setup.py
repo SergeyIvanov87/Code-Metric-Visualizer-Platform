@@ -23,6 +23,8 @@ from utils import wait_until_pipe_exist
 from build_common_api_services import build_ask_dependency_api_service
 from build_common_api_services import make_script_unmet_dependencies
 
+import api_fs_exec_utils
+import api_fs_bash_utils
 
 service_api_deps=dict()
 service_unavailable_api_deps=dict()
@@ -157,6 +159,21 @@ def test_init_and_basic_functionality(service_name, queries_map):
     assert not got_unexpected_exception
 
 
+def make_script_unmet_dependencies_unreachable(script):
+    file_extension = ".json"
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), r"",
+        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
+        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
+        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
+        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
+        *api_fs_exec_utils.generate_api_node_env_init(), r"",
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
+        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${OPT_DIR}/check_missing_pseudo_fs_from_schema.py ${SHARED_API_DIR} "api.pmccabe_collector.restapi.org" ${DEPEND_ON_UNAVAILABLE_SERVICES_API_SCHEMA_DIR}',
+
+    )
+    script.writelines(line + "\n" for line in body)
 
 
 @pytest.mark.parametrize("service_name,queries_map", service_unavailable_api_deps.items())
@@ -165,7 +182,7 @@ def test_unrechable_services(service_name, queries_map):
     global global_depend_on_unreachable_services_api_path
     print(f"Test start: {service_name}", file=sys.stdout, flush=True)
     service_api_schemas_path=os.path.join(global_depend_on_unreachable_services_api_path, service_name)
-
+    print(f"service_api_schemas_path: {service_api_schemas_path}")
     # cleat FS
     shutil.rmtree(global_settings.api_dir, ignore_errors=True)
     generated_api_path = os.path.join(global_settings.work_dir, "generated")
@@ -173,8 +190,8 @@ def test_unrechable_services(service_name, queries_map):
     os.mkdir(generated_api_path)
 
     # launch one particular stub service
-    print(f"Launch unresponsive server from schema: {service_api_schemas_path}")
-    servers = build_and_launch_services(service_api_schemas_path, global_settings.work_dir, generated_api_path, global_settings.api_dir)
+    #print(f"Launch unresponsive server from schema: {service_api_schemas_path}")
+    servers = []#build_and_launch_services(service_api_schemas_path, global_settings.work_dir, generated_api_path, global_settings.api_dir)
 
 
     # build & launch unmet_dependencies API
@@ -184,7 +201,7 @@ def test_unrechable_services(service_name, queries_map):
     unmet_dependencies_api_schema_file = os.path.join(inner_api_schema_path,"unmet_dependencies.json")
     unmet_dependencies_server_script_path, unmet_dependencies_exec_script_path = build_ask_dependency_api_service(unmet_dependencies_api_schema_file,
                                                                       os.path.join(global_settings.work_dir, "aux_services"),
-                                                                      global_settings.work_dir, make_script_unmet_dependencies)
+                                                                      global_settings.work_dir, make_script_unmet_dependencies_unreachable)
 
     unmet_dependencies_server_env = os.environ.copy()
     unmet_dependencies_server_env["WORK_DIR"] = global_settings.work_dir
@@ -223,13 +240,13 @@ def test_unrechable_services(service_name, queries_map):
     url = f'http://{downstream_service_url}:80/set_service_availability'
     headers = {'Accept-Charset': 'UTF-8'}
     params = {"service_name":service_name, "available" :"True"}
-    resp = requests.get(url, data=params, headers=headers)
+    resp = requests.get(url, params=params, headers=headers)
     assert resp.ok
     answer = str(resp.text)
     print(f"Turning on {service_name} got answer: {answer}")
     assert answer.find("service_name") != -1
 
-    print(f"Unreachable service became reachable und must ask for base API pipes: {unmet_deps_communication_pipes_canonized}", file=sys.stdout, flush=True)
+    print(f"Unreachable service must became reachable und must ask for base API pipes: {unmet_deps_communication_pipes_canonized}", file=sys.stdout, flush=True)
     got_unexpected_exception = False
     try:
         for p in unmet_deps_communication_pipes_canonized:
@@ -247,27 +264,34 @@ def test_unrechable_services(service_name, queries_map):
     print(f"check self-created service: {service_name}")
     got_expected_exception = False
     got_error_response = False
-    try:
-        executor = FS_API_Executor(service_api_schemas_path, global_settings.api_dir, global_settings.domain_name_api_entry)
-        for query_name in queries_map.keys():
+    got_positive_answer=False
+
+    executor = FS_API_Executor(service_api_schemas_path, global_settings.api_dir, global_settings.domain_name_api_entry)
+    for query_name in queries_map.keys():
+        try:
+            print(f"test query: {query_name}")
+            assert executor.wait_until_valid(query_name,"", 1, 60, True)
             out = executor.execute(query_name, f"TRACER_ID={query_name} SESSION_ID={service_name}", f"{service_name}")
-            assert not out.startswith("echo args")
-            if out.find("404") != -1:
-                got_error_response=True
-    except Exception as e:
-        got_expected_exception = True
+            print(f"proxied answer: {out}")
+            if query_name.find("not_available") != -1:
+                if not out.startswith("echo args") and out.find("404") != -1:
+                    got_error_response=True
+            else:
+                if out.startswith(global_settings.api_dir):
+                    got_positive_answer=True
+        except Exception as e:
+            got_expected_exception = True
+            pass
 
     if not got_expected_exception and not got_error_response:
         print(f"ERROR: service {service_name} must have not respond" )
         stop_servers(servers)
     assert (got_expected_exception or got_error_response)
+    assert got_positive_answer, "One query must be positive"
 
 
-    print("Stop console servers", file=sys.stdout, flush=True)
     # Tear down
-    # stop servers
-    for s in servers:
-        console_server.kill_detached(s)
+    stop_servers(servers)
 
     print(f"Test stop: {service_name}", file=sys.stdout, flush=True)
     assert not got_unexpected_exception

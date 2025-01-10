@@ -33,6 +33,8 @@ is_service_unrechable_a_available = False
 
 @app.route('/',methods=['HEAD'])
 def portal():
+    global is_service_unrechable_a_available
+
     host_addr_info = socket.gethostbyaddr(request.remote_addr)
     if host_addr_info[0].find("service_unreachable_a") != -1:
         if not is_service_unrechable_a_available:
@@ -42,7 +44,8 @@ def portal():
 
 @app.route("/set_service_availability", methods=["GET", "HEAD"])
 def set_service_availability():
-    # curl -X GET localhost/set_service_availability?service_name=aaass\&available=True
+    global is_service_unrechable_a_available
+
     service_name=None
     available=None
     for k,v in request.args.items():
@@ -53,10 +56,10 @@ def set_service_availability():
             available = v
             continue
 
-    if (service_name == "service_unrechable_a") and (available is not None):
-        is_service_unrechable_a_available = available.lower() in ['true', '1']
+    if (service_name == "service_unreachable_a") and (available is not None):
+        is_service_unrechable_a_available = (available.lower() in ['true', '1'])
 
-    return f"service_name: {service_name}, available: {available}"
+    return f"service_name: {service_name}, available: {available}, {is_service_unrechable_a_available}"
 
 
 @app.route("/api.pmccabe_collector.restapi.org/service_unreachable_a/service_unreachable_a_req_2_not_available", methods=["GET", "HEAD"])
