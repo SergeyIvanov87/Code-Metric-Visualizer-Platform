@@ -29,17 +29,51 @@ app = Flask(__name__)
 methods = ["GET", "POST", "PATCH", "DELETE"]
 
 
-@app.route("/", methods=methods, defaults={"path": ""})
+is_service_unrechable_a_available = False
+
+@app.route('/',methods=['HEAD'])
+def portal():
+    host_addr_info = socket.gethostbyaddr(request.remote_addr)
+    if host_addr_info[0].find("service_unreachable_a") != -1:
+        if not is_service_unrechable_a_available:
+            return "Page not found", 404
+    return "Available", 200
+
+
+@app.route("/set_service_availability", methods=["GET", "HEAD"])
+def set_service_availability():
+    # curl -X GET localhost/set_service_availability?service_name=aaass\&available=True
+    service_name=None
+    available=None
+    for k,v in request.args.items():
+        if k == "service_name":
+            service_name = v
+            continue
+        if k == "available":
+            available = v
+            continue
+
+    if (service_name == "service_unrechable_a") and (available is not None):
+        is_service_unrechable_a_available = available.lower() in ['true', '1']
+
+    return f"service_name: {service_name}, available: {available}"
+
+
+@app.route("/api.pmccabe_collector.restapi.org/service_unreachable_a/service_unreachable_a_req_2_not_available", methods=["GET", "HEAD"])
+def service_unreachable_a_req_2_not_available():
+    return "Page not found", 404
+
+#@app.route("/", methods=methods, defaults={"path": ""})
 @app.route("/<path:path>", methods=methods)
 def hello_world(path):
     print(f"*** Received data at: {path}")
     file_echo_request_path = '/' + path + "_DATA"
-    with open (file_echo_request_path, "w") as file:
-        for param,value in request.args.items():
-            file.write(f"{param}={value}")
+
+    if request.method != "HEAD":
+        with open (file_echo_request_path, "w") as file:
+            for param,value in request.args.items():
+                file.write(f"{param}={value}")
     return f"{file_echo_request_path}"
-
-
 
 if __name__ == "__main__":
     app.run()

@@ -83,6 +83,7 @@ api_gui_schema = [
 api_cli_schema = [
     *generate_exec_watchdog_function(),
     *generate_extract_attr_value_from_string(),
+    'echo "CLI SERVER: {0}"\n',
     "api_exec_node_directory={}\n",
     "shopt -s extglob\n",
     "EXT=`${0}/{1} --result_type`\n",
@@ -194,12 +195,19 @@ def generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_
 
     return api_gui_schema_concrete
 
-def generate_cli_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type, req_exec_script_root_dir= "${WORK_DIR}"):
+def generate_cli_server_content(req_name, req_api, req_type, content_type, req_exec_script_root_dir= "${WORK_DIR}"):
+
+    api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
+            "${SHARED_API_DIR}", req_api, req_type
+    )
+
     req_executor_name = compose_api_exec_script_name(req_name)
     api_cli_schema_concrete = api_cli_schema.copy()
 
     template_schema_row_index = len(generate_exec_watchdog_function())
     template_schema_row_index += len(generate_extract_attr_value_from_string())
+    api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(req_api)
+    template_schema_row_index += 1
     api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(api_exec_node_directory
     )
 
@@ -244,11 +252,7 @@ def create_cli_server_content_from_schema(req_name, req_schema, req_exec_script_
     if "Content-Type" in req_schema:
         content_type = req_schema["Content-Type"]
 
-    api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
-            "${SHARED_API_DIR}", req_api, req_type
-    )
-
-    return generate_cli_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type, req_exec_script_root_dir)
+    return generate_cli_server_content(req_name, req_api, req_type, content_type, req_exec_script_root_dir)
 
 
 def build_api_services(api_schema_path, executor_generated_scripts_path, output_services_path):

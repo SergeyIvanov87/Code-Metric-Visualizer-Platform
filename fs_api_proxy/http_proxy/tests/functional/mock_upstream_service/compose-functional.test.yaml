@@ -12,6 +12,8 @@ services:
         - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub_downstream_service_network_addr
         - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}
         - PYTEST_FILTER=${PYTEST_FILTER:-}
+    networks:
+      - api.pmccabe_collector.service.network
     volumes:
       - api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:/api
     depends_on:

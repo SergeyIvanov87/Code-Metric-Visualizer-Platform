@@ -1,6 +1,6 @@
 FROM test_pseudo_fs:latest
 
-RUN apk add --no-cache inotify-tools
+RUN apk add --no-cache inotify-tools py3-requests curl
 
 RUN mkdir /package
 COPY common/shell_utils /package/shell_utils

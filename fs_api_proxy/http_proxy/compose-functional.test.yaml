@@ -33,6 +33,22 @@ services:
       - api.pmccabe_collector.service.network
     volumes:
       - api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:/api
+
+  http_proxy_service_unreachable_a:
+    build:
+      context: ../../
+      dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
+    environment:
+        - UPSTREAM_SERVICE=mock_upstream_service
+        - DOWNSTREAM_SERVICE=service_unreachable_a
+        - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub_downstream_service_network_addr
+        - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=-1
+    hostname: http_proxy_service_unreachable_a
+    networks:
+      - api.pmccabe_collector.service.network
+    volumes:
+      - api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:/api
+
 networks:
   api.pmccabe_collector.service.network:
     name: api.pmccabe_collector.service.network

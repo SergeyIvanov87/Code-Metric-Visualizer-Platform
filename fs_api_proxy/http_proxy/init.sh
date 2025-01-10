@@ -27,36 +27,42 @@ if [ -z ${DOWNSTREAM_SERVICE_NETWORK_ADDR} ]; then
     exit 255
 fi
 
+DEFAULT_DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=15
+if [ -z ${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT} ]; then
+    echo -e "${BGreen}INFO: ${Color_Off}The environment variable ${BGreen}DOWNSTREAM_SERVICE_CONNECT_ATTEMPT${Color_Off} is not configured. Default value will be used: ${BGreen}${DEFAULT_DOWNSTREAM_SERVICE_CONNECT_ATTEMPT}${Color_Off}"
+    DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=${DEFAULT_DOWNSTREAM_SERVICE_CONNECT_ATTEMPT}
+fi
+
 echo -e "${Blue}Waiting for UPSTREAM_SERVICE: ${BBlue}${UPSTREAM_SERVICE}${Color_Off}"
 SESSION_ID="`hostname`_watchdog"
 pipe_in="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${UPSTREAM_SERVICE}/unmet_dependencies/GET/exec"
 pipe_out="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${UPSTREAM_SERVICE}/unmet_dependencies/GET/result.json_${SESSION_ID}"
 
-#while [ ! -p ${pipe_in} ]; do sleep 0.1; echo "waiting for pipe IN: ${pipe_in}"; done
-#echo "SESSION_ID=${SESSION_ID} --service=${DOWNSTREAM_SERVICE}"> ${pipe_in}
-#while [ ! -p ${pipe_out} ]; do sleep 0.1; echo "waiting for pipe OUT: ${pipe_out}"; done
-#PROXYING_API_QUERIES=`cat ${pipe_out}`
-
-#echo "PROXYING_API_QUERIES: ${PROXYING_API_QUERIES}"
-#if [ -z "${PROXYING_API_QUERIES}" ]; then
-    #echo -e "${BRed}Nothing to proxy. Abort${Color_Off}"
-    #exit 255
-#fi
-
 declare -A SERVICE_WATCH_PIDS
 declare -A API_MANAGEMENT_PIDS
-#./serialize_unmet_deps_into_schema_files.py "${PROXYING_API_QUERIES}" "to_proxy"
-#for service in to_proxy/*
-#do
-#    echo -e "Generate proxy for ${BBlue}${service}${Color_Off}:"
-#    ./build_proxy_services.py "${service}" -os "${service}/generated" -oe "${service}/exec_generated"
-#    ${OPT_DIR}/build_api_pseudo_fs.py "${service}" ${SHARED_API_DIR}
-#    launch_fs_api_services SERVICE_WATCH_PIDS "${service}/generated"
-#
-#    ${OPT_DIR}/api_management.py "${service}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
-#    API_MANAGEMENT_PIDS[${service}]=$!
-#done
 
+shutdown_processors_if_downstream_is_dead(){
+    local downstream_server_addr=${1}
+    #local -n SERVICE_WATCH_PIDS=${2}
+#    local -n API_MANAGEMENT_PIDS=${3}
+    for service in ${!SERVICE_WATCH_PIDS[@]}
+    do
+        query=`sed -n 's/\(echo \"CLI SERVER: \)\(.*\)\(\"\)/\2/p' ${service}`
+        local url="${downstream_server_addr}/${query}"
+        echo -e "check availability of ${url}:"
+
+        if curl --output /dev/null --silent --head --fail "$url"; then
+            echo -e "${url} is alive"
+        else
+            echo -e "${url} is unavailable. Stop proxy for the ${service}"
+            declare -A PID_TO_STOP
+            PID_TO_STOP[${service}]=${SERVICE_WATCH_PIDS[${service}]}
+            gracefull_shutdown ${API_MANAGEMENT_PIDS[${service}]} PID_TO_STOP
+            unset SERVICE_WATCH_PIDS[${service}]
+            unset API_MANAGEMENT_PIDS[${service}]
+        fi
+    done
+}
 
 termination_handler(){
     gracefull_shutdown_bunch SERVICE_WATCH_PIDS API_MANAGEMENT_PIDS
@@ -71,7 +77,8 @@ WAIT_FOR_HEARTBEAT_PIPE_IN_CREATION_SEC=5
 WAIT_FOR_HEARTBEAT_PIPE_OUT_CREATION_SEC=3
 UPSTREAM_SERVICE_HEARTBEAT_SEC=15
 
-API_UPDATE_EVENT_TIMEOUT_LIMIT=15
+# TODO separate cases: Downstram down & Upstream down too
+API_UPDATE_EVENT_TIMEOUT_LIMIT=${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT}
 API_UPDATE_EVENT_TIMEOUT_COUNTER=0
 # Loop until any unrecoverable error would occur
 HAS_GOT_API_UPDATE_EVENT=0
@@ -83,6 +90,15 @@ if [ ! -d "to_proxy" ]; then
     mkdir to_proxy
 fi
 while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT} ]; do
+    # wait until downstream service become alive..
+    curl --output /dev/null --silent --head --fail "${DOWNSTREAM_SERVICE_NETWORK_ADDR}"
+    if (( $? )) ; then
+        echo -e "${BPurple}Downstream service: ${DOWNSTREAM_SERVICE} is unavailable by addr: ${DOWNSTREAM_SERVICE_NETWORK_ADDR}${Color_Off}, trying again in attempt: ${BPurple}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
+        sleep ${TIMEOUT_ON_FAILURE_SEC} &
+        wait $!
+        let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1
+        continue
+    fi
 
     # wait until upstream service become alive...
     wait_for_pipe_exist ${pipe_in} WAIT_RESULT ${WAIT_FOR_HEARTBEAT_PIPE_IN_CREATION_SEC}
@@ -142,6 +158,10 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
 
     PROXYING_API_QUERIES=`cat ${file_pipe_out_result_name}`
     if [ -z "${PROXYING_API_QUERIES}" ]; then
+
+        echo "SERVICE_WATCH_PIDS before: ${SERVICE_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS before: ${API_MANAGEMENT_PIDS[@]}"
+        shutdown_processors_if_downstream_is_dead ${DOWNSTREAM_SERVICE_NETWORK_ADDR} # SERVICE_WATCH_PIDS API_MANAGEMENT_PIDS
+        echo "SERVICE_WATCH_PIDS after: ${SERVICE_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS after: ${API_MANAGEMENT_PIDS[@]}"
         sleep ${UPSTREAM_SERVICE_HEARTBEAT_SEC} &
         wait $!
         continue
