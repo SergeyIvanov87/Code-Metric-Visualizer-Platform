@@ -46,6 +46,7 @@ rm -f ${WORK_DIR}/test_0_pseudo_fs_api_conformance.py
 echo "EXCLUDE test_1_inner_api_functionality.py"
 rm -f ${WORK_DIR}/test_1_inner_api_functionality.py
 for s in ${WORK_DIR}/test_*.py; do
+    #pytest -s ${s} -k 'test_unrechable_services'
     pytest -s ${s}
     VAL=$?
     if [ $VAL != 0 ]

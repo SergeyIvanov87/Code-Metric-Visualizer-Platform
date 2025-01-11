@@ -61,8 +61,7 @@ def set_service_availability():
 
     return f"service_name: {service_name}, available: {available}, {is_service_unrechable_a_available}"
 
-
-@app.route("/api.pmccabe_collector.restapi.org/service_unreachable_a/service_unreachable_a_req_2_not_available", methods=["GET", "HEAD"])
+@app.route("/api/api.pmccabe_collector.restapi.org/service_unreachable_a/service_unreachable_a_req_2_not_available", methods=["GET", "HEAD"])
 def service_unreachable_a_req_2_not_available():
     return "Page not found", 404
 

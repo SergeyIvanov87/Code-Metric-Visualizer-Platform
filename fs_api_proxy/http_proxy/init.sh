@@ -94,6 +94,10 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     curl --output /dev/null --silent --head --fail "${DOWNSTREAM_SERVICE_NETWORK_ADDR}"
     if (( $? )) ; then
         echo -e "${BPurple}Downstream service: ${DOWNSTREAM_SERVICE} is unavailable by addr: ${DOWNSTREAM_SERVICE_NETWORK_ADDR}${Color_Off}, trying again in attempt: ${BPurple}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
+        echo "SERVICE_WATCH_PIDS before: ${SERVICE_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS before: ${API_MANAGEMENT_PIDS[@]}"
+        shutdown_processors_if_downstream_is_dead ${DOWNSTREAM_SERVICE_NETWORK_ADDR} # SERVICE_WATCH_PIDS API_MANAGEMENT_PIDS
+        echo "SERVICE_WATCH_PIDS after: ${SERVICE_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS after: ${API_MANAGEMENT_PIDS[@]}"
+
         sleep ${TIMEOUT_ON_FAILURE_SEC} &
         wait $!
         let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1

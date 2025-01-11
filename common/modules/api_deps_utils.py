@@ -13,12 +13,12 @@ from api_schema_utils import deserialize_api_request_from_schema_file
 def canonize_relative_api_req(full_service_name, common_api_req):
     return os.path.join(full_service_name, common_api_req.removeprefix("+/")) if common_api_req.startswith("+/") else common_api_req
 
-
-def get_api_service_dependency_files(api_schemas_input_dir, file_match_regex = r".*\.json$", api_schemas_subdir="deps"):
+def get_api_service_dependency_files(api_schemas_input_dir, file_match_regex = r".*\.json$"):
     services_dependencies = {}
     p = re.compile(file_match_regex)
+    main_root = os.path.basename(api_schemas_input_dir)
     for root, services, files in os.walk(os.path.join(api_schemas_input_dir)):
-        if os.path.basename(root) == api_schemas_subdir:
+        if main_root == os.path.basename(root):
             for s in services:
                 services_dependencies[os.path.join(root, s)] = list()
         if root in services_dependencies.keys():
@@ -27,12 +27,13 @@ def get_api_service_dependency_files(api_schemas_input_dir, file_match_regex = r
 
 
 
-def get_api_service_dependency_files(api_schemas_input_dir, service_regex = r".*", file_match_regex = r".*\.json$", api_schemas_subdir="deps"):
+def get_api_service_dependency_files(api_schemas_input_dir, service_regex = r".*", file_match_regex = r".*\.json$"):
     services_dependencies = {}
     p = re.compile(file_match_regex)
     sg = re.compile(service_regex)
+    main_root = os.path.basename(api_schemas_input_dir)
     for root, services, files in os.walk(os.path.join(api_schemas_input_dir)):
-        if os.path.basename(root) == api_schemas_subdir:
+        if main_root == os.path.basename(root):
             for s in services:
                 if sg.match(s) or s == service_regex:
                     services_dependencies[os.path.join(root, s)] = list()
@@ -40,8 +41,8 @@ def get_api_service_dependency_files(api_schemas_input_dir, service_regex = r".*
             services_dependencies[root] = [os.path.join(root, f) for f in files if p.match(f)]
     return services_dependencies
 
-def get_api_service_dependencies(api_schemas_input_dir, service_regex = r".*", file_match_regex = r".*\.json$", api_schemas_subdir="deps"):
-    services_schema_files = get_api_service_dependency_files(api_schemas_input_dir, service_regex, file_match_regex, api_schemas_subdir)
+def get_api_service_dependencies(api_schemas_input_dir, service_regex = r".*", file_match_regex = r".*\.json$"):
+    services_schema_files = get_api_service_dependency_files(api_schemas_input_dir, service_regex, file_match_regex)
     service_dependencies = dict()
     for service_path, service_dep_files in services_schema_files.items():
         service_name = os.path.basename(service_path)

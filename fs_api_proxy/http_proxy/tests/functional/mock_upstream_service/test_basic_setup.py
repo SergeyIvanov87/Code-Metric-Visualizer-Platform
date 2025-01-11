@@ -35,7 +35,7 @@ inner_api_schema_path = os.getenv('INNER_API_SCHEMA_DIR', '')
 service_api_deps = get_api_service_dependencies(global_depend_on_services_api_path, r".*", r".*\.json$")
 
 global_depend_on_unreachable_services_api_path = os.getenv('DEPEND_ON_UNAVAILABLE_SERVICES_API_SCHEMA_DIR', '')
-service_unavailable_api_deps = get_api_service_dependencies(global_depend_on_unreachable_services_api_path, r".*", r".*\.json$", "deps_unreachable")
+service_unavailable_api_deps = get_api_service_dependencies(global_depend_on_unreachable_services_api_path, r".*", r".*\.json$")
 
 
 def stop_servers(servers):
@@ -44,6 +44,13 @@ def stop_servers(servers):
     # stop servers
     for s in servers:
         console_server.kill_detached(s)
+
+def remove_generated_files(files):
+    for f in files:
+        try:
+            os.remove(f)
+        except OSError:
+            pass
 
 
 @pytest.mark.parametrize("service_name,queries_map", service_api_deps.items())
@@ -67,10 +74,12 @@ def test_init_and_basic_functionality(service_name, queries_map):
     print("Build pseudo-filesystem for inner API", file=sys.stdout, flush=True)
     build_api_pseudo_fs(inner_api_schema_path, global_settings.api_dir)
 
+    generated_files_to_delete=[]
     unmet_dependencies_api_schema_file = os.path.join(inner_api_schema_path,"unmet_dependencies.json")
     unmet_dependencies_server_script_path, unmet_dependencies_exec_script_path = build_ask_dependency_api_service(unmet_dependencies_api_schema_file,
                                                                       os.path.join(global_settings.work_dir, "aux_services"),
                                                                       global_settings.work_dir, make_script_unmet_dependencies)
+    generated_files_to_delete.extend([unmet_dependencies_server_script_path, unmet_dependencies_exec_script_path])
 
     unmet_dependencies_server_env = os.environ.copy()
     unmet_dependencies_server_env["WORK_DIR"] = global_settings.work_dir
@@ -101,6 +110,7 @@ def test_init_and_basic_functionality(service_name, queries_map):
     if got_unexpected_exception:
         print(f"ERROR: Failed on waiting for unmet_dependencies result pipes creation: {unmet_deps_communication_pipes_canonized}")
         stop_servers(servers)
+        remove_generated_files(generated_files_to_delete)
     assert not got_unexpected_exception
 
 
@@ -120,6 +130,7 @@ def test_init_and_basic_functionality(service_name, queries_map):
     if got_unexpected_exception:
         print(f"ERROR: Failed on testing unmet_dependencies service")
         stop_servers(servers)
+        remove_generated_files(generated_files_to_delete)
     assert not got_unexpected_exception
 
     # check other services  which must have been proxied
@@ -145,6 +156,7 @@ def test_init_and_basic_functionality(service_name, queries_map):
     if got_unexpected_exception:
         print(f"ERROR: Failed on testing proxied services")
         stop_servers(servers)
+        remove_generated_files(generated_files_to_delete)
     assert not got_unexpected_exception
 
 
@@ -155,6 +167,7 @@ def test_init_and_basic_functionality(service_name, queries_map):
     for s in servers:
         console_server.kill_detached(s)
 
+    remove_generated_files(generated_files_to_delete)
     print(f"Test stop: {service_name}", file=sys.stdout, flush=True)
     assert not got_unexpected_exception
 
@@ -189,10 +202,8 @@ def test_unrechable_services(service_name, queries_map):
     shutil.rmtree(generated_api_path, ignore_errors=True)
     os.mkdir(generated_api_path)
 
-    # launch one particular stub service
-    #print(f"Launch unresponsive server from schema: {service_api_schemas_path}")
-    servers = []#build_and_launch_services(service_api_schemas_path, global_settings.work_dir, generated_api_path, global_settings.api_dir)
-
+    servers = []
+    generated_files_to_delete = []
 
     # build & launch unmet_dependencies API
     print("Build pseudo-filesystem for inner API", file=sys.stdout, flush=True)
@@ -202,6 +213,7 @@ def test_unrechable_services(service_name, queries_map):
     unmet_dependencies_server_script_path, unmet_dependencies_exec_script_path = build_ask_dependency_api_service(unmet_dependencies_api_schema_file,
                                                                       os.path.join(global_settings.work_dir, "aux_services"),
                                                                       global_settings.work_dir, make_script_unmet_dependencies_unreachable)
+    generated_files_to_delete.extend([unmet_dependencies_server_script_path, unmet_dependencies_exec_script_path])
 
     unmet_dependencies_server_env = os.environ.copy()
     unmet_dependencies_server_env["WORK_DIR"] = global_settings.work_dir
@@ -232,6 +244,7 @@ def test_unrechable_services(service_name, queries_map):
     if not got_expected_exception:
         print(f"ERROR: Unreachable service got asked for unmet_dependencies result pipes creation: {unmet_deps_communication_pipes_canonized}. Even is DOWNSTREAM is dead")
         stop_servers(servers)
+        remove_generated_files(generated_files_to_delete)
     assert  got_expected_exception
 
     ### Turn the DOWNSTREAM_SERVICE on
@@ -257,6 +270,7 @@ def test_unrechable_services(service_name, queries_map):
     if got_unexpected_exception:
         print(f"ERROR: Failed on waiting for unmet_dependencies result pipes creation: {unmet_deps_communication_pipes_canonized}")
         stop_servers(servers)
+        remove_generated_files(generated_files_to_delete)
     assert not got_unexpected_exception
 
 
@@ -274,7 +288,7 @@ def test_unrechable_services(service_name, queries_map):
             out = executor.execute(query_name, f"TRACER_ID={query_name} SESSION_ID={service_name}", f"{service_name}")
             print(f"proxied answer: {out}")
             if query_name.find("not_available") != -1:
-                if not out.startswith("echo args") and out.find("404") != -1:
+                if not out.startswith("echo args") and out.find("Page not found") != -1:
                     got_error_response=True
             else:
                 if out.startswith(global_settings.api_dir):
@@ -286,12 +300,14 @@ def test_unrechable_services(service_name, queries_map):
     if not got_expected_exception and not got_error_response:
         print(f"ERROR: service {service_name} must have not respond" )
         stop_servers(servers)
+        remove_generated_files(generated_files_to_delete)
     assert (got_expected_exception or got_error_response)
     assert got_positive_answer, "One query must be positive"
 
 
     # Tear down
     stop_servers(servers)
+    remove_generated_files(generated_files_to_delete)
 
     print(f"Test stop: {service_name}", file=sys.stdout, flush=True)
     assert not got_unexpected_exception
