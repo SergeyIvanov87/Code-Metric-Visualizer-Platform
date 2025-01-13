@@ -38,34 +38,53 @@ SESSION_ID="`hostname`_watchdog"
 pipe_in="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${UPSTREAM_SERVICE}/unmet_dependencies/GET/exec"
 pipe_out="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${UPSTREAM_SERVICE}/unmet_dependencies/GET/result.json_${SESSION_ID}"
 
-declare -A SERVICE_WATCH_PIDS
+declare -A SERVICE_QUERY_WATCH_PIDS
 declare -A API_MANAGEMENT_PIDS
 
 shutdown_processors_if_downstream_is_dead(){
     local downstream_server_addr=${1}
-    #local -n SERVICE_WATCH_PIDS=${2}
-#    local -n API_MANAGEMENT_PIDS=${3}
-    for service in ${!SERVICE_WATCH_PIDS[@]}
+    declare -A SERV_TO_STOP
+    for service_query in ${!SERVICE_QUERY_WATCH_PIDS[@]}
     do
-        query=`sed -n 's/\(echo \"CLI SERVER: \)\(.*\)\(\"\)/\2/p' ${service}`
-        local url="${downstream_server_addr}/${query}"
+        query=`sed -n 's/\(echo \"CLI SERVER: \)\(.*\)\(\"\)/\2/p' ${service_query}`
+        local url="${downstream_server_addr}/${SHARED_API_DIR}/${query}"
         echo -e "check availability of ${url}:"
 
         if curl --output /dev/null --silent --head --fail "$url"; then
             echo -e "${url} is alive"
         else
-            echo -e "${url} is unavailable. Stop proxy for the ${service}"
-            declare -A PID_TO_STOP
-            PID_TO_STOP[${service}]=${SERVICE_WATCH_PIDS[${service}]}
-            gracefull_shutdown ${API_MANAGEMENT_PIDS[${service}]} PID_TO_STOP
-            unset SERVICE_WATCH_PIDS[${service}]
-            unset API_MANAGEMENT_PIDS[${service}]
+            echo -e "${url} is unavailable. Stop proxy for the ${service_query}"
+            SERV_TO_STOP[${service_query}]=${SERVICE_QUERY_WATCH_PIDS[${service_query}]}
+
+            unset SERVICE_QUERY_WATCH_PIDS[${service_query}]
         fi
     done
+    if [ ${#SERV_TO_STOP[@]} -ne 0 ] ; then
+        declare -A PID_TO_STOP
+        for service_query in ${!SERV_TO_STOP[@]}
+        do
+            echo "match service_query: ${service_query}"
+            for service in ${!API_MANAGEMENT_PIDS[@]}
+            do
+                echo "for service: ${service}"
+                if [[ $service_query == *"${service}/generated"* ]]; then
+                    PID_TO_STOP[${service}]=${API_MANAGEMENT_PIDS[${service}]}
+                fi
+            done
+        done
+
+        gracefull_shutdown_bunch SERV_TO_STOP PID_TO_STOP
+
+        for service in ${!PID_TO_STOP[@]}
+        do
+            unset API_MANAGEMENT_PIDS[${service}]
+        done
+
+    fi
 }
 
 termination_handler(){
-    gracefull_shutdown_bunch SERVICE_WATCH_PIDS API_MANAGEMENT_PIDS
+    gracefull_shutdown_bunch SERVICE_QUERY_WATCH_PIDS API_MANAGEMENT_PIDS
 }
 echo "Setup signal handlers"
 trap 'termination_handler' SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
@@ -94,9 +113,9 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     curl --output /dev/null --silent --head --fail "${DOWNSTREAM_SERVICE_NETWORK_ADDR}"
     if (( $? )) ; then
         echo -e "${BPurple}Downstream service: ${DOWNSTREAM_SERVICE} is unavailable by addr: ${DOWNSTREAM_SERVICE_NETWORK_ADDR}${Color_Off}, trying again in attempt: ${BPurple}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
-        echo "SERVICE_WATCH_PIDS before: ${SERVICE_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS before: ${API_MANAGEMENT_PIDS[@]}"
-        shutdown_processors_if_downstream_is_dead ${DOWNSTREAM_SERVICE_NETWORK_ADDR} # SERVICE_WATCH_PIDS API_MANAGEMENT_PIDS
-        echo "SERVICE_WATCH_PIDS after: ${SERVICE_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS after: ${API_MANAGEMENT_PIDS[@]}"
+        echo "SERVICE_QUERY_WATCH_PIDS before: ${SERVICE_QUERY_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS before: ${API_MANAGEMENT_PIDS[@]}"
+        shutdown_processors_if_downstream_is_dead ${DOWNSTREAM_SERVICE_NETWORK_ADDR}
+        echo "SERVICE_QUERY_WATCH_PIDS after: ${SERVICE_QUERY_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS after: ${API_MANAGEMENT_PIDS[@]}"
 
         sleep ${TIMEOUT_ON_FAILURE_SEC} &
         wait $!
@@ -163,14 +182,15 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     PROXYING_API_QUERIES=`cat ${file_pipe_out_result_name}`
     if [ -z "${PROXYING_API_QUERIES}" ]; then
 
-        echo "SERVICE_WATCH_PIDS before: ${SERVICE_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS before: ${API_MANAGEMENT_PIDS[@]}"
-        shutdown_processors_if_downstream_is_dead ${DOWNSTREAM_SERVICE_NETWORK_ADDR} # SERVICE_WATCH_PIDS API_MANAGEMENT_PIDS
-        echo "SERVICE_WATCH_PIDS after: ${SERVICE_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS after: ${API_MANAGEMENT_PIDS[@]}"
+        echo "SERVICE_QUERY_WATCH_PIDS before: ${SERVICE_QUERY_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS before: ${API_MANAGEMENT_PIDS[@]}"
+        shutdown_processors_if_downstream_is_dead ${DOWNSTREAM_SERVICE_NETWORK_ADDR}
+        echo "SERVICE_QUERY_WATCH_PIDS after: ${SERVICE_QUERY_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS after: ${API_MANAGEMENT_PIDS[@]}"
         sleep ${UPSTREAM_SERVICE_HEARTBEAT_SEC} &
         wait $!
         continue
     fi
 
+    let API_UPDATE_EVENT_TIMEOUT_COUNTER=0
     echo -e "${Green}Upstream service: ${BGreen}${UPSTREAM_SERVICE}${Green} got dependencies changed: ${BGreen}${PROXYING_API_QUERIES}${Color_Off}"
     rm -rf to_proxy_new
     ./serialize_unmet_deps_into_schema_files.py "${PROXYING_API_QUERIES}" "to_proxy_new"
@@ -192,11 +212,11 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
         then
             OLD_SERVICE_NAME=`echo ${CMD:1:32768} | xargs`
             OLD_SERVICE_FILE_PATH="to_proxy/${OLD_SERVICE_NAME}"
-            if [ ! -z ${SERVICE_WATCH_PIDS[${OLD_SERVICE_FILE_PATH}]} ] ; then
-                SERVICE_TO_STOP[${OLD_SERVICE_FILE_PATH}]=${SERVICE_WATCH_PIDS[${OLD_SERVICE_FILE_PATH}]}
+            if [ ! -z ${SERVICE_QUERY_WATCH_PIDS[${OLD_SERVICE_FILE_PATH}]} ] ; then
+                SERVICE_TO_STOP[${OLD_SERVICE_FILE_PATH}]=${SERVICE_QUERY_WATCH_PIDS[${OLD_SERVICE_FILE_PATH}]}
                 rm ${OLD_SERVICE_FILE_PATH}
             fi
-            unset SERVICE_WATCH_PIDS[${OLD_SERVICE_FILE_PATH}]
+            unset SERVICE_QUERY_WATCH_PIDS[${OLD_SERVICE_FILE_PATH}]
 
             if [ ! -z ${API_MANAGEMENT_PIDS[${OLD_SERVICE_FILE_PATH}]} ] ; then
                 API_MANAGEMENT_PIDS_TO_STOP[${OLD_SERVICE_FILE_PATH}] = ${OLD_SERVICE_FILE_PATH[${OLD_SERVICE_FILE_PATH}]}
@@ -225,8 +245,9 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
         ${OPT_DIR}/build_api_pseudo_fs.py "${service}" ${SHARED_API_DIR}
 
         # for each 'service' launch all its query-servers
-        launch_fs_api_services SERVICE_WATCH_PIDS "${service}/generated"
+        launch_fs_api_services SERVICE_QUERY_WATCH_PIDS "${service}/generated"
 
+        #### TODO - make api_management for individual query!!!
         ${OPT_DIR}/api_management.py "${service}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
         API_MANAGEMENT_PIDS[${service}]=$!
     done

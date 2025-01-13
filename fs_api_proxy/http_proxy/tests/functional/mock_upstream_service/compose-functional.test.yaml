@@ -10,7 +10,7 @@ services:
         - UPSTREAM_SERVICE=mock_upstream_service
         - DOWNSTREAM_SERVICE=service_a
         - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub_downstream_service_network_addr
-        - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}
+        - EXIT_ONCE_DONE=true
         - PYTEST_FILTER=${PYTEST_FILTER:-}
     networks:
       - api.pmccabe_collector.service.network

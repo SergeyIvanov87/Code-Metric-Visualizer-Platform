@@ -48,16 +48,18 @@ gracefull_shutdown_bunch() {
         echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Shutdown servers --- DONE***${Color_Off}"
     fi
     if [ ${#api_management_pids[@]} -ne 0 ]; then
-        for api_management_pid in ${api_management_pids[@]}
+        for service_name in ${!api_management_pids[@]}
         do
-            echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Clear pipes, killing PID: ${Red}${api_management_pid}${BRed}****${Color_Off}"
-            kill -s SIGTERM ${api_management_pid}
+            service_pid=${api_management_pids[$service_name]}
+            echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Clear pipes, killing PID: ${Red}${service_pid}${BRed} of ${Red}${service_name}${BRed}****${Color_Off}"
+            kill -s SIGTERM ${service_pid}
             while true
             do
-                kill -s 0 ${api_management_pid}
+                kill -s 0 ${service_pid}
                 RESULT=$?
                 if [ $RESULT == 0 ]; then
-                    echo -e "`date +%H:%M:%S:%3N`    ${Blue}***api_management_pid: ${api_management_pid} still exist****${Color_Off}"
+                    echo -e "`date +%H:%M:%S:%3N`    ${Blue}***service_pid: ${service_pid} still exist****${Color_Off}"
+                    sleep 1
                     continue
                 fi
                 break
