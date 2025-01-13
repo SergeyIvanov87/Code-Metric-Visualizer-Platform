@@ -1,5 +1,5 @@
 include:
-  - common/images/test_pseudo_fs/compose.yaml
+  - ../../../common/images/test_pseudo_fs/compose.yaml
 
 services:
   rrd_functional_tester:
@@ -7,7 +7,8 @@ services:
       context: ../../../
       dockerfile: rrd/tests/functional/Dockerfile
     environment:
-        RRD_TESTABLE_CONTAINER_HOSTNAME: rrd_analytic_functional
+        - RRD_TESTABLE_CONTAINER_HOSTNAME=rrd_analytic_functional
+        - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}
     volumes:
       - api.pmccabe_collector.restapi.org.rrd.test:/api
       - api.pmccabe_collector.rrd.rrd_analytic:/rrd_data

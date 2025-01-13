@@ -31,7 +31,7 @@ def make_script_dependencies(script):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${OPT_DIR}/get_service_api_deps.py "/package/API"',
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${OPT_DIR}/get_service_api_deps.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR}',
 
     )
     script.writelines(line + "\n" for line in body)
