@@ -51,6 +51,14 @@ jobs:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the REST API Docker image
       run: docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from rest_api_functional_service_tester
+
+    - name: Build the HTTP_FS API PROXY Docker image
+      run: docker build -f fs_api_proxy/http_proxy/Dockerfile --tag fs_api_proxy_http:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test the HTTP_FS API PROXY Docker image
+      run: docker compose -f fs_api_proxy/http_proxy/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from fs_api_http_proxy_functional_tester_service_a
+
     - name: Build the Service Broker Docker image
       run: docker build -f service_broker/Dockerfile -t service_broker:$DATE .
       env:
