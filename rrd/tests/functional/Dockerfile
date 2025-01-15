@@ -29,4 +29,8 @@ RUN dos2unix /tests/*
 VOLUME ["/api", "/mnt", "/rrd_data"]
 
 ENV RRD_TESTABLE_CONTAINER_HOSTNAME=""
+
+ARG EXIT_ONCE_DONE=true
+ENV EXIT_ONCE_DONE=$EXIT_ONCE_DONE
+
 ENTRYPOINT ["/tests/init.sh", "/tests", "/mnt", "/api", "/rrd_data"]

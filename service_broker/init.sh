@@ -7,13 +7,16 @@ export PYTHONPATH="${2}:${2}/modules"
 export SHARED_API_DIR=${3}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+export DEPEND_ON_SERVICES_API_SCHEMA_DIR=${WORK_DIR}/API/deps
+export INNER_API_SCHEMA_DIR=${WORK_DIR}/API
+
 # use source this script as fast way to setup environment for debugging
-echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
+echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport DEPEND_ON_SERVICES_API_SCHEMA_DIR=${DEPEND_ON_SERVICES_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
 source ${OPT_DIR}/shell_utils/init_utils.sh
 
-${OPT_DIR}/canonize_internal_api.py ${WORK_DIR}/API/deps ${MAIN_SERVICE_NAME}/service_broker
-${OPT_DIR}/api_management.py ${WORK_DIR}/API/deps ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
+${OPT_DIR}/canonize_internal_api.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${MAIN_SERVICE_NAME}/service_broker
+${OPT_DIR}/api_management.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
 API_MANAGEMENT_PID=$!
 
 declare -A SERVICE_WATCH_PIDS
@@ -27,8 +30,8 @@ trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
 mkdir -p ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
 
 # Launch internal API services
-${OPT_DIR}/build_common_api_services.py ${WORK_DIR}/API/deps -os ${WORK_DIR}/aux_services -oe ${WORK_DIR}
-${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API/deps/ ${SHARED_API_DIR}
+${OPT_DIR}/build_common_api_services.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} -os ${WORK_DIR}/aux_services -oe ${WORK_DIR}
+${OPT_DIR}/build_api_pseudo_fs.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${SHARED_API_DIR}
 
 launch_fs_api_services SERVICE_WATCH_PIDS "${WORK_DIR}/aux_services"
 
@@ -48,7 +51,7 @@ echo "pull origin" > ${SHARED_API_DIR}/api.pmccabe_collector.restapi.org/project
 (
 set -f
 echo -ne "${CRON_REPO_UPDATE_SCHEDULE}\t" > jobs_schedule
-${WORK_DIR}/build_schedule_jobs.py ${WORK_DIR}/API ${SHARED_API_DIR} api.pmccabe_collector.restapi.org >> jobs_schedule
+${WORK_DIR}/build_schedule_jobs.py ${INNER_API_SCHEMA_DIR} ${SHARED_API_DIR} api.pmccabe_collector.restapi.org >> jobs_schedule
 )
 crontab jobs_schedule
 

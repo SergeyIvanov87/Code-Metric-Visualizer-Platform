@@ -1,0 +1,3 @@
+include:
+  - mock_upstream_service/compose-functional.test.yaml
+  - stub_downstream_service_network_addr/compose-functional.test.yaml

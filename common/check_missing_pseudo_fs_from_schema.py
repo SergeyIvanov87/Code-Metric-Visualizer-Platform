@@ -58,7 +58,6 @@ for must_have_req_name, [must_have_service, must_have_query] in API_dependency_t
     if not found:
         if must_have_service not in missing_API_table.keys():
             missing_API_table[must_have_service] = {}
-        must_have_query.pop('Params', None)
         must_have_query.pop('Description', None)
         missing_API_table[must_have_service][must_have_req_name] = must_have_query
 

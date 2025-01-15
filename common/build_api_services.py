@@ -83,6 +83,7 @@ api_gui_schema = [
 api_cli_schema = [
     *generate_exec_watchdog_function(),
     *generate_extract_attr_value_from_string(),
+    'echo "CLI SERVER: {0}"\n',
     "api_exec_node_directory={}\n",
     "shopt -s extglob\n",
     "EXT=`${0}/{1} --result_type`\n",
@@ -139,7 +140,7 @@ api_cli_schema = [
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=0\n",
     '        echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tSTART    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}"\treqNum:\t${REQUEST_NUM}\n',
     '        touch "${api_exec_node_directory}/in_progress"\n',
-    '        RESULT_OUT=$(${0}/{1} {2} ', '"${CMD_READ}" | base64)\n',
+    '        RESULT_OUT=$({0}/{1} {2} ', '"${CMD_READ}" | base64)\n',
     '        rm -f ${api_exec_node_directory}/in_progress\n',
     '        (touch ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tFINISH    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}\treqNum:\t${REQUEST_NUM} " && echo "${RESULT_OUT}" | base64 -d >$pipe_result_consumer && rm -rf ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tCONSUMED [${SESSION_ID_VALUE}]: ${api_exec_node_directory} <--- ${pipe_result_consumer}") &\n',
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=$!\n",
@@ -194,12 +195,19 @@ def generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_
 
     return api_gui_schema_concrete
 
-def generate_cli_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type):
+def generate_cli_server_content(req_name, req_api, req_type, content_type, req_exec_script_root_dir= "${WORK_DIR}"):
+
+    api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
+            "${SHARED_API_DIR}", req_api, req_type
+    )
+
     req_executor_name = compose_api_exec_script_name(req_name)
     api_cli_schema_concrete = api_cli_schema.copy()
 
     template_schema_row_index = len(generate_exec_watchdog_function())
     template_schema_row_index += len(generate_extract_attr_value_from_string())
+    api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(req_api)
+    template_schema_row_index += 1
     api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(api_exec_node_directory
     )
 
@@ -212,7 +220,7 @@ def generate_cli_server_content(req_name, req_type, api_req_directory, api_exec_
 
     template_schema_row_index += 54
     api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(
-        "{WORK_DIR}",
+        req_exec_script_root_dir,
         req_executor_name,
         api_req_directory
     )
@@ -235,7 +243,7 @@ def create_gui_server_content_from_schema(req_name, req_schema):
     return generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type)
 
 
-def create_cli_server_content_from_schema(req_name, req_schema):
+def create_cli_server_content_from_schema(req_name, req_schema, req_exec_script_root_dir = "${WORK_DIR}"):
     req_type = req_schema["Method"]
     req_api = req_schema["Query"]
     req_params = req_schema["Params"]
@@ -244,11 +252,7 @@ def create_cli_server_content_from_schema(req_name, req_schema):
     if "Content-Type" in req_schema:
         content_type = req_schema["Content-Type"]
 
-    api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
-            "${SHARED_API_DIR}", req_api, req_type
-    )
-
-    return generate_cli_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type)
+    return generate_cli_server_content(req_name, req_api, req_type, content_type, req_exec_script_root_dir)
 
 
 def build_api_services(api_schema_path, executor_generated_scripts_path, output_services_path):

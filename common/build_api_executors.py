@@ -68,6 +68,8 @@ def build_api_executors(api_schema_path, api_exec_generator_path, output_dir):
                 filesystem_utils.make_file_executable(script_generated_path)
                 if req_name in scripts_generator.keys():
                     scripts_generator[req_name](script, content_file_extension)
+                elif hasattr(api_generator, 'generate_request_exec_script'):
+                    api_generator.generate_request_exec_script(req_name, script, content_file_extension)
                 else:
                     make_default_script(script)
         except FileExistsError as e:

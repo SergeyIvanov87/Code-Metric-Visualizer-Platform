@@ -1,0 +1,14 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "GET",
+    "Query": "api.pmccabe_collector.restapi.org/service_b/service_b_req_1",
+    "Params": {
+        "--param_b_1_1" : "\".*\"",
+        "--param_b_1_2" : "\".*\""
+    },
+    "Description": {
+        "header": "HEADER\n",
+        "body": "BODY\n",
+        "footer": "FOOTER"
+    }
+}

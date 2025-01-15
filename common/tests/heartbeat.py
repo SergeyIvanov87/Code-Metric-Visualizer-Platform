@@ -20,6 +20,7 @@ class Heartbeat:
             time.sleep(int(polling_second_count))
             print(f"{message_to_send}[{interval_count}]", file=sys.stdout, flush=True)
             interval_count += 1
+        print(f"Heartbeat has stopped sending: {message_to_send}")
 
     def run(self, message_to_send, polling_second_count = 1):
         self.is_hearbeat_goes_off = True
@@ -29,4 +30,4 @@ class Heartbeat:
     def stop(self):
         self.is_hearbeat_goes_off = False
         self.async_executor.join()
-
+        print("heartbeat thread has stopped")
