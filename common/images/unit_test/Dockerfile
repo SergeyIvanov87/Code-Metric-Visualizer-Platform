@@ -7,7 +7,7 @@ ARG PYTEST_FILTER=
 ENV PYTEST_FILTER=$PYTEST_FILTER
 
 # install app dependencies
-RUN apk add --no-cache coreutils python3 pytest dos2unix bash inotify-tools
+RUN apk add --no-cache coreutils python3 pytest dos2unix bash inotify-tools gdb python3-dbg
 
 COPY common/tests/*.py /tests/
 

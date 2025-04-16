@@ -31,17 +31,16 @@ def remove_pipe(filename):
 
 def check_pipe(pipe_filepath):
     if not os.path.exists(pipe_filepath):
-        print(f"Doesn't exist: {pipe_filepath}, skip")
         return False
 
     if not stat.S_ISFIFO(os.stat(pipe_filepath).st_mode):
-        print(f"Isn't pipe: {pipe_filepath}, remove it")
         os.remove(pipe_filepath)
         return False
     return True
 
-def unblock_result_pipe_reader(pipe_filepath):
-    print(f"Unlock consumer pipe: {pipe_filepath}")
+def unblock_result_pipe_reader(pipe_filepath, print_log = True):
+    if print_log:
+        print(f"Unlock consumer pipe: {pipe_filepath}")
     if not check_pipe(pipe_filepath):
         return
 
@@ -53,23 +52,31 @@ def unblock_result_pipe_reader(pipe_filepath):
             return
 
         unblocked_attempt_count += 1
-        print(f"execute unlocking script: {unlocking_script}, attempt: {unblocked_attempt_count}")
+        if print_log:
+            print(f"execute unlocking script: {unlocking_script}, attempt: {unblocked_attempt_count}")
         proc=subprocess.Popen(unlocking_script, shell=True)
         try:
             proc.wait(0.5)
         except Exception:
-            print(f"No one was listening to: {pipe_filepath}. Skip it")
+            if print_log:
+                print(f"No one was listening to: {pipe_filepath}. Skip it")
             proc.kill()
         else:
             unblocked_readers_count += 1
-            print(f"Unblocked: {pipe_filepath}, clients: {unblocked_readers_count}")
+            if print_log:
+                print(f"Unblocked: {pipe_filepath}, clients: {unblocked_readers_count}")
 
-def unblock_result_pipe_writer(pipe_filepath):
-    print(f"Unlock producer pipe: {pipe_filepath}")
+def unblock_result_pipe_writer(pipe_filepath, print_log = True):
+    if print_log:
+        print(f"Unlock producer pipe: {pipe_filepath}")
     if not check_pipe(pipe_filepath):
         return
 
-    unlocking_script = 'bash -c "cat ' + pipe_filepath +'"'
+    unlocking_script = 'bash -c "cat ' + pipe_filepath
+    if not print_log:
+        unlocking_script += " > /dev/null"
+    unlocking_script += '"'
+
     unblocked_writers_count = 0
     unblocked_attempt_count = 0
     while unblocked_writers_count == unblocked_attempt_count:
@@ -77,16 +84,19 @@ def unblock_result_pipe_writer(pipe_filepath):
             return
 
         unblocked_attempt_count += 1
-        print(f"execute unlocking script: {unlocking_script}, attempt: {unblocked_attempt_count}")
+        if print_log:
+            print(f"execute unlocking script: {unlocking_script}, attempt: {unblocked_attempt_count}")
         proc=subprocess.Popen(unlocking_script, shell=True)
         try:
             proc.wait(0.5)
         except Exception:
-            print(f"No one was writing to: {pipe_filepath}. Skip it")
+            if print_log:
+                print(f"No one was writing to: {pipe_filepath}. Skip it")
             proc.kill()
         else:
             unblocked_writers_count += 1
-            print(f"Unblocked: {pipe_filepath}, clients: {unblocked_writers_count}")
+            if print_log:
+                print(f"Unblocked: {pipe_filepath}, clients: {unblocked_writers_count}")
 
 def remove_api_fs_pipes_node(api_root_path, communication_type, req, rtype):
     api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(api_root_path, req, rtype)

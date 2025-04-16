@@ -43,7 +43,9 @@ def make_script_proxy_query(script):
         r'      let i=0',
         r'  fi',
         r'done',
-        r'curl --get ${CURL_GET_PARAMS} ${DOWNSTREAM_SERVICE_NETWORK_ADDR}/${API_NODE}',
+        r'#cut root /api path, as it must not be present in HTTP query',
+        r'API_REL_NODE=${API_NODE#$SHARED_API_DIR}',
+        r'curl --get ${CURL_GET_PARAMS} ${DOWNSTREAM_SERVICE_NETWORK_ADDR}/${API_REL_NODE}',
 
     )
     script.writelines(line + "\n" for line in body)

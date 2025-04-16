@@ -47,7 +47,8 @@ shutdown_processors_if_downstream_is_dead(){
     for service_query in ${!SERVICE_QUERY_WATCH_PIDS[@]}
     do
         query=`sed -n 's/\(echo \"CLI SERVER: \)\(.*\)\(\"\)/\2/p' ${service_query}`
-        local url="${downstream_server_addr}/${SHARED_API_DIR}/${query}"
+        #local url="${downstream_server_addr}/${SHARED_API_DIR}/${query}"
+        local url="${downstream_server_addr}/${query}"
         echo -e "check availability of ${url}:"
 
         if curl --output /dev/null --silent --head --fail "$url"; then
@@ -78,8 +79,13 @@ shutdown_processors_if_downstream_is_dead(){
         for service in ${!PID_TO_STOP[@]}
         do
             unset API_MANAGEMENT_PIDS[${service}]
+            echo "Remove service launching script: ${service} from proxy list"
+            rm -rf ${service}
         done
 
+        echo "take API fs postmortem snapshot"
+        echo "SHAPSHOT: `date +%D%_H:%M:%S:%3N`" >> /tmp/fs_api_snapshot
+        ls -laR ${SHARED_API_DIR} >> /tmp/fs_api_snapshot
     fi
 }
 
@@ -135,9 +141,10 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
 
     # upstream service may get inoperable abruptly, to prevent stucking on a dead-pipe, let's not block ourselves on it,
     # so that a watchdog introduced
-    (echo "SESSION_ID=${SESSION_ID} --service=${DOWNSTREAM_SERVICE}"> ${pipe_in}) &
+    DEPS_QUERY_WAIT_TIMEOUT=5
+    (echo "SESSION_ID=${SESSION_ID} --service=${DOWNSTREAM_SERVICE} --timeout=${DEPS_QUERY_WAIT_TIMEOUT}"> ${pipe_in}) &
     PID_TO_UNBLOCK=$!
-    sleep 2
+    sleep $((DEPS_QUERY_WAIT_TIMEOUT + 2))
     kill -s 0 ${PID_TO_UNBLOCK} > /dev/null 2>&1
     PID_TO_UNBLOCK_RESULT=$?
     if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
@@ -174,7 +181,7 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
         # query has stucked: probably due to upstream service outage. Unblock query
         timeout 2 echo > ${pipe_out} > /dev/null 2>&1
         if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET:	${pipe_out}"; fi
-        echo -e "${BRed}Heartbeat query: ${pipe_out} has stuck on{Color_Off} probably due to ${BRed}${UPSTREAM_SERVICE}${Color_Off} outage, trying again in attempt: ${BRed}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
+        echo -e "${BRed}Heartbeat query: ${pipe_out} has stuck on${Color_Off} probably due to ${BRed}${UPSTREAM_SERVICE}${Color_Off} outage, trying again in attempt: ${BRed}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1
         continue
     fi
@@ -195,10 +202,17 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     rm -rf to_proxy_new
     ./serialize_unmet_deps_into_schema_files.py "${PROXYING_API_QUERIES}" "to_proxy_new"
 
+    if [ ! -d to_proxy_new ]; then
+        echo -e "${Red}Cannot serialize deps ${BRed}${PROXYING_API_QUERIES}${Red} into schema files! Try again...${Color_Off}"
+        continue
+    fi
     # compare files
     declare -A SERVICE_TO_STOP
     declare -A API_MANAGEMENT_PIDS_TO_STOP
     declare -A SERVICE_TO_RUN
+    SERVICE_TO_STOP=()
+    API_MANAGEMENT_PIDS_TO_STOP=()
+    SERVICE_TO_RUN=()
     while IFS= read -r CMD;
     do
         if [ ${CMD:0:3} == "---" ] || [ ${CMD:0:3} == "+++" ]; then
@@ -236,6 +250,9 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
 
     echo -e "${BBlue}Stop old services${Color_Off}, which are not required by ${UPSTREAM_SERVICE} anymore:"
     gracefull_shutdown_bunch SERVICE_TO_STOP API_MANAGEMENT_PIDS_TO_STOP
+    echo "take API fs snapshot after services shutdown"
+    echo "SHAPSHOT: `date +%D_%H:%M:%S:%3N`" >> /tmp/fs_api_snapshot
+    ls -laR ${SHARED_API_DIR} >> /tmp/fs_api_snapshot
 
     echo -e "${BBlue}Launch new services${Color_Off}, which ${UPSTREAM_SERVICE} has become depend on: ${!SERVICE_TO_RUN[@]}"
     for service in ${!SERVICE_TO_RUN[@]}

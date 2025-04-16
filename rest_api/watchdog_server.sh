@@ -30,6 +30,10 @@ if [ -z ${HOSTNAME_IP_FILE} ]; then
     HOSTNAME_IP_FILE=/package/hostsname_ip
 fi
 
+let wait_for_server_starting_limit=${5}
+if [ -z ${wait_for_server_starting_limit} ]; then
+    wait_for_server_starting_limit=5
+fi
 
 remove_host_ip_file(){
     trap - EXIT
@@ -64,7 +68,7 @@ let wait_for_file_API_initializing_by_its_owners_limit=5
 let wait_for_api_initialization_by_its_owners_sec=1
 
 let wait_for_server_starting_counter=0
-let wait_for_server_starting_limit=5
+#let wait_for_server_starting_limit=5
 let wait_for_server_starting_sec=1
 
 while :

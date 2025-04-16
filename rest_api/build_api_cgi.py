@@ -83,9 +83,30 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
         make_redirect_url =[ r'    if request.method == "GET":',
                              r'        return f"<form style=\"display: none\" action=\"/{}\" method=\"post\">"+'.format(req_api) + r'"<button type=\"submit\" id=\"button_to_link\"> </button></form><label style=\"text-decoration: underline\" for=\"button_to_link\"> submit {} </label>"'.format(req_api)
         ]
-
+    methods += ", \"HEAD\""
+    make_head_probe_check =[ r'    if request.method == "HEAD":',
+                             r'        api_query_pipe="/{}"'.format(fs_pipes[0]),
+                             # rest_api always uses SESSION_ID
+                             r'        session_id_value=socket.gethostname()',
+                             r'        api_result_pipe="/{}_" + session_id_value'.format(fs_pipes[1]),
+                             r'        query = APIQuery([api_query_pipe, api_result_pipe])',
+                             r'        ka_tag = str(time.time() * 1000)',
+                             r'        query_params_str="API_KEEP_ALIVE_CHECK=" + ka_tag + " SESSION_ID=" + session_id_value',
+                             r'        query.execute(query_params_str)',
+                             r'        api_result_pipe_timeout_cycles=0',
+                             r'        while not (os.path.exists(api_result_pipe) and stat.S_ISFIFO(os.stat(api_result_pipe).st_mode)):',
+                             r'            sleep(0.1)',
+                             r'            api_result_pipe_timeout_cycles += 1',
+                             r'            if api_result_pipe_timeout_cycles >= 30:',
+                             r'                return f"<p>\"Resource is not available at the moment\"</p>", 503',
+                             r'        out = query.wait_result(session_id_value, 0.1, 30, True)',
+                             r'        if out != ka_tag:',
+                             r'            return f"<p>\"Resource is not available at the moment (KA probe failed)\"</p>", 503',
+                             r'        return "",200'
+    ]
     cgi_schema = [ r'@app.route("/{}",  methods=[{}])'.format(req_api, methods),
                    r'def {}():'.format(canonize_api_method_name),
+                   *make_head_probe_check,
                    *make_redirect_url,
                    r'    api_query_pipe="/{}"'.format(fs_pipes[0]),
                    # rest_api always uses SESSION_ID

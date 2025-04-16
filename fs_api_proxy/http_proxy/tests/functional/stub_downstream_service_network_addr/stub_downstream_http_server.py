@@ -61,7 +61,7 @@ def set_service_availability():
 
     return f"service_name: {service_name}, available: {available}, {is_service_unrechable_a_available}"
 
-@app.route("/api/api.pmccabe_collector.restapi.org/service_unreachable_a/service_unreachable_a_req_2_not_available", methods=["GET", "HEAD"])
+@app.route("/api.pmccabe_collector.restapi.org/service_unreachable_a/service_unreachable_a_req_2_not_available", methods=["GET", "HEAD"])
 def service_unreachable_a_req_2_not_available():
     return "Page not found", 404
 
@@ -69,7 +69,7 @@ def service_unreachable_a_req_2_not_available():
 @app.route("/<path:path>", methods=methods)
 def hello_world(path):
     print(f"*** Received data at: {path}")
-    file_echo_request_path = '/' + path + "_DATA"
+    file_echo_request_path = '/api/' + path + "_DATA"
 
     if request.method != "HEAD":
         with open (file_echo_request_path, "w") as file:

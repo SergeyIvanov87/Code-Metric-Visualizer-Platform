@@ -3,6 +3,8 @@ services:
     build:
       context: ../../../
       dockerfile: common/images/unit_test/Dockerfile
+    cap_add:
+      - SYS_PTRACE
     image: unit_tests
     environment:
         - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}

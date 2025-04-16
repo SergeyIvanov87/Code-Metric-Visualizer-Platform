@@ -32,8 +32,14 @@ def read_pipes_from_path(path, pipe_match_regex):
     if os.path.isfile(path) and stat.S_ISFIFO(os.stat(path).st_mode) and p.match(path):
         return [path]
 
-    pipes = [f for f in os.listdir(path) if stat.S_ISFIFO(os.stat(os.path.join(path,f)).st_mode)]
-    matched_pipes = [ os.path.join(path,f) for f in pipes if p.match(f) ]
+    matched_pipes=[]
+
+    # os.listdir throws sometimes
+    try:
+        pipes = [f for f in os.listdir(path) if stat.S_ISFIFO(os.stat(os.path.join(path,f)).st_mode)]
+        matched_pipes = [ os.path.join(path,f) for f in pipes if p.match(f) ]
+    except Exception as e:
+        pass
 
     return matched_pipes
 
