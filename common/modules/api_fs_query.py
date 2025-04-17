@@ -251,21 +251,82 @@ class APIQueryInterruptible(APIQuery):
         return self.exec_queue.get(), wait_second_before_interrupt
 
 
-    def __wait_result_with_pipe_mode_impl__(self, mode, session_id, sleep_between_cycles, max_cycles_count, console_ping):
+    def __wait_result_with_pipe_mode_impl__(self, mode, session_id, sleep_between_cycles, max_cycles_count, console_ping, wait_second_before_interrupt, local_begin_ts):
         try:
-            result = super().__wait_result_with_pipe_mode__(mode, session_id, sleep_between_cycles, max_cycles_count, console_ping)
+            pipe_to_read = self.__wait_result_pipe_creation__(session_id, sleep_between_cycles, max_cycles_count, console_ping)
         except Exception as e:
             # do not put any result in queue
+            return
+
+        pin = 0
+        # the thread must ackomplish it job in a finite time
+        # otherwise we will get a stall thread, waiting on pipe reading its data.
+        # These parasitic writes can affect other providers of pipes API by providing them an obsolete data
+
+        # Here we must ensure that we will not block ourselves on an inactive pipe.
+        # If the pipe is inactive that it means that a service, which is responsible for a given pipes API,
+        # might delete a link on this pipe and recreate that pipe using a same name. But it will be a different pipe.
+        # if it do that, this descriptor which we are waiting here for, will be inaccessible from the outside
+        # and we cannot unblock it by writing its content using the name, because it will be the different pipe
+        # So unblocking dealing with a descriptors here is an essential idea of this APIQueryInterruptible implementation
+        while  wait_second_before_interrupt > 0:
+            try:
+                # we are trying to open a pipe here in nonblocking mode.
+                # for success - the path of pipe must exist
+                wait_second_before_interrupt, local_begin_ts = get_elapsed_duration(wait_second_before_interrupt, local_begin_ts)
+                pin = os.open(pipe_to_read, os.O_NONBLOCK | os.O_RDONLY)
+                break;
+            except Exception as e:
+                time.sleep(sleep_between_cycles)
+                pass
+        if wait_second_before_interrupt <= 0:
+            # remove temporal pipe unless it's main session id
+            if self.remove_session_pipe_on_result_done:
+                if session_id != "":
+                    os.remove(pipe_to_read)
+            return
+
+        read_data = ""
+        read_data_size = 0
+        total_read_data_size = 0
+        try:
+            while ((total_read_data_size <= 0 and read_data_size == 0) or read_data_size != 0) and wait_second_before_interrupt > 0:
+                try:
+                    # read until the end or timeout happened or something appear
+                    wait_second_before_interrupt, local_begin_ts = get_elapsed_duration(wait_second_before_interrupt, local_begin_ts)
+                    # TODO Need to think about adding ACTUAL DATA Size in pipe result
+                    bytes_obj=os.read(pin, 4096000000)
+                    read_data_size = len(bytes_obj)
+                    total_read_data_size += read_data_size
+                    read_data += bytes_obj.decode()
+                    time.sleep(0.1)
+                except OSError as err:
+                    if err.errno != errno.EAGAIN and err.errno != errno.EWOULDBLOCK:
+                        raise
+                    time.sleep(sleep_between_cycles)
+                except Exception as e:
+                    time.sleep(sleep_between_cycles)
+                    raise
+        except Exception as e:
             pass
-        else:
-            # if OK put result in the queue
-            self.result_queue.put(result)
+        finally:
+            os.close(pin)
+
+        # remove temporal pipe unless it's main session id
+        if self.remove_session_pipe_on_result_done:
+            if session_id != "":
+                os.remove(pipe_to_read)
+
+        # API is available if utter data portion has been read
+        if total_read_data_size != 0:
+            self.result_queue.put(read_data)
+
 
 
     def wait_binary_result(self, unblock_callback, wait_second_before_interrupt, session_id = "", sleep_between_cycles=0.1, max_cycles_count=30, console_ping = False):
         wait_second_before_interrupt, begin_ts = self.__prepare_for_async__(wait_second_before_interrupt)
 
-        async_executor = threading.Thread(target=self.__wait_result_with_pipe_mode_impl__, args=["rb", session_id, sleep_between_cycles, max_cycles_count, console_ping])
+        async_executor = threading.Thread(target=self.__wait_result_with_pipe_mode_impl__, args=["rb", session_id, sleep_between_cycles, max_cycles_count, console_ping, wait_second_before_interrupt, begin_ts])
         async_executor.start()
 
         async_executor.join(wait_second_before_interrupt)
@@ -280,7 +341,7 @@ class APIQueryInterruptible(APIQuery):
     def wait_result(self, unblock_callback, wait_second_before_interrupt, session_id = "", sleep_between_cycles=0.1, max_cycles_count=30, console_ping = False):
         wait_second_before_interrupt, begin_ts = self.__prepare_for_async__(wait_second_before_interrupt)
 
-        async_executor = threading.Thread(target=self.__wait_result_with_pipe_mode_impl__, args=["r", session_id, sleep_between_cycles, max_cycles_count, console_ping])
+        async_executor = threading.Thread(target=self.__wait_result_with_pipe_mode_impl__, args=["r", session_id, sleep_between_cycles, max_cycles_count, console_ping, wait_second_before_interrupt, begin_ts])
         async_executor.start()
         async_executor.join(wait_second_before_interrupt)
         is_query_hangs = async_executor.is_alive()

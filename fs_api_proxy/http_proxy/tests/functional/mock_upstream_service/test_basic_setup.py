@@ -61,7 +61,7 @@ def http_set_service_availability(http_node, service_name, available):
     resp = requests.get(url, params=params, headers=headers)
     assert resp.ok
     answer = str(resp.text)
-    print(f"Turning on {service_name} got answer: {answer}")
+    print(f"========Turning on {service_name} got answer: {answer}=======")
     assert answer.find("service_name") != -1
     return answer
 
@@ -206,7 +206,7 @@ def make_script_unmet_dependencies_unreachable(script):
 def test_unrechable_services(service_name, queries_map):
     global global_settings
     global global_depend_on_unreachable_services_api_path
-    print(f"Test start: {service_name}", file=sys.stdout, flush=True)
+    print(f"=========Test `test_unrechable_services` start: {service_name}==========", file=sys.stdout, flush=True)
     service_api_schemas_path=os.path.join(global_depend_on_unreachable_services_api_path, service_name)
     print(f"service_api_schemas_path: {service_api_schemas_path}")
     # cleat FS
@@ -219,7 +219,7 @@ def test_unrechable_services(service_name, queries_map):
     generated_files_to_delete = []
 
     # build & launch unmet_dependencies API
-    print("Build pseudo-filesystem for inner API", file=sys.stdout, flush=True)
+    print("===========Build pseudo-filesystem for inner API=========", file=sys.stdout, flush=True)
     build_api_pseudo_fs(inner_api_schema_path, global_settings.api_dir)
 
     unmet_dependencies_api_schema_file = os.path.join(inner_api_schema_path,"unmet_dependencies.json")
@@ -231,7 +231,7 @@ def test_unrechable_services(service_name, queries_map):
     unmet_dependencies_server_env = os.environ.copy()
     unmet_dependencies_server_env["WORK_DIR"] = global_settings.work_dir
     unmet_dependencies_server = console_server.launch_detached(unmet_dependencies_server_script_path, unmet_dependencies_server_env, "")
-    print(f"Launched unmet_dependencies_server PID: {unmet_dependencies_server.pid}, PGID : {os.getpgid(unmet_dependencies_server.pid)}")
+    print(f"==============Launched unmet_dependencies_server PID: {unmet_dependencies_server.pid}, PGID : {os.getpgid(unmet_dependencies_server.pid)}=============")
     servers.append(unmet_dependencies_server)
 
 
@@ -246,7 +246,7 @@ def test_unrechable_services(service_name, queries_map):
         unmet_deps_communication_pipes_canonized.append(p)
 
     # check that special files are really pipes
-    print(f"Unreachable service must not ask base API pipes until its DOWNSTREAM_IS_DOWN: {unmet_deps_communication_pipes_canonized}", file=sys.stdout, flush=True)
+    print(f"============Unreachable service must not ask base API pipes while its DOWNSTREAM_IS_DOWN: {unmet_deps_communication_pipes_canonized}=============", file=sys.stdout, flush=True)
     got_expected_exception = False
     try:
         for p in unmet_deps_communication_pipes_canonized:
@@ -255,7 +255,7 @@ def test_unrechable_services(service_name, queries_map):
         got_expected_exception = True
 
     if not got_expected_exception:
-        print(f"ERROR: Unreachable service got asked for unmet_dependencies result pipes creation: {unmet_deps_communication_pipes_canonized}. Even is DOWNSTREAM is dead")
+        print(f"ERROR: Unreachable service got asked for unmet_dependencies result pipes creation: {unmet_deps_communication_pipes_canonized}. Even is DOWNSTREAM is dead=============")
         stop_servers(servers)
         remove_generated_files(generated_files_to_delete)
     assert  got_expected_exception
@@ -265,7 +265,7 @@ def test_unrechable_services(service_name, queries_map):
     assert downstream_service_url != ''
     http_set_service_availability(downstream_service_url, service_name, True)
 
-    print(f"Unreachable service must became reachable und must ask for base API pipes: {unmet_deps_communication_pipes_canonized}", file=sys.stdout, flush=True)
+    print(f"======Unreachable service must became reachable und must ask for base API pipes: {unmet_deps_communication_pipes_canonized}==========", file=sys.stdout, flush=True)
     got_unexpected_exception = False
     try:
         for p in unmet_deps_communication_pipes_canonized:
