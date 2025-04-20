@@ -118,7 +118,7 @@ for service, queries_data in API_table_to_KA_check.items():
         #TODO Reconsile timeout_elapsed and wait for pipe creation sleep duration and cycles
         status, result, timeout_elapsed = query.wait_result(unblock_result_pipe, timeout_elapsed, hostname, 0.1, timeout_elapsed / 0.1, False)
         if not status or result != ka_tag:
-            req_data["Error"]=f"FAILED on wait result. Response: {result}, expected KA tag: {ka_tag}, elapsed timeout: {timeout_elapsed}"
+            req_data["Error"]=repr(f"FAILED on wait result. Response: {result}, expected KA tag: {ka_tag}, elapsed timeout: {timeout_elapsed}")
             missing_API_table = push_in_table(missing_API_table, service, query_name, req_data)
             continue
 

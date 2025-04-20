@@ -290,10 +290,10 @@ def test_unrechable_services(service_name, queries_map):
     executor = FS_API_Executor(service_api_schemas_path, global_settings.api_dir, global_settings.domain_name_api_entry)
     for query_name in queries_map.keys():
         try:
-            print(f"test query: {query_name}")
+            print(f"======test query: {query_name}=======")
             assert executor.wait_until_valid(query_name,"", 1, 60, True)
             out = executor.execute(query_name, f"TRACER_ID={query_name} SESSION_ID={service_name}", f"{service_name}")
-            print(f"proxied answer: {out}")
+            print(f"=====proxied answer: {out}======")
             if query_name.find("not_available") != -1:
                 if not out.startswith("echo args") and out.find("Page not found") != -1:
                     got_error_response=True
@@ -318,7 +318,35 @@ def test_unrechable_services(service_name, queries_map):
     remove_generated_files(generated_files_to_delete)
     http_set_service_availability(downstream_service_url, service_name, False)
 
-    print(f"Test stop: {service_name}", file=sys.stdout, flush=True)
+    # wait for proxy turns all services out as a part og tear down step
+    # if we won't wait for it, that some proxy- fs API servers may be up after test finishes
+    # and next time when a test clear api fs directory using shutil.rmtree
+    # servers will be inoperable
+    counter = 0
+    while got_positive_answer and counter < 60:
+        #  got_positive_answer must not be recharged by True
+        got_positive_answer = False
+        for query_name in queries_map.keys():
+            try:
+                print(f"======test query, which must be shutdown: {query_name}=======")
+                assert executor.wait_until_valid(query_name,"", 1, 60, True)
+                out = executor.execute(query_name, f"TRACER_ID={query_name} SESSION_ID={service_name}", f"{service_name}")
+                print(f"=====proxied answer, which must be shutdown: {out}======")
+                if query_name.find("not_available") != -1:
+                    if not out.startswith("echo args") and out.find("Page not found") != -1:
+                        got_error_response=True
+                else:
+                    if out.startswith(global_settings.api_dir):
+                        # Though it answered, we must wait for service being shutdown and not responded
+                        got_positive_answer=True
+                        counter += 1
+                        sleep(1)
+            except Exception as e:
+                got_expected_exception = True
+                pass
+    assert not got_positive_answer, "Both query must be unanswered eventually"
+
+    print(f"==============Test stop: {service_name}================", file=sys.stdout, flush=True)
     assert not got_unexpected_exception
 
 
@@ -326,7 +354,7 @@ def test_unrechable_services(service_name, queries_map):
 def test_unreachable_queries_shutdown(service_name, queries_map):
     global global_settings
     global global_depend_on_unreachable_services_api_path
-    print(f"Test start: {service_name}", file=sys.stdout, flush=True)
+    print(f"Test `test_unreachable_queries_shutdown` start: {service_name}", file=sys.stdout, flush=True)
     service_api_schemas_path=os.path.join(global_depend_on_unreachable_services_api_path, service_name)
     print(f"service_api_schemas_path: {service_api_schemas_path}")
 

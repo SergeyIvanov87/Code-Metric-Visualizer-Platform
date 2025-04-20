@@ -69,6 +69,10 @@ def service_unreachable_a_req_2_not_available():
 @app.route("/<path:path>", methods=methods)
 def hello_world(path):
     print(f"*** Received data at: {path}")
+    if path.find("service_unreachable_a") != -1:
+        if not is_service_unrechable_a_available:
+            return "Page not found", 404
+
     file_echo_request_path = '/api/' + path + "_DATA"
 
     if request.method != "HEAD":
