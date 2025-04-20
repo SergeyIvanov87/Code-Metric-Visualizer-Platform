@@ -319,6 +319,7 @@ class APIQueryInterruptible(APIQuery):
 
         # API is available if utter data portion has been read
         if total_read_data_size != 0:
+            read_data = read_data.strip()
             self.result_queue.put(read_data)
 
 
