@@ -26,8 +26,8 @@ from renew_pseudo_fs_pipes import remove_pipe
 def push_in_table(result_table, service, query_name, query):
     if service not in result_table.keys():
         result_table[service] = {}
-        query.pop('Description', None)
-        result_table[service][query_name] = query
+    query.pop('Description', None)
+    result_table[service][query_name] = query
     return result_table
 
 
