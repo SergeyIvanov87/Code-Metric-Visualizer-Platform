@@ -101,6 +101,7 @@ class APIQuery:
                 pin.write(canonize_args(exec_args_str))
         except Exception as e:
             print(f"Query::execute failed on pipe '{exec_pipe_path}', while writing: {exec_args_str}. Exception: {e}", file=sys.stderr, flush=True)
+            raise e
 
     def __wait_result_pipe_creation__(self, session_id, sleep_between_cycles, max_cycles_count, console_ping):
         cycles_count = 0
