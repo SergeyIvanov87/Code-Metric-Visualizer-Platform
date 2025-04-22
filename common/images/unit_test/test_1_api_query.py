@@ -125,11 +125,9 @@ def test_api_interruptible_execute_wait_result(name, query, run_around_tests):
 
     # check API transaction
     print(f"Check API transaction: {name}", file=sys.stdout, flush=True)
-    execute_callback = lambda x: print(f"query.execute callback for {x}")
-    status, timeout = query.execute(execute_callback, 3)
+    status, timeout = query.execute(3)
     assert status, f"exec() must not be interrupted"
-    wait_callback = lambda x: print(f"query.wait_result callback for {x}")
-    status, result, timeout = query.wait_result(wait_callback, 3, "", 0.1, 30, True)
+    status, result, timeout = query.wait_result(3, "", 0.1, 30, True)
     print(f"Transaction result: {result}", file=sys.stdout, flush=True)
     assert status, f"wait_result() must not be interrupted"
     assert len(result)
@@ -137,13 +135,13 @@ def test_api_interruptible_execute_wait_result(name, query, run_around_tests):
     print(f"Check API session transaction: {name}", file=sys.stdout, flush=True)
     session_id_1 = "1"
     session_id_2 = "2"
-    status, timeout = query.execute(execute_callback, 3, "SESSION_ID=" + session_id_1 + "\n" + "SESSION_ID=" + session_id_2)
+    status, timeout = query.execute(3, "SESSION_ID=" + session_id_1 + "\n" + "SESSION_ID=" + session_id_2)
     assert status, f"execute() must not be interrupted"
-    status, result_1, timeout = query.wait_result(wait_callback, 3, session_id_1, 0.1, 30, True)
+    status, result_1, timeout = query.wait_result(3, session_id_1, 0.1, 30, True)
     print(f"Transaction session \"{session_id_1}\" result: {result_1}", file=sys.stdout, flush=True)
     assert status, f"wait_result() for session {session_id_1} must not be interrupted"
     assert len(result_1)
-    status, result_2, timeout = query.wait_result(wait_callback, 3, session_id_2, 0.1, 30, True)
+    status, result_2, timeout = query.wait_result(3, session_id_2, 0.1, 30, True)
     print(f"Transaction session \"{session_id_2}\" result: {result_2}", file=sys.stdout, flush=True)
     assert status, f"wait_result() for session {session_id_2} must not be interrupted"
     assert len(result_2)
@@ -160,23 +158,21 @@ def test_api_interruptible_execute_ka_probe_wait_result(name, query, run_around_
     # check API KA transaction
     ka_tag = str(time.time() * 1000)
     print(f"Check API KA transaction: {name}, ka_tag: {ka_tag}", file=sys.stdout, flush=True)
-    execute_callback = lambda x: print(f"query.execute callback for {x}")
-    status, timeout = query.execute(execute_callback, 3, "API_KEEP_ALIVE_CHECK=" + ka_tag)
+    status, timeout = query.execute(3, "API_KEEP_ALIVE_CHECK=" + ka_tag)
     assert status, f"exec() must not be interrupted"
-    wait_callback = lambda x: print(f"query.wait_result callback for {x}")
-    status, result, timeout = query.wait_result(wait_callback, 3, "", 0.1, 30, True)
+    status, result, timeout = query.wait_result(3, "", 0.1, 30, True)
     assert status, f"wait_result() must not be interrupted"
     assert result == ka_tag, f"result: {result}, must match ka tag: {ka_tag}"
 
     print(f"Check API KA session transaction: {name}, ka_tag: {ka_tag}", file=sys.stdout, flush=True)
     session_id_1 = "1"
     session_id_2 = "2"
-    status, timeout = query.execute(execute_callback, 3, "API_KEEP_ALIVE_CHECK=" + ka_tag + " SESSION_ID=" + session_id_1 + "\n" + "API_KEEP_ALIVE_CHECK=" + ka_tag + " SESSION_ID=" + session_id_2)
+    status, timeout = query.execute(3, "API_KEEP_ALIVE_CHECK=" + ka_tag + " SESSION_ID=" + session_id_1 + "\n" + "API_KEEP_ALIVE_CHECK=" + ka_tag + " SESSION_ID=" + session_id_2)
     assert status, f"execute() must not be interrupted"
-    status, result_1, timeout = query.wait_result(wait_callback, 3, session_id_1, 0.1, 30, True)
+    status, result_1, timeout = query.wait_result(3, session_id_1, 0.1, 30, True)
     assert status, f"wait_result() for session {session_id_1} must not be interrupted"
     assert result_1 == ka_tag, f"result_1: {result_1}, must match ka tag: {ka_tag}"
-    status, result_2, timeout = query.wait_result(wait_callback, 3, session_id_2, 0.1, 30, True)
+    status, result_2, timeout = query.wait_result(3, session_id_2, 0.1, 30, True)
     assert status, f"wait_result() for session {session_id_2} must not be interrupted"
     assert result_2 == ka_tag, f"result_2: {result_2}, must match ka tag: {ka_tag}"
 
@@ -192,12 +188,10 @@ def test_api_interruptible_interruption_check():
 
     # check API transaction
     print(f"Check API transaction", file=sys.stdout, flush=True)
-    execute_callback = lambda x: print(f"query.execute callback for {x}")
-    status, timeout = query.execute(execute_callback, 10)
+    status, timeout = query.execute(10)
     assert not status, f"execute() must be interrupted"
     assert timeout < 0.5, f"execute() must run out of time, timeout: {timeout}"
 
-    wait_callback = lambda x: print(f"query.wait_result callback for {x}")
-    status, result, timeout = query.wait_result(wait_callback, 10, "", 0.1, 100, True)
+    status, result, timeout = query.wait_result(10, "", 0.1, 100, True)
     assert not status, f"wait_result() must be interrupted"
     assert timeout < 0.5, f"wait_result() must run out of time, timeout: {timeout}"

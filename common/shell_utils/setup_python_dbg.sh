@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-local PY_SRC_DOWNLOAD_PATH=${1}
+PY_SRC_DOWNLOAD_PATH=${1}
 
 if [ -z ${PY_SRC_DOWNLOAD_PATH} ]; then
-    local PY_SRC_DOWNLOAD_PATH=./
-local PY_VERS=$(python --version | cut -d' ' -f2)
+    PY_SRC_DOWNLOAD_PATH=./
+PY_VERS=$(python --version | cut -d' ' -f2)
 wget https://www.python.org/ftp/python/${VERS}/Python-${VERS}.tgz
 
 #dirname `find ${PY_SRC_DOWNLOAD_PATH} | grep libpython.py`

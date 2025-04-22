@@ -96,8 +96,11 @@ class APIQuery:
 
     def execute(self, exec_args_str="0"):
         exec_pipe_path = APIQuery.__get_exec_pipe__(self.command_pipes)
-        with open(exec_pipe_path, "w") as pin:
-            pin.write(canonize_args(exec_args_str))
+        try:
+            with open(exec_pipe_path, "w") as pin:
+                pin.write(canonize_args(exec_args_str))
+        except Exception as e:
+            print(f"Query::execute failed on pipe '{exec_pipe_path}', while writing: {exec_args_str}. Exception: {e}", file=sys.stderr, flush=True)
 
     def __wait_result_pipe_creation__(self, session_id, sleep_between_cycles, max_cycles_count, console_ping):
         cycles_count = 0
@@ -141,13 +144,34 @@ def get_elapsed_duration(current_duration, begin_ts):
 class APIQueryInterruptible(APIQuery):
     def __init__(self, command_pipes, remove_session_pipe_on_result_done):
         super().__init__(command_pipes, remove_session_pipe_on_result_done)
-        self.exec_queue = LifoQueue()
         self.result_queue = LifoQueue()
 
-    def __execute_impl__(self, exec_args_str, wait_second_before_interrupt, local_begin_ts, relax_sleep_sec = 0.5):
+    def __prepare_for_async__(self, wait_second_before_interrupt):
+        begin_ts = time.time()  # measure duration
+
+        # drain thread communication queues before proceed, to get off unread messages
+        while not self.result_queue.empty():
+            self.result_queue.get()
+
+        # must not supply join() by 0 timeout not avoid be blocked forever
+        if wait_second_before_interrupt <=0:
+            wait_second_before_interrupt = 0.5
+        return wait_second_before_interrupt, begin_ts
+
+    def __finish_result_async__(self, wait_second_before_interrupt, begin_ts):
+        # check if an exception happened
+        wait_second_before_interrupt, end_ts = get_elapsed_duration(wait_second_before_interrupt, begin_ts)
+        if self.result_queue.empty():
+            return False, None, wait_second_before_interrupt
+        return True, self.result_queue.get(), wait_second_before_interrupt
+
+    def execute(self, wait_second_before_interrupt, exec_args_str="0"):
+        wait_second_before_interrupt, local_begin_ts = self.__prepare_for_async__(wait_second_before_interrupt)
+
+        relax_sleep_sec = 0.5
         exec_pipe_path = APIQuery.__get_exec_pipe__(self.command_pipes)
         pin = 0
-        # the thread must ackomplish it job in a finite time
+        # the routine must ackomplish it job in a finite time
         # otherwise we will get a stall thread, waiting on pipe writing its data.
         # These parasitic writes can affect other consumers of pipes API by providing them an obsolete data
 
@@ -168,7 +192,7 @@ class APIQueryInterruptible(APIQuery):
                 time.sleep(relax_sleep_sec)
                 pass
         if wait_second_before_interrupt <= 0:
-            return
+            return False, wait_second_before_interrupt
         # As we have successfully opened it without blocking,
         # then we no longer need to keep the handle as non-blocking
         flags = fcntl.fcntl(pin, fcntl.F_GETFL)
@@ -205,58 +229,16 @@ class APIQueryInterruptible(APIQuery):
             os.close(pin)
 
         # API is available if utter data portion has been written
-        if offset_to_write == data_to_write_size:
-            self.exec_queue.put(True)
-
-    def __prepare_for_async__(self, wait_second_before_interrupt):
-        begin_ts = time.time()  # measure duration
-
-        # drain thread communication queues before proceed, to get off unread messages
-        while not self.exec_queue.empty():
-            self.exec_queue.get()
-        while not self.result_queue.empty():
-            self.result_queue.get()
-
-        # must not supply join() by 0 timeout not avoid be blocked forever
-        if wait_second_before_interrupt <=0:
-            wait_second_before_interrupt = 0.5
-        return wait_second_before_interrupt, begin_ts
-
-    def __finish_result_async__(self, wait_second_before_interrupt, begin_ts):
-        # check if an exception happened
-        wait_second_before_interrupt, end_ts = get_elapsed_duration(wait_second_before_interrupt, begin_ts)
-        if self.result_queue.empty():
-            return False, None, wait_second_before_interrupt
-        return True, self.result_queue.get(), wait_second_before_interrupt
-
-    def execute(self, unblock_callback, wait_second_before_interrupt, exec_args_str="0"):
-        wait_second_before_interrupt, begin_ts = self.__prepare_for_async__(wait_second_before_interrupt)
-
-        # start thread
-        async_executor = threading.Thread(target=self.__execute_impl__, args=[exec_args_str, wait_second_before_interrupt, begin_ts, 0.5])
-        async_executor.start()
-        async_executor.join(wait_second_before_interrupt)
-        is_query_hangs = async_executor.is_alive()
-        if is_query_hangs:
-            # if thread hangs (which is impossible provigin NONBLOCK nature) then unblock pipe
-            unblock_callback(super().__get_exec_pipe__(self.command_pipes))
-            async_executor.join(wait_second_before_interrupt)
-            wait_second_before_interrupt, end_ts = get_elapsed_duration(wait_second_before_interrupt, begin_ts)
-            return False, wait_second_before_interrupt
-
-        # check if an exception happened
-        wait_second_before_interrupt, end_ts = get_elapsed_duration(wait_second_before_interrupt, begin_ts)
-        if self.exec_queue.empty():
-            return False, wait_second_before_interrupt
-        return self.exec_queue.get(), wait_second_before_interrupt
+        wait_second_before_interrupt, end_ts = get_elapsed_duration(wait_second_before_interrupt, local_begin_ts)
+        return offset_to_write == data_to_write_size, wait_second_before_interrupt
 
 
     def __wait_result_with_pipe_mode_impl__(self, mode, session_id, sleep_between_cycles, max_cycles_count, console_ping, wait_second_before_interrupt, local_begin_ts):
         try:
             pipe_to_read = self.__wait_result_pipe_creation__(session_id, sleep_between_cycles, max_cycles_count, console_ping)
         except Exception as e:
-            # do not put any result in queue
-            return
+            wait_second_before_interrupt, local_begin_ts = get_elapsed_duration(wait_second_before_interrupt, local_begin_ts)
+            return False, None, wait_second_before_interrupt
 
         pin = 0
         # the thread must ackomplish it job in a finite time
@@ -318,37 +300,19 @@ class APIQueryInterruptible(APIQuery):
                 os.remove(pipe_to_read)
 
         # API is available if utter data portion has been read
+        wait_second_before_interrupt, local_begin_ts = get_elapsed_duration(wait_second_before_interrupt, local_begin_ts)
         if total_read_data_size != 0:
             read_data = read_data.strip()
             self.result_queue.put(read_data)
+            return True, read_data, wait_second_before_interrupt
+        else:
+            return False, None, wait_second_before_interrupt
 
-
-
-    def wait_binary_result(self, unblock_callback, wait_second_before_interrupt, session_id = "", sleep_between_cycles=0.1, max_cycles_count=30, console_ping = False):
+    def wait_binary_result(self, wait_second_before_interrupt, session_id = "", sleep_between_cycles=0.1, max_cycles_count=30, console_ping = False):
         wait_second_before_interrupt, begin_ts = self.__prepare_for_async__(wait_second_before_interrupt)
-
-        async_executor = threading.Thread(target=self.__wait_result_with_pipe_mode_impl__, args=["rb", session_id, sleep_between_cycles, max_cycles_count, console_ping, wait_second_before_interrupt, begin_ts])
-        async_executor.start()
-
-        async_executor.join(wait_second_before_interrupt)
-        is_query_hangs = async_executor.is_alive()
-        if is_query_hangs:
-            unblock_callback(super().__get_result_pipe__(self.command_pipes, session_id))
-            async_executor.join(wait_second_before_interrupt)
-
-        return self.__finish_result_async__(wait_second_before_interrupt, begin_ts)
+        return self.__wait_result_with_pipe_mode_impl__("rb", session_id, sleep_between_cycles, max_cycles_count, console_ping, wait_second_before_interrupt, begin_ts)
 
 
-    def wait_result(self, unblock_callback, wait_second_before_interrupt, session_id = "", sleep_between_cycles=0.1, max_cycles_count=30, console_ping = False):
+    def wait_result(self, wait_second_before_interrupt, session_id = "", sleep_between_cycles=0.1, max_cycles_count=30, console_ping = False):
         wait_second_before_interrupt, begin_ts = self.__prepare_for_async__(wait_second_before_interrupt)
-
-        async_executor = threading.Thread(target=self.__wait_result_with_pipe_mode_impl__, args=["r", session_id, sleep_between_cycles, max_cycles_count, console_ping, wait_second_before_interrupt, begin_ts])
-        async_executor.start()
-        async_executor.join(wait_second_before_interrupt)
-        is_query_hangs = async_executor.is_alive()
-        if is_query_hangs:
-            pipe_to_unblock = super().__get_result_pipe__(self.command_pipes, session_id)
-            unblock_callback(pipe_to_unblock)
-            async_executor.join(wait_second_before_interrupt)
-
-        return self.__finish_result_async__(wait_second_before_interrupt, begin_ts)
+        return self.__wait_result_with_pipe_mode_impl__("r", session_id, sleep_between_cycles, max_cycles_count, console_ping, wait_second_before_interrupt, begin_ts)

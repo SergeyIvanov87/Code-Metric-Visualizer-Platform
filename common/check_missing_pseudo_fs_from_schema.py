@@ -76,18 +76,6 @@ for must_have_req_name, [must_have_service, must_have_query] in API_dependency_t
         missing_API_table = push_in_table(missing_API_table, must_have_service, must_have_req_name, must_have_query)
 
 
-def unblock_query_pipe(pipe_path):
-    unblock_result_pipe_writer(pipe_path, False)
-
-    # Do not remove these pipes, as someone may create it at exact time
-    # remove_pipe(pipe_path)
-
-def unblock_result_pipe(pipe_path):
-    unblock_result_pipe_reader(pipe_path, False)
-
-    # Do not remove these pipes, as someone may create it at exact time
-    # remove_pipe(pipe_path)
-
 # keep_alive check of found API
 # As they may exist, but be inoperable
 # The following code just sends KEEP_ALIVE probe to make sure that someone sits on other sides of these query pipes
@@ -109,14 +97,14 @@ for service, queries_data in API_table_to_KA_check.items():
 
         ka_tag = str(time.time() * 1000)
 
-        status,timeout_elapsed = query.execute(unblock_query_pipe, timeout_elapsed, "API_KEEP_ALIVE_CHECK=" + ka_tag + " SESSION_ID=" + hostname)
+        status,timeout_elapsed = query.execute(timeout_elapsed, "API_KEEP_ALIVE_CHECK=" + ka_tag + " SESSION_ID=" + hostname)
         if not status:
             req_data["Error"]=f"FAILED on execute. Elapsed timeout: {timeout_elapsed}"
             missing_API_table = push_in_table(missing_API_table, service, query_name, req_data)
             continue
 
         #TODO Reconsile timeout_elapsed and wait for pipe creation sleep duration and cycles
-        status, result, timeout_elapsed = query.wait_result(unblock_result_pipe, timeout_elapsed, hostname, 0.1, timeout_elapsed / 0.1, False)
+        status, result, timeout_elapsed = query.wait_result(timeout_elapsed, hostname, 0.1, timeout_elapsed / 0.1, False)
         if not status or result != ka_tag:
             req_data["Error"]=repr(f"FAILED on wait result. Response: {result}, expected KA tag: {ka_tag}, elapsed timeout: {timeout_elapsed}")
             missing_API_table = push_in_table(missing_API_table, service, query_name, req_data)
