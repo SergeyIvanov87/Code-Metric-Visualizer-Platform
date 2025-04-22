@@ -322,29 +322,18 @@ def test_unrechable_services(service_name, queries_map):
     # if we won't wait for it, that some proxy- fs API servers may be up after test finishes
     # and next time when a test clear api fs directory using shutil.rmtree
     # servers will be inoperable
+    print(f"==============Wait for: {service_name} shutting down================", file=sys.stdout, flush=True)
     counter = 0
-    while got_positive_answer and counter < 60:
-        #  got_positive_answer must not be recharged by True
-        got_positive_answer = False
+    services_are_available = True
+    while services_are_available and counter < 60:
+        services_are_available = False
         for query_name in queries_map.keys():
             try:
-                print(f"======test query, which must be shutdown: {query_name}=======")
-                assert executor.wait_until_valid(query_name,"", 1, 60, True)
-                out = executor.execute(query_name, f"TRACER_ID={query_name} SESSION_ID={service_name}", f"{service_name}")
-                print(f"=====proxied answer, which must be shutdown: {out}======")
-                if query_name.find("not_available") != -1:
-                    if not out.startswith("echo args") and out.find("Page not found") != -1:
-                        got_error_response=True
-                else:
-                    if out.startswith(global_settings.api_dir):
-                        # Though it answered, we must wait for service being shutdown and not responded
-                        got_positive_answer=True
-                        counter += 1
-                        sleep(1)
+                services_are_available = (services_are_available or executor.wait_until_valid(query_name,"", 1, 60, True))
             except Exception as e:
-                got_expected_exception = True
+                services_are_available = services_are_available or False
                 pass
-    assert not got_positive_answer, "Both query must be unanswered eventually"
+    assert not services_are_available, "Pipes responsible for FS API communication must be closed"
 
     print(f"==============Test stop: {service_name}================", file=sys.stdout, flush=True)
     assert not got_unexpected_exception
@@ -420,14 +409,14 @@ def test_unreachable_queries_shutdown(service_name, queries_map):
     assert (got_expected_exception or got_error_response)
     assert got_positive_answer, "One query must be positive"
 
-    print(f"Shutdown downstream service")
+    print(f"==================Shutdown downstream service==================")
     h = Heartbeat()
     h.run(f"{get_timestamp()}\tTest 'turn down service: {service_name}' is in progress...")
     http_set_service_availability(downstream_service_url, service_name, False)
     time.sleep(30)
     h.stop()
 
-    print(f"check self-created service, which must NOT response: {service_name}")
+    print(f"==================check self-created service, which must NOT response: {service_name}==================")
     got_expected_exception = False
     got_positive_answer=False
 
