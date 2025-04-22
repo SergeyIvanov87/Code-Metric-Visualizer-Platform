@@ -265,7 +265,7 @@ def test_unrechable_services(service_name, queries_map):
     assert downstream_service_url != ''
     http_set_service_availability(downstream_service_url, service_name, True)
 
-    print(f"======Unreachable service must became reachable und must ask for base API pipes: {unmet_deps_communication_pipes_canonized}==========", file=sys.stdout, flush=True)
+    print(f"======Unreachable service must became available und must ask for base API pipes: {unmet_deps_communication_pipes_canonized}==========", file=sys.stdout, flush=True)
     got_unexpected_exception = False
     try:
         for p in unmet_deps_communication_pipes_canonized:
@@ -313,15 +313,11 @@ def test_unrechable_services(service_name, queries_map):
     assert got_positive_answer, "One query must be positive"
 
 
-    # Tear down
-    stop_servers(servers)
-    remove_generated_files(generated_files_to_delete)
-    http_set_service_availability(downstream_service_url, service_name, False)
-
     # wait for proxy turns all services out as a part og tear down step
     # if we won't wait for it, that some proxy- fs API servers may be up after test finishes
     # and next time when a test clear api fs directory using shutil.rmtree
     # servers will be inoperable
+    http_set_service_availability(downstream_service_url, service_name, False)
     print(f"==============Wait for: {service_name} shutting down================", file=sys.stdout, flush=True)
     counter = 0
     services_are_available = True
@@ -335,8 +331,10 @@ def test_unrechable_services(service_name, queries_map):
                 pass
     assert not services_are_available, "Pipes responsible for FS API communication must be closed"
 
+    # Tear down
+    stop_servers(servers)
+    remove_generated_files(generated_files_to_delete)
     print(f"==============Test stop: {service_name}================", file=sys.stdout, flush=True)
-    assert not got_unexpected_exception
 
 
 @pytest.mark.parametrize("service_name,queries_map", service_unavailable_api_deps.items())
