@@ -104,6 +104,8 @@ api_cli_schema = [
     'trap "rm -f $pipe_result" ${SIGNALS}\n',
     'SESSION_ID_ATTR="SESSION_ID"\n',
     'SESSION_ID_VALUE="#####"\n',
+    'API_KEEP_ALIVE_ATTR="API_KEEP_ALIVE_CHECK"\n',
+    'API_KEEP_ALIVE_VALUE="@@@@@"\n'
     'declare -A pipe_result_array\n',
     'pipe_result_array[${SESSION_ID_VALUE}]=${pipe_result}\n',
     'declare -A WATCH_PID_ARRAY\n',
@@ -114,11 +116,13 @@ api_cli_schema = [
     "    do\n",
     "        pipe_result_consumer=${pipe_result}\n",
     '        SESSION_ID_VALUE="#####"\n',
+    '        API_KEEP_ALIVE_VALUE="@@@@@"\n',
     '        if [[ -f "${api_exec_node_directory}/in_progress" ]]; then\n',
     '            rm -f "${api_exec_node_directory}/in_progress"\n',
     "        fi\n",
     '        echo "`date +%H:%M:%S:%3N`\t${ME}\trequest ${REQUEST_NUM}"\n',
     "        " + extract_attr_value_from_string() + " ${SESSION_ID_ATTR} \"${CMD_READ}\" \"#####\" '=' SESSION_ID_VALUE\n",
+    "        " + extract_attr_value_from_string() + " ${API_KEEP_ALIVE_ATTR} \"${CMD_READ}\" \"@@@@@\" '=' API_KEEP_ALIVE_VALUE\n",
     "        if [ -z ${pipe_result_array[${SESSION_ID_VALUE}]} ]; then\n",
     '            pipe_result_consumer="${pipe_result}_${SESSION_ID_VALUE}"\n',
     "            pipe_result_array[${SESSION_ID_VALUE}]=${pipe_result_consumer}\n",
@@ -140,7 +144,11 @@ api_cli_schema = [
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=0\n",
     '        echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tSTART    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}"\treqNum:\t${REQUEST_NUM}\n',
     '        touch "${api_exec_node_directory}/in_progress"\n',
-    '        RESULT_OUT=$({0}/{1} {2} ', '"${CMD_READ}" | base64)\n',
+    '        if [ ! -z ${API_KEEP_ALIVE_VALUE} ] && [ ${API_KEEP_ALIVE_VALUE} != "@@@@@" ]; then\n',
+    '            RESULT_OUT=$(echo -n "${API_KEEP_ALIVE_VALUE}" | base64)\n',
+    '        else\n',
+    '            RESULT_OUT=$({0}/{1} {2} ', '"${CMD_READ}" | base64)\n',
+    '        fi\n',
     '        rm -f ${api_exec_node_directory}/in_progress\n',
     '        (touch ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tFINISH    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}\treqNum:\t${REQUEST_NUM} " && echo "${RESULT_OUT}" | base64 -d >$pipe_result_consumer && rm -rf ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tCONSUMED [${SESSION_ID_VALUE}]: ${api_exec_node_directory} <--- ${pipe_result_consumer}") &\n',
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=$!\n",
@@ -218,7 +226,7 @@ def generate_cli_server_content(req_name, req_api, req_type, content_type, req_e
     else:
         api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format("{WORK_DIR}",req_executor_name)
 
-    template_schema_row_index += 54
+    template_schema_row_index += 60
     api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(
         req_exec_script_root_dir,
         req_executor_name,

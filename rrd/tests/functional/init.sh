@@ -37,16 +37,42 @@ if [ -e ${real_statistic_pipe_out} ]; then
 fi
 mkfifo -m 644 ${real_statistic_pipe_out}
 
+real_main_statistic_pipe_out=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml
+if [ -e ${real_main_statistic_pipe_out} ]; then
+    rm -f ${real_main_statistic_pipe_out}
+fi
+mkfifo -m 644 ${real_main_statistic_pipe_out}
+
 real_statistic_pipe_in=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
 if [ -e ${real_statistic_pipe_in} ]; then
     rm -f ${real_statistic_pipe_in}
 fi
 mkfifo -m 644 ${real_statistic_pipe_in}
 #echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
+echo "Ready to server Mock CC API"
 (
 while :
 do
-    echo "`date +%H:%M:%S:%3N`    START:`cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec`"
+    CMD=`cat ${real_statistic_pipe_in}`
+    readarray -t IN_SERVER_REQUEST_ARGS <<< "${CMD}"
+    KEEP_ALIVE_VALUE=
+    unset KEEP_ALIVE_VALUE
+    for arg in ${IN_SERVER_REQUEST_ARGS[@]}
+    do
+        if [[ "${arg}" = "API_KEEP_ALIVE_CHECK"* ]];
+        then
+            readarray -d '=' -t AVP <<< "${arg}"
+            KEEP_ALIVE_VALUE=${AVP[1]}
+            break
+        fi
+    done
+    if [ ! -z ${KEEP_ALIVE_VALUE} ]; then
+        echo "KEEP_ALIVE_PROBE request: ${KEEP_ALIVE_VALUE}"
+        echo -n "${KEEP_ALIVE_VALUE}" > ${real_statistic_pipe_out}
+        continue
+    fi
+    ############################################################
+    echo "`date +%H:%M:%S:%3N`    START:${CMD}"
     echo "`date +%H:%M:%S:%3N`    MOCK FINISH: ${real_statistic_pipe_out}"
     cat ${fake_statistic_data_result} > ${real_statistic_pipe_out}
     echo "`date +%H:%M:%S:%3N`    MOCK CONSUMED: ${real_statistic_pipe_out}"
@@ -81,6 +107,7 @@ kill -15 ${WATCH_PID}
 wait ${WATCH_PID}
 rm -f ${real_statistic_pipe_in}
 rm -f ${real_statistic_pipe_out}
+rm -f ${real_main_statistic_pipe_out}
 echo "Final API fs snapshot, result ${RET}:"
 ls -laR ${SHARED_API_DIR}
 

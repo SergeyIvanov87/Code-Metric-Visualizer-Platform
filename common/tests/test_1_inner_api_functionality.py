@@ -6,6 +6,7 @@ import pathlib
 import pytest
 import stat
 import glob, shutil
+import sys
 
 from time_utils import get_timestamp
 from settings import Settings
@@ -57,7 +58,7 @@ def check_unmet_dependencies_api(query, pipes):
 
     global global_settings
     if len(before_deps_json_str):
-        before_json_obj = json.loads(json_str)
+        before_json_obj = json.loads(before_deps_json_str)
 
     # remove some existing API result pipes
     service_api_deps = get_api_service_dependencies("/API/deps", r".*", r".*\.json$")
@@ -90,14 +91,19 @@ def check_unmet_dependencies_api(query, pipes):
                 shutil.move(file, api_exec_node_directory)
 
             assert len(after_deps_json_str)
+
+            after_deps_json_str = after_deps_json_str.rstrip()
+            expected = False
             try:
                 after_deps_json_obj = json.loads(after_deps_json_str)
                 assert len(after_deps_json_obj.keys()) != 0
                 assert dep_on_service in after_deps_json_obj.keys()
                 assert req_name in after_deps_json_obj[dep_on_service].keys()
+                expected = True
             except Exception as e:
-                assert 0
-
+                print(f"Exception: {e}", file=sys.stdout, flush=True)
+                expected = False
+            assert expected
     # retrieve deleted API
 
     # removed API service must be met

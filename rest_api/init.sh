@@ -44,7 +44,7 @@ echo "flask --app rest_api_server run --host 0.0.0.0"
 # It must be started before any inotify event has been listened,
 # so when earlier event was arrived, we would process that
 export REST_API_INSTANCE_PIDFILE=${MY_FLASK_INSTANCE_PIDFILE}
-/package/watchdog_server.sh ${REST_API_INSTANCE_PIDFILE} ${FLASK_RUN_HOST} ${FLASK_RUN_PORT} ${HOSTNAME_IP_FILE} &
+/package/watchdog_server.sh ${REST_API_INSTANCE_PIDFILE} ${FLASK_RUN_HOST} ${FLASK_RUN_PORT} ${HOSTNAME_IP_FILE} ${WAIT_FOR_SERVER_STARTING_LIMIT_SEC} &
 WATCHDOG_PID=$!
 
 shopt -s extglob
@@ -115,7 +115,7 @@ while [ $RETURN_STATUS -eq 0 ]; do
 
         # Restart the running service instance only if API has been changed
         if [ ${HAS_GOT_API_UPDATE_EVENT} -gt 0 ]; then
-            echo "Got ${HAS_GOT_API_UPDATE_EVENT} API events. ${BBlue}Restart REST_API service will be scheduled...${Color_Off}"
+            echo -e "Got ${HAS_GOT_API_UPDATE_EVENT} API events. ${BBlue}Restart REST_API service will be scheduled...${Color_Off}"
             # kill an old instance
             remove_populated_host_ip_file
             REST_API_INSTANCE_PIDFILE_PID=`cat ${REST_API_INSTANCE_PIDFILE}`

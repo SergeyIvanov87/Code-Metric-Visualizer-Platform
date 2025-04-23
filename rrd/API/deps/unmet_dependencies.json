@@ -3,7 +3,8 @@
     "Method" : "GET",
     "Query": "+/unmet_dependencies",
     "Params": {
-        "--service" : ".*"
+        "--service" : ".*",
+        "--timeout" : "5"
     },
     "Description": {
         "header": "Ask for external API and services which a current service depends on ",

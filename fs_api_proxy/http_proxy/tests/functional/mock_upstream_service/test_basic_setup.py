@@ -61,7 +61,7 @@ def http_set_service_availability(http_node, service_name, available):
     resp = requests.get(url, params=params, headers=headers)
     assert resp.ok
     answer = str(resp.text)
-    print(f"Turning on {service_name} got answer: {answer}")
+    print(f"========Turning on {service_name} got answer: {answer}=======")
     assert answer.find("service_name") != -1
     return answer
 
@@ -206,7 +206,7 @@ def make_script_unmet_dependencies_unreachable(script):
 def test_unrechable_services(service_name, queries_map):
     global global_settings
     global global_depend_on_unreachable_services_api_path
-    print(f"Test start: {service_name}", file=sys.stdout, flush=True)
+    print(f"=========Test `test_unrechable_services` start: {service_name}==========", file=sys.stdout, flush=True)
     service_api_schemas_path=os.path.join(global_depend_on_unreachable_services_api_path, service_name)
     print(f"service_api_schemas_path: {service_api_schemas_path}")
     # cleat FS
@@ -219,7 +219,7 @@ def test_unrechable_services(service_name, queries_map):
     generated_files_to_delete = []
 
     # build & launch unmet_dependencies API
-    print("Build pseudo-filesystem for inner API", file=sys.stdout, flush=True)
+    print("===========Build pseudo-filesystem for inner API=========", file=sys.stdout, flush=True)
     build_api_pseudo_fs(inner_api_schema_path, global_settings.api_dir)
 
     unmet_dependencies_api_schema_file = os.path.join(inner_api_schema_path,"unmet_dependencies.json")
@@ -231,7 +231,7 @@ def test_unrechable_services(service_name, queries_map):
     unmet_dependencies_server_env = os.environ.copy()
     unmet_dependencies_server_env["WORK_DIR"] = global_settings.work_dir
     unmet_dependencies_server = console_server.launch_detached(unmet_dependencies_server_script_path, unmet_dependencies_server_env, "")
-    print(f"Launched unmet_dependencies_server PID: {unmet_dependencies_server.pid}, PGID : {os.getpgid(unmet_dependencies_server.pid)}")
+    print(f"==============Launched unmet_dependencies_server PID: {unmet_dependencies_server.pid}, PGID : {os.getpgid(unmet_dependencies_server.pid)}=============")
     servers.append(unmet_dependencies_server)
 
 
@@ -246,7 +246,7 @@ def test_unrechable_services(service_name, queries_map):
         unmet_deps_communication_pipes_canonized.append(p)
 
     # check that special files are really pipes
-    print(f"Unreachable service must not ask base API pipes until its DOWNSTREAM_IS_DOWN: {unmet_deps_communication_pipes_canonized}", file=sys.stdout, flush=True)
+    print(f"============Unreachable service must not ask base API pipes while its DOWNSTREAM_IS_DOWN: {unmet_deps_communication_pipes_canonized}=============", file=sys.stdout, flush=True)
     got_expected_exception = False
     try:
         for p in unmet_deps_communication_pipes_canonized:
@@ -255,7 +255,7 @@ def test_unrechable_services(service_name, queries_map):
         got_expected_exception = True
 
     if not got_expected_exception:
-        print(f"ERROR: Unreachable service got asked for unmet_dependencies result pipes creation: {unmet_deps_communication_pipes_canonized}. Even is DOWNSTREAM is dead")
+        print(f"ERROR: Unreachable service got asked for unmet_dependencies result pipes creation: {unmet_deps_communication_pipes_canonized}. Even is DOWNSTREAM is dead=============")
         stop_servers(servers)
         remove_generated_files(generated_files_to_delete)
     assert  got_expected_exception
@@ -265,7 +265,7 @@ def test_unrechable_services(service_name, queries_map):
     assert downstream_service_url != ''
     http_set_service_availability(downstream_service_url, service_name, True)
 
-    print(f"Unreachable service must became reachable und must ask for base API pipes: {unmet_deps_communication_pipes_canonized}", file=sys.stdout, flush=True)
+    print(f"======Unreachable service must became available und must ask for base API pipes: {unmet_deps_communication_pipes_canonized}==========", file=sys.stdout, flush=True)
     got_unexpected_exception = False
     try:
         for p in unmet_deps_communication_pipes_canonized:
@@ -290,10 +290,10 @@ def test_unrechable_services(service_name, queries_map):
     executor = FS_API_Executor(service_api_schemas_path, global_settings.api_dir, global_settings.domain_name_api_entry)
     for query_name in queries_map.keys():
         try:
-            print(f"test query: {query_name}")
+            print(f"======test query: {query_name}=======")
             assert executor.wait_until_valid(query_name,"", 1, 60, True)
             out = executor.execute(query_name, f"TRACER_ID={query_name} SESSION_ID={service_name}", f"{service_name}")
-            print(f"proxied answer: {out}")
+            print(f"=====proxied answer: {out}======")
             if query_name.find("not_available") != -1:
                 if not out.startswith("echo args") and out.find("Page not found") != -1:
                     got_error_response=True
@@ -313,20 +313,35 @@ def test_unrechable_services(service_name, queries_map):
     assert got_positive_answer, "One query must be positive"
 
 
+    # wait for proxy turns all services out as a part og tear down step
+    # if we won't wait for it, that some proxy- fs API servers may be up after test finishes
+    # and next time when a test clear api fs directory using shutil.rmtree
+    # servers will be inoperable
+    http_set_service_availability(downstream_service_url, service_name, False)
+    print(f"==============Wait for: {service_name} shutting down================", file=sys.stdout, flush=True)
+    counter = 0
+    services_are_available = True
+    while services_are_available and counter < 60:
+        services_are_available = False
+        for query_name in queries_map.keys():
+            try:
+                services_are_available = (services_are_available or executor.wait_until_valid(query_name,"", 1, 60, True))
+            except Exception as e:
+                services_are_available = services_are_available or False
+                pass
+    assert not services_are_available, "Pipes responsible for FS API communication must be closed"
+
     # Tear down
     stop_servers(servers)
     remove_generated_files(generated_files_to_delete)
-    http_set_service_availability(downstream_service_url, service_name, False)
-
-    print(f"Test stop: {service_name}", file=sys.stdout, flush=True)
-    assert not got_unexpected_exception
+    print(f"==============Test stop: {service_name}================", file=sys.stdout, flush=True)
 
 
 @pytest.mark.parametrize("service_name,queries_map", service_unavailable_api_deps.items())
 def test_unreachable_queries_shutdown(service_name, queries_map):
     global global_settings
     global global_depend_on_unreachable_services_api_path
-    print(f"Test start: {service_name}", file=sys.stdout, flush=True)
+    print(f"Test `test_unreachable_queries_shutdown` start: {service_name}", file=sys.stdout, flush=True)
     service_api_schemas_path=os.path.join(global_depend_on_unreachable_services_api_path, service_name)
     print(f"service_api_schemas_path: {service_api_schemas_path}")
 
@@ -392,14 +407,14 @@ def test_unreachable_queries_shutdown(service_name, queries_map):
     assert (got_expected_exception or got_error_response)
     assert got_positive_answer, "One query must be positive"
 
-    print(f"Shutdown downstream service")
+    print(f"==================Shutdown downstream service==================")
     h = Heartbeat()
     h.run(f"{get_timestamp()}\tTest 'turn down service: {service_name}' is in progress...")
     http_set_service_availability(downstream_service_url, service_name, False)
     time.sleep(30)
     h.stop()
 
-    print(f"check self-created service, which must NOT response: {service_name}")
+    print(f"==================check self-created service, which must NOT response: {service_name}==================")
     got_expected_exception = False
     got_positive_answer=False
 

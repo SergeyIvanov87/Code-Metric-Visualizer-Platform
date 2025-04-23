@@ -9,6 +9,9 @@ ENV PYTEST_FILTER=$PYTEST_FILTER
 # install app dependencies
 RUN apk add --no-cache coreutils python3 pytest dos2unix bash inotify-tools
 
+# prepare packages for debugging
+RUN apk add --no-cache cython gdb python3-dbg
+
 COPY common/tests/*.py /tests/
 
 # TODO temporary source of utils
@@ -19,7 +22,9 @@ COPY common/modules /tests/utils/modules
 
 COPY common/images/unit_test/API /API/
 COPY common/images/unit_test/init.sh /
+COPY common/shell_utils /tests/shell_utils
 
+RUN dos2unix /tests/shell_utils/*
 RUN dos2unix /tests/utils/*
 RUN dos2unix /tests/utils/modules/*
 
