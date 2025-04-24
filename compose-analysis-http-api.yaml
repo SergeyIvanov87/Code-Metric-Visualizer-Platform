@@ -1,0 +1,10 @@
+
+include:
+  - common/images/syslog-ng_image/compose.yaml
+  - rrd/compose-analysis-http-api.yaml
+  - cyclomatic_complexity/compose-analysis-http-api.yaml
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
