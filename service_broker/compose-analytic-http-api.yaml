@@ -1,0 +1,56 @@
+services:
+  service_broker:
+    build:
+      context: ../
+      dockerfile: ./service_broker/Dockerfile
+    depends_on:
+      - syslog-ng
+    environment:
+        - SKIP_API_DEPS_CHECK=${SKIP_API_DEPS_CHECK:-false}
+        - TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC:-900}
+        - CRON_REPO_UPDATE_SCHEDULE="0 0 * * *"
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.api.service_broker.http.private.org:/api
+
+  service_broker_http_proxy_rrd:
+    build:
+      context: ../
+      dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
+    environment:
+        - UPSTREAM_SERVICE=service_broker
+        - DOWNSTREAM_SERVICE=rrd
+        - DOWNSTREAM_SERVICE_NETWORK_ADDR=rrd_http_api:5002
+        - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT:-900}
+    hostname: service_broker_http_proxy_rrd
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.api.service_broker.http.private.org:/api
+
+  service_broker_http_proxy_vcs_project:
+    build:
+      context: ../
+      dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
+    environment:
+        - UPSTREAM_SERVICE=service_broker
+        - DOWNSTREAM_SERVICE=observable_project_version_control
+        - DOWNSTREAM_SERVICE_NETWORK_ADDR=vcs_project_http_api:5003
+        - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT:-900}
+    hostname: service_broker_http_proxy_vcs_project
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.api.service_broker.http.private.org:/api
+
+
+volumes:
+  api.pmccabe_collector.api.service_broker.http.private.org:
+    name: api.pmccabe_collector.api.service_broker.http.private.org
+    external: false
