@@ -15,6 +15,7 @@ services:
     environment:
       - PROJECT_URL=${PROJECT_URL}
       - PROJECT_BRANCH=${PROJECT_BRANCH}
+      - MICROSERVICE_NAME=vcs_project
     volumes:
       - api.pmccabe_collector.vcs_project:/mnt
       - api.pmccabe_collector.api.vcs_project.http.private.org:/api

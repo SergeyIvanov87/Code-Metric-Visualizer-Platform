@@ -31,15 +31,13 @@ termination_handler(){
 trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
 
 
-# Launch command API services
+# Launch command API services & gracefull shutdown management process
 launch_command_api_services SERVICE_WATCH_PIDS ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"
-
-# Launch gracefull shutdown management process
 ${OPT_DIR}/api_management.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
 API_MANAGEMENT_PID=$!
 
 # Wait until testable service started
-echo -e "${Blue}Skip checking API dependencies${Color_Off}"
+echo -e "${Blue}Waiting for API dependencies${Color_Off}"
 wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}" ANY_SERVICE_UNAVAILABLE_COUNT ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC}
 if [ ! -z ${ANY_SERVICE_UNAVAILABLE_COUNT} ]; then
     echo -e "${BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort${Color_Off}"

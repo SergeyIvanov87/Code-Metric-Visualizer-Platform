@@ -16,7 +16,12 @@ README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-ANALYTIC.m
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport RRD_DATA_STORAGE_DIR=${RRD_DATA_STORAGE_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport DEPEND_ON_SERVICES_API_SCHEMA_DIR=${DEPEND_ON_SERVICES_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
-source ${OPT_DIR}/shell_utils/init_utils.sh
+source ${OPT_DIR}/shell_utils/color_codes.sh
+if [ -z ${MICROSERVICE_NAME} ]; then
+    echo -e "{BRed}ERROR: Please specify env/arg MICROSERVICE_NAME. Abort${Color_Off}"
+    exit 255
+fi
+echo -e "${BGreen}Initializing: ${MICROSERVICE_NAME}...${Color_Off}"
 
 # I use standalone python-based process here to listen to SIGNAL and make PIPEs clearance.
 # For any reason, if I just esecute new python process in a trap handler then it will hangs for a long time until executed.
@@ -26,10 +31,8 @@ source ${OPT_DIR}/shell_utils/init_utils.sh
 # So, to speed up this termination time until being ungracefully killed,
 # I just launch this signal listener in background and then resend any signal being catched in the `trap`-handler
 # It works as expected
-${OPT_DIR}/canonize_internal_api.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${MAIN_SERVICE_NAME}/rrd
-${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}|${DEPEND_ON_SERVICES_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
-API_MANAGEMENT_PID=$!
-
+source ${OPT_DIR}/shell_utils/init_utils.sh
+API_MANAGEMENT_PID=0
 declare -A SERVICE_WATCH_PIDS
 termination_handler(){
     rm -f ${README_FILE_PATH}
@@ -49,25 +52,14 @@ if [ $? -ne 0 ]; then echo "Cannot create ${RRD_DATA_STORAGE_DIR}. Please check 
 
 
 # Launch internal & command API services
-launch_command_api_services SERVICE_WATCH_PIDS ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/rrd"
+launch_command_api_services SERVICE_WATCH_PIDS ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"
 launch_inner_api_services SERVICE_WATCH_PIDS ${INNER_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} ${README_FILE_PATH}
-#TODO find better solution
-#sleep 5
-#if [ ${yesno} == "y" -o ${yesno} == "Y" ]; then
-#    echo "Commiting RRD transaction..."
-
-    # In order to be able to make pipeline of commands outputs need to read from PUT values pairs with '=' instead of ' '???
-    #echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/exec
-    #cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/PUT/result > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
-#    echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
-#    cat ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml | ${WORK_DIR}/build_rrd.py "`${WORK_DIR}/rrd_exec.sh ${OPT_DIR} ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/analytic/rrd`" ${SHARED_API_DIR} -method init
-#    echo "Completed"
-#fi
-
+${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}|${DEPEND_ON_SERVICES_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
+API_MANAGEMENT_PID=$!
 
 echo -e "${Blue}Skip checking API dependencies${Color_Off}: ${BBlack}${SKIP_API_DEPS_CHECK}${Color_Off}"
 if [ ! -z ${SKIP_API_DEPS_CHECK} ] && [ ${SKIP_API_DEPS_CHECK} == false ]; then
-    wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/rrd" ANY_SERVICE_UNAVAILABLE_COUNT ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC}
+    wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}" ANY_SERVICE_UNAVAILABLE_COUNT ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC}
     if [ ! -z ${ANY_SERVICE_UNAVAILABLE_COUNT} ]; then
         echo -e "${BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort${Color_Off}"
         gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}

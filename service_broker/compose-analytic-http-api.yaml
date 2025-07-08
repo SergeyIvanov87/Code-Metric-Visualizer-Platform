@@ -9,6 +9,7 @@ services:
         - SKIP_API_DEPS_CHECK=${SKIP_API_DEPS_CHECK:-false}
         - TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC:-900}
         - CRON_REPO_UPDATE_SCHEDULE="0 0 * * *"
+        - MICROSERVICE_NAME=service_broker
     logging:
       driver: syslog
       options:

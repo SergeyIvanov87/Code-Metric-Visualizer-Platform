@@ -7,6 +7,7 @@ services:
       - syslog-ng
     environment:
         - SKIP_API_DEPS_CHECK=${SKIP_API_DEPS_CHECK:-false}
+        - MICROSERVICE_NAME=rrd
     logging:
       driver: syslog
       options:
