@@ -48,19 +48,9 @@ mkdir -p ${RRD_DATA_STORAGE_DIR}
 if [ $? -ne 0 ]; then echo "Cannot create ${RRD_DATA_STORAGE_DIR}. Please check access rights to the VOLUME '/rrd_data' and grant the container all of them"; exit -1; fi
 
 
-# Launch internal API services
-${OPT_DIR}/build_common_api_services.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} -os ${WORK_DIR}/aux_services -oe ${WORK_DIR}
-${OPT_DIR}/build_api_pseudo_fs.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${SHARED_API_DIR}
-
-launch_fs_api_services SERVICE_WATCH_PIDS "${WORK_DIR}/aux_services"
-
-${OPT_DIR}/build_api_executors.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_DIR}
-${OPT_DIR}/build_api_services.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_DIR}/services
-${OPT_DIR}/build_api_pseudo_fs.py ${INNER_API_SCHEMA_DIR} ${SHARED_API_DIR}
-${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR} > ${README_FILE_PATH}
-
-launch_fs_api_services SERVICE_WATCH_PIDS "${WORK_DIR}/services"
-
+# Launch internal & command API services
+launch_command_api_services SERVICE_WATCH_PIDS ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/rrd"
+launch_inner_api_services SERVICE_WATCH_PIDS ${INNER_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} ${README_FILE_PATH}
 #TODO find better solution
 #sleep 5
 #if [ ${yesno} == "y" -o ${yesno} == "Y" ]; then

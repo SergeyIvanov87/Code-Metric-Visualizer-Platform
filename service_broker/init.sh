@@ -30,11 +30,7 @@ trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
 mkdir -p ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
 
 # Launch internal API services
-${OPT_DIR}/build_common_api_services.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} -os ${WORK_DIR}/aux_services -oe ${WORK_DIR}
-${OPT_DIR}/build_api_pseudo_fs.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${SHARED_API_DIR}
-
-launch_fs_api_services SERVICE_WATCH_PIDS "${WORK_DIR}/aux_services"
-
+launch_command_api_services SERVICE_WATCH_PIDS ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/service_broker"
 echo -e "${Blue}Skip checking API dependencies${Color_Off}: ${BBlack}${SKIP_API_DEPS_CHECK}${Color_Off}"
 if [ ! -z ${SKIP_API_DEPS_CHECK} ] && [ ${SKIP_API_DEPS_CHECK} == false ]; then
     wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/service_broker" ANY_SERVICE_UNAVAILABLE_COUNT ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC}

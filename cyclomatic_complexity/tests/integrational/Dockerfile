@@ -13,5 +13,8 @@ RUN dos2unix /tests/*
 RUN dos2unix /tests/utils/*
 RUN dos2unix /tests/utils/shell_utils/*
 
+ARG MICROSERVICE_NAME=cc_integrational_tester
+ENV MICROSERVICE_NAME=$MICROSERVICE_NAME
+
 VOLUME ["/api", "/mnt"]
 ENTRYPOINT ["/tests/init.sh", "/tests", "/mnt", "/api"]

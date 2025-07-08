@@ -5,6 +5,7 @@ services:
       dockerfile: cyclomatic_complexity/tests/integrational/Dockerfile
     environment:
       - EXIT_ONCE_DONE=false
+      - MICROSERVICE_NAME=cc_integrational_tester
     volumes:
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.project:/mnt
