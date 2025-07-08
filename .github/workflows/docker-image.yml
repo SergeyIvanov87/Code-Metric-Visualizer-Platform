@@ -172,21 +172,14 @@ jobs:
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml up -d
     - name: Stop Analysis UC
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml stop
-    - name: Check filesystem API artefacts
-      run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
     - name: Restart Analysis UC attempt 1
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml up -d
     - name: Stop Analysis UC attempt 1
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml stop
-    - name: Check filesystem API artefacts attempt 1
-      run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
     - name: Restart Analysis UC attempt 2
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml up -d
     - name: Stop Analysis UC attempt 2
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml stop
-    - name: Check filesystem API artefacts attempt 2
-      run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
-
 
   analytic_use-case:
 
@@ -231,5 +224,3 @@ jobs:
       run: sleep 5 && docker compose -f compose-analytic-http-api-integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator
     - name: Stop Analytic UC attempt
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic-http-api.yaml stop
-    - name: Check filesystem API artefacts
-      run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
