@@ -1,0 +1,23 @@
+#wget 0.0.0.0:5001
+#grep -x "<h3>.*</h3>" index.html | sed 's/<h3>.*\/\(.*\)\(\s\+\)<a\ href="\(.*\)">execute<\/a><\/h3>/\1\ \3/'
+
+
+#]$ GET api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph
+#]$ GET api.pmccabe_collector.restapi.org/cc
+#]$ GET api.pmccabe_collector.restapi.org/cc/statistic
+#]$ GET api.pmccabe_collector.restapi.org/cc/statistic/view
+
+include:
+  - common/images/syslog-ng_image/compose.yaml
+  - common/images/test_pseudo_fs/compose.yaml
+  - cyclomatic_complexity/compose-analytic.http-api.integrational-test.yaml
+#  - rrd/compose-analytic.http-api.integrational-test.yaml
+  - common/images/test_aggregator_image/compose.yaml
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
+
+volumes:
+  test_aggregator_logs_storage:
