@@ -1,5 +1,5 @@
 include:
-  - common/images/test_pseudo_fs/compose.yaml
+  - ../../../common/images/test_pseudo_fs/compose.yaml
 
 services:
   cc_functional_tester:
