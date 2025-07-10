@@ -10,6 +10,7 @@ import os
 import socket
 import stat
 import subprocess
+import syslog
 import time
 
 from flask import redirect

@@ -52,9 +52,9 @@ shutdown_processors_if_downstream_is_dead(){
         echo -e "check availability of ${url}:"
 
         if curl --output /dev/null --silent --head --fail "$url"; then
-            echo -e "${url} is alive"
+            echo -e "${url} ${BBlue}is alive${Color_Off}"
         else
-            echo -e "${url} is unavailable. Stop proxy for the ${service_query}"
+            echo -e "${url} ${BRed}is unavailable${Color_Off}. Stop proxy for the ${service_query}"
             SERV_TO_STOP[${service_query}]=${SERVICE_QUERY_WATCH_PIDS[${service_query}]}
 
             unset SERVICE_QUERY_WATCH_PIDS[${service_query}]

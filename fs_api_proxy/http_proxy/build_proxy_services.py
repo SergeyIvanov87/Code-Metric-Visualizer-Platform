@@ -16,13 +16,18 @@ from api_fs_conventions import get_api_schema_files
 from api_fs_conventions import get_generated_scripts_path
 
 from api_schema_utils import deserialize_api_request_from_schema_file
+from api_schema_utils import file_extension_from_content_type_or_default
 
 import api_fs_exec_utils
 import api_fs_bash_utils
 
-def make_script_proxy_query(script):
-    file_extension = ".json"
-    body = (
+def make_script_proxy_query(script, request_data):
+    desired_file_ext = file_extension_from_content_type_or_default(request_data, "")
+    file_extension = ""
+    if len(desired_file_ext) != 0:
+        file_extension = "." + desired_file_ext
+
+    body = [
         *api_fs_exec_utils.generate_exec_header(), r"",
         *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
         *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
@@ -44,10 +49,17 @@ def make_script_proxy_query(script):
         r'  fi',
         r'done',
         r'#cut root /api path, as it must not be present in HTTP query',
-        r'API_REL_NODE=${API_NODE#$SHARED_API_DIR}',
-        r'curl --get ${CURL_GET_PARAMS} ${DOWNSTREAM_SERVICE_NETWORK_ADDR}/${API_REL_NODE}',
-
-    )
+        r'API_REL_NODE=${API_NODE#$SHARED_API_DIR}'
+    ]
+    if "Method" in request_data:
+        if "GET" == request_data["Method"]:
+            body.append(r'curl --get ${CURL_GET_PARAMS} ${DOWNSTREAM_SERVICE_NETWORK_ADDR}/${API_REL_NODE}')
+        elif "PUT" == request_data["Method"]:
+            body.append(r'curl ${CURL_GET_PARAMS} -X PUT ${DOWNSTREAM_SERVICE_NETWORK_ADDR}/${API_REL_NODE}')
+        elif "POST" == request_data["Method"]:
+            body.append(r'curl ${CURL_GET_PARAMS} -X POST ${DOWNSTREAM_SERVICE_NETWORK_ADDR}/${API_REL_NODE}')
+        else:
+            raise RuntimeError(f"Cannot generate script: {script}, as \"Method\" of a request is not supported: {request_data}. Abort")
     script.writelines(line + "\n" for line in body)
 
 
@@ -72,7 +84,7 @@ def build_proxy_api_service(dep_api_schema_file, output_services_path, output_ex
         script_generated_path = os.path.join(output_exec_script_path, script_name_generated)
 
         with open(script_generated_path, "x") as script:
-            make_script(script)
+            make_script(script, request_data)
         filesystem_utils.make_file_executable(script_generated_path)
 
     except FileExistsError as e:

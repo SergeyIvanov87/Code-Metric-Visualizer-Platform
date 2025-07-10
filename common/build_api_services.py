@@ -86,7 +86,7 @@ api_cli_schema = [
     'echo "CLI SERVER: {0}"\n',
     "api_exec_node_directory={}\n",
     "shopt -s extglob\n",
-    "EXT=`${0}/{1} --result_type`\n",
+    "EXT=`{0}/{1} --result_type`\n",
     'ME=$(basename "$0")\n',
     "pipe_result=${api_exec_node_directory}/result${EXT}\n",
     "pipe_request=${api_exec_node_directory}/exec\n",
@@ -224,7 +224,7 @@ def generate_cli_server_content(req_name, req_api, req_type, content_type, req_e
     if len(content_type) != 0:
         api_cli_schema_concrete[template_schema_row_index] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
     else:
-        api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format("{WORK_DIR}",req_executor_name)
+        api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(req_exec_script_root_dir,req_executor_name)
 
     template_schema_row_index += 60
     api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(

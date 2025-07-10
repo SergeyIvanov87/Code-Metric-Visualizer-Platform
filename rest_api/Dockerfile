@@ -19,7 +19,7 @@ ARG MY_FLASK_INSTANCE_PIDFILE=/package/rest_api_server_pid
 ENV MY_FLASK_INSTANCE_PIDFILE=$MY_FLASK_INSTANCE_PIDFILE
 
 # install app dependencies
-RUN apk add --no-cache coreutils python3 dos2unix
+RUN apk add --no-cache coreutils python3 dos2unix busybox-openrc
 RUN apk add --no-cache inotify-tools bash
 RUN apk add --no-cache py3-flask py3-markdown pipx curl
 
@@ -38,8 +38,11 @@ COPY common/build_api_pseudo_fs.py /opt/
 COPY common/make_api_readme.py /opt/
 COPY common/restore_api_from_pseudo_fs.py /opt/
 
-RUN dos2unix /opt/*
-RUN dos2unix /opt/modules*
+RUN <<EOF
+dos2unix /opt/*
+dos2unix /opt/modules*
+rc-update add syslog boot
+EOF
 
 VOLUME /api
 ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api"]
