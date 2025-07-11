@@ -29,4 +29,4 @@ services:
 volumes:
   api.pmccabe_collector.logger.org:
     name: api.pmccabe_collector.logger.org
-    external: true
+    #external: true
