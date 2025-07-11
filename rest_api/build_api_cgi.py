@@ -82,7 +82,8 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
     methods = f"\"{req_type}\""
     make_redirect_url = [""]
     if req_type == "POST":
-        # we cannot send post by typing a resource URL. We need for a 'submit' button placed on HTML form instead
+        # we cannot send a POST query by typing a resource URL in a browser tab.
+        # We need for a 'submit' button placed on HTML form instead
         # For each POST-request we just generate the appropriate GET-request which provides us
         # with a submit HTML form
         methods += ", \"GET\""
@@ -90,11 +91,9 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
                              r'        return f"<form style=\"display: none\" action=\"/{}\" method=\"post\">"+'.format(req_api) + r'"<button type=\"submit\" id=\"button_to_link\"> </button></form><label style=\"text-decoration: underline\" for=\"button_to_link\"> submit {} </label>"'.format(req_api)
         ]
     methods += ", \"HEAD\""
+    make_session_id = [      r'    session_id_value = request.method + "_" + socket.gethostname() + "_" + socket.gethostbyaddr(request.remote_addr)[0]']
     make_head_probe_check =[ r'    if request.method == "HEAD":',
                              r'        api_query_pipe="/{}"'.format(fs_pipes[0]),
-                             # rest_api always uses SESSION_ID
-                             # TODO differenciate a SESSION_ID by remote addr, so that each client won't interfere each other
-                             r'        session_id_value=socket.gethostname() + "_" + socket.gethostbyaddr(request.remote_addr)[0]',
                              r'        api_result_pipe="/{}_" + session_id_value'.format(fs_pipes[1]),
                              r'        query = APIQuery([api_query_pipe, api_result_pipe])',
                              r'        ka_tag = str(time.time() * 1000)',
@@ -120,6 +119,7 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
     ]
     cgi_schema = [ r'@app.route("/{}",  methods=[{}])'.format(req_api, methods),
                    r'def {}():'.format(canonize_api_method_name),
+                   *make_session_id,
                    *make_head_probe_check,
                    *make_redirect_url,
                    r'    api_query_pipe="/{}"'.format(fs_pipes[0]),

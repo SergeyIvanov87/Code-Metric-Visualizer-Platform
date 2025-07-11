@@ -25,6 +25,7 @@ gracefull_shutdown() {
         RESULT=$?
         if [ $RESULT == 0 ]; then
             echo -e "`date +%H:%M:%S:%3N`    ${Blue}***API_MANAGEMENT_PID: ${API_MANAGEMENT_PID} still exist****${Color_Off}"
+            sleep 1
             continue
         fi
         break
