@@ -65,17 +65,21 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
     if len(content_type) != 0:
         response_generator = [
             r'    try:',
+            r'        docker_logger.debug(f"[HTTP] Getting binary result for query: {request.full_path} on pipes:{api_query_pipe},{api_result_pipe}")',
             r'        out = query.wait_binary_result(session_id_value, 0.1, 30, True)',
             r'        return send_file(io.BytesIO(out), download_name="out.{}", mimetype="{}")'.format(file_extension_from_content_type(content_type), content_type),
             r'    except Exception as ex:',
+            r'        docker_logger.error(f"[HTTP] Could not get binary result for query: {request.full_path} on pipes:{api_query_pipe},{api_result_pipe}. Exception: {str(ex)}")',
             r'        return f"<p>\"Exception occured, while waiting for a query binary result for as session id: {session_id_value}</p>", 503',
         ]
     else:
         response_generator = [
             r'    try:',
+            r'        docker_logger.debug(f"[HTTP] Getting result for query: {request.full_path} on pipes:{api_query_pipe},{api_result_pipe}")',
             r'        out = query.wait_result(session_id_value, 0.1, 30, True)',
             r'        return f"<p>{out}</p>"'
             r'    except Exception as ex:',
+            r'        docker_logger.error(f"[HTTP] Could not get result for query: {request.full_path} on pipes:{api_query_pipe},{api_result_pipe}. Exception: {str(ex)}")',
             r'        return f"<p>\"Exception occured, while waiting for a query result for as session id: {session_id_value}</p>", 503',
         ]
 
@@ -92,48 +96,47 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
         ]
     methods += ", \"HEAD\""
     make_session_id = [      r'    session_id_value = request.method + "_" + socket.gethostname() + "_" + socket.gethostbyaddr(request.remote_addr)[0]']
+    make_query = [           r'    api_query_pipe="/{}"'.format(fs_pipes[0]),
+                             r'    api_result_pipe="/{}_" + session_id_value'.format(fs_pipes[1]),
+                             r'    query = APIQuery([api_query_pipe, api_result_pipe])'
+    ]
     make_head_probe_check =[ r'    if request.method == "HEAD":',
-                             r'        api_query_pipe="/{}"'.format(fs_pipes[0]),
-                             r'        api_result_pipe="/{}_" + session_id_value'.format(fs_pipes[1]),
-                             r'        query = APIQuery([api_query_pipe, api_result_pipe])',
                              r'        ka_tag = str(time.time() * 1000)',
                              r'        query_params_str="API_KEEP_ALIVE_CHECK=" + ka_tag + " SESSION_ID=" + session_id_value',
                              r'        try:',
-                             r'            syslog.syslog(f"Execute HEAD query: {request.full_path} on pipes:{api_query_pipe},{api_result_pipe}")',
+                             r'            docker_logger.debug(f"[HTTP] Execute HEAD query: {request.full_path} on pipes:{api_query_pipe},{api_result_pipe}")',
                              r'            query.execute(query_params_str)',
                              r'        except Exception as ex:',
-                             r'            syslog.syslog(f"Exception occured: {str(ex)}, while executing a query: {request.full_path} on pipes: {api_query_pipe}, {api_result_pipe}")',
+                             r'            docker_logger.error(f"[HTTP] Exception occured: {str(ex)}, while executing a query: {request.full_path} on pipes: {api_query_pipe}, {api_result_pipe}")',
                              r'            return f"<p>\"Exception occured: {str(ex)}, while executing a query using pipes: {api_query_pipe}, {api_result_pipe}</p>", 503',
                              r'        api_result_pipe_timeout_cycles=0',
                              r'        while not (os.path.exists(api_result_pipe) and stat.S_ISFIFO(os.stat(api_result_pipe).st_mode)):',
                              r'            sleep(0.1)',
                              r'            api_result_pipe_timeout_cycles += 1',
                              r'            if api_result_pipe_timeout_cycles >= 30:',
-                             r'                syslog.syslog(f"Cannot execute HEAD query: {request.full_path}, pipes are not available: {api_query_pipe}, {api_result_pipe}")',
+                             r'                docker_logger.error(f"[HTTP] Cannot execute HEAD query: {request.full_path}, pipes are not available: {api_query_pipe}, {api_result_pipe}")',
                              r'                return f"<p>\"Resource is not available at the moment\"</p>", 503',
                              r'        out = query.wait_result(session_id_value, 0.1, 30, True)',
                              r'        if out != ka_tag:',
-                             r'            syslog.syslog(f"Cannot execute HEAD query: {request.full_path}: KA probes do not match, get: {out}, expected: {ka_tag}. Pipes : {api_query_pipe}, {api_result_pipe}")',
+                             r'            docker_logger.error(f"[HTTP] Cannot execute HEAD query: {request.full_path}: KA probes do not match, get: {out}, expected: {ka_tag}. Pipes : {api_query_pipe}, {api_result_pipe}")',
                              r'            return f"<p>\"Resource is not available at the moment (KA probe failed)\"</p>", 503',
                              r'        return "",200'
     ]
     cgi_schema = [ r'@app.route("/{}",  methods=[{}])'.format(req_api, methods),
                    r'def {}():'.format(canonize_api_method_name),
                    *make_session_id,
+                   *make_query,
                    *make_head_probe_check,
                    *make_redirect_url,
-                   r'    api_query_pipe="/{}"'.format(fs_pipes[0]),
-                   # rest_api always uses SESSION_ID
-                   r'    session_id_value=socket.gethostname()',
-                   r'    api_result_pipe="/{}_" + session_id_value'.format(fs_pipes[1]),
-                   r'    query = APIQuery([api_query_pipe, api_result_pipe])',
                    *get_query_params(params), r'',
                    r'    query.execute(query_params_str)',
                    r'    api_result_pipe_timeout_cycles=0',
                    r'    while not (os.path.exists(api_result_pipe) and stat.S_ISFIFO(os.stat(api_result_pipe).st_mode)):',
                    r'        sleep(0.1)',
                    r'        api_result_pipe_timeout_cycles += 1',
+                   r'        docker_logger.debug(f"[HTTP] Query: {request.full_path} waiting for a result pipe creation: {api_result_pipe}")',
                    r'        if api_result_pipe_timeout_cycles >= 30:',
+                   r'            docker_logger.error(f"[HTTP] Pipe for query: {request.full_path} by path: {api_result_pipe} has not been created in time")',
                    r'            return f"<p>\"Filesystem API did not respond\"</p>"',
                    *response_generator, r''
     ]

@@ -44,5 +44,10 @@ dos2unix /opt/modules*
 rc-update add syslog boot
 EOF
 
+ENV DOCKER_SYSLOG_NG_DRIVER_FILE_HANDLER=/var/log/docker_syslog-ng_driver.log
+ARG DOCKER_SYSLOG_NG_DRIVER_LOG_LEVEL=DEBUG
+ENV DOCKER_SYSLOG_NG_DRIVER_LOG_LEVEL=$DOCKER_SYSLOG_NG_DRIVER_LOG_LEVEL
+RUN ln -sf /proc/1/fd/1 ${DOCKER_SYSLOG_NG_DRIVER_FILE_HANDLER}
+
 VOLUME /api
 ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api"]

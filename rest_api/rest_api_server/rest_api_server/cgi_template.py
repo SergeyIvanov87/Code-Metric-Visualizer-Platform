@@ -5,6 +5,7 @@ from subprocess import Popen, PIPE, STDOUT
 
 import io
 import json
+import logger
 import markdown
 import os
 import socket
@@ -22,6 +23,8 @@ from rest_api_server import app
 from time import sleep
 
 from api_fs_query import APIQuery
+
+docker_logger = logger.Logger()
 
 @app.route('/restart')
 def restart():
