@@ -106,8 +106,10 @@ jobs:
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
+    - name: Prepare shared volume for SYSLOG-NG
+      run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: All together functional tests
-      run: docker compose -f compose-functional.test.yaml up --abort-on-container-exit --exit-code-from test_aggregator
+      run: docker compose -f compose-functional.test.yaml up --abort-on-container-exit --exit-code-from test_aggregator && if [ $? != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
 
   analysis_use-case:
 
@@ -149,7 +151,7 @@ jobs:
     - name: Restart Analysis UC attempt 2
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
     - name: Restart Integrational Tests on running Analysis UC attempt 2
-      run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator  && if [ $? != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
+      run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator && if [ $? != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
     - name: Stop Analysis UC attempt 2
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop
     - name: Check filesystem API artefacts attempt 2
@@ -167,7 +169,7 @@ jobs:
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Prepare shared volume for SYSLOG-NG
-      run: rm -rf /srv/syslog/logs && mkdir -p /srv/syslog/logs
+      run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: Clone external C/C++ project
       run: git clone https://github.com/SergeyIvanov87/MRUVocabulary.git $GITHUB_WORKSPACE/MRUVocabulary
     - name: Tryout syslog-ng
@@ -197,7 +199,7 @@ jobs:
     - name: Create API volume
       run: mkdir -p ${GITHUB_WORKSPACE}/api && chmod 777 ${GITHUB_WORKSPACE}/api && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/api -o o=bind api.pmccabe_collector.restapi.org
     - name: Prepare shared volume for SYSLOG-NG
-      run: rm -rf /srv/syslog/logs && mkdir -p /srv/syslog/logs
+      run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Create RRD snapshots volume
@@ -221,7 +223,7 @@ jobs:
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
     - name: Prepare shared volume for SYSLOG-NG
-      run: rm -rf /srv/syslog/logs && mkdir -p /srv/syslog/logs
+      run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Create RRD snapshots volume
