@@ -18,6 +18,9 @@ RUN mkdir -p /package/pmccabe_visualizer
 COPY --from=build /package/pmccabe_visualizer/*.py /package/pmccabe_visualizer/
 
 COPY rrd/API /API
+COPY common/API /API/deps
+COPY cyclomatic_complexity/API /API/deps/cyclomatic_complexity
+COPY rrd/API /API/deps/rrd
 
 COPY rrd/tests/integrational/*.py /tests/
 COPY rrd/tests/integrational/*.sh /tests/
@@ -28,4 +31,6 @@ RUN dos2unix /tests/*
 RUN dos2unix /tests/*
 VOLUME ["/api", "/mnt", "/rrd_data"]
 
+ARG MICROSERVICE_NAME=rrd_integrational_tester
+ENV MICROSERVICE_NAME=$MICROSERVICE_NAME
 ENTRYPOINT ["/tests/init.sh", "/tests", "/mnt", "/api", "/rrd_data"]

@@ -91,7 +91,7 @@ for service, queries_data in API_table_to_KA_check.items():
         # In result, our process will delete these actual pipes and break communication
         query = APIQueryInterruptible(pipes, remove_session_pipe_on_result_done = False)
         if not query.is_valid():
-            req_data["Error"]=f"FAILED on pipes checking"
+            req_data["Error"]=f"FAILED due to non existing PIPEs: {pipes}"
             missing_API_table = push_in_table(missing_API_table, service, query_name, req_data)
             continue
 

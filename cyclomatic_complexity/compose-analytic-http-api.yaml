@@ -1,0 +1,45 @@
+services:
+  cc_visualizer:
+    build:
+      context: ../
+      dockerfile: ./cyclomatic_complexity/Dockerfile
+    depends_on:
+      - syslog-ng
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.vcs_project:/mnt
+      - api.pmccabe_collector.api.cc.http.private.org:/api
+
+  cc_http_api:
+    build:
+      context: ../
+      dockerfile: ./rest_api/Dockerfile
+    depends_on:
+      - syslog-ng
+    environment:
+      - FLASK_RUN_PORT=${FLASK_RUN_PORT:-5001}
+      - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}
+    hostname: cc_http_api
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.api.cc.http.private.org:/api
+    ports:
+      - 5001:5001
+
+volumes:
+  api.pmccabe_collector.vcs_project:
+  api.pmccabe_collector.api.cc.http.private.org:
+    name: api.pmccabe_collector.api.cc.http.private.org
+    external: false

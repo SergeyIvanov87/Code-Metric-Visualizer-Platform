@@ -25,6 +25,7 @@ gracefull_shutdown() {
         RESULT=$?
         if [ $RESULT == 0 ]; then
             echo -e "`date +%H:%M:%S:%3N`    ${Blue}***API_MANAGEMENT_PID: ${API_MANAGEMENT_PID} still exist****${Color_Off}"
+            sleep 1
             continue
         fi
         break
@@ -98,6 +99,35 @@ launch_fs_api_services() {
         service_pids_arr[${s}]=$!
         echo "${s} has been started, PID ${service_pids_arr[${s}]}"
     done
+}
+
+launch_command_api_services() {
+    local -n in_out_service_pids_arr=${1}
+    local command_api_schema_dir=${2}
+    local work_dir=${3}
+    local shared_api_dir_for_meta_fs_mount=${4}
+    local full_service_name=${5}
+
+    ${OPT_DIR}/canonize_internal_api.py ${command_api_schema_dir} ${full_service_name}
+    ${OPT_DIR}/build_common_api_services.py ${command_api_schema_dir} -os ${work_dir}/aux_services -oe ${work_dir}
+    ${OPT_DIR}/build_api_pseudo_fs.py ${command_api_schema_dir} ${shared_api_dir_for_meta_fs_mount}
+
+    launch_fs_api_services in_out_service_pids_arr "${work_dir}/aux_services"
+}
+
+launch_inner_api_services() {
+    local -n in_out_inner_service_pids_arr=${1}
+    local inner_api_schema_dir=${2}
+    local work_dir=${3}
+    local shared_api_dir_for_meta_fs_mount=${4}
+    local out_readme_file_path_=${5}
+
+    ${OPT_DIR}/build_api_executors.py ${inner_api_schema_dir} ${work_dir} -o ${work_dir}
+    ${OPT_DIR}/build_api_services.py ${inner_api_schema_dir} ${work_dir} -o ${work_dir}/services
+    ${OPT_DIR}/build_api_pseudo_fs.py ${inner_api_schema_dir} ${shared_api_dir_for_meta_fs_mount}
+    ${OPT_DIR}/make_api_readme.py ${inner_api_schema_dir} > ${out_readme_file_path_}
+
+    launch_fs_api_services in_out_inner_service_pids_arr "${work_dir}/services"
 }
 
 wait_for_unavailable_services() {

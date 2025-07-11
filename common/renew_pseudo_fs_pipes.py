@@ -116,6 +116,12 @@ def remove_api_fs_pipes_node(api_root_path, communication_type, req, rtype):
 
     for p in pipes_to_unblock:
         remove_pipe(p)
+    # make sure a regular file doesn't pretend to be a PIPE,
+    # it may happens sometimes, when a service is dead, but clients are trying to make queries
+    for p in pipes_to_unblock:
+        if (os.path.exists(p)):
+            remove_file(filename)
+
     return pipes_to_unblock
 
 
@@ -146,6 +152,4 @@ if __name__ == "__main__":
 
     deleted_files = renew_api_pseudo_fs(args.api_root_dir, args.communication_type, args.mount_point)
     if len(deleted_files):
-        print(f"API entry terminated:\n")
-        for f in deleted_files:
-            print(f"\t{f}")
+        print(f"API entry terminated:\n{deleted_files}")

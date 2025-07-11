@@ -5,11 +5,13 @@ from subprocess import Popen, PIPE, STDOUT
 
 import io
 import json
+import logger
 import markdown
 import os
 import socket
 import stat
 import subprocess
+import syslog
 import time
 
 from flask import redirect
@@ -21,6 +23,8 @@ from rest_api_server import app
 from time import sleep
 
 from api_fs_query import APIQuery
+
+docker_logger = logger.Logger()
 
 @app.route('/restart')
 def restart():
