@@ -15,6 +15,10 @@ README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-STATISTIC.
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
+# TODO maybe should rely on build_seudo_fs.py?? as it create an entire  chain of directories
+mkdir -p -m 777 ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
+if [ $? -ne 0 ]; then echo "Cannot create ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}. Please check access rights to the VOLUME '/api' and grant the container all of them"; exit -1; fi
+
 source ${OPT_DIR}/shell_utils/init_utils.sh
 
 # I use standalone python-based process here to listen to SIGNAL and make PIPEs clearance.
@@ -43,10 +47,12 @@ TMPDIR=$(mktemp -d --tmpdir=${SHARED_API_DIR})
 if [ $? -ne 0 ]; then echo "Cannot create ${SHARED_API_DIR}. Please check access rights to the VOLUME '/api' and grant the container all of them"; exit -1; fi
 rm -rf $TMPDIR
 
+# TODO consider use launch_inner_api_services!
 ${OPT_DIR}/build_api_executors.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_DIR}
 ${OPT_DIR}/build_api_services.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_DIR}/services
 ${OPT_DIR}/build_api_pseudo_fs.py ${INNER_API_SCHEMA_DIR} ${SHARED_API_DIR}
 ${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR} > ${README_FILE_PATH}
+chmod g+rw ${README_FILE_PATH}
 
 # TODO think about necessity in creating any pivot metrics
 # There are few disadvantages about it:

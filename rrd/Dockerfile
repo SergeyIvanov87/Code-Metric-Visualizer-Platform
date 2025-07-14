@@ -4,6 +4,28 @@ FROM alpine:latest
 WORKDIR package
 ARG SCRIPT_GEN_LOC=services
 
+ARG UID=1101
+ENV UID=$UID
+ARG GID=23456
+ENV GID=$GID
+
+ARG USER=rrd
+ENV USER=$USER
+ENV GROUPNAME=pmccabe
+
+RUN addgroup \
+    --gid "$GID" \
+    "$GROUPNAME" \
+&&  adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "$(pwd)" \
+    -u $UID \
+    --ingroup "$GROUPNAME" \
+    --no-create-home \
+    $USER
+
+
 # install app dependencies
 RUN apk add --no-cache coreutils python3 dos2unix
 RUN apk add --no-cache inotify-tools bash
@@ -40,9 +62,13 @@ ENV SKIP_API_DEPS_CHECK=$SKIP_API_DEPS_CHECK
 ARG TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30
 ENV TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=$TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC
 
-VOLUME /api
-VOLUME /rrd_data
+VOLUME ["/api", "/rrd_data"]
 
 ARG MICROSERVICE_NAME=rrd
 ENV MICROSERVICE_NAME=$MICROSERVICE_NAME
+
+RUN mkdir -p -m 777 /api && mkdir -p -m 777 /rrd_data
+RUN chown -R ${USER}:${GROUPNAME} /api && chown -R ${USER}:${GROUPNAME} /rrd_data
+RUN chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt
+USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api", "/rrd_data"]

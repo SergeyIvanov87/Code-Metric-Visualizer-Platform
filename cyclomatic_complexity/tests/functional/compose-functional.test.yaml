@@ -6,6 +6,8 @@ services:
     build:
       context: ../../../
       dockerfile: cyclomatic_complexity/tests/functional/Dockerfile
+    environment:
+      - EXIT_ONCE_DONE=false
     volumes:
       - api.pmccabe_collector.restapi.org.cc.test:/api
       - api.pmccabe_collector.project.cc.test:/mnt

@@ -126,6 +126,7 @@ launch_inner_api_services() {
     ${OPT_DIR}/build_api_services.py ${inner_api_schema_dir} ${work_dir} -o ${work_dir}/services
     ${OPT_DIR}/build_api_pseudo_fs.py ${inner_api_schema_dir} ${shared_api_dir_for_meta_fs_mount}
     ${OPT_DIR}/make_api_readme.py ${inner_api_schema_dir} > ${out_readme_file_path_}
+    chmod g+rw ${out_readme_file_path_}
 
     launch_fs_api_services in_out_inner_service_pids_arr "${work_dir}/services"
 }

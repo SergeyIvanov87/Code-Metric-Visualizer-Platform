@@ -14,7 +14,7 @@ export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 echo -e "export WORK_DIR=${WORK_DIR}\nexport UTILS=${UTILS}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport RRD_DATA_STORAGE_DIR=${RRD_DATA_STORAGE_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
 rm -rf ${RRD_DATA_STORAGE_DIR}
-mkdir -p ${RRD_DATA_STORAGE_DIR}
+mkdir -p -m 777 ${RRD_DATA_STORAGE_DIR}
 
 # inject test files into project directory
 test_files=(/package/test_data/*.cpp)
@@ -47,7 +47,7 @@ real_statistic_pipe_in=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/e
 if [ -e ${real_statistic_pipe_in} ]; then
     rm -f ${real_statistic_pipe_in}
 fi
-mkfifo -m 644 ${real_statistic_pipe_in}
+mkfifo -m 622 ${real_statistic_pipe_in}
 #echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
 echo "Ready to server Mock CC API"
 (

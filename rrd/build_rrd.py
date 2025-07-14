@@ -131,7 +131,7 @@ class rrd:
         # go deep
         xml_child = xml_package.findall("entry")
         if len(xml_child) > 0:
-            os.makedirs(statistic_node_name, exist_ok=True)
+            os.makedirs(statistic_node_name, mode=0o777, exist_ok=True)
         for c in xml_child:
             self.__build__(c, args, os.path.join(path, item_name), timestamp, method)
 
@@ -143,7 +143,15 @@ class rrd:
             raise Exception(
                 f"Only 1 main package `entry` element is expected in pmccabe xml"
             )
-        self.__build__(main_package[0], rrd_db_create_args, path, timestamp, method)
+        # to create intermediate directories with a given permission
+        # as os.makedirs() uses its mode argument only for a final directory
+        cur_umask = os.umask(0) # umask is not the same as mode, 0 - means 777
+        try:
+            self.__build__(main_package[0], rrd_db_create_args, path, timestamp, method)
+        except Exception as ex:
+            raise
+        finally:
+            os.umask(cur_umask)
 
     def retrieve_last_ts(self, path):
         xml = self.packaged_tree

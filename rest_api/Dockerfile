@@ -18,8 +18,31 @@ ENV WAIT_FOR_SERVER_STARTING_LIMIT_SEC=$WAIT_FOR_SERVER_STARTING_LIMIT_SEC
 ARG MY_FLASK_INSTANCE_PIDFILE=/package/rest_api_server_pid
 ENV MY_FLASK_INSTANCE_PIDFILE=$MY_FLASK_INSTANCE_PIDFILE
 
+ARG UID=1201
+ENV UID=$UID
+ARG GID=23456
+ENV GID=$GID
+
+ARG USER=rest_api
+ENV USER=$USER
+ENV GROUPNAME=pmccabe
+
+RUN addgroup \
+    --gid "$GID" \
+    "$GROUPNAME" \
+&&  adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "$(pwd)" \
+    -u $UID \
+    --ingroup "$GROUPNAME" \
+    --no-create-home \
+    $USER \
+&& adduser ${USER} wheel
+
+
 # install app dependencies
-RUN apk add --no-cache coreutils python3 dos2unix busybox-openrc
+RUN apk add --no-cache coreutils python3 dos2unix busybox-openrc alpine-conf doas
 RUN apk add --no-cache inotify-tools bash
 RUN apk add --no-cache py3-flask py3-markdown pipx curl
 
@@ -50,4 +73,12 @@ ENV DOCKER_SYSLOG_NG_DRIVER_LOG_LEVEL=$DOCKER_SYSLOG_NG_DRIVER_LOG_LEVEL
 RUN ln -sf /proc/1/fd/1 ${DOCKER_SYSLOG_NG_DRIVER_FILE_HANDLER}
 
 VOLUME /api
+
+# allow group wheel to become rott
+RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :wheel" >> /etc/doas.d/doas.conf
+RUN mkdir -p -m 777 /api
+RUN chown -R ${USER}:${GROUPNAME} /api
+RUN chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
+USER ${USER}
+
 ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api"]

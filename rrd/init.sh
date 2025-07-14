@@ -42,12 +42,13 @@ termination_handler(){
 trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
 
 # create API directory and initialize API nodes
-mkdir -p ${SHARED_API_DIR}
+# TODO maybe should rely on build_seudo_fs.py?? as it create an entire  chain of directories
+mkdir -p -m 777 ${SHARED_API_DIR}
 TMPDIR=$(mktemp -d --tmpdir=${SHARED_API_DIR})
 if [ $? -ne 0 ]; then echo "Cannot create ${SHARED_API_DIR}. Please check access rights to the VOLUME '/api' and grant the container all of them"; exit -1; fi
 rm -rf $TMPDIR
 
-mkdir -p ${RRD_DATA_STORAGE_DIR}
+mkdir -p -m 777 ${RRD_DATA_STORAGE_DIR}
 if [ $? -ne 0 ]; then echo "Cannot create ${RRD_DATA_STORAGE_DIR}. Please check access rights to the VOLUME '/rrd_data' and grant the container all of them"; exit -1; fi
 
 

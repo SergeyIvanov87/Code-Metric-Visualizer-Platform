@@ -47,6 +47,7 @@ ${OPT_DIR}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
 ${OPT_DIR}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
 ${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
 ${OPT_DIR}/make_api_readme.py ${WORK_DIR}/API > ${README_FILE_PATH}
+chmod g+rw ${README_FILE_PATH}
 
 launch_fs_api_services SERVICE_WATCH_PIDS "${WORK_DIR}/services/"
 
