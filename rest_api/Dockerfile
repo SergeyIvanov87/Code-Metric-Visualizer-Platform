@@ -74,7 +74,7 @@ RUN ln -sf /proc/1/fd/1 ${DOCKER_SYSLOG_NG_DRIVER_FILE_HANDLER}
 
 VOLUME /api
 
-# allow group wheel to become rott
+# allow group wheel to become root
 RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :wheel" >> /etc/doas.d/doas.conf
 RUN mkdir -p -m 777 /api
 RUN chown -R ${USER}:${GROUPNAME} /api

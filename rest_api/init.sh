@@ -6,6 +6,7 @@ export PYTHONPATH="${2}:${2}/modules"
 export SHARED_API_DIR=${3}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+# start & activate syslogd
 doas -u root rc-status
 doas -u root touch /run/openrc/softlevel
 doas -u root rc-service syslog start
