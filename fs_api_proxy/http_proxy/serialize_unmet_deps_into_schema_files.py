@@ -38,12 +38,20 @@ if __name__ == "__main__":
 
     shutil.rmtree(args.serialize_path, ignore_errors=True)
 
-    service_queries_to_proxy = json.loads(args.to_proxy)
-    print(f"service_queries_to_proxy: {service_queries_to_proxy}")
-    for service, queries_to_proxy_list in service_queries_to_proxy.items():
-        service_serialize_path=os.path.join(args.serialize_path, service)
-        pathlib.Path(service_serialize_path).mkdir(parents=True, exist_ok=True)
-        for query_name, request_data in queries_to_proxy_list.items():
-            print(f"request_data: {request_data}")
-            api_schema_file = os.path.join(service_serialize_path, query_name + ".json")
-            serialize_api_request_to_schema_file(api_schema_file, request_data)
+    # to create intermediate directories with a given permission
+    # as os.makedirs() uses its mode argument only for a final directory
+    cur_umask = os.umask(0) # umask is not the same as mode, 0 - means 777
+    try:
+        service_queries_to_proxy = json.loads(args.to_proxy)
+        print(f"service_queries_to_proxy: {service_queries_to_proxy}")
+        for service, queries_to_proxy_list in service_queries_to_proxy.items():
+            service_serialize_path=os.path.join(args.serialize_path, service)
+            pathlib.Path(service_serialize_path).mkdir(parents=True, exist_ok=True)
+            for query_name, request_data in queries_to_proxy_list.items():
+                print(f"request_data: {request_data}")
+                api_schema_file = os.path.join(service_serialize_path, query_name + ".json")
+                serialize_api_request_to_schema_file(api_schema_file, request_data)
+    except Exception as ex:
+        raise
+    finally:
+        os.umask(cur_umask)

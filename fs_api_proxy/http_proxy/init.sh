@@ -6,6 +6,12 @@ export PYTHONPATH="${2}:${2}/modules"
 export SHARED_API_DIR=${3}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+# start & activate syslogd
+doas -u root rc-status
+doas -u root touch /run/openrc/softlevel
+doas -u root rc-service syslog start
+doas -u root rc-service syslog status
+
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
@@ -112,7 +118,7 @@ rm -rf to_proxy
 rm -rf to_proxy_new
 if [ ! -d "to_proxy" ]; then
     # make empty directory to fill it in by newly detected services
-    mkdir to_proxy
+    mkdir -m 777 to_proxy
 fi
 while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT} ]; do
     # wait until downstream service become alive..

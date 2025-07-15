@@ -19,6 +19,9 @@ source /package/shell_utils/init_utils.sh
 
 ${UTILS}/canonize_internal_api.py ${INNER_API_SCHEMA_DIR} ${MAIN_SERVICE_NAME}/${UPSTREAM_SERVICE}
 
+# give all permissions which are required
+umask -S 0000
+
 echo "Run tests:"
 RET=0
 echo "EXCLUDE test_0_pseudo_fs_api_conformance.py"
