@@ -89,7 +89,7 @@ cp -r /API/deps ${WORK_DIR}/API/
 gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
 #rm -rf ${SHARED_API_DIR}/*
 if [ $EXIT_ONCE_DONE == true ]; then
-    exit $RET;
+    exit $RET
 fi
 
 echo "wait for termination: ${RET}"

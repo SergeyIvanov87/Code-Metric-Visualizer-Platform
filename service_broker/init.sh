@@ -68,7 +68,7 @@ doas -u root crontab jobs_schedule
 echo -e "${BGreen}The service is ready${Color_Off}"
 while true;
 do
-    doas -u root crond -f -l 0 -d 0 &
+    doas -u root crond -f &
     wait $!
 done
 
