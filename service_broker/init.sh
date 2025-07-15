@@ -13,6 +13,13 @@ export INNER_API_SCHEMA_DIR=${WORK_DIR}/API
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport DEPEND_ON_SERVICES_API_SCHEMA_DIR=${DEPEND_ON_SERVICES_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
+# start & activate syslogd
+doas -u root rc-status
+doas -u root touch /run/openrc/softlevel
+doas -u root rc-service syslog start
+doas -u root rc-service syslog status
+
+
 source ${OPT_DIR}/shell_utils/color_codes.sh
 if [ -z ${MICROSERVICE_NAME} ]; then
     echo -e "{BRed}ERROR: Please specify env/arg MICROSERVICE_NAME. Abort${Color_Off}"
@@ -30,7 +37,7 @@ termination_handler(){
 trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
 
 # create API directory and initialize API nodes
-mkdir -p ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
+mkdir -p -m 777 ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
 
 # Launch internal API services
 launch_command_api_services SERVICE_WATCH_PIDS ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"
@@ -55,12 +62,13 @@ set -f
 echo -ne "${CRON_REPO_UPDATE_SCHEDULE}\t" > jobs_schedule
 ${WORK_DIR}/build_schedule_jobs.py ${INNER_API_SCHEMA_DIR} ${SHARED_API_DIR} api.pmccabe_collector.restapi.org >> jobs_schedule
 )
-crontab jobs_schedule
+
+doas -u root crontab jobs_schedule
 
 echo -e "${BGreen}The service is ready${Color_Off}"
 while true;
 do
-    crond -f -l 0 -d 0 &
+    doas -u root crond -f -l 0 -d 0 &
     wait $!
 done
 

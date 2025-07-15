@@ -147,13 +147,29 @@ wait_for_unavailable_services() {
     local SESSION_ID="`hostname`_watchdog"
     local pipe_in="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/exec"
     local pipe_out="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/result.json_${SESSION_ID}"
+    local pipe_couter=1
+    while [ ! -p ${pipe_in} ];
+    do
+        sleep 0.1
+        if [ ${pipe_couter} == 3 ]; then
+            echo "Waiting for IN pipe: ${pipe_in}. Elapsed cycles: {pipe_couter}"
+        fi
+        let pipe_couter=$pipe_couter+1
 
-    while [ ! -p ${pipe_in} ]; do sleep 0.1; done
+    done
     while true :
     do
         ANY_SERVICE_UNAVAILABLE=
         echo "SESSION_ID=${SESSION_ID}"> ${pipe_in}
-        while [ ! -p ${pipe_out} ]; do sleep 0.1; done
+        pipe_couter=1
+        while [ ! -p ${pipe_out} ];
+        do
+            sleep 0.1;
+            if [ ${pipe_couter} == 3 ]; then
+                echo "Waiting for OUT pipe: ${pipe_out}. Elapsed cycles: {pipe_couter}"
+            fi
+            let pipe_couter=$pipe_couter+1
+        done
         local MISSING_API_QUERIES=`cat ${pipe_out}`
 
         if [ ! -z "${MISSING_API_QUERIES}" ]; then
