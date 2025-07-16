@@ -79,7 +79,31 @@ do
 done
 ) &
 WATCH_PID=$!
-#cat ${real_statistic_pipe_out}
+
+gracefull_shutdown_handler(){
+    # remove test files from project directory
+    for f in ${test_files[@]}; do
+        fname=`basename ${f}`
+        rm -f ${INITIAL_PROJECT_LOCATION}/${fname}
+    done
+
+    kill -15 ${WATCH_PID}
+    wait ${WATCH_PID}
+    rm -f ${real_statistic_pipe_in}
+    rm -f ${real_statistic_pipe_out}
+    rm -f ${real_main_statistic_pipe_out}
+    echo "Final API fs snapshot, result ${RET}:"
+    ls -laR ${SHARED_API_DIR}
+}
+
+# If we continue with tests, rrd_analytic must have been started
+echo -e "Wait for rrd starting"
+wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/rrd_analytic" ANY_SERVICE_UNAVAILABLE_COUNT
+if [ ! -z ${ANY_SERVICE_UNAVAILABLE_COUNT} ]; then
+    echo -e "${BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort${Color_Off}"
+    gracefull_shutdown_handler
+    exit 255
+fi
 
 echo "Run tests:"
 RET=0
@@ -97,19 +121,7 @@ for s in ${WORK_DIR}/test_*.py; do
     #ls -laR ${SHARED_API_DIR}
 done
 
-# remove test files from project directory
-for f in ${test_files[@]}; do
-    fname=`basename ${f}`
-    rm -f ${INITIAL_PROJECT_LOCATION}/${fname}
-done
-
-kill -15 ${WATCH_PID}
-wait ${WATCH_PID}
-rm -f ${real_statistic_pipe_in}
-rm -f ${real_statistic_pipe_out}
-rm -f ${real_main_statistic_pipe_out}
-echo "Final API fs snapshot, result ${RET}:"
-ls -laR ${SHARED_API_DIR}
+gracefull_shutdown_handler
 
 if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
 

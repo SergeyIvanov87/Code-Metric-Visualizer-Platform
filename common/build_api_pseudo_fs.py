@@ -36,7 +36,7 @@ from api_fs_args import write_args
 
 def create_api_fs_node(api_root_path, req, rtype, rparams):
     api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(api_root_path, req, rtype)
-    os.makedirs(api_exec_node_directory, mode=0o777, exist_ok=True)
+    os.makedirs(api_exec_node_directory, mode=0o755, exist_ok=True)
     filesystem_utils.append_file_mode(
                 api_req_directory,
                 stat.S_IWUSR
@@ -47,12 +47,14 @@ def create_api_fs_node(api_root_path, req, rtype, rparams):
                 | stat.S_IROTH
     )
 
-    filesystem_utils.append_file_mode(
-                api_exec_node_directory,
-                stat.S_IWUSR
-                | stat.S_IRUSR
+    os.chmod(api_exec_node_directory,
+                stat.S_IRUSR
+                | stat.S_IXUSR
+                | stat.S_IWUSR
                 | stat.S_IRGRP
+                | stat.S_IXGRP
                 | stat.S_IROTH
+                | stat.S_IXOTH
     )
 
     api_gui_exec_filename = os.path.join(api_exec_node_directory, api_gui_exec_filename_from_req_type(rtype))

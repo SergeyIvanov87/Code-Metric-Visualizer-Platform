@@ -123,10 +123,10 @@ class APIQuery:
         with open(pipe_to_read, mode) as pout:
             result = pout.read()
 
-        # remove temporal pipe unless it's main session id
-        if self.remove_session_pipe_on_result_done:
-            if session_id != "":
-                os.remove(pipe_to_read)
+        # TODO DO NOT remove temporal pipe even if it is not main session id
+        #if self.remove_session_pipe_on_result_done:
+        #    if session_id != "":
+        #        os.remove(pipe_to_read)
         return result
 
     def wait_binary_result(self, session_id = "", sleep_between_cycles=0.1, max_cycles_count=30, console_ping = False):
@@ -143,6 +143,10 @@ def get_elapsed_duration(current_duration, begin_ts):
     return float(result), end_ts
 
 class APIQueryInterruptible(APIQuery):
+    # TODO think about remove_session_pipe_on_result_done necessity.
+    # It's must be clear that session pipes must be removed only by it's creator/owner
+    # No one other must remove it.
+    # I have to think about the question: do I realy need to remove them at all?
     def __init__(self, command_pipes, remove_session_pipe_on_result_done):
         super().__init__(command_pipes, remove_session_pipe_on_result_done)
         self.result_queue = LifoQueue()
