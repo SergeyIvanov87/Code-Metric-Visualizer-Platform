@@ -34,7 +34,7 @@ def execute_query(name, query):
             resp = requests.put(url, data=query["Params"], headers=headers)
         case "post":
             resp = requests.post(url, data=query["Params"], headers=headers)
-    print(f"{get_timestamp()}\tsent query: {url}, response status: {resp.status}")
+    print(f"{get_timestamp()}\tsent query: {url}, response status: {resp.content}")
     assert resp.ok
 
 @pytest.mark.parametrize("name,query", testdata)
