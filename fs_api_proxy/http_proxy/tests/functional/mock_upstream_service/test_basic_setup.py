@@ -70,17 +70,17 @@ def http_set_service_availability(http_node, service_name, available):
 def test_init_and_basic_functionality(service_name, queries_map):
     global global_settings
     global global_depend_on_services_api_path
-    print(f"Test start: {service_name}", file=sys.stdout, flush=True)
+    print(f"!!!!!!!!!!!!!!!!!!!!!! Test start: {service_name}", file=sys.stdout, flush=True)
     service_api_schemas_path=os.path.join(global_depend_on_services_api_path, service_name)
 
-    # cleat FS
+    # clear FS
     shutil.rmtree(global_settings.api_dir, ignore_errors=True)
     generated_api_path = os.path.join(global_settings.work_dir, "generated")
     shutil.rmtree(generated_api_path, ignore_errors=True)
     os.mkdir(generated_api_path)
 
     # launch one particular stub service
-    print(f"Launch server from schema: {service_api_schemas_path}")
+    print(f"Launch server: {service_name} from schema: {service_api_schemas_path}")
     servers = build_and_launch_services(service_api_schemas_path, global_settings.work_dir, generated_api_path, global_settings.api_dir)
 
     # build & launch unmet_dependencies API
@@ -129,7 +129,7 @@ def test_init_and_basic_functionality(service_name, queries_map):
 
 
     # send queries to created service
-    print(f"check self-created service: {service_name}")
+    print(f"check self-created service: {service_name}, which we owns and which must not be proxied")
     got_unexpected_exception = False
     try:
         executor = FS_API_Executor(service_api_schemas_path, global_settings.api_dir, global_settings.domain_name_api_entry)
@@ -142,6 +142,7 @@ def test_init_and_basic_functionality(service_name, queries_map):
 
     if got_unexpected_exception:
         print(f"ERROR: Failed on testing unmet_dependencies service")
+        print(f"check self-created service: {service_name} FAILED, it has been proxied")
         stop_servers(servers)
         remove_generated_files(generated_files_to_delete)
     assert not got_unexpected_exception
@@ -151,12 +152,12 @@ def test_init_and_basic_functionality(service_name, queries_map):
     for proxied_service, proxied_query_map in service_api_deps.items():
         if proxied_service == service_name:
             continue
-        print(f"Check proxied service: {proxied_service}")
+        print(f"Check proxied service exist: {proxied_service}")
         proxied_service_api_schemas_path=os.path.join(global_depend_on_services_api_path, proxied_service)
         try:
             executor = FS_API_Executor(proxied_service_api_schemas_path, global_settings.api_dir, global_settings.domain_name_api_entry)
             for query_name in proxied_query_map.keys():
-                print(f"check query name: {query_name}")
+                print(f"check proxied query name: {query_name}")
                 assert executor.wait_until_valid(query_name, "", 1, 30, False), f"Proxied service: {proxied_service} must have been started"
                 out = executor.execute(query_name, f"TRACER_ID={query_name} SESSION_ID={proxied_service}", f"{proxied_service}")
                 print(f"proxied out: {out}")
@@ -174,13 +175,23 @@ def test_init_and_basic_functionality(service_name, queries_map):
 
 
 
+    # Tear down
+    print(f"============Wait for proxied services shutting down, so that we stop downstream server for a while=====", file=sys.stdout, flush=True)
+    downstream_service_url = os.getenv('DOWNSTREAM_SERVICE_NETWORK_ADDR', '')
+    h = Heartbeat()
+    h.run(f"{get_timestamp()}\tTurning down proxied services is in progress...")
+    http_set_service_availability(downstream_service_url, ".*", False)
+    time.sleep(30)
+    http_set_service_availability(downstream_service_url, ".*", True)
+    h.stop()
+
     print("Stop console servers", file=sys.stdout, flush=True)
     # Tear down
     # stop servers
     for s in servers:
         console_server.kill_detached(s)
-
     remove_generated_files(generated_files_to_delete)
+
     print(f"Test stop: {service_name}", file=sys.stdout, flush=True)
     assert not got_unexpected_exception
 
@@ -332,6 +343,14 @@ def test_unrechable_services(service_name, queries_map):
     assert not services_are_available, "Pipes responsible for FS API communication must be closed"
 
     # Tear down
+    print(f"============Wait for proxied services shutting down, so that we stop downstream server for a while=====", file=sys.stdout, flush=True)
+    h = Heartbeat()
+    h.run(f"{get_timestamp()}\tTest 'turn down service: {service_name}' is in progress...")
+    http_set_service_availability(downstream_service_url, ".*", False)
+    time.sleep(30)
+    http_set_service_availability(downstream_service_url, ".*", True)
+    h.stop()
+
     stop_servers(servers)
     remove_generated_files(generated_files_to_delete)
     print(f"==============Test stop: {service_name}================", file=sys.stdout, flush=True)

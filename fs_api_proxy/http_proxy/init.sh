@@ -157,7 +157,7 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
         # query has stucked: probably due to upstream service outage. Unblock query
         timeout 2 cat ${pipe_in} > /dev/null 2>&1
         if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET:	${pipe_in}"; fi
-        echo -e "${BReg}Heartbeat query: ${pipe_in} has stuck on${Color_Off} probably due to ${BRed}${UPSTREAM_SERVICE}${Color_Off} outage, trying again in attempt: ${BRed}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
+        echo -e "${BRed}Heartbeat query: ${pipe_in} has stuck on${Color_Off} probably due to ${BRed}${UPSTREAM_SERVICE}${Color_Off} outage, trying again in attempt: ${BRed}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1
         continue
     fi

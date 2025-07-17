@@ -36,13 +36,13 @@ def build_and_launch_services(service_schema_dirs, api_exec_generator_script_pat
     print("Build pseudo-filesystem API", file=sys.stdout, flush=True)
     build_api_pseudo_fs(service_schema_dirs, fs_api_root)
 
-    print("Launch console servers", file=sys.stdout, flush=True)
     server_env = os.environ.copy()
     server_env["WORK_DIR"] = generated_api_path
     servers = []
-    for s in server_scripts:
+    print(f"Launch console servers: {len(server_scripts)}", file=sys.stdout, flush=True)
+    for s,i in zip(server_scripts, range(1, sys.maxsize)):
         server = console_server.launch_detached(s, server_env, "")
-        print(f"Launched server PID: {server.pid}, PGID : {os.getpgid(server.pid)}")
+        print(f"Launched server: {s}, PID: {server.pid}, PGID: {os.getpgid(server.pid)} - ({i}/{len(server_scripts)})")
         servers.append(server)
 
     return servers
