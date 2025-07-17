@@ -137,7 +137,7 @@ jobs:
     - name: Start Integrational Tests on running Analysis UC one more time
       run: docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator && if [ $? != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
     - name: Stop Analysis UC
-      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop -t 30
     - name: Check filesystem API artefacts
       run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
     - name: Restart Analysis UC attempt 1
@@ -145,7 +145,7 @@ jobs:
     - name: Restart Integrational Tests on running Analysis UC attempt 1
       run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator && if [ $? != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
     - name: Stop Analysis UC attempt 1
-      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop -t 30
     - name: Check filesystem API artefacts attempt 1
       run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && cat ${GITHUB_WORKSPACE}/log/messages &&  exit -1; fi
     - name: Restart Analysis UC attempt 2
@@ -153,7 +153,7 @@ jobs:
     - name: Restart Integrational Tests on running Analysis UC attempt 2
       run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator && if [ $? != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
     - name: Stop Analysis UC attempt 2
-      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop -t 30
     - name: Check filesystem API artefacts attempt 2
       run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
 
@@ -209,7 +209,7 @@ jobs:
     - name: Start Integrational Tests on running Analytic UC
       run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator && if [ $? != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
     - name: Stop Analytic UC attempt
-      run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml stop
+      run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml stop -t 30
     - name: Check filesystem API artefacts
       run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
 
