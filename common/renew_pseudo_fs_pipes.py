@@ -104,15 +104,41 @@ def remove_api_fs_pipes_node(api_root_path, communication_type, req, rtype):
     cli_exec_filename = os.path.join(api_exec_node_directory, "exec")
     result_pipes = filesystem_utils.read_pipes_from_path(api_exec_node_directory, r"^result.*$")
 
+    sys.stdout.flush()
     pipes_to_unblock = []
+    children = []
     if communication_type == "server":
         pipes_to_unblock = [*result_pipes]
         for p in pipes_to_unblock:
-            unblock_result_pipe_reader(p)
+            # leverage multiprocessing to unblock pipes simultaneously
+            try:
+                pid = os.fork()
+                if pid == 0:
+                    # from child
+                    unblock_result_pipe_reader(p)
+                    exit()
+                children.append(pid)
+            except OSError:
+                sys.stderr.write(f"Could not create a child process for unblocking: {communication_type}. Unblock {p} from the main process\n")
+                unblock_result_pipe_reader(p)
+                pass
+
+
     elif communication_type == "client":
         pipes_to_unblock = [cli_exec_filename, api_gui_exec_filename] # api_gui_exec_filename is not pipe, must be skipped
         for p in pipes_to_unblock:
-            unblock_result_pipe_writer(p)
+             # leverage multiprocessing to unblock pipes simultaneously
+            try:
+                pid = os.fork()
+                if pid == 0:
+                    # from child
+                    unblock_result_pipe_writer(p)
+                    exit()
+                children.append(pid)
+            except OSError:
+                sys.stderr.write(f"Could not create a child process for unblocking: {communication_type}. Unblock {p} from the main process\n")
+                unblock_result_pipe_writer(p)
+                pass
 
     for p in pipes_to_unblock:
         remove_pipe(p)
@@ -120,8 +146,11 @@ def remove_api_fs_pipes_node(api_root_path, communication_type, req, rtype):
     # it may happens sometimes, when a service is dead, but clients are trying to make queries
     for p in pipes_to_unblock:
         if (os.path.exists(p)):
-            remove_file(filename)
+            remove_file(p)
 
+    # avoid zombies
+    for c in children:
+        os.waitpid(0, 0)
     return pipes_to_unblock
 
 
