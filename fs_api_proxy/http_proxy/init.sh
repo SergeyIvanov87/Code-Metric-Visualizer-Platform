@@ -155,7 +155,7 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     PID_TO_UNBLOCK_RESULT=$?
     if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
         # query has stucked: probably due to upstream service outage. Unblock query
-        timeout 2 cat ${pipe_in} > /dev/null 2>&1
+        timeout 2 /bin/bash -c "cat ${pipe_in} > /dev/null 2>&1"
         if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET:	${pipe_in}"; fi
         echo -e "${BRed}Heartbeat query: ${pipe_in} has stuck on${Color_Off} probably due to ${BRed}${UPSTREAM_SERVICE}${Color_Off} outage, trying again in attempt: ${BRed}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1
@@ -185,7 +185,7 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     PID_TO_UNBLOCK_RESULT=$?
     if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
         # query has stucked: probably due to upstream service outage. Unblock query
-        timeout 2 echo > ${pipe_out} > /dev/null 2>&1
+        timeout 2 /bin/bash -c "echo > ${pipe_out} > /dev/null 2>&1"
         if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET:	${pipe_out}"; fi
         echo -e "${BRed}Heartbeat query: ${pipe_out} has stuck on${Color_Off} probably due to ${BRed}${UPSTREAM_SERVICE}${Color_Off} outage, trying again in attempt: ${BRed}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1

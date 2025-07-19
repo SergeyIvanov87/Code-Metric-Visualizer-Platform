@@ -34,7 +34,7 @@ API_MANAGEMENT_PID=$!
 
 declare -A SERVICE_WATCH_PIDS
 termination_handler(){
-    trap - SIGTERM
+    #trap - SIGTERM
     rm -f ${README_FILE_PATH}
     gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
     exit 0

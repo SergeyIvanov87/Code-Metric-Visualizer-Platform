@@ -64,7 +64,7 @@ done
 echo "stop services"
 gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
 
-echo "wait for termination"
+echo "wait for termination with code: ${RET}"
 sleep infinity &
 wait $!
 exit $RET

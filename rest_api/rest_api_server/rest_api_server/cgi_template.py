@@ -23,6 +23,7 @@ from rest_api_server import app
 from time import sleep
 
 from api_fs_query import APIQuery
+from api_fs_query import APIQueryInterruptible
 
 docker_logger = logger.Logger()
 

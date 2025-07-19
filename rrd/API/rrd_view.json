@@ -1,7 +1,7 @@
 {
     "Content-Type" : "text/csv",
     "Method" : "GET",
-    "Query": "api.pmccabe_collector.restapi.org/cc/analytic/rrd/select/view",
+    "Query": "api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/view",
     "Params": {
         "rrd_select": {
             "-prune": "-path \"*\" -type d"
@@ -14,7 +14,7 @@
     },
     "Description": {
         "header": "Prints an CSV table of cyclomatic complexity metric trends, which stamps are extracted from RRD time series data silos.\nIt extracts the trend from RRD silos which were determined by appropriated params of `rrd_select` API query.\n",
-        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/cc/analytic/rrd/select/view/GET/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/cc/analytic/rrd/select/view/GET/result.csv > <your filemame>.csv`\n\n",
+        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/view/GET/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/view/GET/result.csv > <your filemame>.csv`\n\n",
         "footer": "The result of this query is a Comma-Separated-Values file, which could be opened my any well-known office application"
     }
 }

@@ -76,7 +76,7 @@ for s in ${WORK_DIR}/test_*.py; do
     fi
 done
 
-echo "wait for termination"
+echo "wait for termination with code: ${RET}"
 sleep infinity &
 wait $!
 exit $RET

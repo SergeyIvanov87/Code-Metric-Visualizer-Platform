@@ -68,7 +68,7 @@ def unblock_pipes_signal_handler(sig, frame):
     for d in exec_node_directories:
         shutil.rmtree(d, ignore_errors=True)
 
-    print(f"{deleted_pipes.append(exec_node_directories)}")
+    print(f"{deleted_pipes.extend(exec_node_directories)}")
     sys.exit(0)
 
 signal.signal(signal.SIGINT, unblock_pipes_signal_handler)

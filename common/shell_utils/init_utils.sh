@@ -5,6 +5,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source ${SCRIPT_DIR}/color_codes.sh
 
 gracefull_shutdown() {
+    echo -e "${BBlue}Starting gracefull shutdown routine${Color_Off}"
     local -n SERVICE_WATCH_PIDS_TO_STOP=${1}
     local API_MANAGEMENT_PID=${2}
 
@@ -148,6 +149,7 @@ wait_for_unavailable_services() {
     local pipe_in="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/exec"
     local pipe_out="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/result.json_${SESSION_ID}"
     local pipe_couter=1
+    rm -r ${pipe_out}
     while [ ! -p ${pipe_in} ];
     do
         sleep 0.1
@@ -170,8 +172,36 @@ wait_for_unavailable_services() {
             fi
             let pipe_couter=$pipe_couter+1
         done
-        local MISSING_API_QUERIES=`cat ${pipe_out}`
 
+        # As we use ephemeral pipe, which have to be created after query sent,
+        # it is possible to face the situation when the new pipe creation may be delayed
+        # but some inactive dead-pipe having the same name still exist.
+        # Reading this dead-pipe may be a reason of a deadlock
+        # So let's read this pipe in async mode
+        file_pipe_out_result_name="cat_pipe_out_result_file"
+        rm -f ${file_pipe_out_result_name}*
+        file_pipe_out_result_name="${file_pipe_out_result_name}_`date +%s`"
+        (cat ${pipe_out} > ${file_pipe_out_result_name}) &
+        local PID_TO_UNBLOCK=$!
+        echo "PID_TO_UNBLOCK: ${PID_TO_UNBLOCK}"
+        sleep 1
+        kill -s 0 ${PID_TO_UNBLOCK} > /dev/null 2>&1
+        local PID_TO_UNBLOCK_RESULT=$?
+        echo "PID_TO_UNBLOCK_RESULT: ${PID_TO_UNBLOCK_RESULT}"
+        if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
+            # query has stucked, probably dead-pipe
+            timeout 1 /bin/bash -c "echo > ${pipe_out}" #> /dev/null 2>&1
+            if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET DEADPIPE:	${pipe_out}"; fi
+            kill -9 ${PID_TO_UNBLOCK}
+            let wait_dependencies_counter=$wait_dependencies_counter+1
+            if [ ${wait_dependencies_counter} == ${wait_dependencies_counter_limit} ]; then
+                eval ${3}=$ANY_SERVICE_UNAVAILABLE
+                break
+            fi
+            continue
+        fi
+
+        local MISSING_API_QUERIES=`cat ${file_pipe_out_result_name}`
         if [ ! -z "${MISSING_API_QUERIES}" ]; then
             echo -e "${Blue}One or more services are unavailable using this API:${Color_Off}"
             echo -e "${Blue}${MISSING_API_QUERIES}${Color_Off}"

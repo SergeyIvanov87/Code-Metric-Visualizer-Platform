@@ -98,6 +98,7 @@ api_cli_schema = [
     "if [[ -e $pipe_result ]]; then\n",
     "    rm -f $pipe_result\n",
     "fi\n",
+    "rm -f ${api_exec_node_directory}/result*\n",
     "mkfifo -m 622 $pipe_request\n",
     'trap "rm -f $pipe_request" ${SIGNALS}\n',
     "mkfifo -m 644 $pipe_result\n",
@@ -226,7 +227,7 @@ def generate_cli_server_content(req_name, req_api, req_type, content_type, req_e
     else:
         api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(req_exec_script_root_dir,req_executor_name)
 
-    template_schema_row_index += 60
+    template_schema_row_index += 61
     api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(
         req_exec_script_root_dir,
         req_executor_name,

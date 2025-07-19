@@ -11,7 +11,7 @@ export DEPEND_ON_SERVICES_API_SCHEMA_DIR=${WORK_DIR}/API/deps
 export INNER_API_SCHEMA_DIR=${WORK_DIR}/API
 
 ##### why cc instead of rrd?
-README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-ANALYTIC.md
+README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc_analytic/README-API-ANALYTIC.md
 
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport RRD_DATA_STORAGE_DIR=${RRD_DATA_STORAGE_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport DEPEND_ON_SERVICES_API_SCHEMA_DIR=${DEPEND_ON_SERVICES_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
@@ -35,6 +35,7 @@ source ${OPT_DIR}/shell_utils/init_utils.sh
 API_MANAGEMENT_PID=0
 declare -A SERVICE_WATCH_PIDS
 termination_handler(){
+    echo "gracefull, remove ${README_FILE_PATH}"
     rm -f ${README_FILE_PATH}
     gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
     exit 0
