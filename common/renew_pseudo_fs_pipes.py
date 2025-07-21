@@ -116,7 +116,7 @@ def remove_api_fs_pipes_node(api_root_path, communication_type, req, rtype):
                 if pid == 0:
                     # from child
                     unblock_result_pipe_reader(p)
-                    exit()
+                    os._exit(0)
                 children.append(pid)
             except OSError:
                 sys.stderr.write(f"Could not create a child process for unblocking: {communication_type}. Unblock {p} from the main process\n")
