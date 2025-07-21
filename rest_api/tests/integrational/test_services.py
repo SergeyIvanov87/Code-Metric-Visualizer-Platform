@@ -28,6 +28,7 @@ def execute_query(name, query):
     params["SESSION_ID"] = socket.gethostname() + "_" + name
 
     service_is_up = False
+    respOk = False
     while not service_is_up:
         h = Heartbeat()
         h.run(f"{get_timestamp()}\tTest 'execute_query: {query['Query']}' is in progress, waiting for a service up...")
@@ -44,8 +45,9 @@ def execute_query(name, query):
                 resp = requests.post(url, data=params, headers=headers)
         print(f"{get_timestamp()}\tsent query: {url}, response status: {resp.content if not resp.ok else '<not an error, ignored>'}")
         service_is_up = service_tester_utils.ping_service("rest_api", 5000)
-        print(f"resp: {resp.ok}, service_is_up: {service_is_up}")
-        assert resp.ok or not service_is_up
+        respOk = resp.ok
+        print(f"resp: {respOk}, service_is_up: {service_is_up}")
+    assert respOk
 
 
 @pytest.mark.parametrize("name,query", testdata)

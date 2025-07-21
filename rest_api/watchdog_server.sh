@@ -165,5 +165,7 @@ do
     echo "${LOG_PREFIX}The new server instance has been started, PID: ${SERVER_INSTANCE_PID}"
     generate_host_ip_file ${MY_FLASK_RUN_PORT} ${HOSTNAME_IP_FILE}
 
+    # TODO remove later
+    cat /package/rest_api_server/rest_api_server/cgi.py
     wait ${SERVER_INSTANCE_PID}
 done
