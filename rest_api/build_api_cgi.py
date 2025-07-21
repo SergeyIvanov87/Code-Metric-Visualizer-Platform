@@ -138,7 +138,7 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
                    r'    while not (os.path.exists(api_result_pipe) and stat.S_ISFIFO(os.stat(api_result_pipe).st_mode)):',
                    r'        sleep(0.1)',
                    r'        api_result_pipe_timeout_cycles += 1',
-                   r'        docker_logger.debug(f"[HTTP] Query: {request.full_path} waiting for a result pipe creation: {api_result_pipe}")',
+                   r'        docker_logger.debug(f"[HTTP] Query: {request.full_path} waiting for a result pipe creation: {api_result_pipe}, cycles: {api_result_pipe_timeout_cycles}")',
                    r'        if api_result_pipe_timeout_cycles >= 30:',
                    r'            docker_logger.error(f"[HTTP] Pipe for query: {request.full_path} by path: {api_result_pipe} has not been created in time")',
                    r'            return f"<p>\"Filesystem API did not respond\"</p>"',

@@ -129,11 +129,11 @@ jobs:
     - name: Prepare shared volume for SYSLOG-NG
       run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: Tryout SYSLOG-NG
-      run: docker compose -f common/images/syslog-ng_image/compose.yaml
+      run: docker compose -f common/images/syslog-ng_image/compose.yaml up -d
     - name: Start Analysis UC
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
     - name: Start Integrational Tests on running Analysis UC
-      run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator && if [ $? != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
+      run: sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator && if [ $? != 0 ]; then echo "Collected Logs: " && cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
     - name: Start Integrational Tests on running Analysis UC one more time
       run: docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator && if [ $? != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
     - name: Stop Analysis UC
@@ -173,7 +173,7 @@ jobs:
     - name: Clone external C/C++ project
       run: git clone https://github.com/SergeyIvanov87/MRUVocabulary.git $GITHUB_WORKSPACE/MRUVocabulary
     - name: Tryout syslog-ng
-      run: docker compose -f common/images/syslog-ng_image/compose.yaml
+      run: docker compose -f common/images/syslog-ng_image/compose.yaml up -d
     - name: Start Analysis UC
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml up -d
     - name: Stop Analysis UC
@@ -204,6 +204,8 @@ jobs:
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Create RRD snapshots volume
       run: LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=${GITHUB_WORKSPACE}/rrd_snapshots && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd_analytic
+    - name: Tryout syslog-ng
+      run: docker compose -f common/images/syslog-ng_image/compose.yaml up -d
     - name: Start Analytic UC
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml up -d
     - name: Start Integrational Tests on running Analytic UC
