@@ -29,4 +29,9 @@ services:
 volumes:
   api.pmccabe_collector.logger.org:
     name: api.pmccabe_collector.logger.org
+    #external: true
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
     external: true
