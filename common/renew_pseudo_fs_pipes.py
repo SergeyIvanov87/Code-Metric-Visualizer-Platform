@@ -142,9 +142,11 @@ def remove_api_fs_pipes_node(api_root_path, communication_type, req, rtype):
 
     # we have to wait all children processess before delete pipes/files
     # If we don't wait, then we won't unblock clients & servers
+    print(f"Waiting for finishing of child processes: {children}", file=sys.stdout, flush=True)
     for c in children:
         os.waitpid(0, 0)
 
+    print(f"Child processes have finished: {children}", file=sys.stdout, flush=True)
     for p in pipes_to_unblock:
         remove_pipe(p)
     # make sure a regular file doesn't pretend to be a PIPE,

@@ -49,3 +49,4 @@ def create_executable_file(path_nodes_list, filename, lines_to_write):
     with open(executable_filepath, "w") as executable_file:
         executable_file.writelines(lines_to_write)
     make_file_executable(executable_filepath)
+    return executable_filepath
