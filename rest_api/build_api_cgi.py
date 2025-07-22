@@ -71,6 +71,8 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
             r'    except Exception as ex:',
             r'        docker_logger.error(f"[HTTP] Could not get binary result for query: {request.full_path} on pipes:{api_query_pipe},{api_result_pipe}. Exception: {str(ex)}")',
             r'        return f"<p>\"Exception occured, while waiting for a query binary result for as session id: {session_id_value}</p>", 503',
+            r'    finally:',
+            r'        queries_in_progress -= 1'
         ]
     else:
         response_generator = [
@@ -81,6 +83,8 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
             r'    except Exception as ex:',
             r'        docker_logger.error(f"[HTTP] Could not get result for query: {request.full_path} on pipes:{api_query_pipe},{api_result_pipe}. Exception: {str(ex)}")',
             r'        return f"<p>\"Exception occured, while waiting for a query result for as session id: {session_id_value}</p>", 503',
+            r'    finally:',
+            r'        queries_in_progress -= 1'
         ]
 
     methods = f"\"{req_type}\""
@@ -128,11 +132,13 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
     ]
     cgi_schema = [ r'@app.route("/{}",  methods=[{}])'.format(req_api, methods),
                    r'def {}():'.format(canonize_api_method_name),
+                   r'    global queries_in_progress',
                    *make_session_id,
                    *make_query,
                    *make_head_probe_check,
                    *make_redirect_url,
                    *get_query_params(params), r'',
+                   r'    queries_in_progress += 1',
                    r'    query.execute(query_params_str)',
                    r'    api_result_pipe_timeout_cycles=0',
                    r'    while not (os.path.exists(api_result_pipe) and stat.S_ISFIFO(os.stat(api_result_pipe).st_mode)):',
@@ -140,6 +146,7 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
                    r'        api_result_pipe_timeout_cycles += 1',
                    r'        docker_logger.debug(f"[HTTP] Query: {request.full_path} waiting for a result pipe creation: {api_result_pipe}, cycles: {api_result_pipe_timeout_cycles}")',
                    r'        if api_result_pipe_timeout_cycles >= 30:',
+                   r'            queries_in_progress -= 1',
                    r'            docker_logger.error(f"[HTTP] Pipe for query: {request.full_path} by path: {api_result_pipe} has not been created in time")',
                    r'            return f"<p>\"Filesystem API did not respond\"</p>"',
                    *response_generator, r''

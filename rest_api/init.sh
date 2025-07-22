@@ -78,12 +78,10 @@ while [ $RETURN_STATUS -eq 0 ]; do
             # To overcome this limitation It had better use `here string` https://www.gnu.org/savannah-checkouts/gnu/bash/manual/bash.html#Here-Strings,
             # which allow us to execute this inner loop in the main shell context so that modification of RETURN_STATUS will be visible here
             # and allow this watching algorithm to be stopped by emergency
-            EVENT_GET=0
             while read dir action file; do
                 case "$action" in
                     CREATE|DELETE|MODIFY|MOVE_TO|MOVE_FROM )
                         let HAS_GOT_API_UPDATE_EVENT=$HAS_GOT_API_UPDATE_EVENT+1
-                        let EVENT_GET=1
                         # reset timeout counter upon event emerging
                         let API_UPDATE_EVENT_TIMEOUT_COUNTER=0
                         echo -e "${BBlue}Event has been detected:${Color_Off} ${file}, action; ${action}, dir: ${dir}. ${BBlue}Reconfigure REST_API Service....${Color_Off}"
@@ -96,7 +94,7 @@ while [ $RETURN_STATUS -eq 0 ]; do
 
             # as do not observe inotify constantly, it's possible that new README file would appear unattended.
             # In this case this safeguard introduced: we keep counting an amount of README files so that we are still able to detect API changing
-            if [ ${EVENT_GET} == 0 ];
+            if [ ${HAS_GOT_API_UPDATE_EVENT} == 0 ];
             then
                 md_files_new_count=`ls -laR ${SHARED_API_DIR} | grep md | wc -l`
                 if [ ${LAST_TIME_README_FILES_DETECTED_COUNT} != ${md_files_new_count} ];
@@ -141,9 +139,10 @@ while [ $RETURN_STATUS -eq 0 ]; do
             # kill an old instance
             remove_populated_host_ip_file
             REST_API_INSTANCE_PIDFILE_PID=`cat ${REST_API_INSTANCE_PIDFILE}`
-            kill -s SIGTERM ${REST_API_INSTANCE_PIDFILE_PID}
+            kill -s SIGINT ${REST_API_INSTANCE_PIDFILE_PID}
             while [ -f ${REST_API_INSTANCE_PIDFILE} ]; do
                 sleep 0.1
+                kill -s SIGINT ${REST_API_INSTANCE_PIDFILE_PID}
                 echo "Waiting for a server to stop, pid ${REST_API_INSTANCE_PIDFILE_PID}..."
             done
             echo "The server stopped, last detected README files count: ${LAST_TIME_README_FILES_DETECTED_COUNT}"
