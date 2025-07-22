@@ -64,6 +64,7 @@ HAS_GOT_API_UPDATE_EVENT=0
 
 inotifywait -rq ${SHARED_API_DIR} -e modify,create,delete -t 1 --include '.md$'
 
+LAST_TIME_README_FILES_DETECTED_COUNT=0
 while [ $RETURN_STATUS -eq 0 ]; do
     if [ ! -d "${SHARED_API_DIR}/${MAIN_SERVICE_NAME}" ]; then
         if [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} == ${API_WAIT_FOR_FILE_API_LOMIT} ]; then
@@ -96,11 +97,12 @@ while [ $RETURN_STATUS -eq 0 ]; do
             # which allow us to execute this inner loop in the main shell context so that modification of RETURN_STATUS will be visible here
             # and allow this watching algorithm to be stopped by emergency
             echo "Polling ${SHARED_API_DIR} has starting..."
+            EVENT_GET=0
             while read dir action file; do
                 case "$action" in
                     CREATE|DELETE|MODIFY|MOVE_TO|MOVE_FROM )
                         let HAS_GOT_API_UPDATE_EVENT=$HAS_GOT_API_UPDATE_EVENT+1
-
+                        let EVENT_GET=1
                         # reset timeout counter upon event emerging
                         let API_UPDATE_EVENT_TIMEOUT_COUNTER=0
                         echo -e "${BBlue}Event has been detected:${Color_Off} ${file}, action; ${action}, dir: ${dir}. ${BBlue}Reconfigure REST_API Service....${Color_Off}"
@@ -110,6 +112,18 @@ while [ $RETURN_STATUS -eq 0 ]; do
                         ;;
                 esac
             done <<< "$(inotifywait -rq ${SHARED_API_DIR} -e modify,create,delete -t ${API_UPDATE_EVENT_TIMEOUT_SEC} --include '.md$' )"
+
+            # as do not observe inotify constantly, it's possible that new README file would appear unattended.
+            # In this case this safeguard introduced: we keep counting an amount of README files so that we are still able to detect API changing
+            if [ ${EVENT_GET} == 0 ];
+            then
+                md_files_new_count=`ls -laR ${SHARED_API_DIR} | grep md | wc -l`
+                if [ ${LAST_TIME_README_FILES_DETECTED_COUNT} != ${md_files_new_count} ];
+                then
+                    echo -e "${BBlue} README files mount has been changed, was: ${LAST_TIME_README_FILES_DETECTED_COUNT}, become: ${md_files_new_count}. Generate event manually#{Color_Off}"
+                    let HAS_GOT_API_UPDATE_EVENT=$HAS_GOT_API_UPDATE_EVENT+1
+                fi
+            fi
             let API_UPDATE_EVENT_TIMEOUT_COUNTER=$API_UPDATE_EVENT_TIMEOUT_COUNTER+1
         done
         # In general, it must restart a running server instance by sending SIGTERM to its PID.
@@ -143,6 +157,8 @@ while [ $RETURN_STATUS -eq 0 ]; do
         echo "Check  HAS_GOT_API_UPDATE_EVENT ${HAS_GOT_API_UPDATE_EVENT}"
         if [ ${HAS_GOT_API_UPDATE_EVENT} -gt 0 ]; then
             echo -e "Got ${HAS_GOT_API_UPDATE_EVENT} API events. ${BBlue}Restart REST_API service will be scheduled...${Color_Off}"
+            # remember last count of README files
+            LAST_TIME_README_FILES_DETECTED_COUNT=`ls -laR ${SHARED_API_DIR} | grep md | wc -l`
             # kill an old instance
             remove_populated_host_ip_file
             REST_API_INSTANCE_PIDFILE_PID=`cat ${REST_API_INSTANCE_PIDFILE}`
@@ -151,7 +167,7 @@ while [ $RETURN_STATUS -eq 0 ]; do
                 sleep 0.1
                 echo "Waiting for a server to stop, pid ${REST_API_INSTANCE_PIDFILE_PID}..."
             done
-            echo "The server stopped"
+            echo "The server stopped, last detected README files count: ${LAST_TIME_README_FILES_DETECTED_COUNT}"
 
             # reset event counter
             HAS_GOT_API_UPDATE_EVENT=0
