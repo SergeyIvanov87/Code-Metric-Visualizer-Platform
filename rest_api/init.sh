@@ -58,28 +58,10 @@ RETURN_STATUS=0
 API_UPDATE_EVENT_TIMEOUT_SEC=1
 API_UPDATE_EVENT_TIMEOUT_LIMIT=3
 API_UPDATE_EVENT_TIMEOUT_COUNTER=0
-API_WAIT_FOR_FILE_API_LOMIT=60
 # Loop until any unrecoverable error would occur
 HAS_GOT_API_UPDATE_EVENT=0
-
-inotifywait -rq ${SHARED_API_DIR} -e modify,create,delete -t 1 --include '.md$'
-
 LAST_TIME_README_FILES_DETECTED_COUNT=0
 while [ $RETURN_STATUS -eq 0 ]; do
-    if [ ! -d "${SHARED_API_DIR}/${MAIN_SERVICE_NAME}" ]; then
-        if [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} == ${API_WAIT_FOR_FILE_API_LOMIT} ]; then
-            echo "$API exporting directory has not been served as expected. Abort"
-            remove_populated_host_ip_file
-            exit 255
-        fi
-        let API_UPDATE_EVENT_TIMEOUT_COUNTER=$API_UPDATE_EVENT_TIMEOUT_COUNTER+1
-        echo "$API exporting directory: ${SHARED_API_DIR}/${MAIN_SERVICE_NAME} - doesn't exist. Another attempt: ${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_WAIT_FOR_FILE_API_LOMIT} - will be made in ${API_UPDATE_EVENT_TIMEOUT_SEC} seconds."
-        sleep ${API_UPDATE_EVENT_TIMEOUT_SEC} &
-        wait $!
-        continue
-    fi
-
-
         # Handle the chain-reaction of API *md files creation.
         # It occurs when multiple services are starting simultaneously and populating their API and that will trigger
         # REST_API service down-up every time when standalone *md file is published.
@@ -96,7 +78,6 @@ while [ $RETURN_STATUS -eq 0 ]; do
             # To overcome this limitation It had better use `here string` https://www.gnu.org/savannah-checkouts/gnu/bash/manual/bash.html#Here-Strings,
             # which allow us to execute this inner loop in the main shell context so that modification of RETURN_STATUS will be visible here
             # and allow this watching algorithm to be stopped by emergency
-            echo "Polling ${SHARED_API_DIR} has starting..."
             EVENT_GET=0
             while read dir action file; do
                 case "$action" in
@@ -120,7 +101,7 @@ while [ $RETURN_STATUS -eq 0 ]; do
                 md_files_new_count=`ls -laR ${SHARED_API_DIR} | grep md | wc -l`
                 if [ ${LAST_TIME_README_FILES_DETECTED_COUNT} != ${md_files_new_count} ];
                 then
-                    echo -e "${BBlue} README files mount has been changed, was: ${LAST_TIME_README_FILES_DETECTED_COUNT}, become: ${md_files_new_count}. Generate event manually#{Color_Off}"
+                    echo -e "${BBlue} README files mount has been changed, was: ${LAST_TIME_README_FILES_DETECTED_COUNT}, become: ${md_files_new_count}. Generate event manually${Color_Off}"
                     let HAS_GOT_API_UPDATE_EVENT=$HAS_GOT_API_UPDATE_EVENT+1
                 fi
             fi
@@ -137,9 +118,8 @@ while [ $RETURN_STATUS -eq 0 ]; do
         # If the WATCHDOG is alive and the SERVER is dead then the former can handle the situation or gives SERVER an another attempt,
         # Thus, we is about to continue waiting for REST_API service uprising, unless
         # WATCHDOG is dead itself. Once the both WATCHDOG and SERVER are dead, this container became inoperable
-        echo "Check  REST_API_INSTANCE_PIDFILE ${REST_API_INSTANCE_PIDFILE}"
         if [ ! -f ${REST_API_INSTANCE_PIDFILE} ]; then
-            kill -s 0 ${WATCHDOG_PID} #-S- > /dev/null 2>&1
+            kill -s 0 ${WATCHDOG_PID} > /dev/null 2>&1
             WATCHDOG_TEST_RESULT=$?
             if [ $WATCHDOG_TEST_RESULT != 0 ]; then
                 echo -e "${BRed}Unrecoverable error has occured. Container is inoperable. Abort.${Color_Off}"
@@ -154,7 +134,6 @@ while [ $RETURN_STATUS -eq 0 ]; do
         fi
 
         # Restart the running service instance only if API has been changed
-        echo "Check  HAS_GOT_API_UPDATE_EVENT ${HAS_GOT_API_UPDATE_EVENT}"
         if [ ${HAS_GOT_API_UPDATE_EVENT} -gt 0 ]; then
             echo -e "Got ${HAS_GOT_API_UPDATE_EVENT} API events. ${BBlue}Restart REST_API service will be scheduled...${Color_Off}"
             # remember last count of README files
