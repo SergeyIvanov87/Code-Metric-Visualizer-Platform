@@ -111,7 +111,7 @@ jobs:
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Prepare shared volume for SYSLOG-NG
-      run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
+      run: rm -rf ${GITHUB_WORKSPACE}/log && mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: All together functional tests
       run: EXIT_STATUS=0 && docker compose -f compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
 
@@ -133,7 +133,7 @@ jobs:
     - name: Clone external C/C++ project
       run: git clone https://github.com/SergeyIvanov87/MRUVocabulary.git $GITHUB_WORKSPACE/MRUVocabulary
     - name: Prepare shared volume for SYSLOG-NG
-      run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
+      run: rm -rf ${GITHUB_WORKSPACE}/log && mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: Start Analysis UC
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up --remove-orphans -d
     - name: Start Integrational Tests on running Analysis UC
@@ -175,7 +175,7 @@ jobs:
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Prepare shared volume for SYSLOG-NG
-      run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
+      run: rm -rf ${GITHUB_WORKSPACE}/log && mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: Clone external C/C++ project
       run: git clone https://github.com/SergeyIvanov87/MRUVocabulary.git $GITHUB_WORKSPACE/MRUVocabulary
     - name: Start Analysis UC
@@ -205,7 +205,7 @@ jobs:
     - name: Create API volume
       run: mkdir -p ${GITHUB_WORKSPACE}/api && chmod 777 ${GITHUB_WORKSPACE}/api && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/api -o o=bind api.pmccabe_collector.restapi.org
     - name: Prepare shared volume for SYSLOG-NG
-      run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
+      run: rm -rf ${GITHUB_WORKSPACE}/log && mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Create RRD snapshots volume
@@ -231,7 +231,7 @@ jobs:
     - name: Clear docker environment
       run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
     - name: Prepare shared volume for SYSLOG-NG
-      run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
+      run: rm -rf ${GITHUB_WORKSPACE}/log && mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Create RRD snapshots volume
