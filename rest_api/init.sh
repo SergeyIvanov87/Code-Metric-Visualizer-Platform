@@ -58,9 +58,24 @@ RETURN_STATUS=0
 API_UPDATE_EVENT_TIMEOUT_SEC=1
 API_UPDATE_EVENT_TIMEOUT_LIMIT=3
 API_UPDATE_EVENT_TIMEOUT_COUNTER=0
+API_WAIT_FOR_FILE_API_LOMIT=60
 # Loop until any unrecoverable error would occur
 HAS_GOT_API_UPDATE_EVENT=0
 while [ $RETURN_STATUS -eq 0 ]; do
+    if [ ! -d "${SHARED_API_DIR}/${MAIN_SERVICE_NAME}" ]; then
+        if [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} == ${API_WAIT_FOR_FILE_API_LOMIT} ]; then
+            echo "$API exporting directory has not been served as expected. Abort"
+            remove_populated_host_ip_file
+            exit 255
+        fi
+        let API_UPDATE_EVENT_TIMEOUT_COUNTER=$API_UPDATE_EVENT_TIMEOUT_COUNTER+1
+        echo "$API exporting directory: ${SHARED_API_DIR}/${MAIN_SERVICE_NAME} - doesn't exist. Another attempt: ${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_WAIT_FOR_FILE_API_LOMIT} - will be made in ${API_UPDATE_EVENT_TIMEOUT_SEC} seconds."
+        sleep ${API_UPDATE_EVENT_TIMEOUT_SEC} &
+        wait $!
+        continue
+    fi
+
+
         # Handle the chain-reaction of API *md files creation.
         # It occurs when multiple services are starting simultaneously and populating their API and that will trigger
         # REST_API service down-up every time when standalone *md file is published.

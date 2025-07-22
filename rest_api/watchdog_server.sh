@@ -167,5 +167,6 @@ do
 
     # TODO remove later
     cat /package/rest_api_server/rest_api_server/cgi.py
+    cat ${WORK_DIR}/rest_api_server/rest_api_server/templates/index.md
     wait ${SERVER_INSTANCE_PID}
 done
