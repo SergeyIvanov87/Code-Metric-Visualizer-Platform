@@ -59,7 +59,7 @@ ${OPT_DIR}/build_api_services.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_D
 ${OPT_DIR}/build_api_pseudo_fs.py ${INNER_API_SCHEMA_DIR} ${SHARED_API_DIR}
 #${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR} > ${README_FILE_PATH}
 #chmod g+rw ${README_FILE_PATH}
-${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR}  | ( umask 0033; cat >> ${README_FILE_PATH} )
+#${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR}  | ( umask 0033; cat >> ${README_FILE_PATH} )
 # TODO think about necessity in creating any pivot metrics
 # There are few disadvantages about it:
 # 1) for a large project it will introduce latency in container starting, because
@@ -72,6 +72,9 @@ ${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR}  | ( umask 0033; cat >> ${
 # Conclusion: do not attempt to call any API commands to build statistic here in init.sh
 
 launch_fs_api_services SERVICE_WATCH_PIDS "${WORK_DIR}/services/"
+
+echo "${BBlue}Populating README file...${Color_Off}"
+${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR}  | ( umask 0033; cat >> ${README_FILE_PATH} )
 
 echo -e "${BGreen}The service is ready${Color_Off}"
 sleep infinity &
