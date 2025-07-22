@@ -61,6 +61,9 @@ API_UPDATE_EVENT_TIMEOUT_COUNTER=0
 API_WAIT_FOR_FILE_API_LOMIT=60
 # Loop until any unrecoverable error would occur
 HAS_GOT_API_UPDATE_EVENT=0
+
+inotifywait -rq ${SHARED_API_DIR} -e modify,create,delete -t 1 --include '.md$'
+
 while [ $RETURN_STATUS -eq 0 ]; do
     if [ ! -d "${SHARED_API_DIR}/${MAIN_SERVICE_NAME}" ]; then
         if [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} == ${API_WAIT_FOR_FILE_API_LOMIT} ]; then
@@ -92,6 +95,7 @@ while [ $RETURN_STATUS -eq 0 ]; do
             # To overcome this limitation It had better use `here string` https://www.gnu.org/savannah-checkouts/gnu/bash/manual/bash.html#Here-Strings,
             # which allow us to execute this inner loop in the main shell context so that modification of RETURN_STATUS will be visible here
             # and allow this watching algorithm to be stopped by emergency
+            echo "Polling ${SHARED_API_DIR} has starting..."
             while read dir action file; do
                 case "$action" in
                     CREATE|DELETE|MODIFY|MOVE_TO|MOVE_FROM )
@@ -119,8 +123,9 @@ while [ $RETURN_STATUS -eq 0 ]; do
         # If the WATCHDOG is alive and the SERVER is dead then the former can handle the situation or gives SERVER an another attempt,
         # Thus, we is about to continue waiting for REST_API service uprising, unless
         # WATCHDOG is dead itself. Once the both WATCHDOG and SERVER are dead, this container became inoperable
+        echo "Check  REST_API_INSTANCE_PIDFILE ${REST_API_INSTANCE_PIDFILE}"
         if [ ! -f ${REST_API_INSTANCE_PIDFILE} ]; then
-            kill -s 0 ${WATCHDOG_PID} > /dev/null 2>&1
+            kill -s 0 ${WATCHDOG_PID} #-S- > /dev/null 2>&1
             WATCHDOG_TEST_RESULT=$?
             if [ $WATCHDOG_TEST_RESULT != 0 ]; then
                 echo -e "${BRed}Unrecoverable error has occured. Container is inoperable. Abort.${Color_Off}"
@@ -135,6 +140,7 @@ while [ $RETURN_STATUS -eq 0 ]; do
         fi
 
         # Restart the running service instance only if API has been changed
+        echo "Check  HAS_GOT_API_UPDATE_EVENT ${HAS_GOT_API_UPDATE_EVENT}"
         if [ ${HAS_GOT_API_UPDATE_EVENT} -gt 0 ]; then
             echo -e "Got ${HAS_GOT_API_UPDATE_EVENT} API events. ${BBlue}Restart REST_API service will be scheduled...${Color_Off}"
             # kill an old instance

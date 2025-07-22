@@ -89,9 +89,10 @@ do
     fi
 
     # clear existing generated API schema files to facilitate clear-build environment
+    echo "${LOG_PREFIX} start restoring API"
     rm -f ${WORK_DIR}/restored_API/*
     ${OPT_DIR}/restore_api_from_pseudo_fs.py ${SHARED_API_DIR} ${MAIN_SERVICE_NAME} ${WORK_DIR}/restored_API
-
+    echo "${LOG_PREFIX} start restore API: `ls -la ${WORK_DIR}/restored_API`"
     # wait for API files
     if [ `ls ${WORK_DIR}/restored_API/*.json | wc -l` == 0 ]; then
         if [ ${wait_for_file_API_counter} == ${wait_for_file_API_limit} ]; then
