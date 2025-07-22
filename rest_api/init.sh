@@ -52,7 +52,7 @@ echo "flask --app rest_api_server run --host 0.0.0.0"
 export REST_API_INSTANCE_PIDFILE=${MY_FLASK_INSTANCE_PIDFILE}
 /package/watchdog_server.sh ${REST_API_INSTANCE_PIDFILE} ${FLASK_RUN_HOST} ${FLASK_RUN_PORT} ${HOSTNAME_IP_FILE} ${WAIT_FOR_SERVER_STARTING_LIMIT_SEC} &
 WATCHDOG_PID=$!
-sssssssssssssssssssssssssssssssssss
+
 shopt -s extglob
 RETURN_STATUS=0
 API_UPDATE_EVENT_TIMEOUT_SEC=1
