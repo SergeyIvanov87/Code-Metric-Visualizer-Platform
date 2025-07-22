@@ -18,7 +18,7 @@ jobs:
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
     - name: Execute unit tests
-      run: docker compose -f common/images/unit_test/compose.yaml up --remove-orphans --exit-code-from unit_tests
+      run: docker compose -f common/images/unit_test/compose.yaml up --exit-code-from unit_tests
 
   build:
 
@@ -29,6 +29,8 @@ jobs:
     - name: Get current date
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune & docker container prune -f
     - name: Build the VCS Docker image
       run: docker build -f observable_project_version_control/Dockerfile -t vcs_project:$DATE .
       env:
@@ -104,6 +106,8 @@ jobs:
     - name: Get current date
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune & docker container prune -f
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Prepare shared volume for SYSLOG-NG
@@ -120,6 +124,8 @@ jobs:
     - name: Get current date
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune & docker container prune -f
     - name: Create API volume
       run: mkdir -p ${GITHUB_WORKSPACE}/api && chmod 777 ${GITHUB_WORKSPACE}/api && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/api -o o=bind api.pmccabe_collector.restapi.org
     - name: Create Shared network
@@ -164,6 +170,8 @@ jobs:
     - name: Get current date
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune & docker container prune -f
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Prepare shared volume for SYSLOG-NG
@@ -192,6 +200,8 @@ jobs:
     - name: Get current date
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune & docker container prune -f
     - name: Create API volume
       run: mkdir -p ${GITHUB_WORKSPACE}/api && chmod 777 ${GITHUB_WORKSPACE}/api && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/api -o o=bind api.pmccabe_collector.restapi.org
     - name: Prepare shared volume for SYSLOG-NG
@@ -218,6 +228,8 @@ jobs:
     - name: Get current date
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune & docker container prune -f
     - name: Prepare shared volume for SYSLOG-NG
       run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: Create Shared network
