@@ -23,7 +23,8 @@ for f in ${test_files[@]}; do
     cp ${f} ${INITIAL_PROJECT_LOCATION}/
 done
 
-${UTILS}/canonize_internal_api.py /API/deps ${MAIN_SERVICE_NAME}/rrd
+MICROSERVICE_NAME_TO_TEST=rrd_analytic
+${UTILS}/canonize_internal_api.py /API/deps ${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME_TO_TEST}
 
 echo "Create CC API which RRD depends on"
 ${UTILS}/build_api_pseudo_fs.py /API/deps/cyclomatic_complexity ${SHARED_API_DIR}
@@ -100,7 +101,7 @@ gracefull_shutdown_handler(){
 
 # If we continue with tests, rrd_analytic must have been started
 echo -e "Wait for rrd starting"
-wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/rrd_analytic" ANY_SERVICE_UNAVAILABLE_COUNT
+wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME_TO_TEST}" ANY_SERVICE_UNAVAILABLE_COUNT
 if [ ! -z ${ANY_SERVICE_UNAVAILABLE_COUNT} ]; then
     echo -e "${BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort${Color_Off}"
     gracefull_shutdown_handler
