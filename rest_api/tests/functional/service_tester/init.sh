@@ -41,7 +41,7 @@ do
     fi
 done
 
-# waiting until all API events handled by REST_API service
+# waiting until all API events are handled by REST_API service
 sleep 15
 
 # Check if service is up once again

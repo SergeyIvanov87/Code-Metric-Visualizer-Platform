@@ -18,7 +18,7 @@ jobs:
       id: date
       run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
     - name: Execute unit tests
-      run: docker compose -f common/images/unit_test/compose.yaml up --exit-code-from unit_tests
+      run: docker compose -f common/images/unit_test/compose.yaml up --remove-orphans --exit-code-from unit_tests
 
   build:
 
@@ -38,33 +38,33 @@ jobs:
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the CC Docker image
-      run: docker compose -f cyclomatic_complexity/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from cc_functional_tester
+      run: docker compose -f cyclomatic_complexity/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from cc_functional_tester
     - name: Build the RRD Docker image
       run: docker build -f rrd/Dockerfile --tag rrd_analytic:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the RRD Docker image
-      run: docker compose -f rrd/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from rrd_functional_tester
+      run: docker compose -f rrd/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rrd_functional_tester
     - name: Build the REST API Docker image
       run: docker build -f rest_api/Dockerfile --tag rest_api:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the REST API Docker image
-      run: docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from rest_api_functional_service_tester
+      run: docker compose -f rest_api/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rest_api_functional_service_tester
 
     - name: Build the HTTP_FS API PROXY Docker image
       run: docker build -f fs_api_proxy/http_proxy/Dockerfile --tag fs_api_proxy_http:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the HTTP_FS API PROXY Docker image
-      run: docker compose -f fs_api_proxy/http_proxy/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from fs_api_http_proxy_functional_tester_service_a
+      run: docker compose -f fs_api_proxy/http_proxy/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from fs_api_http_proxy_functional_tester_service_a
 
     - name: Build the Service Broker Docker image
       run: docker build -f service_broker/Dockerfile -t service_broker:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the Service Broker Docker image
-      run: docker compose -f service_broker/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from service_broker_functional_tester
+      run: docker compose -f service_broker/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from service_broker_functional_tester
     - name: Create API volume
       run: mkdir -p api && chmod 777 api && docker volume create -d local -o type=none -o device=api -o o=bind api.pmccabe_collector.restapi.org
     - name: Run VCS Docker
@@ -109,7 +109,7 @@ jobs:
     - name: Prepare shared volume for SYSLOG-NG
       run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: All together functional tests
-      run: EXIT_STATUS=0 && docker compose -f compose-functional.test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
+      run: EXIT_STATUS=0 && docker compose -f compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
 
   analysis_use-case:
 
@@ -129,27 +129,27 @@ jobs:
     - name: Prepare shared volume for SYSLOG-NG
       run: mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: Start Analysis UC
-      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up --remove-orphans -d
     - name: Start Integrational Tests on running Analysis UC
-      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then echo "Collected Logs:" && cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
+      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then echo "Collected Logs:" && cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
     - name: Start Integrational Tests on running Analysis UC one more time
-      run: EXIT_STATUS=0 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
+      run: EXIT_STATUS=0 && docker compose -f compose-analysis.integrational-test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
     - name: Stop Analysis UC
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop -t 30
     - name: Check filesystem API artefacts
       run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
     - name: Restart Analysis UC attempt 1
-      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up --remove-orphans -d
     - name: Restart Integrational Tests on running Analysis UC attempt 1
-      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
+      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
     - name: Stop Analysis UC attempt 1
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop -t 30
     - name: Check filesystem API artefacts attempt 1
       run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && cat ${GITHUB_WORKSPACE}/log/messages &&  exit -1; fi
     - name: Restart Analysis UC attempt 2
-      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up -d
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml up --remove-orphans -d
     - name: Restart Integrational Tests on running Analysis UC attempt 2
-      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
+      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
     - name: Stop Analysis UC attempt 2
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop -t 30
     - name: Check filesystem API artefacts attempt 2
@@ -171,15 +171,15 @@ jobs:
     - name: Clone external C/C++ project
       run: git clone https://github.com/SergeyIvanov87/MRUVocabulary.git $GITHUB_WORKSPACE/MRUVocabulary
     - name: Start Analysis UC
-      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml up -d
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml up --remove-orphans -d
     - name: Stop Analysis UC
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml stop
     - name: Restart Analysis UC attempt 1
-      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml up -d
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml up --remove-orphans -d
     - name: Stop Analysis UC attempt 1
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml stop
     - name: Restart Analysis UC attempt 2
-      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml up -d
+      run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml up --remove-orphans -d
     - name: Stop Analysis UC attempt 2
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis-http-api.yaml stop
 
@@ -201,9 +201,9 @@ jobs:
     - name: Create RRD snapshots volume
       run: LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=${GITHUB_WORKSPACE}/rrd_snapshots && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd_analytic
     - name: Start Analytic UC
-      run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml up -d
+      run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml up --remove-orphans -d
     - name: Start Integrational Tests on running Analytic UC
-      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
+      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analysis.integrational-test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
     - name: Stop Analytic UC attempt
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml stop -t 30
     - name: Check filesystem API artefacts
@@ -225,8 +225,8 @@ jobs:
     - name: Create RRD snapshots volume
       run: LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=${GITHUB_WORKSPACE}/rrd_snapshots && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd_analytic
     - name: Start Analytic UC
-      run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic-http-api.yaml up -d
+      run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic-http-api.yaml up --remove-orphans -d
     - name: Start Integrational Tests on running Analytic UC
-      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analytic-http-api-integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
+      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analytic-http-api-integrational-test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
     - name: Stop Analytic UC attempt
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic-http-api.yaml stop

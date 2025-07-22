@@ -40,7 +40,7 @@ do
     fi
 done
 
-echo "waiting until all API events handled by REST_API service"
+echo "waiting until all API events are handled by REST_API service"
 sleep 10
 
 echo "check if service is up once again"
