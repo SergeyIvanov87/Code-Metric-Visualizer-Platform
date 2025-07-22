@@ -156,7 +156,7 @@ wait_for_unavailable_services() {
     do
         sleep 0.1
         if [ ${pipe_couter} == 3 ]; then
-            echo "Waiting for IN pipe: ${pipe_in}. Elapsed cycles: {pipe_couter}"
+            echo "Waiting for IN pipe: ${pipe_in}. Elapsed cycles: ${pipe_couter}"
         fi
         let pipe_couter=$pipe_couter+1
 
