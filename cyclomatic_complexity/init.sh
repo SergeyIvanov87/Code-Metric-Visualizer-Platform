@@ -21,6 +21,12 @@ if [ $? -ne 0 ]; then echo "Cannot create ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
 
 source ${OPT_DIR}/shell_utils/init_utils.sh
 
+echo "Premature cleanup..."
+rm -f ${README_FILE_PATH}
+${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
+kill -15 $!
+
+
 # I use standalone python-based process here to listen to SIGNAL and make PIPEs clearance.
 # For any reason, if I just esecute new python process in a trap handler then it will hangs for a long time until executed.
 # The default timeour for graceful termination in docker compose exceeds this interval and the container would be killed ungracefully,
@@ -51,9 +57,9 @@ rm -rf $TMPDIR
 ${OPT_DIR}/build_api_executors.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_DIR}
 ${OPT_DIR}/build_api_services.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_DIR}/services
 ${OPT_DIR}/build_api_pseudo_fs.py ${INNER_API_SCHEMA_DIR} ${SHARED_API_DIR}
-${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR} > ${README_FILE_PATH}
-chmod g+rw ${README_FILE_PATH}
-
+#${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR} > ${README_FILE_PATH}
+#chmod g+rw ${README_FILE_PATH}
+${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR}  | ( umask 0033; cat >> ${README_FILE_PATH} )
 # TODO think about necessity in creating any pivot metrics
 # There are few disadvantages about it:
 # 1) for a large project it will introduce latency in container starting, because

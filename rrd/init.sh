@@ -10,8 +10,8 @@ export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 export DEPEND_ON_SERVICES_API_SCHEMA_DIR=${WORK_DIR}/API/deps
 export INNER_API_SCHEMA_DIR=${WORK_DIR}/API
 
-##### why cc instead of rrd?
 README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc_analytic/README-API-ANALYTIC.md
+
 
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport RRD_DATA_STORAGE_DIR=${RRD_DATA_STORAGE_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport DEPEND_ON_SERVICES_API_SCHEMA_DIR=${DEPEND_ON_SERVICES_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
@@ -21,6 +21,12 @@ if [ -z ${MICROSERVICE_NAME} ]; then
     echo -e "{BRed}ERROR: Please specify env/arg MICROSERVICE_NAME. Abort${Color_Off}"
     exit 255
 fi
+
+echo "Premature cleanup..."
+rm -f ${README_FILE_PATH}
+${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}|${DEPEND_ON_SERVICES_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
+kill -15 $!
+
 echo -e "${BGreen}Initializing: ${MICROSERVICE_NAME}...${Color_Off}"
 
 # I use standalone python-based process here to listen to SIGNAL and make PIPEs clearance.
