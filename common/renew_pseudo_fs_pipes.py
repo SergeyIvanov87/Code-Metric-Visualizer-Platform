@@ -40,7 +40,7 @@ def check_pipe(pipe_filepath):
 
 def unblock_result_pipe_reader(pipe_filepath, print_log = True):
     if print_log:
-        print(f"Unlock consumer pipe: {pipe_filepath}")
+        print(f"Unlock consumer pipe: {pipe_filepath}", file=sys.stdout, flush=True)
     if not check_pipe(pipe_filepath):
         return
 
@@ -53,22 +53,22 @@ def unblock_result_pipe_reader(pipe_filepath, print_log = True):
 
         unblocked_attempt_count += 1
         if print_log:
-            print(f"execute unlocking script: {unlocking_script}, attempt: {unblocked_attempt_count}")
+            print(f"execute unlocking script: {unlocking_script}, attempt: {unblocked_attempt_count}", file=sys.stdout, flush=True)
         proc=subprocess.Popen(unlocking_script, shell=True)
         try:
             proc.wait(0.5)
         except Exception:
             if print_log:
-                print(f"No one was listening to: {pipe_filepath}. Skip it")
+                print(f"No one was listening to: {pipe_filepath}. Skip it", file=sys.stdout, flush=True)
             proc.kill()
         else:
             unblocked_readers_count += 1
             if print_log:
-                print(f"Unblocked: {pipe_filepath}, clients: {unblocked_readers_count}")
+                print(f"Unblocked: {pipe_filepath}, clients: {unblocked_readers_count}", file=sys.stdout, flush=True)
 
 def unblock_result_pipe_writer(pipe_filepath, print_log = True):
     if print_log:
-        print(f"Unlock producer pipe: {pipe_filepath}")
+        print(f"Unlock producer pipe: {pipe_filepath}", file=sys.stdout, flush=True)
     if not check_pipe(pipe_filepath):
         return
 
@@ -85,18 +85,18 @@ def unblock_result_pipe_writer(pipe_filepath, print_log = True):
 
         unblocked_attempt_count += 1
         if print_log:
-            print(f"execute unlocking script: {unlocking_script}, attempt: {unblocked_attempt_count}")
+            print(f"execute unlocking script: {unlocking_script}, attempt: {unblocked_attempt_count}", file=sys.stdout, flush=True)
         proc=subprocess.Popen(unlocking_script, shell=True)
         try:
             proc.wait(0.5)
         except Exception:
             if print_log:
-                print(f"No one was writing to: {pipe_filepath}. Skip it")
+                print(f"No one was writing to: {pipe_filepath}. Skip it", file=sys.stdout, flush=True)
             proc.kill()
         else:
             unblocked_writers_count += 1
             if print_log:
-                print(f"Unblocked: {pipe_filepath}, clients: {unblocked_writers_count}")
+                print(f"Unblocked: {pipe_filepath}, clients: {unblocked_writers_count}", file=sys.stdout, flush=True)
 
 def remove_api_fs_pipes_node(api_root_path, communication_type, req, rtype):
     api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(api_root_path, req, rtype)
@@ -140,6 +140,11 @@ def remove_api_fs_pipes_node(api_root_path, communication_type, req, rtype):
                 unblock_result_pipe_writer(p)
                 pass
 
+    # we have to wait all children processess before delete pipes/files
+    # If we don't wait, then we won't unblock clients & servers
+    for c in children:
+        os.waitpid(0, 0)
+
     for p in pipes_to_unblock:
         remove_pipe(p)
     # make sure a regular file doesn't pretend to be a PIPE,
@@ -148,9 +153,6 @@ def remove_api_fs_pipes_node(api_root_path, communication_type, req, rtype):
         if (os.path.exists(p)):
             remove_file(p)
 
-    # avoid zombies
-    for c in children:
-        os.waitpid(0, 0)
     return pipes_to_unblock
 
 

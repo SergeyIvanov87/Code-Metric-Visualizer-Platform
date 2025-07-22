@@ -149,7 +149,7 @@ wait_for_unavailable_services() {
     local pipe_in="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/exec"
     local pipe_out="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/result.json_${SESSION_ID}"
     local pipe_couter=1
-    rm -r ${pipe_out}
+    rm -f ${pipe_out}
     while [ ! -p ${pipe_in} ];
     do
         sleep 0.1

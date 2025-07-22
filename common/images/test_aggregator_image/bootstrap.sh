@@ -19,7 +19,7 @@ fi
 mkdir -p ${LOG_AGGREGATED_RESULT_PATH}
 
 echo "Remove all SSH stored keys to prevent 'man-in-the-middle' complaint, as host identities may change in our virtual network"
-rm /root/.ssh/known_hosts
+rm -f /root/.ssh/known_hosts
 
 echo "Wait until syslog-ng SSH server started"
 wait_for_ssh "root" "${DOWNSTREAM_SYSLOG_HOSTNAME}" "${DOWNSTREAM_SSH_SECRET}"

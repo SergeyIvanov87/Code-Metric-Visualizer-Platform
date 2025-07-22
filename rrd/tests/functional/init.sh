@@ -7,6 +7,7 @@ export RRD_DATA_STORAGE_DIR=${4}/api.pmccabe_collector.restapi.org
 
 export PYTHONPATH="${WORK_DIR}:${WORK_DIR}/utils:${WORK_DIR}/utils/modules"
 UTILS="${WORK_DIR}/utils"
+export OPT_DIR=${WORK_DIR}/utils
 export MODULES="${WORK_DIR}/utils/modules"
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
@@ -80,6 +81,7 @@ done
 ) &
 WATCH_PID=$!
 
+source ${OPT_DIR}/shell_utils/init_utils.sh
 gracefull_shutdown_handler(){
     # remove test files from project directory
     for f in ${test_files[@]}; do
