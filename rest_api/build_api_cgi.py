@@ -116,7 +116,6 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
                              r'        query_params_str="API_KEEP_ALIVE_CHECK=" + ka_tag + " SESSION_ID=" + session_id_value',
                              r'        try:',
                              r'            docker_logger.debug(f"[HTTP] Execute HEAD query: {request.full_path} on pipes:{api_query_pipe},{api_result_pipe}")',
-                             r'            async_query.execute(query_params_str)',
                              r'            status,timeout_ka_probe = async_query.execute(timeout_ka_probe, query_params_str)',
                              r'            if not status:',
                              r'                docker_logger.error(f"[HTTP] Cannot send KA_PROBE while executing a query: {request.full_path} on pipes: {api_query_pipe}, {api_result_pipe}")',
