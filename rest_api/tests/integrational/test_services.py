@@ -36,17 +36,22 @@ def execute_query(name, query):
         h.stop()
         assert service_is_up
 
-        match query["Method"].lower():
-            case "get":
-                resp = requests.get(url, data=params, headers=headers)
-            case "put":
-                resp = requests.put(url, data=params, headers=headers)
-            case "post":
-                resp = requests.post(url, data=params, headers=headers)
-        print(f"{get_timestamp()}\tsent query: {url}, response status: {resp.content if not resp.ok else '<not an error, ignored>'}")
-        service_is_up = service_tester_utils.ping_service("rest_api", 5000)
-        respOk = resp.ok
-        print(f"resp: {respOk}, service_is_up: {service_is_up}")
+        try:
+            match query["Method"].lower():
+                case "get":
+                    resp = requests.get(url, data=params, headers=headers)
+                case "put":
+                    resp = requests.put(url, data=params, headers=headers)
+                case "post":
+                    resp = requests.post(url, data=params, headers=headers)
+            print(f"{get_timestamp()}\tsent query: {url}, response status: {resp.content if not resp.ok else '<not an error, ignored>'}")
+            service_is_up = service_tester_utils.ping_service("rest_api", 5000)
+            respOk = resp.ok
+            print(f"resp: {respOk}, service_is_up: {service_is_up}")
+        except requests.MaxRetryError as ex:
+            service_is_up = False
+            print(f"Service \"{service}:{port}\" become down during the query execution: {url}. Try out again", file=sys.stdout, flush=True)
+
     assert respOk
 
 
