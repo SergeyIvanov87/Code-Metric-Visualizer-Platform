@@ -129,7 +129,7 @@ launch_inner_api_services() {
     # Do not generate readme unles the server completely started
     #${OPT_DIR}/make_api_readme.py ${inner_api_schema_dir} > ${out_readme_file_path_}
     #chmod g+rw ${out_readme_file_path_}
-    ${OPT_DIR}/make_api_readme.py ${inner_api_schema_dir}  | ( umask 0033; cat >> ${out_readme_file_path_} )
+    #${OPT_DIR}/make_api_readme.py ${inner_api_schema_dir}  | ( umask 0033; cat >> ${out_readme_file_path_} )
 
     launch_fs_api_services in_out_inner_service_pids_arr "${work_dir}/services"
 }
