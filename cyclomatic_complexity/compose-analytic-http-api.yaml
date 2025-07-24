@@ -25,6 +25,8 @@ services:
     environment:
       - FLASK_RUN_PORT=${FLASK_RUN_PORT:-5001}
       - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}
+      - WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS=4
+      - WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS=10
     hostname: cc_http_api
     logging:
       driver: syslog

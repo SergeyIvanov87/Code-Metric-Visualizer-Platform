@@ -30,10 +30,41 @@ if [ -z ${HOSTNAME_IP_FILE} ]; then
     HOSTNAME_IP_FILE=/package/hostsname_ip
 fi
 
-let wait_for_server_starting_limit=${5}
+# this service doesn't create API shared dir at all,
+# let's wait for a fixed amount of time before API shared dir has appeared,
+# which means that API service provider has started.
+# Providing API dir hasn't been populated, this service will be finished as unused
+let wait_for_file_API_limit=${5}
+if [ -z ${wait_for_file_API_limit} ]; then
+    wait_for_file_API_limit=4
+fi
+let wait_for_api_exporting_directory_sec=15
+
+
+# The API service provider must starts its services,
+# which will create communication PIPEs in API shared dir.
+# Let's wait these PIPEs creation.
+# If non one PIPE has been created in this limit,
+# it means that the API service provider stuck and incapable to continue
+let wait_for_file_API_initializing_by_its_owners_limit=${6}
+if [ -z ${wait_for_file_API_initializing_by_its_owners_limit} ]; then
+    wait_for_file_API_initializing_by_its_owners_limit=5
+fi
+let wait_for_api_initialization_by_its_owners_sec=1
+
+
+# Providing these previous phases have been finished,
+# let's ensure that HTTP service is able to start
+# using that API restored from API shared dir,
+# which API service provider delivered
+# If HTTP service can't start in that interval,
+# we suppose that the entire HTTP service is inoperable
+let wait_for_server_starting_limit=${7}
 if [ -z ${wait_for_server_starting_limit} ]; then
     wait_for_server_starting_limit=5
 fi
+
+let wait_for_server_starting_sec=1
 
 remove_host_ip_file(){
     trap - EXIT
@@ -60,17 +91,8 @@ generate_host_ip_file(){
 trap "remove_host_ip_file" EXIT
 
 let wait_for_file_API_counter=0
-let wait_for_file_API_limit=4
-let wait_for_api_exporting_directory_sec=15
-
 let wait_for_file_API_initializing_by_its_owners_counter=0
-let wait_for_file_API_initializing_by_its_owners_limit=5
-let wait_for_api_initialization_by_its_owners_sec=1
-
 let wait_for_server_starting_counter=0
-#let wait_for_server_starting_limit=5
-let wait_for_server_starting_sec=1
-
 while :
 do
     rm -f ${MY_REST_API_INSTANCE_PIDFILE}
