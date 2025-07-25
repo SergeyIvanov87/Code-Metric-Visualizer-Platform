@@ -58,11 +58,11 @@ class FS_API_AsyncExecutor(FS_API_Executor):
                 query_params = f"SESSION_ID={session_id}"
             else:
                 query_params += f"SESSION_ID={session_id}"
-        status, timeout = api_query.execute(exec_timeout, query_params)
+        status, timeout = query.execute(exec_timeout, query_params)
         if status == False or timeout <=0:
             raise RuntimeError(f"Cannot execute query: {query_name}, status: {status}, timeout: {timeout}")
 
-        status, result, timeout = api_query.wait_result(result_timeout, session_id_value, 0.1, 30, True)
+        status, result, timeout = query.wait_result(result_timeout, session_id_value, 0.1, 30, True)
         if status == False or timeout <=0:
             raise RuntimeError(f"Couldn't get result for query: {query_name}, status: {status}, result: {result}, timeout: {timeout}")
         return status, result, timeout
