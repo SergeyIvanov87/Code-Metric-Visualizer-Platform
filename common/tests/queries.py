@@ -62,7 +62,7 @@ class FS_API_AsyncExecutor(FS_API_Executor):
         if status == False or timeout <=0:
             raise RuntimeError(f"Cannot execute query: {query_name}, status: {status}, timeout: {timeout}")
 
-        status, result, timeout = query.wait_result(result_timeout, session_id_value, 0.1, 30, True)
+        status, result, timeout = query.wait_result(result_timeout, session_id, 0.1, 30, True)
         if status == False or timeout <=0:
             raise RuntimeError(f"Couldn't get result for query: {query_name}, status: {status}, result: {result}, timeout: {timeout}")
         return status, result, timeout
