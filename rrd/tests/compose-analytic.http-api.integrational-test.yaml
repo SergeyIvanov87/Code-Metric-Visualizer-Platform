@@ -1,0 +1,20 @@
+
+services:
+  rrd_integrational_tester:
+    extends:
+      file: integrational/compose-analysis.integrational-test.yaml
+      service: rrd_integrational_tester
+    volumes:
+      - api.pmccabe_collector.restapi.rrd.private.org:/api
+      - api.pmccabe_collector.project.rrd.private:/mnt
+      - api.pmccabe_collector.rrd_analytic.private:/rrd_data
+    depends_on:
+      test_aggregator:
+        condition: service_healthy
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network

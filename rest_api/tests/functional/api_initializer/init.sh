@@ -13,9 +13,10 @@ ${UTILS}/build_api_executors.py ${WORK_DIR}/data ${WORK_DIR} -o ${WORK_DIR}
 ${UTILS}/build_api_services.py ${WORK_DIR}/data ${WORK_DIR} -o ${WORK_DIR}/services
 
 rm -rf ${SHARED_API_DIR}/*
-mkdir -p ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
+mkdir -p -m 777 ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
 ${UTILS}/build_api_pseudo_fs.py ${WORK_DIR}/data ${SHARED_API_DIR}
 ${UTILS}/make_api_readme.py ${WORK_DIR}/data > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/README-API-MOCK.md
+chmod g+rw ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/README-API-MOCK.md
 
 echo "run Mock API servers:"
 for s in ${WORK_DIR}/services/*_server.sh; do

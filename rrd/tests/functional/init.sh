@@ -7,6 +7,7 @@ export RRD_DATA_STORAGE_DIR=${4}/api.pmccabe_collector.restapi.org
 
 export PYTHONPATH="${WORK_DIR}:${WORK_DIR}/utils:${WORK_DIR}/utils/modules"
 UTILS="${WORK_DIR}/utils"
+export OPT_DIR=${WORK_DIR}/utils
 export MODULES="${WORK_DIR}/utils/modules"
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
@@ -14,7 +15,7 @@ export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 echo -e "export WORK_DIR=${WORK_DIR}\nexport UTILS=${UTILS}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport RRD_DATA_STORAGE_DIR=${RRD_DATA_STORAGE_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
 rm -rf ${RRD_DATA_STORAGE_DIR}
-mkdir -p ${RRD_DATA_STORAGE_DIR}
+mkdir -p -m 777 ${RRD_DATA_STORAGE_DIR}
 
 # inject test files into project directory
 test_files=(/package/test_data/*.cpp)
@@ -22,7 +23,8 @@ for f in ${test_files[@]}; do
     cp ${f} ${INITIAL_PROJECT_LOCATION}/
 done
 
-${UTILS}/canonize_internal_api.py /API/deps ${MAIN_SERVICE_NAME}/rrd
+MICROSERVICE_NAME_TO_TEST=rrd_analytic
+${UTILS}/canonize_internal_api.py /API/deps ${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME_TO_TEST}
 
 echo "Create CC API which RRD depends on"
 ${UTILS}/build_api_pseudo_fs.py /API/deps/cyclomatic_complexity ${SHARED_API_DIR}
@@ -47,7 +49,7 @@ real_statistic_pipe_in=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/e
 if [ -e ${real_statistic_pipe_in} ]; then
     rm -f ${real_statistic_pipe_in}
 fi
-mkfifo -m 644 ${real_statistic_pipe_in}
+mkfifo -m 622 ${real_statistic_pipe_in}
 #echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
 echo "Ready to server Mock CC API"
 (
@@ -79,7 +81,32 @@ do
 done
 ) &
 WATCH_PID=$!
-#cat ${real_statistic_pipe_out}
+
+source ${OPT_DIR}/shell_utils/init_utils.sh
+gracefull_shutdown_handler(){
+    # remove test files from project directory
+    for f in ${test_files[@]}; do
+        fname=`basename ${f}`
+        rm -f ${INITIAL_PROJECT_LOCATION}/${fname}
+    done
+
+    kill -15 ${WATCH_PID}
+    wait ${WATCH_PID}
+    rm -f ${real_statistic_pipe_in}
+    rm -f ${real_statistic_pipe_out}
+    rm -f ${real_main_statistic_pipe_out}
+    echo "Final API fs snapshot, result ${RET}:"
+    ls -laR ${SHARED_API_DIR}
+}
+
+# If we continue with tests, rrd_analytic must have been started
+echo -e "Wait for rrd starting"
+wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME_TO_TEST}" ANY_SERVICE_UNAVAILABLE_COUNT
+if [ ! -z ${ANY_SERVICE_UNAVAILABLE_COUNT} ]; then
+    echo -e "${BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort${Color_Off}"
+    gracefull_shutdown_handler
+    exit 255
+fi
 
 echo "Run tests:"
 RET=0
@@ -97,19 +124,7 @@ for s in ${WORK_DIR}/test_*.py; do
     #ls -laR ${SHARED_API_DIR}
 done
 
-# remove test files from project directory
-for f in ${test_files[@]}; do
-    fname=`basename ${f}`
-    rm -f ${INITIAL_PROJECT_LOCATION}/${fname}
-done
-
-kill -15 ${WATCH_PID}
-wait ${WATCH_PID}
-rm -f ${real_statistic_pipe_in}
-rm -f ${real_statistic_pipe_out}
-rm -f ${real_main_statistic_pipe_out}
-echo "Final API fs snapshot, result ${RET}:"
-ls -laR ${SHARED_API_DIR}
+gracefull_shutdown_handler
 
 if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
 

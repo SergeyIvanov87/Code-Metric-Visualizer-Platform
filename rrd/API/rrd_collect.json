@@ -1,6 +1,7 @@
 {
+    "Content-Type" : "application/json",
     "Method" : "POST",
-    "Query": "api.pmccabe_collector.restapi.org/cc/analytic/rrd/collect",
+    "Query": "api.pmccabe_collector.restapi.org/cc_analytic/rrd/collect",
     "Params": {
         "rrd": {
             "--start": "1701154260",
@@ -22,7 +23,7 @@
     },
     "Description": {
         "header": "Extracts the cyclomatic complexity metrics: `mmcc`, `tmcc`, `sif`, `lif` - and commits a transaction in order to create/update RRD silos by the extracted metric span representing the current project state.\n\nIt uses the RRD data silos configuration as described by appropriated parameters of the `rrd` API query.\n",
-        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/cc/analytic/rrd/collect/POST/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/cc/analytic/rrd/collect/POST/result`\n\n",
+        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/cc_analytic/rrd/collect/POST/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/cc_analytic/rrd/collect/POST/result`\n\n",
         "footer": "Although the query doesn't return anything useful for API consumer, it'd better wait on the output pipe until the query has been finished"
     }
 }

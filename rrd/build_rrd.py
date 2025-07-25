@@ -5,6 +5,7 @@ The purpose of this module is to generate hierarchical RRD databases
 """
 
 import argparse
+import json
 import os
 import subprocess
 import stat
@@ -26,6 +27,7 @@ xml_node_types = ["package", "file", "item"]
 class rrd:
     def __init__(self, p_tree):
         self.packaged_tree = p_tree
+        self.components_gathered = {t:0 for t in xml_node_types}
 
     def fill_data(self, rrd_db_file, single_timestamp, single_counters_list):
         record_str = single_timestamp + ":" + ":".join(single_counters_list)
@@ -92,6 +94,8 @@ class rrd:
     def __build__(self, xml_package, args, path, timestamp, method):
         item_name, item_type_id=rrd.__extract_xml_node_name_type_id(xml_package)
 
+        self.components_gathered[xml_node_types[item_type_id]] += 1
+
         statistic_node_name = os.path.join(path, item_name)
         statistic_node_db_name = f"{statistic_node_name}.rrd";
         need_to_fill = False
@@ -131,7 +135,7 @@ class rrd:
         # go deep
         xml_child = xml_package.findall("entry")
         if len(xml_child) > 0:
-            os.makedirs(statistic_node_name, exist_ok=True)
+            os.makedirs(statistic_node_name, mode=0o777, exist_ok=True)
         for c in xml_child:
             self.__build__(c, args, os.path.join(path, item_name), timestamp, method)
 
@@ -143,7 +147,15 @@ class rrd:
             raise Exception(
                 f"Only 1 main package `entry` element is expected in pmccabe xml"
             )
-        self.__build__(main_package[0], rrd_db_create_args, path, timestamp, method)
+        # to create intermediate directories with a given permission
+        # as os.makedirs() uses its mode argument only for a final directory
+        cur_umask = os.umask(0) # umask is not the same as mode, 0 - means 777
+        try:
+            self.__build__(main_package[0], rrd_db_create_args, path, timestamp, method)
+        except Exception as ex:
+            raise
+        finally:
+            os.umask(cur_umask)
 
     def retrieve_last_ts(self, path):
         xml = self.packaged_tree
@@ -203,6 +215,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 pmccabe_tree_xml = sys.stdin.read()
+return_data = { "error": -1, "statistic": {} }
 try:
     xml_root = ElementTree.fromstring(pmccabe_tree_xml)
 
@@ -210,5 +223,9 @@ try:
     timestamp=processor.retrieve_last_ts(args.path)
     timestamp = str(int(timestamp) + 1)
     processor.build(args.args.split(), args.path, timestamp, args.method)
+    return_data["error"] = 0
+    return_data["statistic"] = processor.components_gathered
 except Exception as e:
     print(f"Build RRD failed with exception: {e}.\nPMCCabe XML:\n{pmccabe_tree_xml}")
+
+print(json.dumps(return_data))

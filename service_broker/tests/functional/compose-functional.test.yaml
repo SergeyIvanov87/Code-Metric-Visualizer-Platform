@@ -1,11 +1,13 @@
 include:
-  - common/images/test_pseudo_fs/compose.yaml
+  - ../../../common/images/test_pseudo_fs/compose.yaml
 
 services:
   service_broker_functional_tester:
     build:
       context: ../../../
       dockerfile: service_broker/tests/functional/Dockerfile
+    environment:
+      - EXIT_ONCE_DONE=true
     volumes:
       - api.pmccabe_collector.restapi.org.service_broker.test:/api
     depends_on:

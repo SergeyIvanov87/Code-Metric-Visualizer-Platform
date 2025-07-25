@@ -1,5 +1,14 @@
 FROM test_pseudo_fs:latest
 
+ARG UID=9202
+ENV UID=$UID
+ARG GID=23456
+ENV GID=$GID
+
+ARG USER=rest_api_functional_service_tester
+ENV USER=$USER
+ENV GROUPNAME=pmccabe
+
 # install app dependencies
 RUN apk add --no-cache py3-requests curl
 
@@ -19,4 +28,20 @@ RUN dos2unix /tests/utils/modules/*
 
 VOLUME ["/api"]
 
+RUN addgroup \
+    --gid "$GID" \
+    "$GROUPNAME" \
+&&  adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "$(pwd)" \
+    -u $UID \
+    --ingroup "$GROUPNAME" \
+    --no-create-home \
+    $USER
+
+RUN mkdir -p -m 777 /api && chown -R ${USER}:${GROUPNAME} /api
+RUN chown -R ${USER}:${GROUPNAME} /API && chown -R ${USER}:${GROUPNAME} /tests
+
+USER ${USER}
 ENTRYPOINT ["/tests/init.sh", "/tests", "/api"]

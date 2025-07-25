@@ -1,11 +1,13 @@
 include:
-  - common/images/test_pseudo_fs/compose.yaml
+  - ../../../common/images/test_pseudo_fs/compose.yaml
 
 services:
   cc_functional_tester:
     build:
       context: ../../../
       dockerfile: cyclomatic_complexity/tests/functional/Dockerfile
+    environment:
+      - EXIT_ONCE_DONE=true
     volumes:
       - api.pmccabe_collector.restapi.org.cc.test:/api
       - api.pmccabe_collector.project.cc.test:/mnt

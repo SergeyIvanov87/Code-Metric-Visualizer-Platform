@@ -9,6 +9,7 @@ services:
     #container_name: rrd_analytic_functional
     environment:
         - SKIP_API_DEPS_CHECK=${SKIP_API_DEPS_CHECK:-false}
+        - MICROSERVICE_NAME=rrd_analytic
     hostname: rrd_analytic_functional
     volumes:
       - api.pmccabe_collector.project.rrd.test:/mnt

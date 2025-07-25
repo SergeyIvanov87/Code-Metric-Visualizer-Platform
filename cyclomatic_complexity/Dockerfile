@@ -11,6 +11,28 @@ RUN git clone https://github.com/SergeyIvanov87/pmccabe_visualizer.git && git cl
 
 
 FROM alpine:latest
+
+ARG UID=1001
+ENV UID=$UID
+ARG GID=23456
+ENV GID=$GID
+
+ARG USER=cc
+ENV USER=$USER
+ENV GROUPNAME=pmccabe
+
+RUN addgroup \
+    --gid "$GID" \
+    "$GROUPNAME" \
+&&  adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "$(pwd)" \
+    -u $UID \
+    --ingroup "$GROUPNAME" \
+    --no-create-home \
+    $USER
+
 WORKDIR package
 ARG SCRIPT_GEN_LOC=services
 
@@ -48,4 +70,10 @@ COPY cyclomatic_complexity/$SCRIPT_GEN_LOC/*.sh /package/
 RUN dos2unix /package/*
 
 VOLUME ["/api", "/mnt"]
+
+RUN mkdir -p -m 777 /mnt && mkdir -p -m 777 /api
+RUN chown -R ${USER}:${GROUPNAME} /mnt && chown -R ${USER}:${GROUPNAME} /api
+RUN chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt
+
+USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/opt", "/api"]

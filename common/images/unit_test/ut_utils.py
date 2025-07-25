@@ -74,13 +74,14 @@ class APIExecutor(AsyncExecutor):
             # by other activity
             result = ""
             try:
-                print(f"APIExecutor[{obj.index}] waiting", file=sys.stdout, flush=True)
+                print(f"APIExecutor[{obj.index}] waiting a result pipe creation", file=sys.stdout, flush=True)
                 query.__wait_result_pipe_creation__(session_id_value, 0.1, 100, True)
                 if obj.onPostExecute :
                     obj.onPostExecute(obj, exec_params, additional_params)
+                print(f"APIExecutor[{obj.index}] getting data from a result pipe", file=sys.stdout, flush=True)
                 result = query.wait_result(session_id_value, 0.1, 100, True)
                 obj.error_message=""
-            except RuntimeError as timeout:
+            except (RuntimeError,FileNotFoundError) as timeout:
                 if obj.onPostWaitResultFailed :
                     obj.onPostWaitResultFailed(obj, exec_params, additional_params, result)
 

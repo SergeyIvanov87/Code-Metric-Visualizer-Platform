@@ -4,6 +4,7 @@
 import argparse
 import os
 import signal
+import shutil
 import stat
 import sys
 
@@ -62,7 +63,12 @@ def unblock_pipes_signal_handler(sig, frame):
         req_api = query["Query"]
         deleted_pipes.extend(remove_api_fs_pipes_node(args. mount_point, "client", req_api, req_type))
 
-    print(f"{deleted_pipes}")
+
+    exec_node_directories = { os.path.dirname(p) for p in deleted_pipes }
+    for d in exec_node_directories:
+        shutil.rmtree(d, ignore_errors=True)
+
+    print(f"{deleted_pipes.extend(exec_node_directories)}")
     sys.exit(0)
 
 signal.signal(signal.SIGINT, unblock_pipes_signal_handler)

@@ -6,6 +6,12 @@ export PYTHONPATH="${2}:${2}/modules"
 export SHARED_API_DIR=${3}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+# start & activate syslogd
+doas -u root rc-status
+doas -u root touch /run/openrc/softlevel
+doas -u root rc-service syslog start
+doas -u root rc-service syslog status
+
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
@@ -44,7 +50,7 @@ echo "flask --app rest_api_server run --host 0.0.0.0"
 # It must be started before any inotify event has been listened,
 # so when earlier event was arrived, we would process that
 export REST_API_INSTANCE_PIDFILE=${MY_FLASK_INSTANCE_PIDFILE}
-/package/watchdog_server.sh ${REST_API_INSTANCE_PIDFILE} ${FLASK_RUN_HOST} ${FLASK_RUN_PORT} ${HOSTNAME_IP_FILE} ${WAIT_FOR_SERVER_STARTING_LIMIT_SEC} &
+/package/watchdog_server.sh ${REST_API_INSTANCE_PIDFILE} ${FLASK_RUN_HOST} ${FLASK_RUN_PORT} ${HOSTNAME_IP_FILE} ${WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS} ${WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS} ${WAIT_FOR_SERVER_STARTING_LIMIT_SEC} &
 WATCHDOG_PID=$!
 
 shopt -s extglob
@@ -54,6 +60,7 @@ API_UPDATE_EVENT_TIMEOUT_LIMIT=3
 API_UPDATE_EVENT_TIMEOUT_COUNTER=0
 # Loop until any unrecoverable error would occur
 HAS_GOT_API_UPDATE_EVENT=0
+LAST_TIME_README_FILES_DETECTED_COUNT=0
 while [ $RETURN_STATUS -eq 0 ]; do
         # Handle the chain-reaction of API *md files creation.
         # It occurs when multiple services are starting simultaneously and populating their API and that will trigger
@@ -75,7 +82,6 @@ while [ $RETURN_STATUS -eq 0 ]; do
                 case "$action" in
                     CREATE|DELETE|MODIFY|MOVE_TO|MOVE_FROM )
                         let HAS_GOT_API_UPDATE_EVENT=$HAS_GOT_API_UPDATE_EVENT+1
-
                         # reset timeout counter upon event emerging
                         let API_UPDATE_EVENT_TIMEOUT_COUNTER=0
                         echo -e "${BBlue}Event has been detected:${Color_Off} ${file}, action; ${action}, dir: ${dir}. ${BBlue}Reconfigure REST_API Service....${Color_Off}"
@@ -85,6 +91,18 @@ while [ $RETURN_STATUS -eq 0 ]; do
                         ;;
                 esac
             done <<< "$(inotifywait -rq ${SHARED_API_DIR} -e modify,create,delete -t ${API_UPDATE_EVENT_TIMEOUT_SEC} --include '.md$' )"
+
+            # as do not observe inotify constantly, it's possible that new README file would appear unattended.
+            # In this case this safeguard introduced: we keep counting an amount of README files so that we are still able to detect API changing
+            if [ ${HAS_GOT_API_UPDATE_EVENT} == 0 ];
+            then
+                md_files_new_count=`ls -laR ${SHARED_API_DIR} | grep md | wc -l`
+                if [ ${LAST_TIME_README_FILES_DETECTED_COUNT} != ${md_files_new_count} ];
+                then
+                    echo -e "${BBlue} README files mount has been changed, was: ${LAST_TIME_README_FILES_DETECTED_COUNT}, become: ${md_files_new_count}. Generate event manually${Color_Off}"
+                    let HAS_GOT_API_UPDATE_EVENT=$HAS_GOT_API_UPDATE_EVENT+1
+                fi
+            fi
             let API_UPDATE_EVENT_TIMEOUT_COUNTER=$API_UPDATE_EVENT_TIMEOUT_COUNTER+1
         done
         # In general, it must restart a running server instance by sending SIGTERM to its PID.
@@ -116,15 +134,18 @@ while [ $RETURN_STATUS -eq 0 ]; do
         # Restart the running service instance only if API has been changed
         if [ ${HAS_GOT_API_UPDATE_EVENT} -gt 0 ]; then
             echo -e "Got ${HAS_GOT_API_UPDATE_EVENT} API events. ${BBlue}Restart REST_API service will be scheduled...${Color_Off}"
+            # remember last count of README files
+            LAST_TIME_README_FILES_DETECTED_COUNT=`ls -laR ${SHARED_API_DIR} | grep md | wc -l`
             # kill an old instance
             remove_populated_host_ip_file
             REST_API_INSTANCE_PIDFILE_PID=`cat ${REST_API_INSTANCE_PIDFILE}`
-            kill -s SIGTERM ${REST_API_INSTANCE_PIDFILE_PID}
+            kill -s SIGINT ${REST_API_INSTANCE_PIDFILE_PID}
             while [ -f ${REST_API_INSTANCE_PIDFILE} ]; do
                 sleep 0.1
+                kill -s SIGINT ${REST_API_INSTANCE_PIDFILE_PID}
                 echo "Waiting for a server to stop, pid ${REST_API_INSTANCE_PIDFILE_PID}..."
             done
-            echo "The server stopped"
+            echo "The server stopped, last detected README files count: ${LAST_TIME_README_FILES_DETECTED_COUNT}"
 
             # reset event counter
             HAS_GOT_API_UPDATE_EVENT=0

@@ -76,7 +76,10 @@ def check_unmet_dependencies_api(query, pipes):
             pipes_to_move_search_glob = ("result." + result_pipe_ext + "*") if result_pipe_ext != "" else "result*"
             for file in glob.glob(os.path.join(api_exec_node_directory,pipes_to_move_search_glob)):
                 print(f"{get_timestamp()}\tmove pipe {file} temporary to a new place {temporary_replaced_result_pipe_file_path}")
-                shutil.move(file, temporary_replaced_result_pipe_file_path)
+                try:
+                    shutil.move(file, temporary_replaced_result_pipe_file_path)
+                except Exception as ex:
+                    print(f"{get_timestamp()}\tmove pipe {file} temporary to a new place {temporary_replaced_result_pipe_file_path}, exception: {str(ex)}")
 
             # removed API service must be unmet
 

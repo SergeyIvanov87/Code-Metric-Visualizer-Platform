@@ -16,7 +16,7 @@ services:
     container_name: ${DOWNSTREAM_SYSLOG_HOSTNAME}
     hostname: ${DOWNSTREAM_SYSLOG_HOSTNAME}
     volumes:
-      - /srv/syslog/logs:/var/log
+      - api.pmccabe_collector.logger.org:/var/log
     ports:
       - ${HOST_UPSTREAM_SYSLOG_UDP_PORT}:${DOWNSTREAM_SYSLOG_UDP_PORT}/udp
       - ${HOST_UPSTREAM_SYSLOG_TCP_PORT}:${DOWNSTREAM_SYSLOG_TCP_PORT}/tcp
@@ -25,3 +25,13 @@ services:
       - api.pmccabe_collector.network
     logging:
       driver: "json-file"
+
+volumes:
+  api.pmccabe_collector.logger.org:
+    name: api.pmccabe_collector.logger.org
+    external: true
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true

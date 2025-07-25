@@ -1,14 +1,12 @@
+
 services:
   cc_integrational_tester:
-    build:
-      context: ../../../
-      dockerfile: cyclomatic_complexity/tests/integrational/Dockerfile
-    environment:
-      - EXIT_ONCE_DONE=false
-      - MICROSERVICE_NAME=cc_integrational_tester
+    extends:
+      file: integrational/compose-analysis.integrational-test.yaml
+      service: cc_integrational_tester
     volumes:
-      - api.pmccabe_collector.restapi.org:/api
-      - api.pmccabe_collector.project:/mnt
+      - api.pmccabe_collector.restapi.cc.private.org:/api
+      - api.pmccabe_collector.project.cc.private:/mnt
     depends_on:
       test_aggregator:
         condition: service_healthy

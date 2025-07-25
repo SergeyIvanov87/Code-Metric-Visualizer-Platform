@@ -1,0 +1,51 @@
+services:
+  vcs_project:
+    build:
+      context: ../
+      dockerfile: ./observable_project_version_control/Dockerfile
+    depends_on:
+      - syslog-ng
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+    environment:
+      - PROJECT_URL=${PROJECT_URL}
+      - PROJECT_BRANCH=${PROJECT_BRANCH}
+      - MICROSERVICE_NAME=vcs_project
+    volumes:
+      - api.pmccabe_collector.vcs_project:/mnt
+      - api.pmccabe_collector.api.vcs_project.http.private.org:/api
+
+  vcs_project_http_api:
+    build:
+      context: ../
+      dockerfile: ./rest_api/Dockerfile
+    depends_on:
+      - syslog-ng
+    environment:
+      - FLASK_RUN_PORT=${FLASK_RUN_PORT:-5003}
+      - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}
+      - WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS=4
+      - WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS=10
+    hostname: vcs_project_http_api
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.api.vcs_project.http.private.org:/api
+    ports:
+      - 5003:5003
+
+volumes:
+  api.pmccabe_collector.vcs_project:
+  api.pmccabe_collector.api.vcs_project.http.private.org:
+    name: api.pmccabe_collector.api.vcs_project.http.private.org
+    external: false

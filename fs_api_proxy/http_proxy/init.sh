@@ -6,6 +6,12 @@ export PYTHONPATH="${2}:${2}/modules"
 export SHARED_API_DIR=${3}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+# start & activate syslogd
+doas -u root rc-status
+doas -u root touch /run/openrc/softlevel
+doas -u root rc-service syslog start
+doas -u root rc-service syslog status
+
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
@@ -52,9 +58,9 @@ shutdown_processors_if_downstream_is_dead(){
         echo -e "check availability of ${url}:"
 
         if curl --output /dev/null --silent --head --fail "$url"; then
-            echo -e "${url} is alive"
+            echo -e "${url} ${BBlue}is alive${Color_Off}"
         else
-            echo -e "${url} is unavailable. Stop proxy for the ${service_query}"
+            echo -e "${url} ${BRed}is unavailable${Color_Off}. Stop proxy for the ${service_query}"
             SERV_TO_STOP[${service_query}]=${SERVICE_QUERY_WATCH_PIDS[${service_query}]}
 
             unset SERVICE_QUERY_WATCH_PIDS[${service_query}]
@@ -112,7 +118,7 @@ rm -rf to_proxy
 rm -rf to_proxy_new
 if [ ! -d "to_proxy" ]; then
     # make empty directory to fill it in by newly detected services
-    mkdir to_proxy
+    mkdir -m 777 to_proxy
 fi
 while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT} ]; do
     # wait until downstream service become alive..
@@ -141,6 +147,20 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
 
     # upstream service may get inoperable abruptly, to prevent stucking on a dead-pipe, let's not block ourselves on it,
     # so that a watchdog introduced
+
+    #TODO TRY function
+    #send_ka_watchdog_query ${pipe_in} ${SESSION_ID} ".*" ${deps_query_timeout_sec}
+    #    if [ $? == 0 ]; then
+    #        let wait_dependencies_counter=$wait_dependencies_counter+1
+    #        echo -e "Wait for another attempt: ${BCyan}${wait_dependencies_counter}/${wait_dependencies_counter_limit}${Color_Off}"
+    #        if [ ${wait_dependencies_counter} == ${wait_dependencies_counter_limit} ]; then
+    #            eval ${3}=$ANY_SERVICE_UNAVAILABLE
+    #            break
+    #        fi
+    #        continue
+    #    fi
+
+
     DEPS_QUERY_WAIT_TIMEOUT=5
     (echo "SESSION_ID=${SESSION_ID} --service=${DOWNSTREAM_SERVICE} --timeout=${DEPS_QUERY_WAIT_TIMEOUT}"> ${pipe_in}) &
     PID_TO_UNBLOCK=$!
@@ -149,9 +169,9 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     PID_TO_UNBLOCK_RESULT=$?
     if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
         # query has stucked: probably due to upstream service outage. Unblock query
-        timeout 2 cat ${pipe_in} > /dev/null 2>&1
+        timeout 2 /bin/bash -c "cat ${pipe_in} > /dev/null 2>&1"
         if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET:	${pipe_in}"; fi
-        echo -e "${BReg}Heartbeat query: ${pipe_in} has stuck on${Color_Off} probably due to ${BRed}${UPSTREAM_SERVICE}${Color_Off} outage, trying again in attempt: ${BRed}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
+        echo -e "${BRed}Heartbeat query: ${pipe_in} has stuck on${Color_Off} probably due to ${BRed}${UPSTREAM_SERVICE}${Color_Off} outage, trying again in attempt: ${BRed}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1
         continue
     fi
@@ -179,7 +199,7 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     PID_TO_UNBLOCK_RESULT=$?
     if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
         # query has stucked: probably due to upstream service outage. Unblock query
-        timeout 2 echo > ${pipe_out} > /dev/null 2>&1
+        timeout 2 /bin/bash -c "echo > ${pipe_out} > /dev/null 2>&1"
         if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET:	${pipe_out}"; fi
         echo -e "${BRed}Heartbeat query: ${pipe_out} has stuck on${Color_Off} probably due to ${BRed}${UPSTREAM_SERVICE}${Color_Off} outage, trying again in attempt: ${BRed}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1

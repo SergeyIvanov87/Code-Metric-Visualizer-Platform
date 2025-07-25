@@ -36,15 +36,25 @@ from api_fs_args import write_args
 
 def create_api_fs_node(api_root_path, req, rtype, rparams):
     api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(api_root_path, req, rtype)
-    os.makedirs(api_exec_node_directory, exist_ok=True)
-    filesystem_utils.append_file_list_mode(
-                [api_req_directory, api_exec_node_directory],
+    os.makedirs(api_exec_node_directory, mode=0o755, exist_ok=True)
+    filesystem_utils.append_file_mode(
+                api_req_directory,
                 stat.S_IWUSR
                 | stat.S_IRUSR
                 | stat.S_IWGRP
                 | stat.S_IRGRP
                 | stat.S_IWOTH
                 | stat.S_IROTH
+    )
+
+    os.chmod(api_exec_node_directory,
+                stat.S_IRUSR
+                | stat.S_IXUSR
+                | stat.S_IWUSR
+                | stat.S_IRGRP
+                | stat.S_IXGRP
+                | stat.S_IROTH
+                | stat.S_IXOTH
     )
 
     api_gui_exec_filename = os.path.join(api_exec_node_directory, api_gui_exec_filename_from_req_type(rtype))
@@ -95,4 +105,12 @@ if __name__ == "__main__":
     parser.add_argument("mount_point", help="destination to build file-system nodes")
     args = parser.parse_args()
 
-    build_api_pseudo_fs(args.api_root_dir, args.mount_point)
+    # to create intermediate directories with a given permission
+    # as os.makedirs() uses its mode argument only for a final directory
+    cur_umask = os.umask(0) # umask is not the same as mode, 0 - means 777
+    try:
+        build_api_pseudo_fs(args.api_root_dir, args.mount_point)
+    except Exception as ex:
+        raise
+    finally:
+        os.umask(cur_umask)

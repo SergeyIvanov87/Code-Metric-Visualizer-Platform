@@ -40,7 +40,7 @@ do
     fi
 done
 
-echo "waiting until all API events handled by REST_API service"
+echo "waiting until all API events are handled by REST_API service"
 sleep 10
 
 echo "check if service is up once again"
@@ -76,7 +76,7 @@ for s in ${WORK_DIR}/test_*.py; do
     fi
 done
 
-echo "wait for termination"
+echo "wait for termination with code: ${RET}"
 sleep infinity &
 wait $!
 exit $RET

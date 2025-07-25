@@ -61,8 +61,9 @@ def check_rrd_collect_api(query, pipes, project_cpp_files):
     api_query.execute()
     print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     out = api_query.wait_result("", 0.1, 30, True)
-    assert len(out) == 0
     h.stop()
+    assert len(out) != 0
+
 
     for f in rrd_files:
         assert os.path.isfile(f)
@@ -78,7 +79,7 @@ def check_rrd_select_api(query, pipes, project_cpp_files):
     h.run(f"{get_timestamp()}\tTest 'check_rrd_select_api' is in progress...")
     out = executor.execute("rrd_collect", "TRACER_ID=check_rrd_select_api_rrd_collect_helper")
     h.stop()
-    assert len(out) == 0, "check_rrd_select_api_rrd_collect_helper has been failed"
+    assert len(out), "check_rrd_select_api_rrd_collect_helper has been failed"
 
     # seach appropriated RRD files using `rrd_select` api
     print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
@@ -99,7 +100,7 @@ def check_rrd_view_api(query, pipes):
     h.run(f"{get_timestamp()}\tTest 'check_rrd_view_api' is in progress...")
     out = executor.execute("rrd_collect", "TRACER_ID=check_rrd_view_api_rrd_collect_helper")
     h.stop()
-    assert len(out) == 0, "check_rrd_view_api_rrd_collect_helper has been failed"
+    assert len(out), "check_rrd_view_api_rrd_collect_helper has been failed"
 
     print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
@@ -125,7 +126,7 @@ def check_rrd_plot_view_api(query, pipes):
     h.run(f"{get_timestamp()}\tTest 'check_rrd_plot_view_api' is in progress...")
     out = executor.execute("rrd_collect", "TRACER_ID=check_rrd_plot_view_api_rrd_collect_helper")
     h.stop()
-    assert len(out) == 0, "check_rrd_view_api_rrd_collect_helper has been failed"
+    assert len(out), "check_rrd_view_api_rrd_collect_helper has been failed"
 
     print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)

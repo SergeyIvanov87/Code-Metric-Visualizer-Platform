@@ -8,7 +8,9 @@ Provides a functions set which manages to generate API executor scripts
 """
 
 def generate_request_exec_script(req_name, script, desired_file_ext):
-    file_extension = "." + desired_file_ext
+    file_extension=""
+    if len(desired_file_ext) != 0:
+        file_extension = "." + desired_file_ext
 
     body = (
         *api_fs_exec_utils.generate_exec_header(), r"",
