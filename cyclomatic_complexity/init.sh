@@ -73,7 +73,7 @@ ${OPT_DIR}/build_api_pseudo_fs.py ${INNER_API_SCHEMA_DIR} ${SHARED_API_DIR}
 
 launch_fs_api_services SERVICE_WATCH_PIDS "${WORK_DIR}/services/"
 
-echo "${BBlue}Populating README file...${Color_Off}"
+echo -e "${BBlue}Populating README file...${Color_Off}"
 ${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR}  | ( umask 0033; cat >> ${README_FILE_PATH} )
 
 echo -e "${BGreen}The service is ready${Color_Off}"

@@ -48,9 +48,9 @@ def execute_query(name, query):
             service_is_up = service_tester_utils.ping_service("rest_api", 5000)
             respOk = resp.ok
             print(f"resp: {respOk}, service_is_up: {service_is_up}")
-        except requests.MaxRetryError as ex:
+        except requests.ConnectTimeout as ex:
             service_is_up = False
-            print(f"Service \"{service}:{port}\" become down during the query execution: {url}. Try out again", file=sys.stdout, flush=True)
+            print(f"Service \"{service}:{port}\" got down during the query execution: {url}. Try out again", file=sys.stdout, flush=True)
 
     assert respOk
 

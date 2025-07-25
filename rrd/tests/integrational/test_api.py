@@ -6,21 +6,23 @@ import shutil
 import socket
 
 import rrd_utils
+import functools
 
 from settings import Settings
 from time_utils import get_timestamp
 from heartbeat import Heartbeat
-from queries import FS_API_Executor
+from queries import FS_API_AsyncExecutor
 from utils import get_api_queries
 from utils import get_files
 from api_schema_utils import compose_api_queries_pipe_names
 from utils import wait_until_pipe_exist
 
 from api_fs_query import APIQuery
+from api_fs_query import APIQueryInterruptible
 
 
 global_settings = Settings()
-executor = FS_API_Executor("/API", global_settings.api_dir, global_settings.domain_name_api_entry)
+executor = FS_API_AsyncExecutor("/API", global_settings.api_dir, global_settings.domain_name_api_entry)
 testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).items())
 
 def check_analytic_api(query, pipes, exec_params, session_id_value):
@@ -55,21 +57,30 @@ def check_rrd_collect_api(query, pipes, exec_params, session_id_value):
     h = Heartbeat()
     h.run(f"Test 'check_rrd_collect_api' is in progress...")
     print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
-    api_query = APIQuery(pipes)
-    api_query.execute(exec_params)
-    print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
-    out = api_query.wait_result(session_id_value, 0.1, 30, True)
+    api_query = APIQueryInterruptible(pipes)
+    assert api_query.wait_until_valid(0.1, 30, True), f"Pipes for test {name} must have been created"
+    status, timeout = api_query.execute(30, exec_params)
     h.stop()
-    assert len(out) == 0
+    assert status, f"'check_rrd_collect_api' must not be interrupted"
 
+    h.run(f"Test 'check_rrd_collect_api' waiting for a result: {query['Query']}...")
+    status, result, timeout = api_query.wait_result(30, session_id_value, 0.1, 30, True)
+    h.stop()
+
+    assert status, f"wait_result() for 'check_rrd_collect_api' for session {session_id_value} must not be interrupted"
+    assert len(result) != 0
 
 def check_rrd_select_api(query, pipes, exec_params, session_id_value):
     # prepare RRD files
     global executor
     h = Heartbeat()
-    h.run(f"Test 'check_rrd_select_api' is in progress...")
-    executor.execute("rrd_collect", exec_params, session_id_value)
-    h.stop()
+    try:
+        h.run(f"Test 'check_rrd_select_api' is in progress...")
+        executor.execute("rrd_collect", exec_params, session_id_value, 30, 30)
+        h.stop()
+    except Exception as ex:
+        h.stop()
+        pytest.fail(f"During `check_rrd_select_api` the auxiliary query `rrd_collect` threw the exception: {ex}")
 
     # seach appropriated RRD files using `rrd_select` api
     print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
@@ -85,9 +96,13 @@ def check_rrd_view_api(query, pipes, exec_params, session_id_value):
     # prepare RRD files
     global executor
     h = Heartbeat()
-    h.run(f"Test 'check_rrd_view_api' is in progress...")
-    executor.execute("rrd_collect", exec_params, session_id_value)
-    h.stop()
+    try:
+        h.run(f"Test 'check_rrd_view_api' is in progress...")
+        executor.execute("rrd_collect", exec_params, session_id_value)
+        h.stop()
+    except Exception as ex:
+        h.stop()
+        pytest.fail(f"During `check_rrd_view_api` the auxiliary query `rrd_collect` threw the exception: {ex}")
 
     api_query = APIQuery(pipes)
     api_query.execute(exec_params)
@@ -107,9 +122,13 @@ def check_rrd_plot_view_api(query, pipes, exec_params, session_id_value):
     # prepare RRD files
     global executor
     h = Heartbeat()
-    h.run(f"Test 'check_rrd_plot_view_api' is in progress...")
-    executor.execute("rrd_collect", exec_params, session_id_value)
-    h.stop()
+    try:
+        h.run(f"Test 'check_rrd_plot_view_api' is in progress...")
+        executor.execute("rrd_collect", exec_params, session_id_value)
+        h.stop()
+    except Exception as ex:
+        h.stop()
+        pytest.fail(f"During `check_rrd_plot_view_api` the auxiliary query `rrd_collect` threw the exception: {ex}")
 
     print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)

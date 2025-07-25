@@ -147,6 +147,20 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
 
     # upstream service may get inoperable abruptly, to prevent stucking on a dead-pipe, let's not block ourselves on it,
     # so that a watchdog introduced
+
+    #TODO TRY function
+    #send_ka_watchdog_query ${pipe_in} ${SESSION_ID} ".*" ${deps_query_timeout_sec}
+    #    if [ $? == 0 ]; then
+    #        let wait_dependencies_counter=$wait_dependencies_counter+1
+    #        echo -e "Wait for another attempt: ${BCyan}${wait_dependencies_counter}/${wait_dependencies_counter_limit}${Color_Off}"
+    #        if [ ${wait_dependencies_counter} == ${wait_dependencies_counter_limit} ]; then
+    #            eval ${3}=$ANY_SERVICE_UNAVAILABLE
+    #            break
+    #        fi
+    #        continue
+    #    fi
+
+
     DEPS_QUERY_WAIT_TIMEOUT=5
     (echo "SESSION_ID=${SESSION_ID} --service=${DOWNSTREAM_SERVICE} --timeout=${DEPS_QUERY_WAIT_TIMEOUT}"> ${pipe_in}) &
     PID_TO_UNBLOCK=$!

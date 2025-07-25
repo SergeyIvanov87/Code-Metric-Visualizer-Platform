@@ -147,7 +147,7 @@ class APIQueryInterruptible(APIQuery):
     # It's must be clear that session pipes must be removed only by it's creator/owner
     # No one other must remove it.
     # I have to think about the question: do I realy need to remove them at all?
-    def __init__(self, command_pipes, remove_session_pipe_on_result_done):
+    def __init__(self, command_pipes, remove_session_pipe_on_result_done = False):
         super().__init__(command_pipes, remove_session_pipe_on_result_done)
         self.result_queue = LifoQueue()
 

@@ -71,6 +71,61 @@ gracefull_shutdown_bunch() {
     fi
 }
 
+
+send_ka_watchdog_query() {
+    local pipe_in=${1}
+    local session_id=${2}
+    local downstream_service=${3}
+    local deps_query_timeout_sec=${4}
+    echo -e "Send watchdog query ${Cyan}${session_id}${Color_Off} to the pipe: ${pipe_in}"
+    (echo "SESSION_ID=${session_id} --service=${downstream_service} --timeout=${deps_query_timeout_sec}"> ${pipe_in}) &
+    local PID_TO_UNBLOCK=$!
+    sleep $((deps_query_timeout_sec + 2))
+    kill -s 0 ${PID_TO_UNBLOCK} > /dev/null 2>&1
+    local PID_TO_UNBLOCK_RESULT=$?
+    if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
+        # query has stucked, probably dead-pipe
+        echo -e "${Cyan}Watchdog can't make a query through ${pipe_in}, PID: {PID_TO_UNBLOCK}. Unblock the pipe${Color_Off}"
+        timeout 2 /bin/bash -c "cat ${pipe_in} > /dev/null 2>&1"
+        if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET:	${pipe_in}"; fi
+        return 255
+    fi
+    return 0
+}
+
+receive_ka_watchdog_query() {
+    local pipe_out=${1}
+    local result_timeout_sec=${2}
+    if [ -z result_timeout_sec ]; then
+        result_timeout_sec=5
+    fi
+
+    # upstream service may get inoperable abruptly, to prevent stucking on a dead-pipe, let's not block ourselves on it,
+    # so that a watchdog introduced.
+    local file_pipe_out_result_name=cat_pipe_out_result_file
+    rm -f ${file_pipe_out_result_name}*
+    local file_pipe_out_result_name="${file_pipe_out_result_name}_`date +%s`"
+    echo -e "Prepare to receive watchdog answer and store it into the temporary file: ${file_pipe_out_result_name}"
+    (cat ${pipe_out} > ${file_pipe_out_result_name}) &
+    local PID_TO_UNBLOCK=$!
+    sleep ${result_timeout_sec}
+    kill -s 0 ${PID_TO_UNBLOCK} > /dev/null 2>&1
+    local PID_TO_UNBLOCK_RESULT=$?
+    if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
+        # query has stucked, probably dead-pipe
+        echo -e "${Cyan}Watchdog hasn't answered by ${pipe_out}, PID: {PID_TO_UNBLOCK}. Unblock pipe${Color_Off}"
+
+        # query has stucked: probably due to upstream service outage. Unblock query
+        timeout 2 /bin/bash -c "echo > ${pipe_out} > /dev/null 2>&1"
+        if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET:	${pipe_out}"; fi
+        return 255
+    fi
+
+    local PROXYING_API_QUERIES=`cat ${file_pipe_out_result_name}`
+    eval ${3}=$PROXYING_API_QUERIES
+    return 0
+}
+
 wait_for_pipe_exist() {
     local pipe=${1}
     local pipe_wait_timeout_sec=0.1
@@ -150,6 +205,7 @@ wait_for_unavailable_services() {
     local SESSION_ID="`hostname`_watchdog"
     local pipe_in="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/exec"
     local pipe_out="${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/result.json_${SESSION_ID}"
+    ls -la "${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/"
     local pipe_couter=1
     rm -f ${pipe_out}
     while [ ! -p ${pipe_in} ];
@@ -164,7 +220,19 @@ wait_for_unavailable_services() {
     while true :
     do
         ANY_SERVICE_UNAVAILABLE=
-        echo "SESSION_ID=${SESSION_ID}"> ${pipe_in}
+        local deps_query_timeout_sec=15
+        send_ka_watchdog_query ${pipe_in} ${SESSION_ID} ".*" ${deps_query_timeout_sec}
+        if [ $? == 255 ]; then
+            let wait_dependencies_counter=$wait_dependencies_counter+1
+            echo -e "Wait for another attempt: ${BCyan}${wait_dependencies_counter}/${wait_dependencies_counter_limit}${Color_Off}"
+            if [ ${wait_dependencies_counter} == ${wait_dependencies_counter_limit} ]; then
+                eval ${3}=$ANY_SERVICE_UNAVAILABLE
+                break
+            fi
+            continue
+        fi
+
+
         pipe_couter=1
         while [ ! -p ${pipe_out} ];
         do
@@ -180,21 +248,11 @@ wait_for_unavailable_services() {
         # but some inactive dead-pipe having the same name still exist.
         # Reading this dead-pipe may be a reason of a deadlock
         # So let's read this pipe in async mode
-        file_pipe_out_result_name="cat_pipe_out_result_file"
-        rm -f ${file_pipe_out_result_name}*
-        file_pipe_out_result_name="${file_pipe_out_result_name}_`date +%s`"
-        (cat ${pipe_out} > ${file_pipe_out_result_name}) &
-        local PID_TO_UNBLOCK=$!
-        echo "PID_TO_UNBLOCK: ${PID_TO_UNBLOCK}"
-        sleep 1
-        kill -s 0 ${PID_TO_UNBLOCK} > /dev/null 2>&1
-        local PID_TO_UNBLOCK_RESULT=$?
-        echo "PID_TO_UNBLOCK_RESULT: ${PID_TO_UNBLOCK_RESULT}"
-        if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
-            # query has stucked, probably dead-pipe
-            timeout 1 /bin/bash -c "echo > ${pipe_out}" #> /dev/null 2>&1
-            if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET DEADPIPE:	${pipe_out}"; fi
-            kill -9 ${PID_TO_UNBLOCK}
+        local MISSING_API_QUERIES=
+        local deps_response_timeout_sec=5
+        receive_ka_watchdog_query ${pipe_out} ${deps_response_timeout_sec} MISSING_API_QUERIES
+        if [ $? == 255 ]; then
+            echo -e "Wait for another attempt: ${BCyan}${wait_dependencies_counter}/${wait_dependencies_counter_limit}${Color_Off}"
             let wait_dependencies_counter=$wait_dependencies_counter+1
             if [ ${wait_dependencies_counter} == ${wait_dependencies_counter_limit} ]; then
                 eval ${3}=$ANY_SERVICE_UNAVAILABLE
@@ -203,7 +261,6 @@ wait_for_unavailable_services() {
             continue
         fi
 
-        local MISSING_API_QUERIES=`cat ${file_pipe_out_result_name}`
         if [ ! -z "${MISSING_API_QUERIES}" ]; then
             echo -e "${Blue}One or more services are unavailable using this API:${Color_Off}"
             echo -e "${Blue}${MISSING_API_QUERIES}${Color_Off}"

@@ -1,4 +1,5 @@
 {
+    "Content-Type" : "application/json",
     "Method" : "POST",
     "Query": "api.pmccabe_collector.restapi.org/cc_analytic/rrd/collect",
     "Params": {

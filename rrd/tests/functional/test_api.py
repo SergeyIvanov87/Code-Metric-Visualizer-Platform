@@ -61,8 +61,9 @@ def check_rrd_collect_api(query, pipes, project_cpp_files):
     api_query.execute()
     print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
     out = api_query.wait_result("", 0.1, 30, True)
-    assert len(out) == 0
     h.stop()
+    assert len(out) != 0
+
 
     for f in rrd_files:
         assert os.path.isfile(f)
