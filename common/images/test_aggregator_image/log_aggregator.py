@@ -84,8 +84,12 @@ class LogParser:
             print(f"not a valid logger record: {raw_record}\nError {e}\n")
 
     def collect_statistic(self):
+        # TODO handle this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        #  ========================= 1 failed, 5 passed in 45.09s =========================
+
         test_amount_regex = re.compile(r"^collected (\d+) item[s]?$")
         test_failed_regex = re.compile(r"^=+\s+(\d+)\s+failed\s+in\s+.*=+$")
+        test_failed_passed_regex = re.compile(r"^=+\s+(\d+)\s+failed,\s+(\d+)\s+passed\s+in\s+.*=+$")
         test_passed_regex = re.compile(r"^=+\s+(\d+)\s+passed\s+in\s+.*=+$")
         test_skipped_regex = re.compile(r"^=+\s+(\d+)\s+skipped\s+in\s+.*=+$")
         stat = TestStatistic()
@@ -100,6 +104,12 @@ class LogParser:
             failed_found = test_failed_regex.match(r.data)
             if failed_found:
                 stat.failed += int(failed_found.group(1))
+                continue
+
+            failed_passed_found = test_failed_passed_regex.match(r.data)
+            if failed_passed_found:
+                stat.failed += int(failed_passed_found.group(1))
+                stat.passed += int(failed_passed_found.group(2))
                 continue
 
             passed_found = test_passed_regex.match(r.data)
