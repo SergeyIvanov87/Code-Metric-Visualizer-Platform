@@ -1,5 +1,5 @@
 services:
-  rrd_analytic:
+  rrd-analytic:
     build:
       context: ../
       dockerfile: ./rrd/Dockerfile

@@ -9,11 +9,11 @@ services:
     environment:
       - EXIT_ONCE_DONE=true
     volumes:
-      - api.pmccabe_collector.restapi.org.service_broker.test:/api
+      - api.pmccabe_collector.restapi.org.service-broker.test:/api
     depends_on:
-       - service_broker
+       - service-broker
        - test_pseudo_fs
 
 
 volumes:
-  api.pmccabe_collector.restapi.org.service_broker.test:
+  api.pmccabe_collector.restapi.org.service-broker.test:

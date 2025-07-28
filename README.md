@@ -114,9 +114,9 @@ In addition to **General** prerequisites above, you **MUST** define environment 
 
 In addition to **General** prerequisites above:
 
-- You **MUST** configure a docker volume `api.pmccabe_collector.rrd_analytic`, which will store analyzed metrics snapshots in RRDs (Round-Robin databases), by executing the following command:
+- You **MUST** configure a docker volume `api.pmccabe_collector.rrd-analytic`, which will store analyzed metrics snapshots in RRDs (Round-Robin databases), by executing the following command:
 
-    `LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=<local host RRD mount point> && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd_analytic`
+    `LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=<local host RRD mount point> && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd-analytic`
 
 - You **MUST** define environment variables `PROJECT_URL` and `PROJECT_BRANCH` when launching both `docker compose  -f compose-analytic.yaml` and `docker build`, which specify your project repository and branch( `git` by default).
 
@@ -234,3 +234,21 @@ Anytime afther that invoke the command to launch the integrational test scope:
 
 This testing flow of this integrational test scope can be represented on the following picture:
 ![alt text](assets/all_integrational_tests_in_parallel.png)
+
+
+
+
+# K8S
+sudo systemctl start libvirtd.service
+sudo systemctl status libvirtd.service
+export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock
+
+minikube start --driver=docker --container-runtime=containerd
+
+#### the console where the cluster was started:
+eval $(minikube docker-env)
+
+
+kubectl create deployment hello-node --image=registry.k8s.io/e2e-test-images/agnhost:2.39 -- /agnhost netexec --http-port=8080 imagePullPolicy: Never
+
+docker build -t cc-visualizer  cyclomatic_complexity/

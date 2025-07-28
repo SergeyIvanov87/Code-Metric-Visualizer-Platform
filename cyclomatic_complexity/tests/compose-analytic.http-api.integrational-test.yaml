@@ -1,9 +1,9 @@
 
 services:
-  cc_integrational_tester:
+  cc-integrational-tester:
     extends:
       file: integrational/compose-analysis.integrational-test.yaml
-      service: cc_integrational_tester
+      service: cc-integrational-tester
     volumes:
       - api.pmccabe_collector.restapi.cc.private.org:/api
       - api.pmccabe_collector.project.cc.private:/mnt

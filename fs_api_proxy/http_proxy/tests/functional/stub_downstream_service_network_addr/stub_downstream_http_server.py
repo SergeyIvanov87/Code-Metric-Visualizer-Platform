@@ -38,7 +38,7 @@ def portal():
     global is_global_available
 
     host_addr_info = socket.gethostbyaddr(request.remote_addr)
-    if host_addr_info[0].find("service_unreachable_a") != -1:
+    if host_addr_info[0].find("service-unreachable-a") != -1:
         if not is_service_unrechable_a_available:
             return "Page not found", 404
     return "Available", 200
@@ -58,14 +58,14 @@ def set_service_availability():
             available = v
             continue
 
-    if (service_name == "service_unreachable_a") and (available is not None):
+    if (service_name == "service-unreachable-a") and (available is not None):
         is_service_unrechable_a_available = (available.lower() in ['true', '1'])
 
     if (service_name == ".*") and (available is not None):
         is_global_available = (available.lower() in ['true', '1'])
     return f"service_name: {service_name}, available: {available}, {is_service_unrechable_a_available}, is_global_available: {is_global_available}"
 
-@app.route("/api.pmccabe_collector.restapi.org/service_unreachable_a/service_unreachable_a_req_2_not_available", methods=["GET", "HEAD"])
+@app.route("/api.pmccabe_collector.restapi.org/service-unreachable-a/service_unreachable_a_req_2_not_available", methods=["GET", "HEAD"])
 def service_unreachable_a_req_2_not_available():
     return "Page not found", 404
 
@@ -75,7 +75,7 @@ def hello_world(path):
     global is_global_available
 
     print(f"*** Received data at: {path}")
-    if path.find("service_unreachable_a") != -1:
+    if path.find("service-unreachable-a") != -1:
         if not is_service_unrechable_a_available:
             return "Page not found", 404
     else:
