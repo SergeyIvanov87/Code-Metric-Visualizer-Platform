@@ -2,7 +2,7 @@ include:
   - ../../../common/images/test_pseudo_fs/compose.yaml
 
 services:
-  service_broker_functional_tester:
+  service-broker-functional-tester:
     build:
       context: ../../../
       dockerfile: service_broker/tests/functional/Dockerfile
