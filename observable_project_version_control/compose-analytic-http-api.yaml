@@ -1,5 +1,5 @@
 services:
-  vcs_project:
+  vcs-project:
     build:
       context: ../
       dockerfile: ./observable_project_version_control/Dockerfile
@@ -15,12 +15,12 @@ services:
     environment:
       - PROJECT_URL=${PROJECT_URL}
       - PROJECT_BRANCH=${PROJECT_BRANCH}
-      - MICROSERVICE_NAME=vcs_project
+      - MICROSERVICE_NAME=vcs-project
     volumes:
-      - api.pmccabe_collector.vcs_project:/mnt
-      - api.pmccabe_collector.api.vcs_project.http.private.org:/api
+      - api.pmccabe_collector.vcs-project:/mnt
+      - api.pmccabe_collector.api.vcs-project.http.private.org:/api
 
-  vcs_project_http_api:
+  vcs-project-http-api:
     build:
       context: ../
       dockerfile: ./rest_api/Dockerfile
@@ -31,7 +31,7 @@ services:
       - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}
       - WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS=4
       - WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS=10
-    hostname: vcs_project_http_api
+    hostname: vcs-project-http-api
     logging:
       driver: syslog
       options:
@@ -40,12 +40,12 @@ services:
     networks:
       - api.pmccabe_collector.network
     volumes:
-      - api.pmccabe_collector.api.vcs_project.http.private.org:/api
+      - api.pmccabe_collector.api.vcs-project.http.private.org:/api
     ports:
       - 5003:5003
 
 volumes:
-  api.pmccabe_collector.vcs_project:
-  api.pmccabe_collector.api.vcs_project.http.private.org:
-    name: api.pmccabe_collector.api.vcs_project.http.private.org
+  api.pmccabe_collector.vcs-project:
+  api.pmccabe_collector.api.vcs-project.http.private.org:
+    name: api.pmccabe_collector.api.vcs-project.http.private.org
     external: false

@@ -1,5 +1,5 @@
 services:
-  cc_visualizer:
+  cc-visualizer:
     build:
       context: ../
       dockerfile: ./cyclomatic_complexity/Dockerfile
@@ -13,10 +13,10 @@ services:
     networks:
       - api.pmccabe_collector.network
     volumes:
-      - api.pmccabe_collector.vcs_project:/mnt
+      - api.pmccabe_collector.vcs-project:/mnt
       - api.pmccabe_collector.api.cc.http.private.org:/api
 
-  cc_http_api:
+  cc-http-api:
     build:
       context: ../
       dockerfile: ./rest_api/Dockerfile
@@ -27,7 +27,7 @@ services:
       - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}
       - WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS=4
       - WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS=10
-    hostname: cc_http_api
+    hostname: cc-http-api
     logging:
       driver: syslog
       options:
@@ -41,7 +41,7 @@ services:
       - 5001:5001
 
 volumes:
-  api.pmccabe_collector.vcs_project:
+  api.pmccabe_collector.vcs-project:
   api.pmccabe_collector.api.cc.http.private.org:
     name: api.pmccabe_collector.api.cc.http.private.org
     external: false

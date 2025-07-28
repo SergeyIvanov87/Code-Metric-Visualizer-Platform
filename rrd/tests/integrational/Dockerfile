@@ -31,6 +31,6 @@ RUN dos2unix /tests/*
 RUN dos2unix /tests/*
 VOLUME ["/api", "/mnt", "/rrd_data"]
 
-ARG MICROSERVICE_NAME=rrd_integrational_tester
+ARG MICROSERVICE_NAME=rrd-integrational-tester
 ENV MICROSERVICE_NAME=$MICROSERVICE_NAME
 ENTRYPOINT ["/tests/init.sh", "/tests", "/mnt", "/api", "/rrd_data"]

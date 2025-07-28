@@ -2,14 +2,14 @@ include:
   - tests/compose-functional.test.yaml
 
 services:
-  service_broker:
+  service-broker:
     build:
       context: ../
       dockerfile: ./service_broker/Dockerfile
     environment:
       CRON_REPO_UPDATE_SCHEDULE: "* * * * *"
     volumes:
-      - api.pmccabe_collector.restapi.org.service_broker.test:/api
+      - api.pmccabe_collector.restapi.org.service-broker.test:/api
 
 volumes:
-    api.pmccabe_collector.restapi.org.service_broker.test:
+    api.pmccabe_collector.restapi.org.service-broker.test:

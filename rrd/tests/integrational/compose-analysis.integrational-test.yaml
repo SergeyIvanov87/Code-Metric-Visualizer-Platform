@@ -1,15 +1,15 @@
 services:
-  rrd_integrational_tester:
+  rrd-integrational-tester:
     build:
       context: ../../../
       dockerfile: rrd/tests/integrational/Dockerfile
     environment:
       - EXIT_ONCE_DONE=false
-      - MICROSERVICE_NAME=rrd_integrational_tester
+      - MICROSERVICE_NAME=rrd-integrational-tester
     volumes:
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.project:/mnt
-      - api.pmccabe_collector.rrd_analytic:/rrd_data
+      - api.pmccabe_collector.rrd-analytic:/rrd_data
     depends_on:
       test_aggregator:
         condition: service_healthy

@@ -2,15 +2,15 @@ include:
   - tests/compose-functional.test.yaml
 
 services:
-  http_proxy_service_a:
+  http-proxy-service-a:
     build:
       context: ../../
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
     environment:
-        - UPSTREAM_SERVICE=mock_upstream_service
-        - DOWNSTREAM_SERVICE=service_a
-        - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub_downstream_service_network_addr
-    hostname: http_proxy_service_a
+        - UPSTREAM_SERVICE=mock-upstream-service
+        - DOWNSTREAM_SERVICE=service-a
+        - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub-downstream-service-network-addr
+    hostname: http-proxy-service-a
     networks:
       - api.pmccabe_collector.service.network
     volumes:
@@ -20,30 +20,30 @@ services:
 #    depends_on:
 #      - http_proxy_functional_api_initializer
 
-  http_proxy_service_b:
+  http-proxy-service-b:
     build:
       context: ../../
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
     environment:
-        - UPSTREAM_SERVICE=mock_upstream_service
-        - DOWNSTREAM_SERVICE=service_b
-        - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub_downstream_service_network_addr
-    hostname: http_proxy_service_b
+        - UPSTREAM_SERVICE=mock-upstream-service
+        - DOWNSTREAM_SERVICE=service-b
+        - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub-downstream-service-network-addr
+    hostname: http-proxy-service-b
     networks:
       - api.pmccabe_collector.service.network
     volumes:
       - api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:/api
 
-  http_proxy_service_unreachable_a:
+  http-proxy-service-unreachable-a:
     build:
       context: ../../
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
     environment:
-        - UPSTREAM_SERVICE=mock_upstream_service
-        - DOWNSTREAM_SERVICE=service_unreachable_a
-        - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub_downstream_service_network_addr
+        - UPSTREAM_SERVICE=mock-upstream-service
+        - DOWNSTREAM_SERVICE=service-unreachable-a
+        - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub-downstream-service-network-addr
         - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=-1
-    hostname: http_proxy_service_unreachable_a
+    hostname: http-proxy-service-unreachable-a
     networks:
       - api.pmccabe_collector.service.network
     volumes:

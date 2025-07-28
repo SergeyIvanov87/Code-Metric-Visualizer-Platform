@@ -11,4 +11,4 @@ networks:
     external: true
 
 volumes:
-  api.pmccabe_collector.vcs_project:
+  api.pmccabe_collector.vcs-project:

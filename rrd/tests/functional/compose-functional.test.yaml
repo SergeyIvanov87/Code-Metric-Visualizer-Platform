@@ -2,22 +2,22 @@ include:
   - ../../../common/images/test_pseudo_fs/compose.yaml
 
 services:
-  rrd_functional_tester:
+  rrd-functional-tester:
     build:
       context: ../../../
       dockerfile: rrd/tests/functional/Dockerfile
     environment:
-        - RRD_TESTABLE_CONTAINER_HOSTNAME=rrd_analytic_functional
+        - RRD_TESTABLE_CONTAINER_HOSTNAME=rrd-analytic-functional
         - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}
     volumes:
       - api.pmccabe_collector.restapi.org.rrd.test:/api
-      - api.pmccabe_collector.rrd.rrd_analytic:/rrd_data
+      - api.pmccabe_collector.rrd.rrd-analytic:/rrd_data
       - api.pmccabe_collector.project.rrd.test:/mnt
     depends_on:
-      - rrd_analytic
+      - rrd_\-analytic
       - test_pseudo_fs
 
 volumes:
   api.pmccabe_collector.project.rrd.test:
   api.pmccabe_collector.restapi.org.rrd.test:
-  api.pmccabe_collector.rrd.rrd_analytic:
+  api.pmccabe_collector.rrd.rrd-analytic:

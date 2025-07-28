@@ -4,8 +4,9 @@ WORKDIR package
 ENV CRON_REPO_UPDATE_SCHEDULE="0 0 * * *"
 
 # install app dependencies
-RUN apk add --no-cache coreutils python3 dos2unix bash busybox-openrc alpine-conf doas
-RUN apk add --no-cache apk-cron
+RUN apk add --no-cache coreutils python3 dos2unix
+RUN apk add --no-cache busybox-openrc alpine-conf doas
+RUN apk add --no-cache apk-cron bash
 
 COPY service_broker/*.sh /package/
 COPY service_broker/*.py /package/
@@ -44,7 +45,7 @@ ENV SKIP_API_DEPS_CHECK=$SKIP_API_DEPS_CHECK
 ARG TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30
 ENV TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=$TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC
 
-ARG MICROSERVICE_NAME=service_broker
+ARG MICROSERVICE_NAME=service-broker
 ENV MICROSERVICE_NAME=$MICROSERVICE_NAME
 
 ARG UID=1301

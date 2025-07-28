@@ -1,5 +1,5 @@
 services:
-  rrd_analytic:
+  rrd-analytic:
     build:
       context: ../
       dockerfile: ./rrd/Dockerfile
@@ -17,7 +17,7 @@ services:
       - api.pmccabe_collector.network
     volumes:
       - api.pmccabe_collector.restapi.org:/api
-      - api.pmccabe_collector.rrd_analytic:/rrd_data
+      - api.pmccabe_collector.rrd-analytic:/rrd_data
 
 networks:
   api.pmccabe_collector.network:
@@ -29,6 +29,6 @@ volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
-  api.pmccabe_collector.rrd_analytic:
-    name: api.pmccabe_collector.rrd_analytic
+  api.pmccabe_collector.rrd-analytic:
+    name: api.pmccabe_collector.rrd-analytic
     external: true

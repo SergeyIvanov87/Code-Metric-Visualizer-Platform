@@ -23,7 +23,7 @@ for f in "${test_files[@]}"; do
     cp ${f} ${INITIAL_PROJECT_LOCATION}/
 done
 
-MICROSERVICE_NAME_TO_TEST=rrd_analytic
+MICROSERVICE_NAME_TO_TEST=rrd-analytic
 ${UTILS}/canonize_internal_api.py /API/deps ${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME_TO_TEST}
 
 echo "Create CC API which RRD depends on"
@@ -99,7 +99,7 @@ gracefull_shutdown_handler(){
     ls -laR ${SHARED_API_DIR}
 }
 
-# If we continue with tests, rrd_analytic must have been started
+# If we continue with tests, rrd-analytic must have been started
 echo -e "Wait for rrd starting"
 wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME_TO_TEST}"
 if [ $? -ne 0 ]; then

@@ -27,8 +27,9 @@ RUN addgroup \
 
 
 # install app dependencies
-RUN apk add --no-cache coreutils python3 dos2unix busybox-openrc alpine-conf doas
+RUN apk add --no-cache coreutils python3 dos2unix
 RUN apk add --no-cache inotify-tools bash
+RUN apk add --no-cache busybox-openrc alpine-conf doas
 RUN apk add --no-cache curl
 
 RUN mkdir -p /opt

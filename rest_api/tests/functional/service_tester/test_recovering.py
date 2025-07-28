@@ -22,8 +22,7 @@ testdata = list(get_api_queries(os.path.join(global_settings.work_dir, "restored
 def check_if_query_available(domain, query):
     global global_settings
 
-    #url = 'http://rest_api:5000/' + query["Query"]
-    url = 'http://rest_api:5000/' + domain
+    url = 'http://rest-api:5000/' + domain
     headers = {'Accept-Charset': 'UTF-8'}
     resp = requests.get(url, headers=headers)
     assert resp.ok
@@ -66,7 +65,7 @@ def test_api_queries_lietening(name_query_2_turn_off, query_2_turn_off, all_api_
             break
     assert len(query_to_disable_file)
 
-    stopped, started = service_tester_utils.if_service_reconfigured("rest_api", 5000, 10, 30, 1)
+    stopped, started = service_tester_utils.if_service_reconfigured("rest-api", 5000, 10, 30, 1)
     assert stopped
     assert started
 
@@ -80,7 +79,7 @@ def test_api_queries_lietening(name_query_2_turn_off, query_2_turn_off, all_api_
     os.remove(initial_readme_file)
     tear_down(initial_readme_file, query_to_disable_file)
 
-    stopped, started = service_tester_utils.if_service_reconfigured("rest_api", 5000, 10, 30, 1)
+    stopped, started = service_tester_utils.if_service_reconfigured("rest-api", 5000, 10, 30, 1)
     assert stopped
     assert started
 

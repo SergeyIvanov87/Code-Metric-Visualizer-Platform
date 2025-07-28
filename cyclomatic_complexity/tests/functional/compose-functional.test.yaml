@@ -2,7 +2,7 @@ include:
   - ../../../common/images/test_pseudo_fs/compose.yaml
 
 services:
-  cc_functional_tester:
+  cc-functional-tester:
     build:
       context: ../../../
       dockerfile: cyclomatic_complexity/tests/functional/Dockerfile
@@ -12,7 +12,7 @@ services:
       - api.pmccabe_collector.restapi.org.cc.test:/api
       - api.pmccabe_collector.project.cc.test:/mnt
     depends_on:
-       - cc_visualizer
+       - cc-visualizer
        - test_pseudo_fs
 
 #volumes:

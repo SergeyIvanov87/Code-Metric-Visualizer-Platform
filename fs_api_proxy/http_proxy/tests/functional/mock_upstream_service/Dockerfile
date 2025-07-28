@@ -34,13 +34,13 @@ COPY fs_api_proxy/http_proxy//tests/functional/mock_upstream_service/*.sh /tests
 
 RUN dos2unix /tests/*
 
-ARG UPSTREAM_SERVICE=mock_upstream_service
+ARG UPSTREAM_SERVICE=mock-upstream-service
 ENV UPSTREAM_SERVICE=$UPSTREAM_SERVICE
 
-ARG DOWNSTREAM_SERVICE=service_a
+ARG DOWNSTREAM_SERVICE=service-a
 ENV DOWNSTREAM_SERVICE=$DOWNSTREAM_SERVICE
 
-ARG DOWNSTREAM_SERVICE_NETWORK_ADDR=stub_downstream_service_network_addr
+ARG DOWNSTREAM_SERVICE_NETWORK_ADDR=stub-downstream-service-network-addr
 ENV DOWNSTREAM_SERVICE_NETWORK_ADDR=$DOWNSTREAM_SERVICE_NETWORK_ADDR
 
 VOLUME ["/api", "/mnt"]

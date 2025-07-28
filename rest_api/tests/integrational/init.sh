@@ -20,7 +20,7 @@ echo "Wait until service started"
 let wait_for_counter=0
 let wait_for_limit=12
 let wait_for_sec=10
-SERVICE=http://rest_api:5000
+SERVICE=http://rest-api:5000
 while true
 do
     curl -I -s -o /dev/null ${SERVICE}

@@ -2,13 +2,13 @@ include:
   - ../../../../../common/images/test_pseudo_fs/compose.yaml
 
 services:
-  stub_downstream_service_network_addr:
+  stub-downstream-service-network-addr:
     build:
       context: ../../../../../
       dockerfile: fs_api_proxy/http_proxy/tests/functional/stub_downstream_service_network_addr/Dockerfile
     environment:
         - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}
-    hostname: stub_downstream_service_network_addr
+    hostname: stub-downstream-service-network-addr
     networks:
       - api.pmccabe_collector.service.network
     ports:

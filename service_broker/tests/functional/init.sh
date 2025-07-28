@@ -9,7 +9,7 @@ UTILS="${WORK_DIR}/utils"
 export OPT_DIR=${UTILS}
 export MODULES="${WORK_DIR}/utils/modules"
 
-${UTILS}/canonize_internal_api.py ${WORK_DIR}/API/deps ${MAIN_SERVICE_NAME}/service_broker
+${UTILS}/canonize_internal_api.py ${WORK_DIR}/API/deps ${MAIN_SERVICE_NAME}/service-broker
 
 # copy service broker APIs (command & internal) into designated dire /API
 # in order to allow tests_inner_api to test its inner API.
@@ -63,7 +63,7 @@ API_MANAGEMENT_PID=$!
 
 # Now service broker must have started before we continue with tests
 echo -e "Wait for service broker starting"
-wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/service_broker"
+wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/service-broker"
 if [ $? -ne 0 ]; then
     echo -e "${BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort${Color_Off}"
     gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}

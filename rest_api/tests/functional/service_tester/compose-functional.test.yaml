@@ -6,7 +6,7 @@ services:
     volumes:
       - api.pmccabe_collector.restapi.org.rest_api.test:/api
     depends_on:
-      - rest_api
+      - rest-api
       - test_pseudo_fs
 
 volumes:
