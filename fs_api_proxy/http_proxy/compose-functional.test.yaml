@@ -8,13 +8,13 @@ services:
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
     environment:
         - UPSTREAM_SERVICE=mock-upstream-service
-        - DOWNSTREAM_SERVICE=service-a
+        - DOWNSTREAM_SERVICE=service_a
         - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub-downstream-service-network-addr
     hostname: http-proxy-service-a
     networks:
       - api.pmccabe_collector.service.network
     volumes:
-      - api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:/api
+      - api.pmccabe_collector.restapi.org.fs-api-http-proxy.test:/api
 #    ports:
 #      - 6000:6000
 #    depends_on:
@@ -26,13 +26,13 @@ services:
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
     environment:
         - UPSTREAM_SERVICE=mock-upstream-service
-        - DOWNSTREAM_SERVICE=service-b
+        - DOWNSTREAM_SERVICE=service_b
         - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub-downstream-service-network-addr
     hostname: http-proxy-service-b
     networks:
       - api.pmccabe_collector.service.network
     volumes:
-      - api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:/api
+      - api.pmccabe_collector.restapi.org.fs-api-http-proxy.test:/api
 
   http-proxy-service-unreachable-a:
     build:
@@ -40,14 +40,14 @@ services:
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
     environment:
         - UPSTREAM_SERVICE=mock-upstream-service
-        - DOWNSTREAM_SERVICE=service-unreachable-a
+        - DOWNSTREAM_SERVICE=service_unreachable_a
         - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub-downstream-service-network-addr
         - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=-1
     hostname: http-proxy-service-unreachable-a
     networks:
       - api.pmccabe_collector.service.network
     volumes:
-      - api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:/api
+      - api.pmccabe_collector.restapi.org.fs-api-http-proxy.test:/api
 
 networks:
   api.pmccabe_collector.service.network:
@@ -55,4 +55,4 @@ networks:
     external: false
 
 volumes:
-  api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:
+  api.pmccabe_collector.restapi.org.fs-api-http-proxy.test:
