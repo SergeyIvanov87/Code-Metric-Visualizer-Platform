@@ -25,21 +25,21 @@ Since the service depends on [observable_project_version_control](../observable_
 
 From the main repository directory run:
 
-`docker build -t cc_visualizer:latest -f cyclomatic_complexity/Dockerfile .`
+`docker build -t cc-visualizer:latest -f cyclomatic_complexity/Dockerfile .`
 
 then launch it
 
-`docker run -it --mount type=bind,src=${PROJECT_PATH},target=/mnt -v api.pmccabe_collector.restapi.org:/api --name cc_visualizer cc_visualizer:latest`
+`docker run -it --mount type=bind,src=${PROJECT_PATH},target=/mnt -v api.pmccabe_collector.restapi.org:/api --name cc-visualizer cc-visualizer:latest`
 
 ### Analytic UC
 
 From the main repository directory run:
 
-`docker build -t cc_visualizer:latest -f cyclomatic_complexity/Dockerfile .`
+`docker build -t cc-visualizer:latest -f cyclomatic_complexity/Dockerfile .`
 
-Launching depends on [observable_project_version_control](../observable_project_version_control), thereby launch the `vcs_project` image at first.
+Launching depends on [observable_project_version_control](../observable_project_version_control), thereby launch the `vcs-project` image at first.
 
-`docker run -it --name cc_visualizer --volumes-from vcs_project cc_visualizer:latest`
+`docker run -it --name cc-visualizer --volumes-from vcs-project cc-visualizer:latest`
 
 # Testing the container
 

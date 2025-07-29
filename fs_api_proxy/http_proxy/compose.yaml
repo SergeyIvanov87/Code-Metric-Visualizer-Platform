@@ -1,11 +1,11 @@
 services:
-  http_proxy:
+  http-proxy:
     build:
       context: ../../
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
     depends_on:
       - syslog-ng
-    hostname: http_proxy
+    hostname: http-proxy
     logging:
       driver: syslog
       options:

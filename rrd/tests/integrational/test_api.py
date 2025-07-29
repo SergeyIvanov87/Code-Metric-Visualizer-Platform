@@ -58,7 +58,9 @@ def check_rrd_collect_api(query, pipes, exec_params, session_id_value):
     h.run(f"Test 'check_rrd_collect_api' is in progress...")
     print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQueryInterruptible(pipes)
-    assert api_query.wait_until_valid(0.1, 30, True), f"Pipes for test {name} must have been created"
+    if not api_query.wait_until_valid(0.1, 30, True):
+        h.stop()
+        assert False, f"Pipes for test 'check_rrd_collect_api' must have been created: {pipes}"
     status, timeout = api_query.execute(30, exec_params)
     h.stop()
     assert status, f"'check_rrd_collect_api' must not be interrupted"

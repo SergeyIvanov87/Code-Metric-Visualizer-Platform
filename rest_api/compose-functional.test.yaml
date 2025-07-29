@@ -2,17 +2,17 @@ include:
   - tests/compose-functional.test.yaml
 
 services:
-  rest_api:
+  rest-api:
     build:
       context: ../
       dockerfile: ./rest_api/Dockerfile
-    hostname: rest_api
+    hostname: rest-api
     volumes:
-      - api.pmccabe_collector.restapi.org.rest_api.test:/api
+      - api.pmccabe_collector.restapi.org.rest-api.test:/api
     ports:
       - 5000:5000
     depends_on:
-      - rest_api_functional_api_initializer
+      - rest-api-functional-api-initializer
 
 volumes:
-  api.pmccabe_collector.restapi.org.rest_api.test:
+  api.pmccabe_collector.restapi.org.rest-api.test:

@@ -38,7 +38,10 @@ trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
 git -C ${INITIAL_PROJECT_LOCATION} pull || git clone ${PROJECT_URL} -b ${PROJECT_BRANCH} ${INITIAL_PROJECT_LOCATION}
 if [ $? -ne 0 ]; then
     echo "Cannot pull project ${PROJECT_URL} by branch: ${PROJECT_BRANCH} into location: ${INITIAL_PROJECT_LOCATION}"
-    exit -1
+    if [ $EXIT_ON_INIT_FAIL == true ]; then
+        exit -1
+    fi
+    echo "Continue with an initialization error "
 fi
 
 # create API directory and initialize API nodes

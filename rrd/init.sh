@@ -75,7 +75,7 @@ if [ ! -z ${SKIP_API_DEPS_CHECK} ] && [ ${SKIP_API_DEPS_CHECK} == false ]; then
     fi
 fi
 
-echo "${BBlue}Populating README file...${Color_Off}"
+echo -e "${BBlue}Populating README file...${Color_Off}"
 ${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR}  | ( umask 0033; cat >> ${README_FILE_PATH} )
 echo -e "${BGreen}The service is ready${Color_Off}"
 sleep infinity &
