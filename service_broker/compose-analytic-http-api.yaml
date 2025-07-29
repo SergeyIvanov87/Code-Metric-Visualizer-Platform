@@ -20,7 +20,7 @@ services:
     volumes:
       - api.pmccabe_collector.api.service-broker.http.private.org:/api
 
-  service_broker_http_proxy_rrd:
+  service-broker-http-proxy-rrd:
     build:
       context: ../
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
@@ -29,13 +29,13 @@ services:
         - DOWNSTREAM_SERVICE=rrd
         - DOWNSTREAM_SERVICE_NETWORK_ADDR=rrd-http-api:5002
         - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT:-900}
-    hostname: service_broker_http_proxy_rrd
+    hostname: service-broker-http-proxy-rrd
     networks:
       - api.pmccabe_collector.network
     volumes:
       - api.pmccabe_collector.api.service-broker.http.private.org:/api
 
-  service_broker_http_proxy_vcs_project:
+  service-broker-http-proxy-vcs-project:
     build:
       context: ../
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
@@ -44,7 +44,7 @@ services:
         - DOWNSTREAM_SERVICE=observable_project_version_control
         - DOWNSTREAM_SERVICE_NETWORK_ADDR=vcs-project-http-api:5003
         - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT:-900}
-    hostname: service_broker_http_proxy_vcs_project
+    hostname: service-broker-http-proxy-vcs-project
     networks:
       - api.pmccabe_collector.network
     volumes:
