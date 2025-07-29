@@ -74,10 +74,10 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  rest_api_functional_api_initializer:
+  rest-api-functional-api-initializer:
     extends:
       file: rest_api/tests/functional/api_initializer/compose-functional.test.yaml
-      service: rest_api_functional_api_initializer
+      service: rest-api-functional-api-initializer
     depends_on:
       test_aggregator:      # explicit dependency
         condition: service_healthy
@@ -91,10 +91,10 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  rest_api_functional_service_tester:
+  rest-api-functional-service-tester:
     extends:
       file: rest_api/tests/functional/service_tester/compose-functional.test.yaml
-      service: rest_api_functional_service_tester
+      service: rest-api-functional-service-tester
     depends_on:             # explicit dependency
       test_aggregator:
         condition: service_healthy

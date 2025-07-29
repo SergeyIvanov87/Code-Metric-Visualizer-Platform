@@ -12,7 +12,7 @@ services:
     ports:
       - 5000:5000
     depends_on:
-      - rest_api_functional_api_initializer
+      - rest-api-functional-api-initializer
 
 volumes:
   api.pmccabe_collector.restapi.org.rest-api.test:
