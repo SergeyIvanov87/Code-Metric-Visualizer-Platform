@@ -57,6 +57,8 @@ EOF
 ARG UPSTREAM_SERVICE=
 ENV UPSTREAM_SERVICE=$UPSTREAM_SERVICE
 
+# as a service directory name in the project directory
+# as a service directory name in an upstream 'API/deps' directory
 ARG DOWNSTREAM_SERVICE=
 ENV DOWNSTREAM_SERVICE=$DOWNSTREAM_SERVICE
 

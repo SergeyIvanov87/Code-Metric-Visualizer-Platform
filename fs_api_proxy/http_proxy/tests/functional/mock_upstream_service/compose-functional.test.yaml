@@ -8,16 +8,16 @@ services:
       dockerfile: fs_api_proxy/http_proxy/tests/functional/mock_upstream_service/Dockerfile
     environment:
         - UPSTREAM_SERVICE=mock-upstream-service
-        - DOWNSTREAM_SERVICE=service-a
+        - DOWNSTREAM_SERVICE=service_a
         - DOWNSTREAM_SERVICE_NETWORK_ADDR=stub-downstream-service-network-addr
         - EXIT_ONCE_DONE=true
         - PYTEST_FILTER=${PYTEST_FILTER:-}
     networks:
       - api.pmccabe_collector.service.network
     volumes:
-      - api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:/api
+      - api.pmccabe_collector.restapi.org.fs-api-http-proxy.test:/api
     depends_on:
-      - http_proxy_service_a
+      - http-proxy-service-a
 
 volumes:
-  api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:
+  api.pmccabe_collector.restapi.org.fs-api-http-proxy.test:

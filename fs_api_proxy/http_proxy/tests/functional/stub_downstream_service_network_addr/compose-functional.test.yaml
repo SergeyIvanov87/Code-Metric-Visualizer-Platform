@@ -14,9 +14,9 @@ services:
     ports:
       - 5000:5000
     volumes:
-      - api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:/api
+      - api.pmccabe_collector.restapi.org.fs-api-http-proxy.test:/api
     depends_on:
-      - http_proxy_service_a
+      - http-proxy-service-a
 
 networks:
   api.pmccabe_collector.service.network:
@@ -24,4 +24,4 @@ networks:
     external: false
 
 volumes:
-  api.pmccabe_collector.restapi.org.fs_api_http_proxy.test:
+  api.pmccabe_collector.restapi.org.fs-api-http-proxy.test:

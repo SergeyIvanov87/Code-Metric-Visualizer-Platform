@@ -239,8 +239,10 @@ This testing flow of this integrational test scope can be represented on the fol
 
 
 # K8S
-sudo systemctl start libvirtd.service
-sudo systemctl status libvirtd.service
+//sudo systemctl start libvirtd.service
+//sudo systemctl status libvirtd.service
+
+### ENSURE VPN is DOWN!!! Otherwise there might be issues with docker and name resolutions
 export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock
 
 minikube start --driver=docker --container-runtime=containerd
