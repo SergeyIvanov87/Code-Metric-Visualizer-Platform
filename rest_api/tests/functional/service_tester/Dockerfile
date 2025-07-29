@@ -5,7 +5,7 @@ ENV UID=$UID
 ARG GID=23456
 ENV GID=$GID
 
-ARG USER=rest_api_functional_service_tester
+ARG USER=rest-api-functional-service-tester
 ENV USER=$USER
 ENV GROUPNAME=pmccabe
 
