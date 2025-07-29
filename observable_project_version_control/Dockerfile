@@ -1,8 +1,8 @@
 FROM alpine:latest
 WORKDIR package
 
-ENV PROJECT_URL="this must be a project URL"
-ENV PROJECT_BRANCH="this must be a project branch"
+ARG EXIT_ON_INIT_FAIL=true
+ENV PROJECT_URL="this must be a project URL" PROJECT_BRANCH="this must be a project branch" EXIT_ON_INIT_FAIL=${EXIT_ON_INIT_FAIL}
 
 # install app dependencies
 RUN apk add --no-cache coreutils python3 dos2unix

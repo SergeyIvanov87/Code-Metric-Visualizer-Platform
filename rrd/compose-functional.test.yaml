@@ -10,7 +10,7 @@ services:
     environment:
         - SKIP_API_DEPS_CHECK=${SKIP_API_DEPS_CHECK:-false}
         - MICROSERVICE_NAME=rrd-analytic
-    hostname: rrd_analytic_functional
+    hostname: rrd-analytic-functional
     volumes:
       - api.pmccabe_collector.project.rrd.test:/mnt
       - api.pmccabe_collector.restapi.org.rrd.test:/api
