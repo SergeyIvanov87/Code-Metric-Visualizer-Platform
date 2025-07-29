@@ -36,6 +36,9 @@ args = parser.parse_args()
 schemas_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, r".*\.json$")
 
 
+def canonize_precedure_call(req_api):
+    return req_api.replace('-','_')
+
 def get_query_params(params):
     #str_keys = (f"'{k}'" for k in params.keys()).join(", ")
     #str_values = (f"'{v}'" for v in params.values()).join(", ")
@@ -129,6 +132,7 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
                              r'            return f"<p>\"Resource is not available at the moment (KA probe failed)\"</p>", 503',
                              r'        return "",200'
     ]
+    procedure_call_req_api = canonize_precedure_call(req_api)
     cgi_schema = [ r'@app.route("/{}",  methods=[{}])'.format(req_api, methods),
                    r'def {}():'.format(canonize_api_method_name),
                    r'    global queries_in_progress',
