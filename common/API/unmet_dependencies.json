@@ -3,7 +3,7 @@
     "Method" : "GET",
     "Query": "+/unmet_dependencies",
     "Params": {
-        "--service" : ".*",
+        "--service" : "\".*\"",
         "--timeout" : "5"
     },
     "Description": {

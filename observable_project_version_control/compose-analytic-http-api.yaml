@@ -16,6 +16,7 @@ services:
       - PROJECT_URL=${PROJECT_URL}
       - PROJECT_BRANCH=${PROJECT_BRANCH}
       - MICROSERVICE_NAME=vcs-project
+      - EXIT_ON_INIT_FAIL=${EXIT_ON_INIT_FAIL:-true}
     volumes:
       - api.pmccabe_collector.vcs-project:/mnt
       - api.pmccabe_collector.api.vcs-project.http.private.org:/api
