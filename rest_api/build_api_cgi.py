@@ -64,6 +64,7 @@ def get_query_params(params):
 def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
     canonize_api_method_name = req_api.replace(os.sep, "_")
     canonize_api_method_name = canonize_api_method_name.replace('.', '_')
+    canonize_api_method_name = canonize_api_method_name.replace('-', '_')
 
     if len(content_type) != 0:
         response_generator = [
@@ -132,7 +133,7 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
                              r'            return f"<p>\"Resource is not available at the moment (KA probe failed)\"</p>", 503',
                              r'        return "",200'
     ]
-    procedure_call_req_api = canonize_precedure_call(req_api)
+
     cgi_schema = [ r'@app.route("/{}",  methods=[{}])'.format(req_api, methods),
                    r'def {}():'.format(canonize_api_method_name),
                    r'    global queries_in_progress',
