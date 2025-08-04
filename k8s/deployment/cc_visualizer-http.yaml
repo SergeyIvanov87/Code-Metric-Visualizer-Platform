@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cc-visualizer-deployment
+  labels:
+    app: cc_visualizer_app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cc_visualizer_app
+  template:
+    metadata:
+      labels:
+        app: cc_visualizer_app
+    spec:
+      containers:
+      - name: vcs-project
+        image: pmccabe_docker-vcs-project
+        imagePullPolicy: Never
+        env:
+        - name: PROJECT_URL
+          value: https://github.com/SergeyIvanov87/MRUVocabulary.git
+        - name: PROJECT_BRANCH
+          value: main
+        volumeMounts:
+        - mountPath: /api
+          name: api-pmccabecollector-api-cc-http-private-org
+          readOnly: false
+        - mountPath: /mnt
+          name: api-pmccabe-collector-vcs-project
+          readOnly: false
+        securityContext:
+          capabilities:
+            add:
+            - NET_RAW
+      - name: cc-visualizer
+        image: pmccabe_docker-cc-visualizer
+        imagePullPolicy: Never
+        volumeMounts:
+        - mountPath: /api
+          name: api-pmccabecollector-api-cc-http-private-org
+        - mountPath: /mnt
+          name: api-pmccabe-collector-vcs-project
+        securityContext:
+          runAsUser: 1001
+          runAsGroup: 23456
+          capabilities:
+            add:
+            - NET_RAW
+      - name: cc-http-api
+        image: pmccabe_docker-cc-http-api
+        imagePullPolicy: Never
+        env:
+        - name: FLASK_RUN_PORT
+          value: "5001"
+        - name: WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS
+          value: "4"
+        - name: WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS
+          value: "10"
+        volumeMounts:
+        - mountPath: /api
+          name: api-pmccabecollector-api-cc-http-private-org
+        ports:
+        - containerPort: 5001
+        securityContext:
+          runAsUser: 1201
+          runAsGroup: 23456
+          capabilities:
+            add:
+            - NET_RAW
+
+      volumes:
+      - name: api-pmccabe-collector-vcs-project
+        emptyDir:
+            sizeLimit: 500Mi
+      - name: api-pmccabecollector-api-cc-http-private-org
+        emptyDir:
+            sizeLimit: 500Mi
