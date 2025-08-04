@@ -234,23 +234,3 @@ Anytime afther that invoke the command to launch the integrational test scope:
 
 This testing flow of this integrational test scope can be represented on the following picture:
 ![alt text](assets/all_integrational_tests_in_parallel.png)
-
-
-
-
-# K8S
-//sudo systemctl start libvirtd.service
-//sudo systemctl status libvirtd.service
-
-### ENSURE VPN is DOWN!!! Otherwise there might be issues with docker and name resolutions
-export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock
-
-minikube start --driver=docker --container-runtime=containerd
-
-#### the console where the cluster was started:
-eval $(minikube docker-env)
-
-
-kubectl create deployment hello-node --image=registry.k8s.io/e2e-test-images/agnhost:2.39 -- /agnhost netexec --http-port=8080 imagePullPolicy: Never
-
-docker build -t cc-visualizer  cyclomatic_complexity/

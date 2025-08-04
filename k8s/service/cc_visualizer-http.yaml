@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cc-visualizer-service
+  labels:
+    app: cc_visualizer_app
+spec:
+  type: NodePort
+  ports:
+  - port: 5001
+    nodePort: 30001
+    protocol: TCP
+  selector:
+    app: cc_visualizer_app
