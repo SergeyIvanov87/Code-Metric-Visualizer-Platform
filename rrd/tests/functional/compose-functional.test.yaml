@@ -6,6 +6,8 @@ services:
     build:
       context: ../../../
       dockerfile: rrd/tests/functional/Dockerfile
+      additional_contexts:
+        base_image: "test_pseudo_fs:latest"
     environment:
         - RRD_TESTABLE_CONTAINER_HOSTNAME=rrd-analytic-functional
         - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}
