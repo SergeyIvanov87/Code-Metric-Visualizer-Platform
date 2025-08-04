@@ -3,6 +3,8 @@ services:
     build:
       context: ../../../../
       dockerfile: rest_api/tests/functional/service_tester/Dockerfile
+      additional_contexts:
+        base_image: "test_pseudo_fs:latest"
     volumes:
       - api.pmccabe_collector.restapi.org.rest-api.test:/api
     depends_on:

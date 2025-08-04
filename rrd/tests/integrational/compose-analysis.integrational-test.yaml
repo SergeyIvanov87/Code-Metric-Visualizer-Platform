@@ -3,6 +3,8 @@ services:
     build:
       context: ../../../
       dockerfile: rrd/tests/integrational/Dockerfile
+      additional_contexts:
+        base_image: "test_pseudo_fs:latest"
     environment:
       - EXIT_ONCE_DONE=false
       - MICROSERVICE_NAME=rrd-integrational-tester

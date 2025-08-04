@@ -6,6 +6,8 @@ services:
     build:
       context: ../../../
       dockerfile: service_broker/tests/functional/Dockerfile
+      additional_contexts:
+        base_image: "test_pseudo_fs:latest"
     environment:
       - EXIT_ONCE_DONE=true
     volumes:
