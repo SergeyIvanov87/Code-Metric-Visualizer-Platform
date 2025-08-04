@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vcs-project-deployment
+  labels:
+    app: vcs_project
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vcs_project
+  template:
+    metadata:
+      labels:
+        app: vcs_project
+    spec:
+      containers:
+      - name: vcs-project
+        image: pmccabe_docker-vcs-project
+        imagePullPolicy: Never
+        env:
+        - name: PROJECT_URL
+          value: https://github.com/SergeyIvanov87/MRUVocabulary.git
+        - name: PROJECT_BRANCH
+          value: main
+        - name: EXIT_ON_INIT_FAIL
+          value: 'false'
+        volumeMounts:
+        - mountPath: /api
+          name: api-pmccabecollector-api-cc-http-private-org
+        - mountPath: /mnt
+          name: api-pmccabe-collector-vcs-project
+        ports:
+        - containerPort: 80
+        securityContext:
+          capabilities:
+           add:
+           - NET_RAW
+
+      volumes:
+      - name: api-pmccabe-collector-vcs-project
+        emptyDir:
+            sizeLimit: 500Mi
+      - name: api-pmccabecollector-api-cc-http-private-org
+        emptyDir:
+            sizeLimit: 500Mi

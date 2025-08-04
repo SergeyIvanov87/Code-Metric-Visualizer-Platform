@@ -27,8 +27,9 @@ RUN addgroup \
 
 
 # install app dependencies
-RUN apk add --no-cache coreutils python3 dos2unix busybox-openrc alpine-conf doas
+RUN apk add --no-cache coreutils python3 dos2unix
 RUN apk add --no-cache inotify-tools bash
+RUN apk add --no-cache busybox-openrc alpine-conf doas
 RUN apk add --no-cache curl
 
 RUN mkdir -p /opt
@@ -56,6 +57,8 @@ EOF
 ARG UPSTREAM_SERVICE=
 ENV UPSTREAM_SERVICE=$UPSTREAM_SERVICE
 
+# as a service directory name in the project directory
+# as a service directory name in an upstream 'API/deps' directory
 ARG DOWNSTREAM_SERVICE=
 ENV DOWNSTREAM_SERVICE=$DOWNSTREAM_SERVICE
 

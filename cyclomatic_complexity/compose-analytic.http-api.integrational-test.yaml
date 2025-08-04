@@ -2,14 +2,14 @@ include:
   - tests/compose-analytic.http-api.integrational-test.yaml
 
 services:
-  http_integrational_test_http_proxy_cc:
+  http-integrational-test-http-proxy-cc:
     build:
       context: ../
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
     environment:
-        - UPSTREAM_SERVICE=cc_integrational_tester
+        - UPSTREAM_SERVICE=cc-integrational-tester
         - DOWNSTREAM_SERVICE=cyclomatic_complexity
-        - DOWNSTREAM_SERVICE_NETWORK_ADDR=cc_http_api:5001
+        - DOWNSTREAM_SERVICE_NETWORK_ADDR=cc-http-api:5001
         - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT:-900}
     networks:
       - api.pmccabe_collector.network

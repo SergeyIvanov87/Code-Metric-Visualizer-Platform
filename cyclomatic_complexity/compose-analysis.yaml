@@ -1,5 +1,5 @@
 services:
-  cc_visualizer:
+  cc-visualizer:
     build:
       context: ../
       dockerfile: ./cyclomatic_complexity/Dockerfile
