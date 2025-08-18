@@ -10,7 +10,7 @@ RUN git clone https://github.com/SergeyIvanov87/pmccabe_visualizer.git
 
 
 # main image logic
-FROM test_pseudo_fs:latest
+FROM test_pseudo_fs
 WORKDIR package
 
 COPY --from=build /usr/bin/pmccabe /usr/bin/pmccabe

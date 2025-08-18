@@ -1,4 +1,4 @@
-FROM test_pseudo_fs:latest
+FROM test_pseudo_fs
 
 # install app dependencies
 RUN apk add --no-cache py3-requests curl

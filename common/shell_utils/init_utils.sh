@@ -119,7 +119,7 @@ send_ka_watchdog_query() {
         return 255
     fi
 
-    echo -e "Send watchdog query ${Cyan}${session_id}${Color_Off} to the pipe: ${pipe_in}"
+    echo -e "Send watchdog query ${Cyan}${session_id}${Color_Off} to the pipe: ${pipe_in}, timeout: ${send_ka_query_timeout}"
     local deps_query_timeout_protection_sec=${send_ka_query_timeout}
     let deps_query_timeout_protection_sec=${deps_query_timeout_protection_sec}+3
     timeout ${deps_query_timeout_protection_sec} /bin/bash -c "echo \"SESSION_ID=${session_id} --service=${downstream_service} --timeout=${send_ka_query_timeout}\"> ${pipe_in}"
