@@ -6,6 +6,8 @@ services:
     build:
       context: ../../../../../
       dockerfile: fs_api_proxy/http_proxy/tests/functional/mock_upstream_service/Dockerfile
+      additional_contexts:
+        test_pseudo_fs: "service:test_pseudo_fs"
     environment:
         - UPSTREAM_SERVICE=mock-upstream-service
         - DOWNSTREAM_SERVICE=service_a

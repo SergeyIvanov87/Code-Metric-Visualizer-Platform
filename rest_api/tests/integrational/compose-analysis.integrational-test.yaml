@@ -3,6 +3,8 @@ services:
     build:
       context: ../../../
       dockerfile: rest_api/tests/integrational/Dockerfile
+      additional_contexts:
+        test_pseudo_fs: "service:test_pseudo_fs"
     environment:
       - EXIT_ONCE_DONE=false
     depends_on:

@@ -6,6 +6,8 @@ services:
     build:
       context: ../../../../../
       dockerfile: fs_api_proxy/http_proxy/tests/functional/stub_downstream_service_network_addr/Dockerfile
+      additional_contexts:
+        test_pseudo_fs: "service:test_pseudo_fs"
     environment:
         - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}
     hostname: stub-downstream-service-network-addr
