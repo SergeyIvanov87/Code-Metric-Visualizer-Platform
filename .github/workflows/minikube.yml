@@ -17,8 +17,8 @@ jobs:
         with:
           cache: false
           minikube-version: 1.24.0
-          driver: docker
-          container-runtime: containerd
+          driver: kvm2
+#          container-runtime: containerd
           kubernetes-version: v1.22.3
           nodes: 2
           cpus: 4
