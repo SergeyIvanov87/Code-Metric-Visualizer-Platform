@@ -127,3 +127,13 @@ or
     * From inside the cluster using the DNS name `cc_visualizer-http` on port `5001`
 
     * From outside the cluster by hitting any of the cluster nodes on port `30001`
+
+    Using `minikube` setup, you can reach the service out by hitting minikube API service. In order to get the API servber IP please execute the command
+
+    `minikube ip`
+
+    Given IP address you can access the service.
+
+    As BASH offers the command substituition, you can check health of the service by executing the command:
+
+    ```curl  --head --fail "`minikube ip`:30001//api.pmccabe_collector.restapi.org"```

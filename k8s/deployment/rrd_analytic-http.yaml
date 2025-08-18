@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rrd-analytic-deployment
+  labels:
+    app: rrd_analytic_app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rrd_analytic_app
+  template:
+    metadata:
+      labels:
+        app: rrd_analytic_app
+    spec:
+      containers:
+      - name: rrd-analytic
+        image: pmccabe_docker-rrd-analytic
+        imagePullPolicy: Never
+        volumeMounts:
+        - mountPath: /api
+          name: api-pmccabecollector-api-rrd-http-private-org
+          readOnly: false
+        - mountPath: /mnt
+          name: api-pmccabe-collector-rrd-analytic-storage
+          readOnly: false
+        securityContext:
+          runAsUser: 1101
+          runAsGroup: 23456
+          capabilities:
+            add:
+            - NET_RAW
+      - name: rrd-http-api
+        image: pmccabe_docker-rrd-http-api
+        imagePullPolicy: Never
+        env:
+        - name: FLASK_RUN_PORT
+          value: "5002"
+        - name: WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS
+          value: "4"
+        - name: WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS
+          value: "90"
+        volumeMounts:
+        - mountPath: /api
+          name: api-pmccabecollector-api-rrd-http-private-org
+        ports:
+        - containerPort: 5002
+        securityContext:
+          runAsUser: 1201
+          runAsGroup: 23456
+          capabilities:
+            add:
+            - NET_RAW
+      - name: rrd-http-proxy-cc
+        image: pmccabe_docker-rrd-http-proxy-cc
+        imagePullPolicy: Never
+        env:
+        - name: UPSTREAM_SERVICE
+          value: rrd
+        - name: DOWNSTREAM_SERVICE
+          value: cyclomatic_complexity
+        - name: DOWNSTREAM_SERVICE_NETWORK_ADDR
+          value: cc-visualizer-service:5001
+        - name: DOWNSTREAM_SERVICE_CONNECT_ATTEMPT
+          value: "900"
+        securityContext:
+          runAsUser: 2001
+          runAsGroup: 23456
+          capabilities:
+            add:
+            - NET_RAW
+        volumeMounts:
+        - mountPath: /api
+          name: api-pmccabecollector-api-rrd-http-private-org
+
+      volumes:
+      - name: api-pmccabe-collector-rrd-analytic-storage
+        emptyDir:
+            sizeLimit: 5000Mi
+      - name: api-pmccabecollector-api-rrd-http-private-org
+        emptyDir:
+            sizeLimit: 500Mi

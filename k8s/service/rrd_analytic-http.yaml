@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rrd-analytic-service
+  labels:
+    app: rrd_analytic_app
+spec:
+  type: NodePort
+  ports:
+  - port: 5002
+    nodePort: 30002
+    protocol: TCP
+  selector:
+    app: rrd_analytic_app
