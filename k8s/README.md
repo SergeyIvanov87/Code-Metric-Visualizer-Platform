@@ -41,7 +41,7 @@ Ensure that docker service is stopped by running
 The service must be stopped and inactve. The set up doesn't require this service running up, the docker service will be started on demand.
 To make it possible, ensure that `docker.socket` is enabled for the current user:
 
-`systemctl enable docker.socker`
+`systemctl enable docker.socket`
 
 Ensure that docker is accessible by running
 

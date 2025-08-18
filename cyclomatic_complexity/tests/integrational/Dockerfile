@@ -1,4 +1,4 @@
-FROM test_pseudo_fs:latest
+FROM test_pseudo_fs
 
 COPY cyclomatic_complexity/API /API
 COPY common/API /API/deps

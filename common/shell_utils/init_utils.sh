@@ -85,7 +85,7 @@ send_ka_watchdog_query() {
     local PID_TO_UNBLOCK_RESULT=$?
     if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
         # query has stucked, probably dead-pipe
-        echo -e "${Cyan}Watchdog can't make a query through ${pipe_in}, PID: {PID_TO_UNBLOCK}. Unblock the pipe${Color_Off}"
+        echo -e "${Cyan}Watchdog can't make a query through ${pipe_in}, PID: ${PID_TO_UNBLOCK}. Unblock the pipe${Color_Off}"
         timeout 2 /bin/bash -c "cat ${pipe_in} > /dev/null 2>&1"
         if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET:	${pipe_in}"; fi
         return 255
