@@ -30,7 +30,8 @@ jobs:
           mount-path: '/Users/user1/test-files:/testdata'
           wait: false
           insecure-registry: 'localhost:5000,10.0.0.0/24'
-          start-args: '--delete-on-failure --subnet 192.168.50.0'
+          #start-args: '--delete-on-failure --subnet 192.168.50.0'
+          start-args: '--delete-on-failure'
       - name: kubectl
         run: kubectl get pods -A
       - name: Activate docker env
