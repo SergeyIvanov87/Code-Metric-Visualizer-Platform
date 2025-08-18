@@ -1,7 +1,3 @@
-- name: setup-minikube
-  uses: medyagh/setup-minikube@v0.0.20
-
-
 name: Minikube CI
 on:
   push:
