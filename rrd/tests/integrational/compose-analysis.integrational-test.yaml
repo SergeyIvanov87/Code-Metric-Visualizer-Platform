@@ -4,7 +4,7 @@ services:
       context: ../../../
       dockerfile: rrd/tests/integrational/Dockerfile
       additional_contexts:
-        base_image: "service:test_pseudo_fs"
+        test_pseudo_fs: "service:test_pseudo_fs"
     environment:
       - EXIT_ONCE_DONE=false
       - MICROSERVICE_NAME=rrd-integrational-tester
