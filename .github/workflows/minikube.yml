@@ -17,14 +17,14 @@ jobs:
         with:
           cache: false
           minikube-version: 1.24.0
-          driver: kvm2
+#          driver: kvm2
 #          container-runtime: containerd
           kubernetes-version: v1.22.3
           nodes: 2
           cpus: 4
           memory: 4000m
           cni: bridge
-          addons: registry,ingress
+#          addons: registry,ingress
           extra-config: 'kubelet.max-pods=10'
           feature-gates: 'DownwardAPIHugePages=true'
           mount-path: '/Users/user1/test-files:/testdata'
