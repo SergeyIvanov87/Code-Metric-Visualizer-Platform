@@ -37,6 +37,7 @@ jobs:
       - name: Activate docker env
         run: eval $(minikube docker-env)
       - name: Build Docker images locally
+      - uses: actions/checkout@v3
         run: docker compose -f compose-analytic-http-api.yaml build
       - name: Deploy CC
         run: kubectl apply -f k8s/deployment/cc_visualizer-http.yaml
