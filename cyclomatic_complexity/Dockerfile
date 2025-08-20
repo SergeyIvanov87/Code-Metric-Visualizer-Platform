@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 FROM alpine:latest as build
-WORKDIR package
+WORKDIR /package
 # install app dependencies
 RUN apk add --no-cache git gcc musl-dev make
 
@@ -12,12 +12,13 @@ RUN git clone https://github.com/SergeyIvanov87/pmccabe_visualizer.git && git cl
 
 FROM alpine:latest
 
-WORKDIR package
+WORKDIR /package
 ARG SCRIPT_GEN_LOC=services
 
 # install app dependencies
 RUN apk add --no-cache coreutils python3 dos2unix
 RUN apk add --no-cache inotify-tools bash
+RUN apk add --no-cache busybox-openrc alpine-conf doas
 RUN apk add --no-cache perl
 
 COPY --from=build /usr/bin/pmccabe /usr/bin/pmccabe
@@ -58,12 +59,15 @@ RUN addgroup \
     -u $UID \
     --ingroup "$GROUPNAME" \
     --no-create-home \
-    $USER
+    $USER \
+&& adduser ${USER} wheel
+
 
 RUN  <<EOF
+mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
 mkdir -p -m 777 /mnt && mkdir -p -m 777 /api
 chown -R ${USER}:${GROUPNAME} /mnt && chown -R ${USER}:${GROUPNAME} /api
-chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt
+chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
 EOF
 
 USER ${USER}

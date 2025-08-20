@@ -26,7 +26,7 @@ termination_handler(){
     gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
     exit 0
 }
-trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
+trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
 
 echo "Generate Mock API"
 mv ${WORK_DIR}/API/service_broker_queries_order_list.json service_broker_queries_order_list.json
