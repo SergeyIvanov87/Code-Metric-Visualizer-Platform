@@ -7,9 +7,9 @@ on:
 
 # See https://github.com/marketplace/actions/setup-minikube
 jobs:
-  test_job:
+  minikube_setup_job:
     runs-on: ubuntu-latest
-    name: test_job
+    name: minikube_setup_job
     steps:
       - uses: medyagh/setup-minikube@latest
       - name: start minikube
@@ -34,6 +34,9 @@ jobs:
           start-args: '--delete-on-failure'
       - name: kubectl
         run: kubectl get pods -A
+  minikube_launch_job:
+    runs-on: ubuntu-latest
+    name: minikube_setup_job
     steps:
       - uses: actions/checkout@v3
       - name: Activate docker env
