@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     name: test_job
     steps:
+      - name: start minikube
       - uses: actions/checkout@v3
       - uses: medyagh/setup-minikube@latest
-      - name: start minikube
         id: minikube
         with:
           cache: false
