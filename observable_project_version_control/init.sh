@@ -32,7 +32,7 @@ termination_handler(){
     gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
     exit 0
 }
-trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
+trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
 
 # allow pmccabe_collector to access reposiroty
 git -C ${INITIAL_PROJECT_LOCATION} pull || git clone ${PROJECT_URL} -b ${PROJECT_BRANCH} ${INITIAL_PROJECT_LOCATION}

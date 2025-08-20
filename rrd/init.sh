@@ -46,7 +46,7 @@ termination_handler(){
     gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
     exit 0
 }
-trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
+trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
 
 # create API directory and initialize API nodes
 # TODO maybe should rely on build_seudo_fs.py?? as it create an entire  chain of directories
