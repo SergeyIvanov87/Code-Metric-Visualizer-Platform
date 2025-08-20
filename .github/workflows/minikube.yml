@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     name: minikube_setup_job
     steps:
-      - uses: medyagh/setup-minikube@latest
       - name: start minikube
+        uses: medyagh/setup-minikube@latest
         id: minikube
         with:
           cache: false
@@ -34,12 +34,13 @@ jobs:
           start-args: '--delete-on-failure'
       - name: kubectl
         run: kubectl get pods -A
+
   minikube_launch_job:
     runs-on: ubuntu-latest
     name: minikube_setup_job
     steps:
-      - uses: actions/checkout@v3
       - name: Activate docker env
+        uses: actions/checkout@v3
         run: eval $(minikube docker-env)
       - name: Build Docker images locally
         run: docker compose -f compose-analytic-http-api.yaml build
