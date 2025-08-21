@@ -42,14 +42,42 @@ spec:
           name: api-pmccabecollector-api-cc-http-private-org
         - mountPath: /mnt
           name: api-pmccabe-collector-vcs-project
-        # Mount ConfigMap params as files in FS, which are devoted to customize queries using pseudo FS API interface
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc
+        ####
+        # Mount ConfigMap params as files in FS, which are devoted to customize queries using pseudo FS API interface.
+        # Unfortunately ConfigMap mounts as read-only volumes, which stops us from creating FS API node in those directory
+        # due to lack of permissions on write: pipes cannot be created etc.
+        ####
+        # The only WA is to use `subPath`, which will mount a single file-parameter only, without touching access-right
+        # of an entire FS API. In this case FS is not read-only and we still can leverage FS API advantages
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/0.-regex
+          subPath: 0.-regex
           name: cc-watch-list-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/statistic
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/1.NO_NAME_PARAM.0
+          subPath: 1.NO_NAME_PARAM.0
+          name: cc-watch-list-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/2.-type
+          subPath: 2.-type
+          name: cc-watch-list-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/statistic/0.-mmcc
+          subPath: 0.-mmcc
           name: cc-statistic-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/statistic/view
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/statistic/1.-tmcc
+          subPath: 1.-tmcc
+          name: cc-statistic-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/statistic/2.-sif
+          subPath: 2.-sif
+          name: cc-statistic-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/statistic/3.-lif
+          subPath: 3.-lif
+          name: cc-statistic-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/statistic/view/0.-attr
+          subPath: 0.-attr
           name: cc-view-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/0.--width
+          subPath: 0.--width
+          name: cc-flamegraph-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/1.--height
+          subPath: 1.--height
           name: cc-flamegraph-query-params
         securityContext:
           runAsUser: 1001

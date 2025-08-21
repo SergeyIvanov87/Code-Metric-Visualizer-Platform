@@ -137,3 +137,7 @@ or
     As BASH offers the command substituition, you can check health of the service by executing the command:
 
     ```curl  --head --fail "`minikube ip`:30001//api.pmccabe_collector.restapi.org"```
+
+4. To log-in into a container on a POD
+
+    `kubectl exec <POD> -it -c <container>  -- /bin/bash`
