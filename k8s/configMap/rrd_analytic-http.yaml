@@ -1,0 +1,70 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cc-analytic-cm
+data:
+  0.-mmcc: "1,"
+  1.-tmcc: "1,"
+  2.-sif: "1,"
+  3.-lif: "1,"
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cc-rrd-cm
+data:
+  0.--start: "1701154260"
+  1.--step: "1"
+  2.NO_NAME_PARAM.0: "DS:mmcc:GAUGE:1y:U:U"
+  3.NO_NAME_PARAM.1: "DS:tmcc:GAUGE:1y:U:U"
+  4.NO_NAME_PARAM.2: "DS:sif:GAUGE:1y:U:U"
+  5.NO_NAME_PARAM.3: "DS:lif:GAUGE:1y:U:U"
+  6.NO_NAME_PARAM.4: "DS:mmcc_median:GAUGE:1y:U:U"
+  7.NO_NAME_PARAM.5: "DS:tmcc_median:GAUGE:1y:U:U"
+  8.NO_NAME_PARAM.6: "DS:sif_median:GAUGE:1y:U:U"
+  9.NO_NAME_PARAM.7: "DS:lif_median:GAUGE:1y:U:U"
+  10.NO_NAME_PARAM.8: "DS:mmcc_deviation:GAUGE:1y:U:U"
+  11.NO_NAME_PARAM.9: "DS:tmcc_deviation:GAUGE:1y:U:U"
+  12.NO_NAME_PARAM.10: "DS:sif_deviation:GAUGE:1y:U:U"
+  13.NO_NAME_PARAM.11: "DS:lif_deviation:GAUGE:1y:U:U"
+  14.NO_NAME_PARAM.12: "RRA:LAST:0.1:1:10000"
+  15.--no-overwrite: ""
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cc-rrd-collect-cm
+data:
+  0.-method: "update"
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cc-rrd-select-cm
+data:
+  0.-path: "\"*api.pmccabe_collector.restapi.org/*\" -prune"
+  1.-name: "\"*rrd\""
+  2.-type: "f"
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cc-rrd-view-cm
+data:
+  0.-s: "1701154260"
+  1.-e: "None"
+  2.NO_NAME_PARAM.0: "AVERAGE"
+  3.package_counters: "mmcc_mean,mmcc_median,mmcc_deviation,tmcc_mean,tmcc_median,tmcc_deviation,sif_mean,sif_median,sif_deviation,lif_mean,lif_median,lif_deviation"
+  4.leaf_counters: "mmcc,tmcc,sif,lif"
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cc-rrd-plot-view-cm
+data:
+  0.-a: "SVG"
+  1.-x: "none"
+  2.-s: "1701154260"
+  3.-e: "None"
+  4.package_counters: "mmcc_mean:FF0000,mmcc_median:6E0000,mmcc_deviation:2D0000,tmcc_mean:00FF00,tmcc_median:006E00,tmcc_deviation:002D00,sif_mean:0000FF,sif_median:00006E,sif_deviation:00002D,lif_mean:FFFF00,lif_median:6E6E00,lif_deviation:2D2D00"
+  5.leaf_counters: "mmcc:FF0000,tmcc:FFFF00,sif:00FF00,lif:0000FF"

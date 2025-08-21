@@ -44,4 +44,4 @@ jobs:
       - name: Deploy CC Service
         run: kubectl apply -f k8s/service/cc_visualizer-http.yaml
       - name: Check CC service health
-        run: sleep 30 && curl  --head --fail "`minikube ip`:30001//api.pmccabe_collector.restapi.org"
+        run: sleep 90 && curl  --head --fail "`minikube ip`:30001//api.pmccabe_collector.restapi.org"
