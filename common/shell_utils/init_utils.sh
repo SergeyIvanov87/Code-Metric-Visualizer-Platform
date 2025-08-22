@@ -186,6 +186,21 @@ launch_command_api_services() {
     launch_fs_api_services in_out_service_pids_arr "${work_dir}/aux_services"
 }
 
+doas_launch_command_api_services() {
+    local -n in_out_service_pids_arr=${1}
+    local command_api_schema_dir=${2}
+    local work_dir=${3}
+    local shared_api_dir_for_meta_fs_mount=${4}
+    local full_service_name=${5}
+
+    ${OPT_DIR}/canonize_internal_api.py ${command_api_schema_dir} ${full_service_name}
+    ${OPT_DIR}/build_common_api_services.py ${command_api_schema_dir} -os ${work_dir}/aux_services -oe ${work_dir}
+    doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${shared_api_dir_for_meta_fs_mount} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/build_api_pseudo_fs.py ${command_api_schema_dir} ${shared_api_dir_for_meta_fs_mount}
+    doas -u root chown -R $USER:$GROUPNAME ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+    ls -laR ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+    launch_fs_api_services in_out_service_pids_arr "${work_dir}/aux_services"
+}
+
 launch_inner_api_services() {
     local -n in_out_inner_service_pids_arr=${1}
     local inner_api_schema_dir=${2}
@@ -203,6 +218,29 @@ launch_inner_api_services() {
 
     launch_fs_api_services in_out_inner_service_pids_arr "${work_dir}/services"
 }
+
+doas_launch_inner_api_services() {
+    local -n in_out_inner_service_pids_arr=${1}
+    local inner_api_schema_dir=${2}
+    local work_dir=${3}
+    local shared_api_dir_for_meta_fs_mount=${4}
+    local out_readme_file_path_=${5}
+    local full_service_name=${6}
+
+    ${OPT_DIR}/build_api_executors.py ${inner_api_schema_dir} ${work_dir} -o ${work_dir}
+    ${OPT_DIR}/build_api_services.py ${inner_api_schema_dir} ${work_dir} -o ${work_dir}/services
+    doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${shared_api_dir_for_meta_fs_mount} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/build_api_pseudo_fs.py ${inner_api_schema_dir} ${shared_api_dir_for_meta_fs_mount}
+    doas -u root chown -R $USER:$GROUPNAME ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+    ls -laR ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+
+    # Do not generate readme unles the server completely started
+    #${OPT_DIR}/make_api_readme.py ${inner_api_schema_dir} > ${out_readme_file_path_}
+    #chmod g+rw ${out_readme_file_path_}
+    #${OPT_DIR}/make_api_readme.py ${inner_api_schema_dir}  | ( umask 0033; cat >> ${out_readme_file_path_} )
+
+    launch_fs_api_services in_out_inner_service_pids_arr "${work_dir}/services"
+}
+
 
 wait_for_unavailable_services() {
     local shared_api_mount_dir=${1}
