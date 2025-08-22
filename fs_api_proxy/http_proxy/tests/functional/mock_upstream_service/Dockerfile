@@ -1,27 +1,6 @@
+# syntax=docker/dockerfile:1
+
 FROM test_pseudo_fs
-
-ARG UID=10001
-ENV UID=$UID
-ARG GID=23456
-ENV GID=$GID
-
-ARG USER=mock_upstream_service
-ENV USER=$USER
-ENV GROUPNAME=pmccabe
-
-RUN addgroup \
-    --gid "$GID" \
-    "$GROUPNAME" \
-&&  adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "$(pwd)" \
-    -u $UID \
-    --ingroup "$GROUPNAME" \
-    --no-create-home \
-    $USER \
-&& adduser ${USER} wheel
-
 
 RUN apk add --no-cache inotify-tools alpine-conf doas py3-requests curl
 
@@ -45,11 +24,30 @@ ENV DOWNSTREAM_SERVICE_NETWORK_ADDR=$DOWNSTREAM_SERVICE_NETWORK_ADDR
 
 VOLUME ["/api", "/mnt"]
 
+ARG UID=10001 GID=23456 USER=mock_upstream_service
+ENV UID=$UID GID=$GID USER=$USER GROUPNAME=pmccabe
+
+# create user
+RUN addgroup \
+    --gid "$GID" \
+    "$GROUPNAME" \
+&&  adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "$(pwd)" \
+    -u $UID \
+    --ingroup "$GROUPNAME" \
+    --no-create-home \
+    $USER \
+&& adduser ${USER} wheel
+
 # allow group wheel to become root
-RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :wheel" >> /etc/doas.d/doas.conf
-RUN mkdir -p -m 777 /api && chown -R ${USER}:${GROUPNAME} /api
-RUN mkdir -p -m 777 /mnt && chown -R ${USER}:${GROUPNAME} /mnt
-RUN chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /tests
+RUN  <<EOF
+mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
+mkdir -p -m 777 /api && chown -R ${USER}:${GROUPNAME} /api
+mkdir -p -m 777 /mnt && chown -R ${USER}:${GROUPNAME} /mnt
+chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /tests
+EOF
 
 USER ${USER}
 ENTRYPOINT ["/tests/init.sh", "/tests", "/api"]

@@ -24,9 +24,10 @@ fi
 
 echo "Premature cleanup..."
 rm -f ${README_FILE_PATH}
-${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}|${DEPEND_ON_SERVICES_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
-kill -15 $!
+doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${SHARED_API_DIR} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}|${DEPEND_ON_SERVICES_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
+doas -u root kill -15 $!
 
+ls -laR ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
 echo -e "${BGreen}Initializing: ${MICROSERVICE_NAME}...${Color_Off}"
 
 # I use standalone python-based process here to listen to SIGNAL and make PIPEs clearance.
@@ -48,20 +49,13 @@ termination_handler(){
 }
 trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
 
-# create API directory and initialize API nodes
-# TODO maybe should rely on build_seudo_fs.py?? as it create an entire  chain of directories
-mkdir -p -m 777 ${SHARED_API_DIR}
-TMPDIR=$(mktemp -d --tmpdir=${SHARED_API_DIR})
-if [ $? -ne 0 ]; then echo "Cannot create ${SHARED_API_DIR}. Please check access rights to the VOLUME '/api' and grant the container all of them"; exit -1; fi
-rm -rf $TMPDIR
-
 mkdir -p -m 777 ${RRD_DATA_STORAGE_DIR}
 if [ $? -ne 0 ]; then echo "Cannot create ${RRD_DATA_STORAGE_DIR}. Please check access rights to the VOLUME '/rrd_data' and grant the container all of them"; exit -1; fi
 
 
 # Launch internal & command API services
-launch_command_api_services SERVICE_WATCH_PIDS ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"
-launch_inner_api_services SERVICE_WATCH_PIDS ${INNER_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} ${README_FILE_PATH}
+doas_launch_command_api_services SERVICE_WATCH_PIDS ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"
+doas_launch_inner_api_services SERVICE_WATCH_PIDS ${INNER_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} ${README_FILE_PATH} "${MAIN_SERVICE_NAME}/cc_analytic"
 ${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}|${DEPEND_ON_SERVICES_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
 API_MANAGEMENT_PID=$!
 

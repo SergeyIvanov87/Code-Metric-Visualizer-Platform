@@ -4,31 +4,10 @@ FROM alpine:latest
 WORKDIR package
 ARG SCRIPT_GEN_LOC=services
 
-ARG UID=1101
-ENV UID=$UID
-ARG GID=23456
-ENV GID=$GID
-
-ARG USER=rrd
-ENV USER=$USER
-ENV GROUPNAME=pmccabe
-
-RUN addgroup \
-    --gid "$GID" \
-    "$GROUPNAME" \
-&&  adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "$(pwd)" \
-    -u $UID \
-    --ingroup "$GROUPNAME" \
-    --no-create-home \
-    $USER
-
-
 # install app dependencies
 RUN apk add --no-cache coreutils python3 dos2unix
 RUN apk add --no-cache inotify-tools bash
+RUN apk add --no-cache busybox-openrc alpine-conf doas
 RUN apk add --no-cache rrdtool librsvg potrace imagemagick ghostscript-fonts terminus-font
 
 RUN mkdir -p /opt
@@ -52,23 +31,40 @@ COPY rrd/API /package/API
 
 COPY rrd/$SCRIPT_GEN_LOC/*.sh /package/
 
-RUN dos2unix /package/*
-RUN dos2unix /opt/*
-RUN dos2unix /opt/modules*
+RUN <<EOF
+dos2unix /package/*
+dos2unix /opt/*
+dos2unix /opt/modules*
+EOF
 
-ARG SKIP_API_DEPS_CHECK=false
-ENV SKIP_API_DEPS_CHECK=$SKIP_API_DEPS_CHECK
-
-ARG TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30
-ENV TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=$TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC
+ARG SKIP_API_DEPS_CHECK=false TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30 MICROSERVICE_NAME=rrd
+ENV SKIP_API_DEPS_CHECK=$SKIP_API_DEPS_CHECK TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=$TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC MICROSERVICE_NAME=$MICROSERVICE_NAME
 
 VOLUME ["/api", "/rrd_data"]
 
-ARG MICROSERVICE_NAME=rrd
-ENV MICROSERVICE_NAME=$MICROSERVICE_NAME
+ARG UID=1101 GID=23456 USER=rrd
+ENV UID=$UID GID=$GID USER=$USER GROUPNAME=pmccabe
 
-RUN mkdir -p -m 777 /api && mkdir -p -m 777 /rrd_data
-RUN chown -R ${USER}:${GROUPNAME} /api && chown -R ${USER}:${GROUPNAME} /rrd_data
-RUN chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt
+RUN addgroup \
+    --gid "$GID" \
+    "$GROUPNAME" \
+&&  adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "$(pwd)" \
+    -u $UID \
+    --ingroup "$GROUPNAME" \
+    --no-create-home \
+    $USER \
+&& adduser ${USER} wheel
+
+
+RUN  <<EOF
+mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
+mkdir -p -m 777 /api && mkdir -p -m 777 /rrd_data
+chown -R ${USER}:${GROUPNAME} /api && chown -R ${USER}:${GROUPNAME} /rrd_data
+chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt
+EOF
+
 USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api", "/rrd_data"]

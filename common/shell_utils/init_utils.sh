@@ -77,7 +77,7 @@ send_ka_watchdog_query() {
     local session_id=${2}
     local downstream_service=${3}
     local deps_query_timeout_sec=${4}
-    echo -e "Send watchdog query ${Cyan}${session_id}${Color_Off} to the pipe: ${pipe_in}"
+    echo -e "Send watchdog query ${Cyan}${session_id}${Color_Off} to the pipe: ${pipe_in}, timeout: ${deps_query_timeout_sec}"
     (echo "SESSION_ID=${session_id} --service=${downstream_service} --timeout=${deps_query_timeout_sec}"> ${pipe_in}) &
     local PID_TO_UNBLOCK=$!
     sleep $((deps_query_timeout_sec + 2))
@@ -113,7 +113,7 @@ receive_ka_watchdog_query() {
     local PID_TO_UNBLOCK_RESULT=$?
     if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
         # query has stucked, probably dead-pipe
-        echo -e "${Cyan}Watchdog hasn't answered by ${pipe_out}, PID: {PID_TO_UNBLOCK}. Unblock pipe${Color_Off}"
+        echo -e "${Cyan}Watchdog hasn't answered by ${pipe_out}, PID: ${PID_TO_UNBLOCK}. Unblock pipe${Color_Off}"
 
         # query has stucked: probably due to upstream service outage. Unblock query
         timeout 2 /bin/bash -c "echo > ${pipe_out} > /dev/null 2>&1"
@@ -122,7 +122,7 @@ receive_ka_watchdog_query() {
     fi
 
     local PROXYING_API_QUERIES=`cat ${file_pipe_out_result_name}`
-    eval ${3}=$PROXYING_API_QUERIES
+    eval ${3}='${PROXYING_API_QUERIES}'
     return 0
 }
 
@@ -171,6 +171,21 @@ launch_command_api_services() {
     launch_fs_api_services in_out_service_pids_arr "${work_dir}/aux_services"
 }
 
+doas_launch_command_api_services() {
+    local -n in_out_service_pids_arr=${1}
+    local command_api_schema_dir=${2}
+    local work_dir=${3}
+    local shared_api_dir_for_meta_fs_mount=${4}
+    local full_service_name=${5}
+
+    ${OPT_DIR}/canonize_internal_api.py ${command_api_schema_dir} ${full_service_name}
+    ${OPT_DIR}/build_common_api_services.py ${command_api_schema_dir} -os ${work_dir}/aux_services -oe ${work_dir}
+    doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${shared_api_dir_for_meta_fs_mount} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/build_api_pseudo_fs.py ${command_api_schema_dir} ${shared_api_dir_for_meta_fs_mount}
+    doas -u root chown -R $USER:$GROUPNAME ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+    ls -laR ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+    launch_fs_api_services in_out_service_pids_arr "${work_dir}/aux_services"
+}
+
 launch_inner_api_services() {
     local -n in_out_inner_service_pids_arr=${1}
     local inner_api_schema_dir=${2}
@@ -188,6 +203,29 @@ launch_inner_api_services() {
 
     launch_fs_api_services in_out_inner_service_pids_arr "${work_dir}/services"
 }
+
+doas_launch_inner_api_services() {
+    local -n in_out_inner_service_pids_arr=${1}
+    local inner_api_schema_dir=${2}
+    local work_dir=${3}
+    local shared_api_dir_for_meta_fs_mount=${4}
+    local out_readme_file_path_=${5}
+    local full_service_name=${6}
+
+    ${OPT_DIR}/build_api_executors.py ${inner_api_schema_dir} ${work_dir} -o ${work_dir}
+    ${OPT_DIR}/build_api_services.py ${inner_api_schema_dir} ${work_dir} -o ${work_dir}/services
+    doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${shared_api_dir_for_meta_fs_mount} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/build_api_pseudo_fs.py ${inner_api_schema_dir} ${shared_api_dir_for_meta_fs_mount}
+    doas -u root chown -R $USER:$GROUPNAME ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+    ls -laR ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+
+    # Do not generate readme unles the server completely started
+    #${OPT_DIR}/make_api_readme.py ${inner_api_schema_dir} > ${out_readme_file_path_}
+    #chmod g+rw ${out_readme_file_path_}
+    #${OPT_DIR}/make_api_readme.py ${inner_api_schema_dir}  | ( umask 0033; cat >> ${out_readme_file_path_} )
+
+    launch_fs_api_services in_out_inner_service_pids_arr "${work_dir}/services"
+}
+
 
 wait_for_unavailable_services() {
     local SHARED_API_MOUNT_DIR=${1}
@@ -226,7 +264,7 @@ wait_for_unavailable_services() {
             let wait_dependencies_counter=$wait_dependencies_counter+1
             echo -e "Wait for another attempt: ${BCyan}${wait_dependencies_counter}/${wait_dependencies_counter_limit}${Color_Off}"
             if [ ${wait_dependencies_counter} == ${wait_dependencies_counter_limit} ]; then
-                eval ${3}=$ANY_SERVICE_UNAVAILABLE
+                eval ${3}=-1 #$ANY_SERVICE_UNAVAILABLE
                 break
             fi
             continue
@@ -255,7 +293,7 @@ wait_for_unavailable_services() {
             echo -e "Wait for another attempt: ${BCyan}${wait_dependencies_counter}/${wait_dependencies_counter_limit}${Color_Off}"
             let wait_dependencies_counter=$wait_dependencies_counter+1
             if [ ${wait_dependencies_counter} == ${wait_dependencies_counter_limit} ]; then
-                eval ${3}=$ANY_SERVICE_UNAVAILABLE
+                eval ${3}=-1 #$ANY_SERVICE_UNAVAILABLE
                 break
             fi
             continue
