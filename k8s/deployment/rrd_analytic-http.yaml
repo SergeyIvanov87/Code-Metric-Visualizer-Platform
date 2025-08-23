@@ -175,7 +175,7 @@ spec:
         imagePullPolicy: Never
         env:
         - name: UPSTREAM_SERVICE
-          value: rrd
+          value: rrd_analytic
         - name: DOWNSTREAM_SERVICE
           value: cyclomatic_complexity
         - name: DOWNSTREAM_SERVICE_NETWORK_ADDR

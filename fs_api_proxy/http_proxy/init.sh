@@ -223,7 +223,7 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
         ./build_proxy_services.py "${service}" -os "${service}/generated" -oe "${service}/exec_generated"
 #        ${OPT_DIR}/build_api_pseudo_fs.py "${service}" ${SHARED_API_DIR}
         doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${SHARED_API_DIR} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/build_api_pseudo_fs.py ${service} ${SHARED_API_DIR}
-        doas -u root chown -R $USER:$GROUPNAME ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${service} #how do we get CC or CC_ANALYTIC ???? Rename it please
+        doas -u root chown -R $USER:$GROUPNAME ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/`basename ${service}`
 
         # for each 'service' launch all its query-servers
         launch_fs_api_services SERVICE_QUERY_WATCH_PIDS "${service}/generated"
