@@ -47,7 +47,7 @@ trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
 ${OPT_DIR}/build_api_executors.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_DIR}
 ${OPT_DIR}/build_api_services.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_DIR}/services
 doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${SHARED_API_DIR} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/build_api_pseudo_fs.py ${INNER_API_SCHEMA_DIR} ${SHARED_API_DIR}
-doas -u root chown -R $USER:$GROUPNAME ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc
+doas -u root chown -R $USER:$GROUPNAME ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cyclomatic_complexity
 #${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR} > ${README_FILE_PATH}
 #chmod g+rw ${README_FILE_PATH}
 #${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR}  | ( umask 0033; cat >> ${README_FILE_PATH} )
