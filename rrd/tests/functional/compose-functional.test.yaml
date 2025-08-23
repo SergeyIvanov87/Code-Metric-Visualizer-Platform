@@ -5,7 +5,7 @@ services:
   rrd-functional-tester:
     build:
       context: ../../../
-      dockerfile: rrd/tests/functional/Dockerfile
+      dockerfile: rrd_analytic/tests/functional/Dockerfile
       additional_contexts:
         test_pseudo_fs: "service:test_pseudo_fs"
     environment:
@@ -16,7 +16,7 @@ services:
       - api.pmccabe_collector.rrd.rrd-analytic:/rrd_data
       - api.pmccabe_collector.project.rrd.test:/mnt
     depends_on:
-      - rrd-analytic
+      - rrd_analytic-analytic
       - test_pseudo_fs
 
 volumes:

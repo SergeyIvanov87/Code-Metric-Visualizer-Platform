@@ -5,7 +5,7 @@ services:
   rrd-analytic:
     build:
       context: ../
-      dockerfile: ./rrd/Dockerfile
+      dockerfile: ./rrd_analytic/Dockerfile
     #container_name: rrd_analytic_functional
     environment:
         - SKIP_API_DEPS_CHECK=${SKIP_API_DEPS_CHECK:-false}

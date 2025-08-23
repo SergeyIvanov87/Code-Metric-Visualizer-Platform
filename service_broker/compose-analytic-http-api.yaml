@@ -26,7 +26,7 @@ services:
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
     environment:
         - UPSTREAM_SERVICE=service-broker
-        - DOWNSTREAM_SERVICE=rrd
+        - DOWNSTREAM_SERVICE=rrd_analytic
         - DOWNSTREAM_SERVICE_NETWORK_ADDR=rrd-http-api:5002
         - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT:-900}
     hostname: service-broker-http-proxy-rrd

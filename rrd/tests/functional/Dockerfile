@@ -26,13 +26,13 @@ COPY --from=build /usr/bin/pmccabe /usr/bin/pmccabe
 RUN mkdir -p /package/pmccabe_visualizer
 COPY --from=build /package/pmccabe_visualizer/*.py /package/pmccabe_visualizer/
 
-COPY rrd/tests/functional/data /package/test_data
+COPY rrd_analytic/tests/functional/data /package/test_data
 
-COPY rrd/API /API
-COPY rrd/*.py /tests/
+COPY rrd_analytic/API /API
+COPY rrd_analytic/*.py /tests/
 
-COPY rrd/tests/functional/*.sh /tests/
-COPY rrd/tests/functional/*.py /tests/
+COPY rrd_analytic/tests/functional/*.sh /tests/
+COPY rrd_analytic/tests/functional/*.py /tests/
 
 RUN dos2unix /tests/*
 VOLUME ["/api", "/mnt", "/rrd_data"]

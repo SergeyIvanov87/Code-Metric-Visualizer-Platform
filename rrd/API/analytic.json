@@ -1,6 +1,6 @@
 {
     "Method" : "PUT",
-    "Query": "api.pmccabe_collector.restapi.org/cc_analytic",
+    "Query": "api.pmccabe_collector.restapi.org/rrd_analytic",
     "Params": {
         "watch_list" : {
             "-regex": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\"",
@@ -13,7 +13,7 @@
     },
     "Description": {
         "header": "Apply filters to exclude all functions and modules which metric values are resided outside the range of values described in arguments of this query.\n\n`-mmcc` stands for 'Modified McCabe Cyclomatic Complexity'\n\n`-tmcc` - 'Traditional McCabe Cyclomatic Complexity'\n\n`-sif` - 'Statements in function'\n\n`-lif` - 'lines in function'\n\nDefault range (1,*) admits all functions/methods/components for putting them into a final statistic report, regardless which metric value they have. To focus your interest onto significantly large functions or components, you may apply limits filters narrowing statistic generation for particular range only.\nTypical usecase for a large project is to shift points of interest onto inflated functions, determined by the ranges `-mmcc 10,3000` and `-lif 10,*` for example.\n\nPlease don't hesitate to find the best matches for your project.\nThe filtering will be applied for the project files list detemined by a rule introduced by `watch_list` API query.\n",
-        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/cc_analytic/PUT/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/cc_analytic/PUT/result`\n\n",
+        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/rrd_analytic/PUT/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/rrd_analytic/PUT/result`\n\n",
         "footer": "The query doesn't return anything useful for API consumer. The result of this query execution is the same arguments enumeration as which were asked when this query was called. This query output result is pipelined as a transitive input of any sebsequent API function"
     }
 }

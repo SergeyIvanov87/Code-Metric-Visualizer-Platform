@@ -2,7 +2,7 @@ services:
   rrd-analytic:
     build:
       context: ../
-      dockerfile: ./rrd/Dockerfile
+      dockerfile: ./rrd_analytic/Dockerfile
     cap_add:
       - SYS_PTRACE
     depends_on:
@@ -10,7 +10,7 @@ services:
     environment:
         - SKIP_API_DEPS_CHECK=${SKIP_API_DEPS_CHECK:-false}
         - TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC:-900}
-        - MICROSERVICE_NAME=rrd
+        - MICROSERVICE_NAME=rrd_analytic
     logging:
       driver: syslog
       options:
@@ -50,7 +50,7 @@ services:
       context: ../
       dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
     environment:
-        - UPSTREAM_SERVICE=rrd
+        - UPSTREAM_SERVICE=rrd_analytic
         - DOWNSTREAM_SERVICE=cyclomatic_complexity
         - DOWNSTREAM_SERVICE_NETWORK_ADDR=cc-http-api:5001
         - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT:-900}

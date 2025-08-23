@@ -10,7 +10,7 @@ export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 export DEPEND_ON_SERVICES_API_SCHEMA_DIR=${WORK_DIR}/API/deps
 export INNER_API_SCHEMA_DIR=${WORK_DIR}/API
 
-README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc_analytic/README-API-ANALYTIC.md
+README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/rrd_analytic/README-API-ANALYTIC.md
 
 
 # use source this script as fast way to setup environment for debugging
@@ -55,7 +55,7 @@ if [ $? -ne 0 ]; then echo "Cannot create ${RRD_DATA_STORAGE_DIR}. Please check 
 
 # Launch internal & command API services
 doas_launch_command_api_services SERVICE_WATCH_PIDS ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"
-doas_launch_inner_api_services SERVICE_WATCH_PIDS ${INNER_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} ${README_FILE_PATH} "${MAIN_SERVICE_NAME}/cc_analytic"
+doas_launch_inner_api_services SERVICE_WATCH_PIDS ${INNER_API_SCHEMA_DIR} ${WORK_DIR} ${SHARED_API_DIR} ${README_FILE_PATH} "${MAIN_SERVICE_NAME}/rrd_analytic"
 ${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}|${DEPEND_ON_SERVICES_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
 API_MANAGEMENT_PID=$!
 

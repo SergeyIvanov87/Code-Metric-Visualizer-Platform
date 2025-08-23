@@ -26,7 +26,7 @@ No special requirements for this UC
 
 From the main repository directory run:
 
-`docker build -t rrd-analytic:latest -f rrd/Dockerfile .`
+`docker build -t rrd-analytic:latest -f rrd_analytic/Dockerfile .`
 
 Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), thereby launch the `cc-visualizer` image at first.
 
@@ -38,7 +38,7 @@ Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), thereby 
 
 From the main repository directory run:
 
-`docker build -t rrd-analytic:latest -f rrd/Dockerfile .`
+`docker build -t rrd-analytic:latest -f rrd_analytic/Dockerfile .`
 
 Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), [observable_project_version_control](../observable_project_version_control), thereby launch the `cc-visualizer`, `vcs-project` images at first.
 
@@ -50,8 +50,8 @@ Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), [observa
 
 From the main repository directory run:
 
-`docker compose -f rrd/compose-functional.test.yaml build`
+`docker compose -f rrd_analytic/compose-functional.test.yaml build`
 
 and then
 
-`docker compose -f rrd/compose-functional.test.yaml up --abort-on-container-exit`
+`docker compose -f rrd_analytic/compose-functional.test.yaml up --abort-on-container-exit`

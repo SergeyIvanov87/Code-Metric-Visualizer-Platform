@@ -12,7 +12,7 @@ COPY rest_api/tests/integrational/*.py /tests/
 
 # copy API schemas
 COPY cyclomatic_complexity/API/*.json /tests/collected_API/
-COPY rrd/API/*.json /tests/collected_API/
+COPY rrd_analytic/API/*.json /tests/collected_API/
 
 RUN dos2unix /tests/*
 

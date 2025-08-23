@@ -10,7 +10,7 @@ export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
 export INNER_API_SCHEMA_DIR=${WORK_DIR}/API
 
-README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/README-API-STATISTIC.md
+README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cyclomatic_complexity/README-API-STATISTIC.md
 
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh

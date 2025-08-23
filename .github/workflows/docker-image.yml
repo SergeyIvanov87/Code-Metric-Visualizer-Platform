@@ -44,11 +44,11 @@ jobs:
     - name: Test the CC Docker image
       run: docker compose -f cyclomatic_complexity/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from cc-functional-tester
     - name: Build the RRD Docker image
-      run: docker build -f rrd/Dockerfile --tag rrd-analytic:$DATE .
+      run: docker build -f rrd_analytic/Dockerfile --tag rrd-analytic:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the RRD Docker image
-      run: docker compose -f rrd/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rrd-functional-tester
+      run: docker compose -f rrd_analytic/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rrd-functional-tester
     - name: Build the REST API Docker image
       run: docker build -f rest_api/Dockerfile --tag rest-api:$DATE .
       env:
