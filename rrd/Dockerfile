@@ -25,11 +25,11 @@ COPY common/make_api_readme.py /opt/
 COPY common/renew_pseudo_fs_pipes.py /opt/
 
 
-COPY rrd/*.sh /package/
-COPY rrd/*.py /package/
-COPY rrd/API /package/API
+COPY rrd_analytic/*.sh /package/
+COPY rrd_analytic/*.py /package/
+COPY rrd_analytic/API /package/API
 
-COPY rrd/$SCRIPT_GEN_LOC/*.sh /package/
+COPY rrd_analytic/$SCRIPT_GEN_LOC/*.sh /package/
 
 RUN <<EOF
 dos2unix /package/*
@@ -37,12 +37,12 @@ dos2unix /opt/*
 dos2unix /opt/modules*
 EOF
 
-ARG SKIP_API_DEPS_CHECK=false TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30 MICROSERVICE_NAME=rrd
+ARG SKIP_API_DEPS_CHECK=false TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30 MICROSERVICE_NAME=rrd_analytic
 ENV SKIP_API_DEPS_CHECK=$SKIP_API_DEPS_CHECK TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=$TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC MICROSERVICE_NAME=$MICROSERVICE_NAME
 
 VOLUME ["/api", "/rrd_data"]
 
-ARG UID=1101 GID=23456 USER=rrd
+ARG UID=1101 GID=23456 USER=rrd_analytic
 ENV UID=$UID GID=$GID USER=$USER GROUPNAME=pmccabe
 
 RUN addgroup \

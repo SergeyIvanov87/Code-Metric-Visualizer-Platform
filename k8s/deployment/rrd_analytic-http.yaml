@@ -32,115 +32,115 @@ spec:
         ####
         # The only WA is to use `subPath`, which will mount a single file-parameter only, without touching access-right
         # of an entire FS API. In this case FS is not read-only and we still can leverage FS API advantages
-        # "Query": "api.pmccabe_collector.restapi.org/cc_analytic"
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/0.-mmcc
+        # "Query": "api.pmccabe_collector.restapi.org/rrd_analytic"
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/0.-mmcc
           subPath: 0.-mmcc
           name: cc-analytic-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/1.-tmcc
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/1.-tmcc
           subPath: 1.-tmcc
           name: cc-analytic-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/2.-sif
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/2.-sif
           subPath: 2.-sif
           name: cc-analytic-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/3.-lif
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/3.-lif
           subPath: 3.-lif
           name: cc-analytic-query-params
-        # "Query": "api.pmccabe_collector.restapi.org/cc_analytic/rrd"
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/0.--start
-          subPath: 0.--start
+        # "Query": "api.pmccabe_collector.restapi.org/rrd_analytic/rrd"
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/00.--start
+          subPath: 00.--start
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/1.--step
-          subPath: 1.--step
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/01.--step
+          subPath: 01.--step
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/2.NO_NAME_PARAM.0
-          subPath: 2.NO_NAME_PARAM.0
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/02.NO_NAME_PARAM.0
+          subPath: 02.NO_NAME_PARAM.0
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/3.NO_NAME_PARAM.1
-          subPath: 3.NO_NAME_PARAM.1
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/03.NO_NAME_PARAM.1
+          subPath: 03.NO_NAME_PARAM.1
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/4.NO_NAME_PARAM.2
-          subPath: 4.NO_NAME_PARAM.2
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/04.NO_NAME_PARAM.2
+          subPath: 04.NO_NAME_PARAM.2
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/5.NO_NAME_PARAM.3
-          subPath: 5.NO_NAME_PARAM.3
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/05.NO_NAME_PARAM.3
+          subPath: 05.NO_NAME_PARAM.3
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/6.NO_NAME_PARAM.4
-          subPath: 6.NO_NAME_PARAM.4
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/06.NO_NAME_PARAM.4
+          subPath: 06.NO_NAME_PARAM.4
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/7.NO_NAME_PARAM.5
-          subPath: 7.NO_NAME_PARAM.5
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/07.NO_NAME_PARAM.5
+          subPath: 07.NO_NAME_PARAM.5
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/8.NO_NAME_PARAM.6
-          subPath: 8.NO_NAME_PARAM.6
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/08.NO_NAME_PARAM.6
+          subPath: 08.NO_NAME_PARAM.6
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/9.NO_NAME_PARAM.7
-          subPath: 9.NO_NAME_PARAM.7
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/09.NO_NAME_PARAM.7
+          subPath: 09.NO_NAME_PARAM.7
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/10.NO_NAME_PARAM.8
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/10.NO_NAME_PARAM.8
           subPath: 10.NO_NAME_PARAM.8
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/11.NO_NAME_PARAM.9
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/11.NO_NAME_PARAM.9
           subPath: 11.NO_NAME_PARAM.9
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/12.NO_NAME_PARAM.10
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/12.NO_NAME_PARAM.10
           subPath: 12.NO_NAME_PARAM.10
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/13.NO_NAME_PARAM.11
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/13.NO_NAME_PARAM.11
           subPath: 13.NO_NAME_PARAM.11
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/14.NO_NAME_PARAM.12
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/14.NO_NAME_PARAM.12
           subPath: 14.NO_NAME_PARAM.12
           name: cc-rrd-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/15.--no-overwrite
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/15.--no-overwrite
           subPath: 15.--no-overwrite
           name: cc-rrd-query-params
-        # "Query": "api.pmccabe_collector.restapi.org/cc_analytic/rrd/collect"
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/0.-method
+        # "Query": "api.pmccabe_collector.restapi.org/rrd_analytic/rrd/collect"
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/collect/0.-method
           subPath: 0.-method
           name: cc-rrd-collect-query-params
-        # "Query": "api.pmccabe_collector.restapi.org/cc_analytic/rrd/select"
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/0.-path
+        # "Query": "api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select"
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/0.-path
           subPath: 0.-path
           name: cc-rrd-select-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/1.-name
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/1.-name
           subPath: 1.-name
           name: cc-rrd-select-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/2.-type
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/2.-type
           subPath: 2.-type
           name: cc-rrd-select-query-params
-        # "Query": "api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/view"
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/view/0.-s
+        # "Query": "api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/view"
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/view/0.-s
           subPath: 0.-s
           name: cc-rrd-view-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/view/1.-e
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/view/1.-e
           subPath: 1.-e
           name: cc-rrd-view-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/view/2.NO_NAME_PARAM.0
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/view/2.NO_NAME_PARAM.0
           subPath: 2.NO_NAME_PARAM.0
           name: cc-rrd-view-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/view/3.package_counters
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/view/3.package_counters
           subPath: 3.package_counters
           name: cc-rrd-view-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/view/4.leaf_counters
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/view/4.leaf_counters
           subPath: 4.leaf_counters
           name: cc-rrd-view-query-params
-        # "Query": "api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/plot_view"
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/plot_view/0.-a
+        # "Query": "api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/plot_view"
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/plot_view/0.-a
           subPath: 0.-a
           name: cc-rrd-plot-view-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/plot_view/1.-x
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/plot_view/1.-x
           subPath: 1.-x
           name: cc-rrd-plot-view-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/plot_view/2.-s
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/plot_view/2.-s
           subPath: 2.-s
           name: cc-rrd-plot-view-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/plot_view/3.-e
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/plot_view/3.-e
           subPath: 3.-e
           name: cc-rrd-plot-view-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/plot_view/4.package_counters
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/plot_view/4.package_counters
           subPath: 4.package_counters
           name: cc-rrd-plot-view-query-params
-        - mountPath: /api/api.pmccabe_collector.restapi.org/cc_analytic/rrd/select/plot_view/5.leaf_counters
+        - mountPath: /api/api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/plot_view/5.leaf_counters
           subPath: 5.leaf_counters
           name: cc-rrd-plot-view-query-params
         securityContext:

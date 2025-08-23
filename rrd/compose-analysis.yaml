@@ -2,12 +2,12 @@ services:
   rrd-analytic:
     build:
       context: ../
-      dockerfile: ./rrd/Dockerfile
+      dockerfile: ./rrd_analytic/Dockerfile
     depends_on:
       - syslog-ng
     environment:
         - SKIP_API_DEPS_CHECK=${SKIP_API_DEPS_CHECK:-false}
-        - MICROSERVICE_NAME=rrd
+        - MICROSERVICE_NAME=rrd_analytic
     logging:
       driver: syslog
       options:

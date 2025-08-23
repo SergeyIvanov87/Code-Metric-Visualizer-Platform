@@ -17,15 +17,15 @@ COPY --from=build /usr/bin/pmccabe /usr/bin/pmccabe
 RUN mkdir -p /package/pmccabe_visualizer
 COPY --from=build /package/pmccabe_visualizer/*.py /package/pmccabe_visualizer/
 
-COPY rrd/API /API
+COPY rrd_analytic/API /API
 COPY common/API /API/deps
 COPY cyclomatic_complexity/API /API/deps/cyclomatic_complexity
-COPY rrd/API /API/deps/rrd
+COPY rrd_analytic/API /API/deps/rrd
 
-COPY rrd/tests/integrational/*.py /tests/
-COPY rrd/tests/integrational/*.sh /tests/
+COPY rrd_analytic/tests/integrational/*.py /tests/
+COPY rrd_analytic/tests/integrational/*.sh /tests/
 
-COPY rrd/*.py /tests/
+COPY rrd_analytic/*.py /tests/
 
 RUN dos2unix /tests/*
 RUN dos2unix /tests/*

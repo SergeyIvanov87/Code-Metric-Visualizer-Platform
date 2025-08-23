@@ -30,27 +30,27 @@ echo "Create CC API which RRD depends on"
 ${UTILS}/build_api_pseudo_fs.py /API/deps/cyclomatic_complexity ${SHARED_API_DIR}
 
 echo "Mock CC API for standalone functional tests only"
-rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_fake_data
-fake_statistic_data_result=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_fake_data
+rm -f ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cyclomatic_complexity/statistic/GET/result.xml_fake_data
+fake_statistic_data_result=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cyclomatic_complexity/statistic/GET/result.xml_fake_data
 find ${INITIAL_PROJECT_LOCATION} -regex ".*\\.\\(hpp\\|cpp\\|c\\|h\\)" -type f | /package/pmccabe_visualizer/pmccabe_build.py > ${fake_statistic_data_result}
-real_statistic_pipe_out=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml_${RRD_TESTABLE_CONTAINER_HOSTNAME}
+real_statistic_pipe_out=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cyclomatic_complexity/statistic/GET/result.xml_${RRD_TESTABLE_CONTAINER_HOSTNAME}
 if [ -e ${real_statistic_pipe_out} ]; then
     rm -f ${real_statistic_pipe_out}
 fi
 mkfifo -m 644 ${real_statistic_pipe_out}
 
-real_main_statistic_pipe_out=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/result.xml
+real_main_statistic_pipe_out=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cyclomatic_complexity/statistic/GET/result.xml
 if [ -e ${real_main_statistic_pipe_out} ]; then
     rm -f ${real_main_statistic_pipe_out}
 fi
 mkfifo -m 644 ${real_main_statistic_pipe_out}
 
-real_statistic_pipe_in=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
+real_statistic_pipe_in=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cyclomatic_complexity/statistic/GET/exec
 if [ -e ${real_statistic_pipe_in} ]; then
     rm -f ${real_statistic_pipe_in}
 fi
 mkfifo -m 622 ${real_statistic_pipe_in}
-#echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cc/statistic/GET/exec
+#echo 0 > ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cyclomatic_complexity/statistic/GET/exec
 echo "Ready to server Mock CC API"
 (
 while :

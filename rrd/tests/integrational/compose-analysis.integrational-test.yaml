@@ -2,7 +2,7 @@ services:
   rrd-integrational-tester:
     build:
       context: ../../../
-      dockerfile: rrd/tests/integrational/Dockerfile
+      dockerfile: rrd_analytic/tests/integrational/Dockerfile
       additional_contexts:
         test_pseudo_fs: "service:test_pseudo_fs"
     environment:

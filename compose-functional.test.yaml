@@ -33,7 +33,7 @@ services:
 
   rrd-analytic:
     extends:
-      file: rrd/compose-functional.test.yaml
+      file: rrd_analytic/compose-functional.test.yaml
       service: rrd-analytic
     depends_on:
       - cc-visualizer
@@ -47,7 +47,7 @@ services:
 
   rrd-functional-tester:
     extends:
-      file: rrd/tests/functional/compose-functional.test.yaml
+      file: rrd_analytic/tests/functional/compose-functional.test.yaml
       service: rrd-functional-tester
     environment:
       - EXIT_ONCE_DONE=false
@@ -65,7 +65,7 @@ services:
       service: rest-api
     depends_on:
       - cc-visualizer
-      - rrd-analytic
+      - rrd_analytic-analytic
     logging:
       driver: syslog
       options:
@@ -114,7 +114,7 @@ services:
       service: service-broker
     depends_on:
       - cc-visualizer
-      - rrd-analytic
+      - rrd_analytic-analytic
     logging:
       driver: syslog
       options:
