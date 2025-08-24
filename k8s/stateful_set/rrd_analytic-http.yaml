@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: rrd-analytic-deployment
   labels:
@@ -9,11 +9,13 @@ spec:
   selector:
     matchLabels:
       app: rrd_analytic_app
+  serviceName: rrd-analytic-service
   template:
     metadata:
       labels:
         app: rrd_analytic_app
     spec:
+      terminationGracePeriodSeconds: 60
       containers:
       - name: rrd-analytic
         image: pmccabe_docker-rrd-analytic
@@ -191,11 +193,10 @@ spec:
         volumeMounts:
         - mountPath: /api
           name: api-pmccabecollector-api-rrd-http-private-org
-
       volumes:
-      - name: api-pmccabe-collector-rrd-analytic-storage
-        persistentVolumeClaim:
-          claimName: rrd-analytic-storage
+      #- name: api-pmccabe-collector-rrd-analytic-storage
+      #  persistentVolumeClaim:
+      #    claimName: rrd-analytic-storage
       - name: api-pmccabecollector-api-rrd-http-private-org
         emptyDir:
             sizeLimit: 500Mi
@@ -224,3 +225,12 @@ spec:
         configMap:
            name: cc-rrd-plot-view-cm
            defaultMode: 0777
+  volumeClaimTemplates:
+  - metadata:
+      name: api-pmccabe-collector-rrd-analytic-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "local-path"
+      resources:
+        requests:
+          storage: 1Gi

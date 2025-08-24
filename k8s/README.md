@@ -68,6 +68,17 @@ After that it's possible to launch the minikube cluster
 
 `minikube start`
 
+To enable local filesystem resources to be mounted as persistent volumes, use this command:
+
+`minikube addons enable storage-provisioner-rancher`
+
+Having configured and launched your pods which consumes an associated persistent volume claim (PVC), you can find your data on one of your nodes in the cluster:
+
+`minikube ssh -n <node-name> "ls /opt/local-path-provisioner/pvc-*"`
+
+where `node-name` can be found using:
+
+`minikube node list`
 
 #### Using a local machine docker storage
 
