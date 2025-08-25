@@ -251,6 +251,6 @@ jobs:
     - name: Start Analytic UC
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic-http-api.yaml up --remove-orphans -d
     - name: Start Integrational Tests on running Analytic UC
-      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analytic-http-api-integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
+      run: EXIT_STATUS=0 && sleep 30 && docker compose -f compose-analytic-http-api-integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
     - name: Stop Analytic UC attempt
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic-http-api.yaml stop
