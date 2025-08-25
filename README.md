@@ -104,6 +104,10 @@ Although `<local host mount point>` **SHOULD NOT** be employable by `Analytic UC
 
     `docker network create -d bridge api.pmccabe_collector.network`
 
+- As ltroubleshooting-ability is reputedly a good idea,  you **MUST** configure a logger storage space
+
+    `LOCAL_HOST_LOG_DIR=<local host logger mount point> && mkdir -p ${LOCAL_HOST_LOG_DIR}/log && chmod 777 ${LOCAL_HOST_LOG_DIR} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_LOG_DIR}/log -o o=bind api.pmccabe_collector.logger.org`
+
 - You **SHOULD** define environment variables `FLASK_RUN_HOST` and `FLASK_RUN_PORT` to determine where REST API service will listen incoming connections (default values `0.0.0.0` and `5000` respectfully).
 
 ### Analysis UC
