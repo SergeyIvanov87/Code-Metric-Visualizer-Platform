@@ -2,10 +2,10 @@ include:
   - common/compose-common.yaml
 
 services:
-  cc_visualizer:
+  cc-visualizer:
     extends:
       file: cyclomatic_complexity/compose-functional.test.yaml
-      service: cc_visualizer
+      service: cc-visualizer
     depends_on:             # explicit dependency
       test_aggregator:
         condition: service_healthy
@@ -17,10 +17,10 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  cc_functional_tester:
+  cc-functional-tester:
     extends:
       file: cyclomatic_complexity/tests/functional/compose-functional.test.yaml
-      service: cc_functional_tester
+      service: cc-functional-tester
     environment:
       - EXIT_ONCE_DONE=false
     logging:
@@ -31,12 +31,12 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  rrd_analytic:
+  rrd-analytic:
     extends:
-      file: rrd/compose-functional.test.yaml
-      service: rrd_analytic
+      file: rrd_analytic/compose-functional.test.yaml
+      service: rrd-analytic
     depends_on:
-      - cc_visualizer
+      - cc-visualizer
     logging:
       driver: syslog
       options:
@@ -45,10 +45,10 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  rrd_functional_tester:
+  rrd-functional-tester:
     extends:
-      file: rrd/tests/functional/compose-functional.test.yaml
-      service: rrd_functional_tester
+      file: rrd_analytic/tests/functional/compose-functional.test.yaml
+      service: rrd-functional-tester
     environment:
       - EXIT_ONCE_DONE=false
     logging:
@@ -59,13 +59,13 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  rest_api:
+  rest-api:
     extends:
       file: rest_api/compose-functional.test.yaml
-      service: rest_api
+      service: rest-api
     depends_on:
-      - cc_visualizer
-      - rrd_analytic
+      - cc-visualizer
+      - rrd-analytic
     logging:
       driver: syslog
       options:
@@ -74,10 +74,10 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  rest_api_functional_api_initializer:
+  rest-api-functional-api-initializer:
     extends:
       file: rest_api/tests/functional/api_initializer/compose-functional.test.yaml
-      service: rest_api_functional_api_initializer
+      service: rest-api-functional-api-initializer
     depends_on:
       test_aggregator:      # explicit dependency
         condition: service_healthy
@@ -91,10 +91,10 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  rest_api_functional_service_tester:
+  rest-api-functional-service-tester:
     extends:
       file: rest_api/tests/functional/service_tester/compose-functional.test.yaml
-      service: rest_api_functional_service_tester
+      service: rest-api-functional-service-tester
     depends_on:             # explicit dependency
       test_aggregator:
         condition: service_healthy
@@ -108,13 +108,13 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  service_broker:
+  service-broker:
     extends:
       file: service_broker/compose-functional.test.yaml
-      service: service_broker
+      service: service-broker
     depends_on:
-      - cc_visualizer
-      - rrd_analytic
+      - cc-visualizer
+      - rrd-analytic
     logging:
       driver: syslog
       options:
@@ -123,10 +123,10 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  service_broker_functional_tester:
+  service-broker-functional-tester:
     extends:
       file: service_broker/tests/functional/compose-functional.test.yaml
-      service: service_broker_functional_tester
+      service: service-broker-functional-tester
     environment:
       - EXIT_ONCE_DONE=false
     logging:
@@ -147,7 +147,7 @@ volumes:
   api.pmccabe_collector.project.cc.test:
   api.pmccabe_collector.restapi.org.cc.test:
   api.pmccabe_collector.project.rrd.test:
-  api.pmccabe_collector.rrd.rrd_analytic:
+  api.pmccabe_collector.rrd.rrd-analytic:
   api.pmccabe_collector.restapi.org.rrd.test:
-  api.pmccabe_collector.restapi.org.rest_api.test:
-  api.pmccabe_collector.restapi.org.service_broker.test:
+  api.pmccabe_collector.restapi.org.rest-api.test:
+  api.pmccabe_collector.restapi.org.service-broker.test:

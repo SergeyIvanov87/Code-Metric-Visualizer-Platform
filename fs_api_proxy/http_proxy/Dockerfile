@@ -3,32 +3,10 @@
 FROM alpine:latest
 WORKDIR package
 
-ARG UID=2001
-ENV UID=$UID
-ARG GID=23456
-ENV GID=$GID
-
-ARG USER=http_proxy
-ENV USER=$USER
-ENV GROUPNAME=pmccabe
-
-RUN addgroup \
-    --gid "$GID" \
-    "$GROUPNAME" \
-&&  adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "$(pwd)" \
-    -u $UID \
-    --ingroup "$GROUPNAME" \
-    --no-create-home \
-    $USER \
-&& adduser ${USER} wheel
-
-
 # install app dependencies
-RUN apk add --no-cache coreutils python3 dos2unix busybox-openrc alpine-conf doas
+RUN apk add --no-cache coreutils python3 dos2unix
 RUN apk add --no-cache inotify-tools bash
+RUN apk add --no-cache busybox-openrc alpine-conf doas
 RUN apk add --no-cache curl
 
 RUN mkdir -p /opt
@@ -56,6 +34,8 @@ EOF
 ARG UPSTREAM_SERVICE=
 ENV UPSTREAM_SERVICE=$UPSTREAM_SERVICE
 
+# as a service directory name in the project directory
+# as a service directory name in an upstream 'API/deps' directory
 ARG DOWNSTREAM_SERVICE=
 ENV DOWNSTREAM_SERVICE=$DOWNSTREAM_SERVICE
 
@@ -72,10 +52,29 @@ RUN ln -sf /proc/1/fd/1 ${DOCKER_SYSLOG_NG_DRIVER_FILE_HANDLER}
 
 VOLUME /api
 
-# allow group wheel to become root
-RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :wheel" >> /etc/doas.d/doas.conf
-RUN mkdir -p -m 777 /api && chown -R ${USER}:${GROUPNAME} /api
-RUN chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
+ARG UID=2001 GID=23456 USER=http_proxy
+ENV UID=$UID GID=$GID USER=$USER GROUPNAME=pmccabe
+
+# user creation
+RUN addgroup \
+    --gid "$GID" \
+    "$GROUPNAME" \
+&&  adduser \
+    --disabled-password \
+    --gecos "" \
+    --home "$(pwd)" \
+    -u $UID \
+    --ingroup "$GROUPNAME" \
+    --no-create-home \
+    $USER \
+&& adduser ${USER} wheel
+
+# allow group GROUPNAME to become root
+RUN  <<EOF
+mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
+mkdir -p -m 777 /api && chown -R ${USER}:${GROUPNAME} /api
+chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
+EOF
 
 USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api"]

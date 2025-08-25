@@ -1,7 +1,7 @@
 {
     "Content-Type" : "image/svg+xml",
     "Method" : "GET",
-    "Query": "api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph",
+    "Query": "api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/view/flamegraph",
     "Params": {
         "view" : {
             "statistic" : {
@@ -21,7 +21,7 @@
     },
     "Description": {
         "header": "Generates visual representation of various cyclomatic compexity metrics of the project in the flamegraph format.\nFor more information about flamegraph, please refer https://github.com/brendangregg/FlameGraph#3-flamegraphpl",
-        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/GET/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/cc/statistic/view/flamegraph/GET/result.svg > <your_filename>.svg`\n\n",
+        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/view/flamegraph/GET/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/view/flamegraph/GET/result.svg > <your_filename>.svg`\n\n",
         "footer": "Please pay attention that a flamegraph collected in `*.svg` format is interactive in exploration. To leverage that navigation through a call stack please open this file in any web-browser."
     }
 }

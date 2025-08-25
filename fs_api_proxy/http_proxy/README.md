@@ -38,6 +38,6 @@ Otherwise the `HTTP FS API Proxy` won't discover any queries to proxy
 
 - `UPSTREAM_SERVICE` - is a name of a service which initiates queries to other services and need these queries to be proxied
 
-- `DOWNSTREAM_SERVICE` - is a name of one of those services which queries are going to be proxied to
+- `DOWNSTREAM_SERVICE` - is a name of one of those services which queries are going to be proxied to. Please pay attention that `DOWNSTREAM_SERVICE` is a service name as it declared in `API/deps` or in the project main directory
 
 - `DOWNSTREAM_SERVICE_NETWORK_ADDR` - is an implementation dependent (DNS, IP at the moment) network address of a node which implements a service described by `DOWNSTREAM_SERVICE`

@@ -1,4 +1,4 @@
-FROM test_pseudo_fs:latest
+FROM test_pseudo_fs
 
 COPY service_broker/API API
 COPY service_broker/tests/functional/*.py /tests/

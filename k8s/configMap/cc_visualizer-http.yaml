@@ -1,0 +1,33 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cc-watch-list-cm
+data:
+  0.-regex: "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\""
+  1.NO_NAME_PARAM.0: "-prune ! -path \"*buil*\" ! -path \"*thirdpart*\""
+  2.-type: "f"
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cc-statistic-cm
+data:
+  0.-mmcc: "1,"
+  1.-tmcc: "1,"
+  2.-sif: "1,"
+  3.-lif: "1,"
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cc-view-cm
+data:
+  0.-attr : "mmcc,tmcc,sif,lif"
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cc-flamegraph-cm
+data:
+  0.--width: "1200"
+  1.--height : "16"

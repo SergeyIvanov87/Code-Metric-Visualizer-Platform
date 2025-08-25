@@ -1,0 +1,23 @@
+{
+    "Content-Type" : "image/png",
+    "Method" : "GET",
+    "Query": "api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/plot_view",
+    "Params": {
+        "rrd_select" : {
+            "-path" : "\"*api.pmccabe_collector.restapi.org/mnt*\"",
+            "-name" : "\"*\"",
+            "-type" :"d -prune"
+        },
+        "-a": "SVG",
+        "-x": "none",
+        "-s": "1701154260",
+        "-e": "None",
+        "package_counters": "mmcc_mean:FF0000,mmcc_median:6E0000,mmcc_deviation:2D0000,tmcc_mean:00FF00,tmcc_median:006E00,tmcc_deviation:002D00,sif_mean:0000FF,sif_median:00006E,sif_deviation:00002D,lif_mean:FFFF00,lif_median:6E6E00,lif_deviation:2D2D00",
+        "leaf_counters": "mmcc:FF0000,tmcc:FFFF00,sif:00FF00,lif:0000FF"
+    },
+    "Description": {
+        "header": "Draw aggregated plots of various cyclomatic complexity metric trends, which stamps are extracted from RRD time series data silos.\nIt extracts the trend from RRD silos which were determined by appropriated params of `rrd_select` API query.",
+        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/plot_view/GET/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/plot_view/GET/result.png > <your_filename>.png`\n\n",
+        "footer": "The result is a `*.png` image of the analytic trends"
+    }
+}

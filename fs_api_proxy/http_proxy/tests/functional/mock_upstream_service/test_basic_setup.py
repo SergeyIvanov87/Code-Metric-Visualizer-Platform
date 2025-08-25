@@ -54,7 +54,8 @@ def remove_generated_files(files):
         except OSError:
             pass
 
-def http_set_service_availability(http_node, service_name, available):
+def http_set_service_availability(http_node, service_name_orig, available):
+    service_name = service_name_orig.replace("_", "-")
     url = f'http://{http_node}:80/set_service_availability'
     headers = {'Accept-Charset': 'UTF-8'}
     params = {"service_name":service_name, "available" :str(available)}
@@ -108,7 +109,7 @@ def test_init_and_basic_functionality(service_name, queries_map):
     unmet_deps_communication_pipes_canonized=[]
     for p in unmet_deps_communication_pipes:
         if p.find("result.json") != -1:
-            p = p + "_http_proxy_" + service_name + "_watchdog"
+            p = p + "_http-proxy-" + service_name.replace("_","-") + "_watchdog"
         unmet_deps_communication_pipes_canonized.append(p)
 
     # check that special files are really pipes
@@ -253,7 +254,7 @@ def test_unrechable_services(service_name, queries_map):
     unmet_deps_communication_pipes_canonized=[]
     for p in unmet_deps_communication_pipes:
         if p.find("result.json") != -1:
-            p = p + "_http_proxy_" + service_name + "_watchdog"
+            p = p + "_http-proxy-" + service_name.replace("_","-") + "_watchdog"
         unmet_deps_communication_pipes_canonized.append(p)
 
     # check that special files are really pipes
