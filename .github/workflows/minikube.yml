@@ -39,6 +39,8 @@ jobs:
         run: eval $(minikube docker-env)
       - name: Build Docker images locally
         run: docker compose -f compose-analytic-http-api.yaml build
+      - name: Docker images
+        run: docker image ls
       - name: Deploy CC
         run: kubectl apply -f k8s/configMap/cc_visualizer-http.yaml && kubectl apply -f k8s/deployment/cc_visualizer-http.yaml
       - name: Deploy CC Service
