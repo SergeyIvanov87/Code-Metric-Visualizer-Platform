@@ -32,7 +32,7 @@ jobs:
     - name: Clear docker environment
       run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
     - name: TODO Remove this phase build test_pseudo_fs
-      run: docker build -f common/images/test_pseudo_fs/Docker test_pseudo_fs:latest
+      run: docker build -f common/images/test_pseudo_fs/Docker test_pseudo_fs:latest .
     - name: Build the VCS Docker image
       run: docker build -f observable_project_version_control/Dockerfile -t vcs_project:$DATE .
       env:
