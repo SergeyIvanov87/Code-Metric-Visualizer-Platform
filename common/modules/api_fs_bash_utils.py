@@ -43,7 +43,7 @@ def __extract_attr_value_from_string_function__():
         '    readarray -t IN_SERVER_REQUEST_ARGS <<< "${STR}"\n',
         "    for arg in ${IN_SERVER_REQUEST_ARGS[@]}\n",
         "    do\n",
-        '        if [[ "${arg}" = ${ATTR}* ]];\n',
+        '        if [[ "${arg}" = "${ATTR}${AVP_DELIM}"* ]];\n',
         "        then\n",
         '            readarray -d ${AVP_DELIM} -t AVP <<< "${arg}"\n',
         "            VALUE=${AVP[1]}\n",

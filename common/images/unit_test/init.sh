@@ -17,11 +17,10 @@ RET=0
 for s in ${WORK_DIR}/bash/test_*.sh; do
     ${s}
     VAL=$?
-    #if [ $VAL != 0 ]
-    #then
-        # TODO skip it no
-        # RET=$VAL
-    #fi
+    if [ $VAL != 0 ]
+    then
+        RET=$VAL
+    fi
 done
 
 # TODO

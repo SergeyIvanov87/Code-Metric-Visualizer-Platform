@@ -8,7 +8,9 @@ oneTimeSetUp() {
 }
 
 oneTimeTearDown() {
-    rm ${test_suite_filename}_impl.sh
+    if [ -f ${test_suite_filename}_impl.sh ]; then
+        rm ${test_suite_filename}_impl.sh
+    fi
 }
 
 test_watchdog() {

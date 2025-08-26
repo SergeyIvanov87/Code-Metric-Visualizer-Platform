@@ -17,11 +17,14 @@ EOM
 }
 
 oneTimeTearDown() {
-    rm ${test_suite_filename}_impl.sh
+    if [ -f ${test_suite_filename}_impl.sh ]; then
+        rm ${test_suite_filename}_impl.sh
+    fi
 }
 
 TEST_API_NODE="/tmp/tests_sandbox_`date +%H%M%S`"
 declare -A TEST_PARAM_VALUE_MAP
+
 setUp() {
     TEST_API_NODE="${TEST_API_NODE}/api_node_`date +%H%M%S`"
     mkdir -p ${TEST_API_NODE}
@@ -35,7 +38,7 @@ setUp() {
 }
 
 tearDown() {
-    if [ ! -z ${TEST_API_NODE} ]; then
+    if [ ! -z ${TEST_API_NODE} ] && [ -d  ${TEST_API_NODE} ]; then
         rm -r ${TEST_API_NODE}
     fi
 
@@ -44,25 +47,33 @@ tearDown() {
     done
 }
 
-test_all_files() {
-
-    test_function "${TEST_API_NODE}" "bbb"
-    echo "API_NODE: ${API_NODE}"
-    declare -A ARRAY
+overrided_cmd_args_to_array() {
     prev_file=
+
+    # nameref for indirection
+    local -n out_array=${1}
     for file in ${OVERRIDEN_CMD_ARGS[@]};
     do
       if [ -z $prev_file ]; then
         prev_file=${file}
       else
-        ARRAY[${prev_file}]=${file}
+        out_array[${prev_file}]=${file}
         prev_file=
       fi
     done
+}
+
+test_all_files() {
+
+    test_function "${TEST_API_NODE}" "bbb"
+    echo "API_NODE: ${API_NODE}"
+    declare -A ARRAY
+    overrided_cmd_args_to_array ARRAY
     for file in ${!ARRAY[@]};
     do
-       echo "f: ${file}, v: ${ARRAY[$file]}"
+       assertEquals ${TEST_PARAM_VALUE_MAP[$file]} ${ARRAY[$file]}
     done
 }
+
 
 . shunit2
