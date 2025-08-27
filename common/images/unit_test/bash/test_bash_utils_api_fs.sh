@@ -3,7 +3,19 @@
 test_suite_filename=${0}
 
 oneTimeSetUp() {
-    python -c "from api_fs_bash_utils import *; print(*generate_exec_watchdog_function(), *generate_extract_attr_value_from_string(), *generate_add_suffix_if_exist(), *generate_wait_until_pipe_exist())" > ${test_suite_filename}_impl.sh
+    read -r -d '' EXEC_STR << EOM
+from api_fs_bash_utils import *
+
+print(*generate_exec_watchdog_function(),
+      *generate_extract_attr_value_from_string(),
+      *generate_add_suffix_if_exist(),
+      *generate_wait_until_pipe_exist(),
+      *generate_unblock_query_pipe_writers_by_owner(),
+      *generate_unblock_result_pipe_reader_by_owner(),
+      *generate_unblock_readers_of_result_pipe_array_by_owner()
+)
+EOM
+    python -c "${EXEC_STR}" > ${test_suite_filename}_impl.sh
     source ${test_suite_filename}_impl.sh
 }
 
@@ -174,6 +186,108 @@ test_wait_until_pipe_exist() {
 
     done
     assertNotSame "Waiting pipe process: ${WAIT_PROC_PID} finishes because the pipe created" ${COUNTER} ${COUNTER_LIMIT}
+}
+
+test_unblock_query_pipe_by_owner_no_pipe() {
+    PIPE_IN="test_fifo"
+    unblock_query_pipe_writers_by_owner ${PIPE_IN}
+}
+
+test_unblock_query_pipe_by_owner_no_one_stuck() {
+    PIPE_IN="test_fifo_no_one_stuck"
+    mkfifo -m 644  ${PIPE_IN}
+    unblock_query_pipe_writers_by_owner ${PIPE_IN}
+}
+
+test_unblock_query_pipe_by_owner_single_request_stuck() {
+    PIPE_IN="test_fifo"
+
+    mkfifo -m 644  ${PIPE_IN}
+    echo 0 > ${PIPE_IN} &
+    PID=$!
+    assertEquals `ps -ef | grep ${PID} | grep -v grep | wc -l` 1
+    unblock_query_pipe_writers_by_owner ${PIPE_IN}
+    assertEquals `ps -ef | grep ${PID} | grep -v grep | wc -l` 0
+}
+
+test_unblock_query_pipe_by_owner_multiple_request_stuck() {
+    PIPE_IN="test_fifo_multiple_clients"
+    mkfifo -m 644  ${PIPE_IN}
+    echo 0 > ${PIPE_IN} &
+    PID_0=$!
+    assertEquals `ps -ef | grep ${PID_0} | grep -v grep | wc -l` 1
+    echo 0 > ${PIPE_IN} &
+    PID_1=$!
+    assertEquals `ps -ef | grep ${PID_1} | grep -v grep | wc -l` 1
+
+    unblock_query_pipe_writers_by_owner ${PIPE_IN}
+    assertEquals `ps -ef | grep ${PID_0} | grep -v grep | wc -l` 0
+    assertEquals `ps -ef | grep ${PID_1} | grep -v grep | wc -l` 0
+}
+
+
+test_unblock_result_pipe_readers_by_owner_no_pipe() {
+    PIPE_OUT="test_fifo"
+    unblock_result_pipe_readers_by_owner ${PIPE_OUT}
+}
+
+test_unblock_result_pipe_readers_by_owner_no_one_stuck() {
+    PIPE_OUT="test_fifo_no_one_stuck"
+    mkfifo -m 644  ${PIPE_OUT}
+    unblock_result_pipe_readers_by_owner ${PIPE_OUT}
+}
+
+test_unblock_result_pipe_readers_by_owner_single_request_stuck() {
+    PIPE_OUT="test_fifo"
+
+    mkfifo -m 644  ${PIPE_OUT}
+    cat ${PIPE_OUT} &
+    PID=$!
+    assertEquals `ps -ef | grep ${PID} | grep -v grep | wc -l` 1
+    unblock_result_pipe_readers_by_owner ${PIPE_OUT}
+    assertEquals `ps -ef | grep ${PID} | grep -v grep | wc -l` 0
+}
+
+test_unblock_result_pipe_readers_by_owner_multiple_request_stuck() {
+    PIPE_OUT="test_fifo_multiple_clients"
+    mkfifo -m 644  ${PIPE_OUT}
+    cat ${PIPE_OUT} &
+    PID_0=$!
+    assertEquals `ps -ef | grep ${PID_0} | grep -v grep | wc -l` 1
+    cat ${PIPE_OUT} &
+    PID_1=$!
+    assertEquals `ps -ef | grep ${PID_1} | grep -v grep | wc -l` 1
+
+    unblock_result_pipe_readers_by_owner ${PIPE_OUT}
+    assertEquals `ps -ef | grep ${PID_0} | grep -v grep | wc -l` 0
+    assertEquals `ps -ef | grep ${PID_1} | grep -v grep | wc -l` 0
+
+}
+
+test_unblock_readers_of_result_pipe_array_by_owner_multiple_request_stuck() {
+    PIPE_OUT_0="test_fifo_multiple_clients_multiple_pipes_0"
+    PIPE_OUT_1="test_fifo_multiple_clients_multiple_pipes_1"
+    mkfifo -m 644  ${PIPE_OUT_0}
+    mkfifo -m 644  ${PIPE_OUT_1}
+    cat ${PIPE_OUT_0} &
+    PID_0_0=$!
+    assertEquals `ps -ef | grep ${PID_0_0} | grep -v grep | wc -l` 1
+    cat ${PIPE_OUT_0} &
+    PID_0_1=$!
+    assertEquals `ps -ef | grep ${PID_0_1} | grep -v grep | wc -l` 1
+
+    cat ${PIPE_OUT_1} &
+    PID_1_0=$!
+    assertEquals `ps -ef | grep ${PID_1_0} | grep -v grep | wc -l` 1
+    cat ${PIPE_OUT_1} &
+    PID_1_1=$!
+    assertEquals `ps -ef | grep ${PID_1_1} | grep -v grep | wc -l` 1
+
+    unblock_readers_of_result_pipe_array_by_owner "test_fifo_multiple_clients_multiple_pipes_*"
+    assertEquals `ps -ef | grep ${PID_0_0} | grep -v grep | wc -l` 0
+    assertEquals `ps -ef | grep ${PID_0_1} | grep -v grep | wc -l` 0
+    assertEquals `ps -ef | grep ${PID_1_0} | grep -v grep | wc -l` 0
+    assertEquals `ps -ef | grep ${PID_1_1} | grep -v grep | wc -l` 0
 }
 
 . shunit2
