@@ -46,7 +46,7 @@ ls -laR ${SHARED_API_DIR}
 
 if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
 
-echo "wait for termination"
+echo "wait for termination, ret: ${RET}"
 sleep infinity &
 wait $!
 exit $RET

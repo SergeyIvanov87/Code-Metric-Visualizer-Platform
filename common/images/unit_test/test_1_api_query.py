@@ -6,7 +6,9 @@ import pytest
 import stat
 import sys
 import time
+import threading
 
+from multiprocessing import Process, Queue
 from settings import Settings
 from utils import get_api_queries
 from api_schema_utils import compose_api_queries_pipe_names
@@ -195,3 +197,41 @@ def test_api_interruptible_interruption_check():
     status, result, timeout = query.wait_result(10, "", 0.1, 100, True)
     assert not status, f"wait_result() must be interrupted"
     assert timeout < 0.5, f"wait_result() must run out of time, timeout: {timeout}"
+
+def parallel_exec(index, query, message_to_send, polling_second_count = 1):
+        status, timeout = query.execute(30, message_to_send)
+        print(f"Process: {index} has finished, status: {status}, timeout: {timeout}")
+
+def test_api_interruptible_multiple_queries():
+    pipes = ["exec", "result"]
+    for p in pipes:
+        if os.path.exists(p):
+            os.unlink(p)
+        os.mkfifo(p)
+
+    print(f"Test start: test_api_interruptible_interruption_check", file=sys.stdout, flush=True)
+    query = APIQueryInterruptible(pipes, remove_session_pipe_on_result_done = True)
+
+    # check API transaction
+    transactions_count = 10
+    print(f"Check API transactions: {transactions_count}", file=sys.stdout, flush=True)
+    async_jobs = []
+    for n in range(0,transactions_count):
+        print(f"Launch process: [{n}/{transactions_count}]", file=sys.stdout, flush=True)
+        async_executor = Process(target=parallel_exec, args=[n, query, "VALUE=" + str(n)])
+        async_executor.start()
+        async_jobs.append(async_executor)
+
+    read_queries=0
+    while read_queries < transactions_count:
+        with open(pipes[0], "r") as pout:
+            print(f"Multiple waiting reading is starting: [{read_queries}/{transactions_count}]", file=sys.stdout, flush=True)
+            result = pout.read()
+            print(f"Multiple waiting has finished result: {result}", file=sys.stdout, flush=True)
+        lines = result.split();
+        for l in lines:
+            assert len(l.split('=')) == 2
+            read_queries += 1
+
+    for j in async_jobs:
+        j.join()

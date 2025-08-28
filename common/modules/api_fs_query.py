@@ -13,7 +13,7 @@ from queue import LifoQueue
 
 def canonize_args(exec_args_str):
     canonized_exec_args_str = exec_args_str.strip().strip('\n')
-    canonized_exec_args_str += '\n' # only one must survive
+    canonized_exec_args_str += os.linesep#'\n' # only one must survive
     return canonized_exec_args_str
 
 
@@ -206,9 +206,10 @@ class APIQueryInterruptible(APIQuery):
 
         # the data to write in, must be terminated by \n
         data_to_write = canonize_args(exec_args_str)
+        data_to_write += "\n"       # add additional EOL, because for some reason os.write ignore a single EOL
         data_to_write_size=len(data_to_write)
 
-        # pipe doesn't consume terminating \n here (for some reason), thus do not count it
+        # pipe doesn't consume single terminating \n here (for some reason), thus do not count it
         if data_to_write_size > 0 and data_to_write[-1] == '\n':
             data_to_write_size -= 1
         offset_to_write=0
