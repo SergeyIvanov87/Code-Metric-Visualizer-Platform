@@ -19,7 +19,7 @@ mkdir -p -m 777 ${RRD_DATA_STORAGE_DIR}
 
 # inject test files into project directory
 test_files=(/package/test_data/*.cpp)
-for f in ${test_files[@]}; do
+for f in "${test_files[@]}"; do
     cp ${f} ${INITIAL_PROJECT_LOCATION}/
 done
 

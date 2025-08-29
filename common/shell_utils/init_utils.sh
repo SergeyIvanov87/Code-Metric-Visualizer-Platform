@@ -6,23 +6,23 @@ source ${SCRIPT_DIR}/color_codes.sh
 
 gracefull_shutdown() {
     echo -e "${BBlue}Starting gracefull shutdown routine${Color_Off}"
-    local -n SERVICE_WATCH_PIDS_TO_STOP=${1}
-    local API_MANAGEMENT_PID=${2}
+    local -n service_watch_pids_to_stop=${1}
+    local api_management_pid=${2}
 
     echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Shutdown servers***${Color_Off}"
     ps -ef
-    for server_script_path in "${!SERVICE_WATCH_PIDS_TO_STOP[@]}"
+    for server_script_path in "${!service_watch_pids_to_stop[@]}"
     do
-        echo -e "${BRed}Kill ${server_script_path}${Color_Off} by PID: ${Red}${SERVICE_WATCH_PIDS_TO_STOP[$server_script_path]}${Color_Off}"
-        pkill -KILL -e -P ${SERVICE_WATCH_PIDS_TO_STOP[$server_script_path]}
-        kill -9 ${SERVICE_WATCH_PIDS_TO_STOP[$server_script_path]}
+        echo -e "${BRed}Kill ${server_script_path}${Color_Off} by PID: ${Red}${service_watch_pids_to_stop[$server_script_path]}${Color_Off}"
+        pkill -KILL -e -P ${service_watch_pids_to_stop[$server_script_path]}
+        kill -9 ${service_watch_pids_to_stop[$server_script_path]}
         ps -ef
     done
     echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Clear pipes, killing PID: ${Red}${API_MANAGEMENT_PID}${BRed}****${Color_Off}"
-    kill -s SIGTERM ${API_MANAGEMENT_PID}
+    kill -s SIGTERM ${api_management_pid}
     while true
     do
-        kill -s 0 ${API_MANAGEMENT_PID}
+        kill -s 0 ${api_management_pid} > /dev/null 2>&1
         RESULT=$?
         if [ $RESULT == 0 ]; then
             echo -e "`date +%H:%M:%S:%3N`    ${Blue}***API_MANAGEMENT_PID: ${API_MANAGEMENT_PID} still exist****${Color_Off}"
@@ -50,9 +50,9 @@ gracefull_shutdown_bunch() {
         echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Shutdown servers --- DONE***${Color_Off}"
     fi
     if [ ${#api_management_pids[@]} -ne 0 ]; then
-        for service_name in ${!api_management_pids[@]}
+        for service_name in "${!api_management_pids[@]}"
         do
-            service_pid=${api_management_pids[$service_name]}
+            service_pid=${api_management_pids[${service_name}]}
             echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Clear pipes, killing PID: ${Red}${service_pid}${BRed} of ${Red}${service_name}${BRed}****${Color_Off}"
             kill -s SIGTERM ${service_pid}
             while true
@@ -72,11 +72,45 @@ gracefull_shutdown_bunch() {
 }
 
 
+wait_until_pipe_appear() {
+    local pipe=${1}
+
+    local pipe_wait_timeout_limit=${2}
+    if [ -z pipe_wait_timeout_limit ]; then
+        pipe_wait_timeout_limit=5
+    fi
+
+    local pipe_wait_timeout_sec=${3}
+    if [ -z pipe_wait_timeout_sec ]; then
+        pipe_wait_timeout_sec=0.1
+    fi
+
+    local pipe_wait_timeout_counter=0
+    local ret_code=0
+    while [ ! -p ${pipe} ];
+    do
+        sleep ${pipe_wait_timeout_sec}
+        echo "waiting for pipe: ${pipe}, attempt: [${pipe_wait_timeout_counter}/${pipe_wait_timeout_limit}]"
+        let pipe_wait_timeout_counter=${pipe_wait_timeout_counter}+1
+        if [ ${pipe_wait_timeout_counter} == ${pipe_wait_timeout_limit} ]; then
+            ret_code=255
+            break
+        fi
+    done
+    eval ${4}=${ret_code}
+}
+
 send_ka_watchdog_query() {
     local pipe_in=${1}
     local session_id=${2}
     local downstream_service=${3}
     local deps_query_timeout_sec=${4}
+    wait_until_pipe_appear ${pipe_in} 3 1 WAIT_RESULT
+    if [ ${WAIT_RESULT} -eq 255 ] ; then
+        echo "Cannot send KA watchdog query as waiting for IN pipe: ${pipe_in} has been failed. Elapsed cycles: 3"
+        return 255
+    fi
+
     echo -e "Send watchdog query ${Cyan}${session_id}${Color_Off} to the pipe: ${pipe_in}"
     (echo "SESSION_ID=${session_id} --service=${downstream_service} --timeout=${deps_query_timeout_sec}"> ${pipe_in}) &
     local PID_TO_UNBLOCK=$!
@@ -99,6 +133,15 @@ receive_ka_watchdog_query() {
     if [ -z result_timeout_sec ]; then
         result_timeout_sec=5
     fi
+
+    local start_time=$(date +%s)
+    wait_until_pipe_appear ${pipe_out} ${result_timeout_sec} 1 WAIT_RESULT
+    if [ ${WAIT_RESULT} -eq 255 ] ; then
+        echo "Cannot send KA watchdog query as waiting for IN pipe: ${pipe_in} has been failed. Elapsed cycles: ${result_timeout_sec}"
+        return 255
+    fi
+    local end_time=$(date +%s)
+    let result_timeout_sec=${result_timeout_sec}+${start_time}-${end_time}
 
     # upstream service may get inoperable abruptly, to prevent stucking on a dead-pipe, let's not block ourselves on it,
     # so that a watchdog introduced.
@@ -124,26 +167,6 @@ receive_ka_watchdog_query() {
     local PROXYING_API_QUERIES=`cat ${file_pipe_out_result_name}`
     eval ${3}=$PROXYING_API_QUERIES
     return 0
-}
-
-wait_for_pipe_exist() {
-    local pipe=${1}
-    local pipe_wait_timeout_sec=0.1
-    local pipe_wait_timeout_limit=${3}
-    local pipe_wait_timeout_counter=0
-    local ret_code=0
-    while [ ! -p ${pipe} ];
-    do
-        sleep ${pipe_wait_timeout_sec}
-        echo "waiting for pipe: ${pipe}, attempt: [${pipe_wait_timeout_counter}/${pipe_wait_timeout_limit}]"
-        let pipe_wait_timeout_counter=${pipe_wait_timeout_counter}+1
-        if [ ${pipe_wait_timeout_counter} == ${pipe_wait_timeout_limit} ]; then
-            ret_code=255
-            break
-        fi
-    done
-    eval ${2}=${ret_code}
-
 }
 
 launch_fs_api_services() {
@@ -208,15 +231,13 @@ wait_for_unavailable_services() {
     ls -la "${SHARED_API_MOUNT_DIR}/${OWN_SERVICE_NAME}/unmet_dependencies/GET/"
     local pipe_couter=1
     rm -f ${pipe_out}
-    while [ ! -p ${pipe_in} ];
-    do
-        sleep 0.1
-        if [ ${pipe_couter} == 3 ]; then
-            echo "Waiting for IN pipe: ${pipe_in}. Elapsed cycles: ${pipe_couter}"
-        fi
-        let pipe_couter=$pipe_couter+1
 
-    done
+    wait_until_pipe_appear ${pipe_in} -1 1 WAIT_RESULT
+    if [ ${WAIT_RESULT} -eq 255 ] ; then
+        echo "Waiting for IN pipe: ${pipe_in} failed. Elapsed cycles: -1"
+    fi
+
+    local pipe_couter=1
     while true :
     do
         ANY_SERVICE_UNAVAILABLE=

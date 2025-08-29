@@ -50,7 +50,7 @@ declare -A API_MANAGEMENT_PIDS
 shutdown_processors_if_downstream_is_dead(){
     local downstream_server_addr=${1}
     declare -A SERV_TO_STOP
-    for service_query in ${!SERVICE_QUERY_WATCH_PIDS[@]}
+    for service_query in "${!SERVICE_QUERY_WATCH_PIDS[@]}"
     do
         query=`sed -n 's/\(echo \"CLI SERVER: \)\(.*\)\(\"\)/\2/p' ${service_query}`
         #local url="${downstream_server_addr}/${SHARED_API_DIR}/${query}"
@@ -68,10 +68,10 @@ shutdown_processors_if_downstream_is_dead(){
     done
     if [ ${#SERV_TO_STOP[@]} -ne 0 ] ; then
         declare -A PID_TO_STOP
-        for service_query in ${!SERV_TO_STOP[@]}
+        for service_query in "${!SERV_TO_STOP[@]}"
         do
             echo "match service_query: ${service_query}"
-            for service in ${!API_MANAGEMENT_PIDS[@]}
+            for service in "${!API_MANAGEMENT_PIDS[@]}"
             do
                 echo "for service: ${service}"
                 if [[ $service_query == *"${service}/generated"* ]]; then
@@ -82,7 +82,7 @@ shutdown_processors_if_downstream_is_dead(){
 
         gracefull_shutdown_bunch SERV_TO_STOP PID_TO_STOP
 
-        for service in ${!PID_TO_STOP[@]}
+        for service in "${!PID_TO_STOP[@]}"
         do
             unset API_MANAGEMENT_PIDS[${service}]
             echo "Remove service launching script: ${service} from proxy list"
@@ -136,7 +136,7 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     fi
 
     # wait until upstream service become alive...
-    wait_for_pipe_exist ${pipe_in} WAIT_RESULT ${WAIT_FOR_HEARTBEAT_PIPE_IN_CREATION_SEC}
+    wait_until_pipe_appear ${pipe_in} ${WAIT_FOR_HEARTBEAT_PIPE_IN_CREATION_SEC} 0.1 WAIT_RESULT
     if [ ${WAIT_RESULT} -eq 255 ] ; then
         echo -e "${BPurple}PIPE IN: ${pipe_in} doesn't exist${Color_Off}, trying again in attempt: ${BPurple}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         sleep ${TIMEOUT_ON_FAILURE_SEC} &
@@ -177,7 +177,7 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     fi
 
     # wait until upstream service create OUT pipe to read on
-    wait_for_pipe_exist ${pipe_out} WAIT_RESULT ${WAIT_FOR_HEARTBEAT_PIPE_OUT_CREATION_SEC}
+    wait_until_pipe_appear ${pipe_out} ${WAIT_FOR_HEARTBEAT_PIPE_OUT_CREATION_SEC} 0.1 WAIT_RESULT
     if [ ${WAIT_RESULT} -eq 255 ] ; then
         echo -e "${BPurple}PIPE OUT: ${pipe_out} doesn't exist${Color_Off}, trying again in attempt: ${BPurple}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         sleep ${TIMEOUT_ON_FAILURE_SEC} &
@@ -275,7 +275,7 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     ls -laR ${SHARED_API_DIR} >> /tmp/fs_api_snapshot
 
     echo -e "${BBlue}Launch new services${Color_Off}, which ${UPSTREAM_SERVICE} has become depend on: ${!SERVICE_TO_RUN[@]}"
-    for service in ${!SERVICE_TO_RUN[@]}
+    for service in "${!SERVICE_TO_RUN[@]}"
     do
         echo -e "Generate proxy for ${BBlue}${service}${Color_Off}:"
         ./build_proxy_services.py "${service}" -os "${service}/generated" -oe "${service}/exec_generated"

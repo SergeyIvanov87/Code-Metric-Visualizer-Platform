@@ -32,7 +32,7 @@ setUp() {
     TEST_PARAM_VALUE_MAP["-param_a"]="value_00"
     TEST_PARAM_VALUE_MAP["--param_b"]="value_01"
     TEST_PARAM_VALUE_MAP["--param_c"]="value_02"
-    for p in ${!TEST_PARAM_VALUE_MAP[@]}; do
+    for p in "${!TEST_PARAM_VALUE_MAP[@]}"; do
         echo ${TEST_PARAM_VALUE_MAP[${p}]} > "${TEST_API_NODE}/00.${p}"
     done
 }
@@ -42,7 +42,7 @@ tearDown() {
         rm -r ${TEST_API_NODE}
     fi
 
-    for p in ${!TEST_PARAM_VALUE_MAP[@]}; do
+    for p in "${!TEST_PARAM_VALUE_MAP[@]}"; do
         unset TEST_PARAM_VALUE_MAP[${p}]
     done
 }
@@ -52,7 +52,7 @@ overrided_cmd_args_to_array() {
 
     # nameref for indirection
     local -n out_array=${1}
-    for file in ${OVERRIDEN_CMD_ARGS[@]};
+    for file in "${OVERRIDEN_CMD_ARGS[@]}";
     do
       if [ -z $prev_file ]; then
         prev_file=${file}
@@ -69,7 +69,7 @@ test_all_files() {
     echo "API_NODE: ${API_NODE}"
     declare -A ARRAY
     overrided_cmd_args_to_array ARRAY
-    for file in ${!ARRAY[@]};
+    for file in "${!ARRAY[@]}";
     do
        assertEquals ${TEST_PARAM_VALUE_MAP[$file]} ${ARRAY[$file]}
     done
