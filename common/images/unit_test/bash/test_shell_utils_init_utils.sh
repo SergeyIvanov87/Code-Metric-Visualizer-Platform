@@ -138,15 +138,23 @@ test_receive_own_ka_watchdog_query() {
     rm -f ${result_pipe}
     assertEquals ${RET} 255
 
-    #  response
-    (mkfifo -m 644 ${result_pipe} && sleep 5 && echo "ABRACADABRA" > ${result_pipe}) &
+    # response, check JSON output can be received
+    read -r -d '' EXEC_STR << EOM
+from api_fs_exec_utils import *
+import json
+
+d={"service": {"name": 566}}
+print(json.dumps(d))
+EOM
+    RECEIVE_STR=`python -c "${EXEC_STR}"`
+    (mkfifo -m 644 ${result_pipe} && sleep 5 && echo $RECEIVE_STR > ${result_pipe}) &
     WAIT_PID=$!
     assertEquals `ps -ef | grep ${WAIT_PID} | grep -v grep | wc -l` 1
     receive_ka_watchdog_query ${result_pipe} ${query_timeout_sec} MISSING_API_QUERIES
     local RET=$?
     rm -f ${result_pipe}
     assertEquals ${RET} 0
-    assertEquals ${MISSING_API_QUERIES} "ABRACADABRA"
+    assertEquals "${MISSING_API_QUERIES}" "${RECEIVE_STR}"
 }
 
 ################################################################################

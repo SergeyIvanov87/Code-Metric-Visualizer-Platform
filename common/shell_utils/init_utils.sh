@@ -165,7 +165,7 @@ receive_ka_watchdog_query() {
     fi
 
     local PROXYING_API_QUERIES=`cat ${file_pipe_out_result_name}`
-    eval ${3}=$PROXYING_API_QUERIES
+    eval ${3}='$PROXYING_API_QUERIES'
     return 0
 }
 
