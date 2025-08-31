@@ -74,16 +74,21 @@ gracefull_shutdown_bunch() {
 
 wait_until_pipe_appear() {
     local pipe=${1}
+    local func_arg_read_message=""
 
     local pipe_wait_timeout_limit=${2}
     if [ -z pipe_wait_timeout_limit ]; then
         pipe_wait_timeout_limit=5
+        func_arg_read_message="As \"wait_until_pipe_appear\" got no argument \"pipe_wait_timeout_limit\" value set, use default: ${pipe_wait_timeout_limit}"
     fi
 
     local pipe_wait_timeout_sec=${3}
     if [ -z pipe_wait_timeout_sec ]; then
         pipe_wait_timeout_sec=0.1
+        func_arg_read_message="${func_arg_read_message}. As \"wait_until_pipe_appear\" got no argument \"pipe_wait_timeout_sec\" value set, use default: ${pipe_wait_timeout_sec}"
     fi
+
+    if [ ! -z ${func_arg_read_message} ]; then echo ${func_arg_read_message}; fi
 
     local pipe_wait_timeout_counter=0
     while [ ! -p ${pipe} ];
@@ -103,6 +108,11 @@ send_ka_watchdog_query() {
     local session_id=${2}
     local downstream_service=${3}
     local send_ka_query_timeout=${4}
+     if [ -z send_ka_query_timeout ]; then
+        send_ka_query_timeout=15
+        echo "As \"send_ka_watchdog_query\" got no argument \"send_ka_query_timeout\" value set, use default: ${send_ka_query_timeout}"
+    fi
+
     wait_until_pipe_appear ${pipe_in} 3 1
     if [ $? -eq 255 ] ; then
         echo "Cannot send KA watchdog query as no queries through IN pipe have been made: ${pipe_in} has been failed. Elapsed cycles: 3"
@@ -125,6 +135,7 @@ receive_ka_watchdog_query() {
     local result_timeout_sec=${2}
     if [ -z result_timeout_sec ]; then
         result_timeout_sec=5
+        echo "As \"receive_ka_watchdog_query\" got no argument \"result_timeout_sec\" value set, use default: ${result_timeout_sec}"
     fi
 
     local start_time=$(date +%s)
@@ -194,23 +205,26 @@ wait_for_unavailable_services() {
     local shared_api_mount_dir=${1}
     local own_service_name=${2}
 
+    local func_arg_read_message=""
     local wait_dependencies_counter_limit=${3}
     if [ -z ${wait_dependencies_counter_limit} ]; then
         wait_dependencies_counter_limit=30
-        echo "as \"wait_dependencies_counter_limit\" is not set, use default value: ${wait_dependencies_counter_limit}"
+        func_arg_read_message="As \"wait_dependencies_counter_limit\" is not set, use default value: ${wait_dependencies_counter_limit}."
     fi
 
     local send_ka_query_timeout=${4}
     if [ -z ${send_ka_query_timeout} ]; then
         send_ka_query_timeout=15
-        echo "as \"send_ka_query_timeout\" is not set, use default value: ${send_ka_query_timeout}"
+        func_arg_read_message="${func_arg_read_message} As \"send_ka_query_timeout\" is not set, use default value: ${send_ka_query_timeout}."
     fi
 
     local receive_ka_query_timeout=${5}
     if [ -z ${receive_ka_query_timeout} ]; then
         receive_ka_query_timeout=5
-        echo "as \"receive_ka_query_timeout\" is not set, use default value: ${receive_ka_query_timeout}"
+        func_arg_read_message="${func_arg_read_message} As \"receive_ka_query_timeout\" is not set, use default value: ${receive_ka_query_timeout}"
     fi
+
+    if [ ! -z ${func_arg_read_message} ]; then echo ${func_arg_read_message}; fi
 
     let wait_dependencies_counter_limit=${wait_dependencies_counter_limit}
     let send_ka_query_timeout=${send_ka_query_timeout}
