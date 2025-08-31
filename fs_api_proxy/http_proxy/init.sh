@@ -136,8 +136,8 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     fi
 
     # wait until upstream service become alive...
-    wait_until_pipe_appear ${pipe_in} ${WAIT_FOR_HEARTBEAT_PIPE_IN_CREATION_SEC} 0.1 WAIT_RESULT
-    if [ ${WAIT_RESULT} -eq 255 ] ; then
+    wait_until_pipe_appear ${pipe_in} ${WAIT_FOR_HEARTBEAT_PIPE_IN_CREATION_SEC} 0.1
+    if [ $? -eq 255 ] ; then
         echo -e "${BPurple}PIPE IN: ${pipe_in} doesn't exist${Color_Off}, trying again in attempt: ${BPurple}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         sleep ${TIMEOUT_ON_FAILURE_SEC} &
         wait $!
@@ -177,8 +177,8 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     fi
 
     # wait until upstream service create OUT pipe to read on
-    wait_until_pipe_appear ${pipe_out} ${WAIT_FOR_HEARTBEAT_PIPE_OUT_CREATION_SEC} 0.1 WAIT_RESULT
-    if [ ${WAIT_RESULT} -eq 255 ] ; then
+    wait_until_pipe_appear ${pipe_out} ${WAIT_FOR_HEARTBEAT_PIPE_OUT_CREATION_SEC} 0.1
+    if [ $? -eq 255 ] ; then
         echo -e "${BPurple}PIPE OUT: ${pipe_out} doesn't exist${Color_Off}, trying again in attempt: ${BPurple}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         sleep ${TIMEOUT_ON_FAILURE_SEC} &
         wait $!
