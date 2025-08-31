@@ -51,6 +51,9 @@ def execute_query(name, query):
         except requests.ConnectTimeout as ex:
             service_is_up = False
             print(f"Service \"{service}:{port}\" got down during the query execution: {url}. Try out again", file=sys.stdout, flush=True)
+        except requests.ConnectionError as ex:
+            service_is_up = False
+            print(f"Service \"{service}:{port}\" has a connection error: {url}. Try out again", file=sys.stdout, flush=True)
 
     assert respOk
 
