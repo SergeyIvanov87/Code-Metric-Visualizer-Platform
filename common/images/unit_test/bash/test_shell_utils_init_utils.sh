@@ -130,7 +130,7 @@ test_receive_own_ka_watchdog_query_no_pipe() {
     local query_timeout_sec=15
 
     # no pipe
-    receive_ka_watchdog_query ${result_pipe} ${query_timeout_sec} MISSING_API_QUERIES
+    receive_ka_watchdog_query ${result_pipe} ${query_timeout_sec} PROXYING_API_QUERIES
     assertEquals $? 255
 }
 
@@ -141,7 +141,7 @@ test_receive_own_ka_watchdog_query_no_response() {
 
     # no response
     mkfifo -m 644 ${result_pipe}
-    receive_ka_watchdog_query ${result_pipe} ${query_timeout_sec} MISSING_API_QUERIES
+    receive_ka_watchdog_query ${result_pipe} ${query_timeout_sec} PROXYING_API_QUERIES
     local RET=$?
     rm -f ${result_pipe}
     assertEquals ${RET} 255
@@ -161,15 +161,41 @@ d={"service": {"name": 566, "param": "something with spaces in between"}}
 print(json.dumps(d))
 EOM
     RECEIVE_STR=`python -c "${EXEC_STR}"`
+    local PROXYING_API_QUERIES=
     echo "expected RECEIVE_STR: ${RECEIVE_STR}"
     (mkfifo -m 644 ${result_pipe} && sleep 5 && echo $RECEIVE_STR > ${result_pipe}) &
     WAIT_PID=$!
     assertEquals `ps -ef | grep ${WAIT_PID} | grep -v grep | wc -l` 1
-    receive_ka_watchdog_query ${result_pipe} ${query_timeout_sec} MISSING_API_QUERIES
+
+    PROXYING_API_QUERIES=
+    receive_ka_watchdog_query ${result_pipe} ${query_timeout_sec} PROXYING_API_QUERIES
     local RET=$?
     rm -f ${result_pipe}
     assertEquals ${RET} 0
-    assertEquals "${MISSING_API_QUERIES}" "${RECEIVE_STR}"
+    assertEquals "${PROXYING_API_QUERIES}" "${RECEIVE_STR}"
+
+
+    echo "repeat test_receive_own_ka_watchdog_query_no_response_JSON_response again..."
+    (mkfifo -m 644 ${result_pipe} && sleep 5 && echo $RECEIVE_STR > ${result_pipe}) &
+    WAIT_PID=$!
+    assertEquals `ps -ef | grep ${WAIT_PID} | grep -v grep | wc -l` 1
+    PROXYING_API_QUERIES=
+    receive_ka_watchdog_query ${result_pipe} ${query_timeout_sec} PROXYING_API_QUERIES
+    RET=$?
+    rm -f ${result_pipe}
+    assertEquals ${RET} 0
+    assertEquals "${PROXYING_API_QUERIES}" "${RECEIVE_STR}"
+
+    echo "repeat test_receive_own_ka_watchdog_query_no_response_JSON_response and again..."
+    (mkfifo -m 644 ${result_pipe} && sleep 5 && echo $RECEIVE_STR > ${result_pipe}) &
+    WAIT_PID=$!
+    assertEquals `ps -ef | grep ${WAIT_PID} | grep -v grep | wc -l` 1
+    PROXYING_API_QUERIES=
+    receive_ka_watchdog_query ${result_pipe} ${query_timeout_sec} PROXYING_API_QUERIES
+    RET=$?
+    rm -f ${result_pipe}
+    assertEquals ${RET} 0
+    assertEquals "${PROXYING_API_QUERIES}" "${RECEIVE_STR}"
 }
 
 ################################################################################
