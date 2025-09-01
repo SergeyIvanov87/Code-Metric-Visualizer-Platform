@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.3-labs
 
 FROM alpine:latest as build
 WORKDIR /package
