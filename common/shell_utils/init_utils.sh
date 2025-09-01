@@ -341,7 +341,7 @@ wait_for_unavailable_services() {
             return 250
         fi
         let wait_dependencies_counter=$wait_dependencies_counter+1
-        echo -e "${Red}WARNING: One or more services are offline. Another attempt: ${wait_dependencies_counter}/${wait_dependencies_counter_limit} - will be made in ${wait_dependencies_sec} seconds.${Color_Off}"
+        echo -e "${Red}WARNING: One or more services are offline: ${missing_api_queries}. Another attempt: ${wait_dependencies_counter}/${wait_dependencies_counter_limit} - will be made in ${wait_dependencies_sec} seconds.${Color_Off}"
         sleep ${wait_dependencies_sec} &
         wait $!
     done
