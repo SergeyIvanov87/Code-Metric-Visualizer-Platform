@@ -33,10 +33,8 @@ COPY common/modules /opt/modules
 COPY common/shell_utils /opt/shell_utils
 COPY ["common/api_management.py", "common/build_api_executors.py", "common/build_api_services.py", "common/build_api_pseudo_fs.py", "common/build_common_api_services.py", "common/make_api_readme.py", "common/renew_pseudo_fs_pipes.py", "/opt/"]
 
-RUN <<EOF
-dos2unix /opt/*
-dos2unix /opt/modules*
-EOF
+RUN dos2unix /opt/* && \
+    dos2unix /opt/modules*
 
 COPY ["cyclomatic_complexity/*.sh", "cyclomatic_complexity/*.py", "cyclomatic_complexity/$SCRIPT_GEN_LOC/*.sh", "/package/"]
 COPY cyclomatic_complexity/API /package/API
@@ -63,12 +61,10 @@ RUN addgroup \
 && adduser ${USER} wheel
 
 
-RUN  <<EOF
-mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
-mkdir -p -m 777 /mnt && mkdir -p -m 777 /api
-chown -R ${USER}:${GROUPNAME} /mnt && chown -R ${USER}:${GROUPNAME} /api
-chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
-EOF
+RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf   && \
+    mkdir -p -m 777 /mnt && mkdir -p -m 777 /api    && \
+    chown -R ${USER}:${GROUPNAME} /mnt && chown -R ${USER}:${GROUPNAME} /api    && \
+    chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
 
 USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/opt", "/api"]

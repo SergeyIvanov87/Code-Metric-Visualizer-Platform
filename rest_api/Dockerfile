@@ -29,12 +29,10 @@ COPY common/build_api_pseudo_fs.py /opt/
 COPY common/make_api_readme.py /opt/
 COPY common/restore_api_from_pseudo_fs.py /opt/
 
-RUN <<EOF
-dos2unix /package/*
-dos2unix /opt/*
-dos2unix /opt/modules*
-rc-update add syslog boot
-EOF
+RUN dos2unix /package/* && \
+    dos2unix /opt/* && \
+    dos2unix /opt/modules* && \
+    rc-update add syslog boot
 
 ENV DOCKER_SYSLOG_NG_DRIVER_FILE_HANDLER=/var/log/docker_syslog-ng_driver.log
 ARG DOCKER_SYSLOG_NG_DRIVER_LOG_LEVEL=DEBUG
@@ -61,12 +59,10 @@ RUN addgroup \
 && adduser ${USER} wheel
 
 # allow group wheel to become root
-RUN  <<EOF
-mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
-mkdir -p -m 777 /api
-chown -R ${USER}:${GROUPNAME} /api
-chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
-EOF
+RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf   && \
+    mkdir -p -m 777 /api    && \
+    chown -R ${USER}:${GROUPNAME} /api  && \
+    chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
 
 USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api"]

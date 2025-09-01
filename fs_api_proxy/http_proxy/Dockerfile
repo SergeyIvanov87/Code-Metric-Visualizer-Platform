@@ -24,12 +24,10 @@ COPY fs_api_proxy/http_proxy/*.sh /package/
 COPY fs_api_proxy/http_proxy/*.py /package/
 
 
-RUN <<EOF
-dos2unix /opt/*
-dos2unix /opt/modules*
-dos2unix /package/*
-rc-update add syslog boot
-EOF
+RUN dos2unix /opt/* && \
+    dos2unix /opt/modules* && \
+    dos2unix /package/* && \
+    rc-update add syslog boot
 
 ARG UPSTREAM_SERVICE=
 ENV UPSTREAM_SERVICE=$UPSTREAM_SERVICE
@@ -70,11 +68,9 @@ RUN addgroup \
 && adduser ${USER} wheel
 
 # allow group GROUPNAME to become root
-RUN  <<EOF
-mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
-mkdir -p -m 777 /api && chown -R ${USER}:${GROUPNAME} /api
-chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
-EOF
+RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf && \
+    mkdir -p -m 777 /api && chown -R ${USER}:${GROUPNAME} /api && \
+    chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
 
 USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api"]

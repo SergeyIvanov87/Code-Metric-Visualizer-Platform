@@ -31,11 +31,9 @@ COPY rrd_analytic/API /package/API
 
 COPY rrd_analytic/$SCRIPT_GEN_LOC/*.sh /package/
 
-RUN <<EOF
-dos2unix /package/*
-dos2unix /opt/*
-dos2unix /opt/modules*
-EOF
+RUN dos2unix /package/* && \
+    dos2unix /opt/* && \
+    dos2unix /opt/modules*
 
 ARG SKIP_API_DEPS_CHECK=false TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30 MICROSERVICE_NAME=rrd_analytic
 ENV SKIP_API_DEPS_CHECK=$SKIP_API_DEPS_CHECK TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=$TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC MICROSERVICE_NAME=$MICROSERVICE_NAME
@@ -59,12 +57,10 @@ RUN addgroup \
 && adduser ${USER} wheel
 
 
-RUN  <<EOF
-mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
-mkdir -p -m 777 /api && mkdir -p -m 777 /rrd_data
-chown -R ${USER}:${GROUPNAME} /api && chown -R ${USER}:${GROUPNAME} /rrd_data
-chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt
-EOF
+RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf   && \
+    mkdir -p -m 777 /api && mkdir -p -m 777 /rrd_data   && \
+    chown -R ${USER}:${GROUPNAME} /api && chown -R ${USER}:${GROUPNAME} /rrd_data   && \
+    chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt
 
 USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api", "/rrd_data"]

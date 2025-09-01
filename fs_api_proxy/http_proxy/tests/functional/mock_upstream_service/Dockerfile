@@ -42,12 +42,10 @@ RUN addgroup \
 && adduser ${USER} wheel
 
 # allow group wheel to become root
-RUN  <<EOF
-mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
-mkdir -p -m 777 /api && chown -R ${USER}:${GROUPNAME} /api
-mkdir -p -m 777 /mnt && chown -R ${USER}:${GROUPNAME} /mnt
-chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /tests
-EOF
+RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf   && \
+    mkdir -p -m 777 /api && chown -R ${USER}:${GROUPNAME} /api  && \
+    mkdir -p -m 777 /mnt && chown -R ${USER}:${GROUPNAME} /mnt  && \
+    chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /tests
 
 USER ${USER}
 ENTRYPOINT ["/tests/init.sh", "/tests", "/api"]
