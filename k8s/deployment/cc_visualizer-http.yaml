@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: vcs-project
-        image: pmccabe_docker-vcs-project
+        image: code-metric-platform-vcs-project
         imagePullPolicy: Never
         env:
         - name: PROJECT_URL
@@ -35,7 +35,7 @@ spec:
             add:
             - NET_RAW
       - name: cc-visualizer
-        image: pmccabe_docker-cc-visualizer
+        image: code-metric-platform-cc-visualizer
         imagePullPolicy: Never
         volumeMounts:
         - mountPath: /api
@@ -86,7 +86,7 @@ spec:
             add:
             - NET_RAW
       - name: cc-http-api
-        image: pmccabe_docker-cc-http-api
+        image: code-metric-platform-cc-http-api
         imagePullPolicy: Never
         env:
         - name: FLASK_RUN_PORT

@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: vcs-project
-        image: pmccabe_docker-vcs-project
+        image: code-metric-platform-vcs-project
         imagePullPolicy: Never
         env:
         - name: PROJECT_URL

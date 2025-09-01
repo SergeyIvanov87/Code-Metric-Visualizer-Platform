@@ -18,7 +18,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: rrd-analytic
-        image: pmccabe_docker-rrd-analytic
+        image: code-metric-platform-rrd-analytic
         imagePullPolicy: Never
         volumeMounts:
         - mountPath: /api
@@ -152,7 +152,7 @@ spec:
             add:
             - NET_RAW
       - name: rrd-http-api
-        image: pmccabe_docker-rrd-http-api
+        image: code-metric-platform-rrd-http-api
         imagePullPolicy: Never
         env:
         - name: FLASK_RUN_PORT
@@ -173,7 +173,7 @@ spec:
             add:
             - NET_RAW
       - name: rrd-http-proxy-cc
-        image: pmccabe_docker-rrd-http-proxy-cc
+        image: code-metric-platform-rrd-http-proxy-cc
         imagePullPolicy: Never
         env:
         - name: UPSTREAM_SERVICE
