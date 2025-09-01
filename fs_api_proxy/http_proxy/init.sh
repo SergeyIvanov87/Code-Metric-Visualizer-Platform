@@ -18,23 +18,23 @@ echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_A
 source ${OPT_DIR}/shell_utils/init_utils.sh
 
 echo -e "${Blue}Proxy UPSTREAM_SERVICE: ${BBlue}${UPSTREAM_SERVICE}${Blue}, DOWNSTREAM_SERVICE: ${BBlue}${DOWNSTREAM_SERVICE}${Blue}, DOWNSTREAM_SERVICE_NETWORK_ADDR: ${BBlue}${DOWNSTREAM_SERVICE_NETWORK_ADDR}${Color_Off}"
-if [ -z ${UPSTREAM_SERVICE} ]; then
+if [ -z "${UPSTREAM_SERVICE}" ]; then
     echo -e "${BRed}ERROR:${Color_Off}The environment variable ${BRed}UPSTREAM_SERVICE${Color_Off} is not configured. Cannot start without proxying anything"
     exit 255
 fi
 
-if [ -z ${DOWNSTREAM_SERVICE} ]; then
+if [ -z "${DOWNSTREAM_SERVICE}" ]; then
     echo -e "${BRed}ERROR:${Color_Off}The environment variable ${BRed}DOWNSTREAM_SERVICE${Color_Off} is not configured. Cannot start without proxying anything"
     exit 255
 fi
 
-if [ -z ${DOWNSTREAM_SERVICE_NETWORK_ADDR} ]; then
+if [ -z "${DOWNSTREAM_SERVICE_NETWORK_ADDR}" ]; then
     echo -e "${BRed}ERROR:${Color_Off}The environment variable ${BRed}DOWNSTREAM_SERVICE_NETWORK_ADDR${Color_Off} is not configured. Cannot start without proxying anything"
     exit 255
 fi
 
 DEFAULT_DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=15
-if [ -z ${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT} ]; then
+if [ -z "${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT}" ]; then
     echo -e "${BGreen}INFO: ${Color_Off}The environment variable ${BGreen}DOWNSTREAM_SERVICE_CONNECT_ATTEMPT${Color_Off} is not configured. Default value will be used: ${BGreen}${DEFAULT_DOWNSTREAM_SERVICE_CONNECT_ATTEMPT}${Color_Off}"
     DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=${DEFAULT_DOWNSTREAM_SERVICE_CONNECT_ATTEMPT}
 fi
@@ -50,9 +50,9 @@ declare -A API_MANAGEMENT_PIDS
 shutdown_processors_if_downstream_is_dead(){
     local downstream_server_addr=${1}
     declare -A SERV_TO_STOP
-    for service_query in ${!SERVICE_QUERY_WATCH_PIDS[@]}
+    for service_query in "${!SERVICE_QUERY_WATCH_PIDS[@]}"
     do
-        query=`sed -n 's/\(echo \"CLI SERVER: \)\(.*\)\(\"\)/\2/p' ${service_query}`
+        query=$(sed -n 's/\(echo \"CLI SERVER: \)\(.*\)\(\"\)/\2/p' "${service_query}")
         #local url="${downstream_server_addr}/${SHARED_API_DIR}/${query}"
         local url="${downstream_server_addr}/${query}"
         echo -e "check availability of ${url}:"
@@ -68,10 +68,10 @@ shutdown_processors_if_downstream_is_dead(){
     done
     if [ ${#SERV_TO_STOP[@]} -ne 0 ] ; then
         declare -A PID_TO_STOP
-        for service_query in ${!SERV_TO_STOP[@]}
+        for service_query in "${!SERV_TO_STOP[@]}"
         do
             echo "match service_query: ${service_query}"
-            for service in ${!API_MANAGEMENT_PIDS[@]}
+            for service in "${!API_MANAGEMENT_PIDS[@]}"
             do
                 echo "for service: ${service}"
                 if [[ $service_query == *"${service}/generated"* ]]; then
@@ -82,7 +82,7 @@ shutdown_processors_if_downstream_is_dead(){
 
         gracefull_shutdown_bunch SERV_TO_STOP PID_TO_STOP
 
-        for service in ${!PID_TO_STOP[@]}
+        for service in "${!PID_TO_STOP[@]}"
         do
             unset API_MANAGEMENT_PIDS[${service}]
             echo "Remove service launching script: ${service} from proxy list"
@@ -90,7 +90,7 @@ shutdown_processors_if_downstream_is_dead(){
         done
 
         echo "take API fs postmortem snapshot"
-        echo "SHAPSHOT: `date +%D%_H:%M:%S:%3N`" >> /tmp/fs_api_snapshot
+        echo "SHAPSHOT: $(date +%D%_H:%M:%S:%3N)" >> /tmp/fs_api_snapshot
         ls -laR ${SHARED_API_DIR} >> /tmp/fs_api_snapshot
     fi
 }
@@ -104,15 +104,11 @@ trap 'termination_handler' SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
 shopt -s extglob
 RETURN_STATUS=0
 TIMEOUT_ON_FAILURE_SEC=1
-WAIT_FOR_HEARTBEAT_PIPE_IN_CREATION_SEC=5
-WAIT_FOR_HEARTBEAT_PIPE_OUT_CREATION_SEC=3
 UPSTREAM_SERVICE_HEARTBEAT_SEC=15
 
 # TODO separate cases: Downstram down & Upstream down too
 API_UPDATE_EVENT_TIMEOUT_LIMIT=${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT}
 API_UPDATE_EVENT_TIMEOUT_COUNTER=0
-# Loop until any unrecoverable error would occur
-HAS_GOT_API_UPDATE_EVENT=0
 
 rm -rf to_proxy
 rm -rf to_proxy_new
@@ -120,6 +116,7 @@ if [ ! -d "to_proxy" ]; then
     # make empty directory to fill it in by newly detected services
     mkdir -m 777 to_proxy
 fi
+local PROXYING_API_QUERIES
 while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT} ]; do
     # wait until downstream service become alive..
     curl --output /dev/null --silent --head --fail "${DOWNSTREAM_SERVICE_NETWORK_ADDR}"
@@ -136,77 +133,22 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     fi
 
     # wait until upstream service become alive...
-    wait_for_pipe_exist ${pipe_in} WAIT_RESULT ${WAIT_FOR_HEARTBEAT_PIPE_IN_CREATION_SEC}
-    if [ ${WAIT_RESULT} -eq 255 ] ; then
-        echo -e "${BPurple}PIPE IN: ${pipe_in} doesn't exist${Color_Off}, trying again in attempt: ${BPurple}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
-        sleep ${TIMEOUT_ON_FAILURE_SEC} &
-        wait $!
-        let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1
-        continue
-    fi
-
-    # upstream service may get inoperable abruptly, to prevent stucking on a dead-pipe, let's not block ourselves on it,
-    # so that a watchdog introduced
-
-    #TODO TRY function
-    #send_ka_watchdog_query ${pipe_in} ${SESSION_ID} ".*" ${deps_query_timeout_sec}
-    #    if [ $? == 0 ]; then
-    #        let wait_dependencies_counter=$wait_dependencies_counter+1
-    #        echo -e "Wait for another attempt: ${BCyan}${wait_dependencies_counter}/${wait_dependencies_counter_limit}${Color_Off}"
-    #        if [ ${wait_dependencies_counter} == ${wait_dependencies_counter_limit} ]; then
-    #            eval ${3}=$ANY_SERVICE_UNAVAILABLE
-    #            break
-    #        fi
-    #        continue
-    #    fi
-
-
-    DEPS_QUERY_WAIT_TIMEOUT=5
-    (echo "SESSION_ID=${SESSION_ID} --service=${DOWNSTREAM_SERVICE} --timeout=${DEPS_QUERY_WAIT_TIMEOUT}"> ${pipe_in}) &
-    PID_TO_UNBLOCK=$!
-    sleep $((DEPS_QUERY_WAIT_TIMEOUT + 2))
-    kill -s 0 ${PID_TO_UNBLOCK} > /dev/null 2>&1
-    PID_TO_UNBLOCK_RESULT=$?
-    if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
-        # query has stucked: probably due to upstream service outage. Unblock query
-        timeout 2 /bin/bash -c "cat ${pipe_in} > /dev/null 2>&1"
-        if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET:	${pipe_in}"; fi
+    send_ka_watchdog_query ${pipe_in} ${SESSION_ID} ${DOWNSTREAM_SERVICE} 5
+    if [ $? -ne 0 ]; then
         echo -e "${BRed}Heartbeat query: ${pipe_in} has stuck on${Color_Off} probably due to ${BRed}${UPSTREAM_SERVICE}${Color_Off} outage, trying again in attempt: ${BRed}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1
-        continue
-    fi
-
-    # wait until upstream service create OUT pipe to read on
-    wait_for_pipe_exist ${pipe_out} WAIT_RESULT ${WAIT_FOR_HEARTBEAT_PIPE_OUT_CREATION_SEC}
-    if [ ${WAIT_RESULT} -eq 255 ] ; then
-        echo -e "${BPurple}PIPE OUT: ${pipe_out} doesn't exist${Color_Off}, trying again in attempt: ${BPurple}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         sleep ${TIMEOUT_ON_FAILURE_SEC} &
         wait $!
-        let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1
         continue
     fi
-
-
-    # upstream service may get inoperable abruptly, to prevent stucking on a dead-pipe, let's not block ourselves on it,
-    # so that a watchdog introduced.
-    file_pipe_out_result_name=cat_pipe_out_result_file
-    rm -f ${file_pipe_out_result_name}*
-    file_pipe_out_result_name="${file_pipe_out_result_name}_`date +%s`"
-    (cat ${pipe_out} > ${file_pipe_out_result_name}) &
-    PID_TO_UNBLOCK=$!
-    sleep 2
-    kill -s 0 ${PID_TO_UNBLOCK} > /dev/null 2>&1
-    PID_TO_UNBLOCK_RESULT=$?
-    if [ $PID_TO_UNBLOCK_RESULT == 0 ]; then
-        # query has stucked: probably due to upstream service outage. Unblock query
-        timeout 2 /bin/bash -c "echo > ${pipe_out} > /dev/null 2>&1"
-        if [ $? == 124 ] ; then echo "`date +%H:%M:%S:%3N`	`hostname`	RESET:	${pipe_out}"; fi
+    PROXYING_API_QUERIES=
+    receive_ka_watchdog_query ${pipe_out} 5 PROXYING_API_QUERIES
+    if [ $? -ne 0 ]; then
         echo -e "${BRed}Heartbeat query: ${pipe_out} has stuck on${Color_Off} probably due to ${BRed}${UPSTREAM_SERVICE}${Color_Off} outage, trying again in attempt: ${BRed}(${API_UPDATE_EVENT_TIMEOUT_COUNTER}/${API_UPDATE_EVENT_TIMEOUT_LIMIT})${Color_Off}"
         let API_UPDATE_EVENT_TIMEOUT_COUNTER=${API_UPDATE_EVENT_TIMEOUT_COUNTER}+1
         continue
     fi
 
-    PROXYING_API_QUERIES=`cat ${file_pipe_out_result_name}`
     if [ -z "${PROXYING_API_QUERIES}" ]; then
 
         echo "SERVICE_QUERY_WATCH_PIDS before: ${SERVICE_QUERY_WATCH_PIDS[@]}, API_MANAGEMENT_PIDS before: ${API_MANAGEMENT_PIDS[@]}"
@@ -253,7 +195,7 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
             unset SERVICE_QUERY_WATCH_PIDS[${OLD_SERVICE_FILE_PATH}]
 
             if [ ! -z ${API_MANAGEMENT_PIDS[${OLD_SERVICE_FILE_PATH}]} ] ; then
-                API_MANAGEMENT_PIDS_TO_STOP[${OLD_SERVICE_FILE_PATH}] = ${OLD_SERVICE_FILE_PATH[${OLD_SERVICE_FILE_PATH}]}
+                API_MANAGEMENT_PIDS_TO_STOP[${OLD_SERVICE_FILE_PATH}]=${OLD_SERVICE_FILE_PATH[${OLD_SERVICE_FILE_PATH}]}
             fi
             unset API_MANAGEMENT_PIDS[${OLD_SERVICE_FILE_PATH}]
 
@@ -275,7 +217,7 @@ while [ ${API_UPDATE_EVENT_TIMEOUT_COUNTER} != ${API_UPDATE_EVENT_TIMEOUT_LIMIT}
     ls -laR ${SHARED_API_DIR} >> /tmp/fs_api_snapshot
 
     echo -e "${BBlue}Launch new services${Color_Off}, which ${UPSTREAM_SERVICE} has become depend on: ${!SERVICE_TO_RUN[@]}"
-    for service in ${!SERVICE_TO_RUN[@]}
+    for service in "${!SERVICE_TO_RUN[@]}"
     do
         echo -e "Generate proxy for ${BBlue}${service}${Color_Off}:"
         ./build_proxy_services.py "${service}" -os "${service}/generated" -oe "${service}/exec_generated"

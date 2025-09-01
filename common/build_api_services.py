@@ -34,6 +34,12 @@ from api_fs_bash_utils import generate_exec_watchdog_function
 from api_fs_bash_utils import exec_watchdog_function
 from api_fs_bash_utils import generate_extract_attr_value_from_string
 from api_fs_bash_utils import extract_attr_value_from_string
+from api_fs_bash_utils import generate_unblock_query_pipe_writers_by_owner
+from api_fs_bash_utils import unblock_query_pipe_writers_by_owner
+from api_fs_bash_utils import generate_unblock_result_pipe_reader_by_owner
+from api_fs_bash_utils import unblock_result_pipe_readers_by_owner
+from api_fs_bash_utils import generate_unblock_readers_of_result_pipe_array_by_owner
+from api_fs_bash_utils import unblock_readers_of_result_pipe_array_by_owner
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
 
@@ -83,6 +89,9 @@ api_gui_schema = [
 api_cli_schema = [
     *generate_exec_watchdog_function(),
     *generate_extract_attr_value_from_string(),
+    *generate_unblock_query_pipe_writers_by_owner(),
+    *generate_unblock_result_pipe_reader_by_owner(),
+    *generate_unblock_readers_of_result_pipe_array_by_owner(),
     'echo "CLI SERVER: {0}"\n',
     "api_exec_node_directory={}\n",
     "shopt -s extglob\n",
@@ -93,12 +102,12 @@ api_cli_schema = [
     "pipe_result_consumer=${pipe_result}\n",
     'SIGNALS="HUP QUIT ABRT KILL EXIT TERM"\n',
     "if [[ -e $pipe_request ]]; then\n",
-    "    rm -f $pipe_request\n",
+    "    " + unblock_query_pipe_writers_by_owner() + " $pipe_request\n",
     "fi\n",
     "if [[ -e $pipe_result ]]; then\n",
-    "    rm -f $pipe_result\n",
+    "    " + unblock_result_pipe_readers_by_owner() + " $pipe_result\n",
     "fi\n",
-    "rm -f ${api_exec_node_directory}/result*\n",
+    unblock_readers_of_result_pipe_array_by_owner() + " ${api_exec_node_directory}/result*\n",
     "mkfifo -m 622 $pipe_request\n",
     'trap "rm -f $pipe_request" ${SIGNALS}\n',
     "mkfifo -m 644 $pipe_result\n",
@@ -215,6 +224,9 @@ def generate_cli_server_content(req_name, req_api, req_type, content_type, req_e
 
     template_schema_row_index = len(generate_exec_watchdog_function())
     template_schema_row_index += len(generate_extract_attr_value_from_string())
+    template_schema_row_index += len(generate_unblock_query_pipe_writers_by_owner())
+    template_schema_row_index += len(generate_unblock_result_pipe_reader_by_owner())
+    template_schema_row_index += len(generate_unblock_readers_of_result_pipe_array_by_owner())
     api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(req_api)
     template_schema_row_index += 1
     api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(api_exec_node_directory

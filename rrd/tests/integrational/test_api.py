@@ -75,7 +75,7 @@ def check_rrd_select_api(query, pipes, exec_params, session_id_value):
     global executor
     h = Heartbeat()
     try:
-        h.run(f"Test 'check_rrd_select_api' is in progress...")
+        h.run(f"Test 'check_rrd_select_api' is in progress...exec_params: {exec_params}")
         executor.execute("rrd_collect", exec_params, session_id_value, 30, 30)
         h.stop()
     except Exception as ex:
@@ -97,7 +97,7 @@ def check_rrd_view_api(query, pipes, exec_params, session_id_value):
     global executor
     h = Heartbeat()
     try:
-        h.run(f"Test 'check_rrd_view_api' is in progress...")
+        h.run(f"Test 'check_rrd_view_api' is in progress...exec_params: {exec_params}")
         executor.execute("rrd_collect", exec_params, session_id_value)
         h.stop()
     except Exception as ex:
@@ -123,7 +123,7 @@ def check_rrd_plot_view_api(query, pipes, exec_params, session_id_value):
     global executor
     h = Heartbeat()
     try:
-        h.run(f"Test 'check_rrd_plot_view_api' is in progress...")
+        h.run(f"Test 'check_rrd_plot_view_api' is in progress...exec_params: {exec_params}")
         executor.execute("rrd_collect", exec_params, session_id_value)
         h.stop()
     except Exception as ex:
@@ -141,7 +141,7 @@ def check_rrd_plot_view_api(query, pipes, exec_params, session_id_value):
 @pytest.mark.parametrize("name,query", testdata)
 def test_filesystem_api_nodes(name, query):
     # compose expected pipe names, based on query data
-    session_id_value = socket.gethostname() + "_" + name
+    session_id_value = "RRD-integrational-test_" + socket.gethostname() + "_" + name
     print(f"{get_timestamp()}\tExecute test: {name}, session: {session_id_value}")
     global global_settings
 

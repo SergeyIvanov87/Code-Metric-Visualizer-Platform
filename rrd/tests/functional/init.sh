@@ -19,7 +19,7 @@ mkdir -p -m 777 ${RRD_DATA_STORAGE_DIR}
 
 # inject test files into project directory
 test_files=(/package/test_data/*.cpp)
-for f in ${test_files[@]}; do
+for f in "${test_files[@]}"; do
     cp ${f} ${INITIAL_PROJECT_LOCATION}/
 done
 
@@ -101,8 +101,8 @@ gracefull_shutdown_handler(){
 
 # If we continue with tests, rrd_analytic must have been started
 echo -e "Wait for rrd starting"
-wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME_TO_TEST}" ANY_SERVICE_UNAVAILABLE_COUNT
-if [ ! -z ${ANY_SERVICE_UNAVAILABLE_COUNT} ]; then
+wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME_TO_TEST}"
+if [ $? -ne 0 ]; then
     echo -e "${BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort${Color_Off}"
     gracefull_shutdown_handler
     exit 255

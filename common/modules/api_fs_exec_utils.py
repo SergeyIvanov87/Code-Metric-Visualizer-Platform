@@ -38,7 +38,7 @@ def generate_read_api_fs_args():
              r"        OVERRIDEN_CMD_ARGS+=(${param_name})",
              r"        for arg in ${IN_SERVER_REQUEST_ARGS[@]}",
              r"        do",
-             r'            if [[ "${arg}" = *${param_name}* ]];',
+             r'            if [[ "${arg}" = *"${param_name}="* ]];',
              r"            then",
              r'''                readarray -d '=' -t ARG_ARR <<< "${arg}"''',
              r'                readarray -t arr <<< "${ARG_ARR[1]}"',

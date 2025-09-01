@@ -129,7 +129,7 @@ for f in rrd_files:
 
 # nan in last row protection
 all_nan_in_line = True
-while all_nan_in_line:
+while all_nan_in_line and len(aggregated_body) > 0:
     all_nan_in_line = True
     last_row = aggregated_body[-1]
     for v in last_row[2:-1]:

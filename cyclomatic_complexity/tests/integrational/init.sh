@@ -38,8 +38,8 @@ API_MANAGEMENT_PID=$!
 
 # Wait until testable service started
 echo -e "${Blue}Waiting for API dependencies${Color_Off}"
-wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}" ANY_SERVICE_UNAVAILABLE_COUNT ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC}
-if [ ! -z ${ANY_SERVICE_UNAVAILABLE_COUNT} ]; then
+wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}" ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC}
+if [ $? -ne 0 ]; then
     echo -e "${BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort${Color_Off}"
     gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
     exit 255

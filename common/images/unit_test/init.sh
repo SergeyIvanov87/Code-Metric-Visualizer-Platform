@@ -12,8 +12,17 @@ export MODULES="${WORK_DIR}/utils/modules"
 echo -e "export WORK_DIR=${WORK_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
 
 
-echo "Run tests:"
+echo "Run BASH tests:"
 RET=0
+for s in ${WORK_DIR}/bash/test_*.sh; do
+    ${s}
+    VAL=$?
+    if [ $VAL != 0 ]
+    then
+        RET=$VAL
+    fi
+done
+
 # TODO
 rm -f ${WORK_DIR}/test_0_pseudo_fs_api_conformance.py
 rm -f ${WORK_DIR}/test_1_inner_api_functionality.py
@@ -37,7 +46,7 @@ ls -laR ${SHARED_API_DIR}
 
 if [ $EXIT_ONCE_DONE == true ]; then exit $RET; fi
 
-echo "wait for termination"
+echo "wait for termination, ret: ${RET}"
 sleep infinity &
 wait $!
 exit $RET
