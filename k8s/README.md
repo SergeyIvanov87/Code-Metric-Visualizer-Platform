@@ -88,7 +88,7 @@ If you want to pull out docker images on pods inside the minikube cluster using 
 
 ##### Build an entire image set
 
-Upon the building process finishes, the ldocker compose will store it in the local docker storage
+Upon the building process finishes, the docker compose will store it in the local docker storage
 
 `docker compose -f compose-analytic-http-api.yaml build`
 
