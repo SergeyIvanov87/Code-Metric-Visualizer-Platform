@@ -15,28 +15,10 @@ jobs:
         uses: actions/checkout@v4
       - name: start minikube
         uses: medyagh/setup-minikube@latest
-        with:
-          cache: false
-          minikube-version: 1.24.0
-#          driver: kvm2
-#          container-runtime: containerd
-          kubernetes-version: v1.22.3
-          nodes: 2
-          cpus: 4
-          memory: 4000m
-          cni: bridge
-#          addons: registry,ingress
-          extra-config: 'kubelet.max-pods=10'
-          feature-gates: 'DownwardAPIHugePages=true'
-          mount-path: '/Users/user1/test-files:/testdata'
-          wait: false
-          insecure-registry: 'localhost:5000,10.0.0.0/24'
-          #start-args: '--delete-on-failure --subnet 192.168.50.0'
-          start-args: '--delete-on-failure'
       - name: kubectl
         run: kubectl get pods -A
       - name: Activate docker env & Build Docker images locally
-        run: eval $(minikube docker-env) && docker --version && DOCKER_BUILDKIT=0 docker-compose -f compose-analytic-http-api.yaml build
+        run: eval $(minikube docker-env) && docker --version && DOCKER_BUILDKIT=0 docker compose -f compose-analytic-http-api.yaml build
       - name: Deploy CC
         run: kubectl apply -f k8s/configMap/cc_visualizer-http.yaml && kubectl apply -f k8s/deployment/cc_visualizer-http.yaml
       - name: Deploy CC Service
