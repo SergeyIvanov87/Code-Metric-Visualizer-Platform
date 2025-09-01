@@ -20,7 +20,7 @@ COPY --from=build /package/pmccabe_visualizer/*.py /package/pmccabe_visualizer/
 COPY rrd_analytic/API /API
 COPY common/API /API/deps
 COPY cyclomatic_complexity/API /API/deps/cyclomatic_complexity
-COPY rrd_analytic/API /API/deps/rrd
+COPY rrd_analytic/API /API/deps/rrd_analytic
 
 COPY rrd_analytic/tests/integrational/*.py /tests/
 COPY rrd_analytic/tests/integrational/*.sh /tests/
