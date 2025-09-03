@@ -18,7 +18,7 @@ jobs:
       - name: kubectl
         run: kubectl get pods -A
       - name: Activate docker env & Build Docker images locally
-        run: eval $(minikube docker-env) && docker --version && DOCKER_BUILDKIT=0 docker compose -f compose-analytic-http-api.yaml build
+        run: eval $(minikube docker-env) && docker --version && docker compose -f compose-analytic-http-api.yaml build
       - name: Deploy CC
         run: kubectl apply -f k8s/configMap/cc_visualizer-http.yaml && kubectl apply -f k8s/deployment/cc_visualizer-http.yaml
       - name: Deploy CC Service

@@ -22,19 +22,18 @@ RUN apk add --no-cache busybox-openrc alpine-conf doas
 RUN apk add --no-cache perl
 
 COPY --from=build /usr/bin/pmccabe /usr/bin/pmccabe
-RUN mkdir pmccabe_visualizer && mkdir FlameGraph
+RUN mkdir pmccabe_visualizer && mkdir FlameGraph && mkdir -p /opt
 # For some reasons you need specify `/package` path from `build` otherwise WORKDIR failed to resolve it
 COPY --from=build /package/FlameGraph/flamegraph.pl FlameGraph/flamegraph.pl
 COPY --from=build /package/pmccabe_visualizer/*.py pmccabe_visualizer/
-
-
-RUN mkdir -p /opt
 COPY common/modules /opt/modules
 COPY common/shell_utils /opt/shell_utils
 COPY ["common/api_management.py", "common/build_api_executors.py", "common/build_api_services.py", "common/build_api_pseudo_fs.py", "common/build_common_api_services.py", "common/make_api_readme.py", "common/renew_pseudo_fs_pipes.py", "/opt/"]
 
-RUN dos2unix /opt/* && \
-    dos2unix /opt/modules*
+RUN <<EOF
+dos2unix /opt/* && \
+dos2unix /opt/modules*
+EOF
 
 COPY ["cyclomatic_complexity/*.sh", "cyclomatic_complexity/*.py", "cyclomatic_complexity/$SCRIPT_GEN_LOC/*.sh", "/package/"]
 COPY cyclomatic_complexity/API /package/API
@@ -61,10 +60,12 @@ RUN addgroup \
 && adduser ${USER} wheel
 
 
-RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf   && \
-    mkdir -p -m 777 /mnt && mkdir -p -m 777 /api    && \
-    chown -R ${USER}:${GROUPNAME} /mnt && chown -R ${USER}:${GROUPNAME} /api    && \
-    chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
+RUN <<EOF
+mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
+mkdir -p -m 777 /mnt && mkdir -p -m 777 /api
+chown -R ${USER}:${GROUPNAME} /mnt && chown -R ${USER}:${GROUPNAME} /api
+chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
+EOF
 
 USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/opt", "/api"]
