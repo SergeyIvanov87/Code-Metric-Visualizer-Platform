@@ -19,6 +19,7 @@ jobs:
         run: kubectl get pods -A
       - name: Activate docker env & Build Docker images locally
         run: |
+          minikube addons enable storage-provisioner-rancher
           eval $(minikube docker-env)
           docker --version
           docker compose -f compose-analytic-http-api.yaml build
@@ -35,7 +36,7 @@ jobs:
           kubectl get cm
           kubectl describe pods
           kubectl describe svc
-      - name: Create an RRD storage persistent value claine
+      - name: Create an RRD storage persistent value claim
         run: |
           kubectl apply -f k8s/pvc/rrd_analytic_data_pvc.yaml
           kubectl get pvc

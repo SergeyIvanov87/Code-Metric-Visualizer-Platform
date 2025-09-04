@@ -194,9 +194,9 @@ spec:
         - mountPath: /api
           name: api-pmccabecollector-api-rrd-http-private-org
       volumes:
-      #- name: api-pmccabe-collector-rrd-analytic-storage
-      #  persistentVolumeClaim:
-      #    claimName: rrd-analytic-storage
+      - name: api-pmccabe-collector-rrd-analytic-storage
+        persistentVolumeClaim:
+          claimName: rrd-analytic-storage
       - name: api-pmccabecollector-api-rrd-http-private-org
         emptyDir:
             sizeLimit: 500Mi
