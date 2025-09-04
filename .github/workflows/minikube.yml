@@ -23,7 +23,15 @@ jobs:
         run: kubectl apply -f k8s/configMap/cc_visualizer-http.yaml && kubectl apply -f k8s/deployment/cc_visualizer-http.yaml
       - name: Deploy CC Service
         run: kubectl apply -f k8s/service/cc_visualizer-http.yaml
-      - name: Check PODs and SVC
-        run: kubectl get cm && kubectl describe pods && kubectl describe svc
+      - name: Check CC PODs and SVC
+        run: kubectl wait --for=condition=ready pod -l app=cc_visualizer_app && kubectl get cm && kubectl describe pods && kubectl describe svc
+      - name: Deploy RRD statefull set && headless service
+        run: kubectl apply -f k8s/configMap/rrd_analytic-http.yaml && kubectl apply -f k8s/stateful_set/rrd_analytic-http.yaml && kubectl apply -f k8s/stateful_set/rrd_analytic-headless-service.yaml
+      - name: Deploy RRD Service
+        run: kubectl apply -f k8s/service/rrd_analytic-http.yaml
+      - name: Check RRD PODs and SVC
+        run: kubectl wait --for=condition=ready pod -l app=rrd_analytic_app && kubectl get cm && kubectl describe pods && kubectl describe svc
       - name: Check CC service health
-        run: sleep 90 && curl  --head --fail "`minikube ip`:30001//api.pmccabe_collector.restapi.org"
+        run: RET=-1 && for i in $(seq 1 90); do curl --head --fail "`minikube ip`:30001//api.pmccabe_collector.restapi.org"; if [ $? -eq 0 ]; then RET=0; break; fi;  exit ${RET}
+      - name: Check RRD service health
+        run: RET=-1 && for i in $(seq 1 90); do curl --head --fail "`minikube ip`:30002//api.pmccabe_collector.restapi.org"; if [ $? -eq 0 ]; then RET=0; break; fi;  exit ${RET}
