@@ -35,6 +35,10 @@ jobs:
           kubectl get cm
           kubectl describe pods
           kubectl describe svc
+      - name: Create an RRD storage persistent value claine
+        run: |
+          kubectl apply -f k8s/pvc/rrd_analytic_data_pvc.yaml
+          kubectl get pvc
       - name: Deploy RRD statefull set && headless service
         run: |
           kubectl apply -f k8s/configMap/rrd_analytic-http.yaml
