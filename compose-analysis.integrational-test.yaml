@@ -1,7 +1,7 @@
 include:
   - common/images/test_pseudo_fs/compose.yaml
   - cyclomatic_complexity/compose-analysis.integrational-test.yaml
-  - rrd/compose-analysis.integrational-test.yaml
+  - rrd_analytic/compose-analysis.integrational-test.yaml
   - rest_api/compose-analysis.integrational-test.yaml
   #- common/compose-common.yaml
   - common/images/test_aggregator_image/compose.yaml
@@ -17,4 +17,4 @@ volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
-  api.pmccabe_collector.rrd_analytic:
+  api.pmccabe_collector.rrd-analytic:

@@ -1,0 +1,15 @@
+{
+    "Content-Type" : "text/plain",
+    "Method" : "GET",
+    "Query": "api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select",
+    "Params": {
+        "-path" : "\"*api.pmccabe_collector.restapi.org/*\" -prune",
+        "-name" : "\"*rrd\"",
+        "-type" :"f"
+    },
+    "Description": {
+        "header": "Selects the existing RRD silos to be process by API `rrd_view`, `rrd_plot_view` queries further.\nBy default, it allows only a root project package time series RRD file to be processed\n. Please modify this rule (check on `man find`) in order ot include or exclude RRD silos from processing.\n Using the value for the param `-path` without `-prune` at the end, like  `-path \"*api.pmccabe_collector.restapi.org/*\"` will admit the utter RRD silos tree as the enabled list for further `rrd_view`,`rrd_plot_view` API queries processing.\n",
+        "body": "To make a query:\n\n`echo \"0\" > api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/GET/exec`\n\nTo wait and extract the query result:\n\n`cat api.pmccabe_collector.restapi.org/rrd_analytic/rrd/select/GET/result.txt > <your filemame>.txt`\n\n",
+        "footer": "The result of this query is a enumerated RRD silos list of full pathes, which will be consumed by `rrd_view`, `rrd_plot_view` API queries further"
+    }
+}

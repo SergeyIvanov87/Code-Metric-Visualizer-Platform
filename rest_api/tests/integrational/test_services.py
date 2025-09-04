@@ -21,7 +21,7 @@ testdata = list(get_api_queries(os.path.join(global_settings.work_dir, "API_for_
 def execute_query(name, query):
     global global_settings
 
-    url = 'http://rest_api:5000/' + query["Query"]
+    url = 'http://rest-api:5000/' + query["Query"]
     headers = {'Accept-Charset': 'UTF-8'}
 
     print(f"{get_timestamp()}\tsend query: {url}")
@@ -33,7 +33,7 @@ def execute_query(name, query):
     while not service_is_up:
         h = Heartbeat()
         h.run(f"{get_timestamp()}\tTest 'execute_query: {query['Query']}' is in progress, waiting for a service up...")
-        service_is_up = service_tester_utils.if_service_started_up_until("rest_api", 5000, 60, 1)
+        service_is_up = service_tester_utils.if_service_started_up_until("rest-api", 5000, 60, 1)
         h.stop()
         assert service_is_up
 
@@ -46,7 +46,7 @@ def execute_query(name, query):
                 case "post":
                     resp = requests.post(url, data=params, headers=headers)
             print(f"{get_timestamp()}\tsent query: {url}, response status: {resp.content if not resp.ok else '<not an error, ignored>'}")
-            service_is_up = service_tester_utils.ping_service("rest_api", 5000)
+            service_is_up = service_tester_utils.ping_service("rest-api", 5000)
             respOk = resp.ok
             print(f"resp: {respOk}, service_is_up: {service_is_up}")
         except requests.ConnectTimeout as ex:

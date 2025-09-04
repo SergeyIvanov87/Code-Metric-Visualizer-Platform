@@ -28,11 +28,11 @@ The service is not engaged into this UC
 
 From the main repository directory run:
 
-`docker build -t service_broker:latest -f service_broker/Dockerfile .`
+`docker build -t service-broker:latest -f service_broker/Dockerfile .`
 
 The service requires all other services to be started. Once they started, use the following command:
 
-`docker run -it --name service_broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:latest`
+`docker run -it --name service-broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service-broker:latest`
 
 # Testing the container
 

@@ -1,6 +1,6 @@
 FROM linuxserver/syslog-ng:4.5.0
 
-RUN apk add openssh patch
+RUN apk add --no-cache openssh patch
 COPY common/images/syslog-ng_image/config/syslog-ng.conf /config/syslog-ng.conf
 COPY common/images/syslog-ng_image/config/volatile.conf /config/volatile.conf
 VOLUME ["/var/log/"]

@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cc-visualizer-deployment
+  labels:
+    app: cc_visualizer_app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cc_visualizer_app
+  template:
+    metadata:
+      labels:
+        app: cc_visualizer_app
+    spec:
+      containers:
+      - name: vcs-project
+        image: code-metric-platform-vcs-project
+        imagePullPolicy: Never
+        env:
+        - name: PROJECT_URL
+          value: https://github.com/SergeyIvanov87/MRUVocabulary.git
+        - name: PROJECT_BRANCH
+          value: main
+        volumeMounts:
+        - mountPath: /api
+          name: api-pmccabecollector-api-cc-http-private-org
+          readOnly: false
+        - mountPath: /mnt
+          name: api-pmccabe-collector-vcs-project
+          readOnly: false
+        securityContext:
+          capabilities:
+            add:
+            - NET_RAW
+      - name: cc-visualizer
+        image: code-metric-platform-cc-visualizer
+        imagePullPolicy: Never
+        volumeMounts:
+        - mountPath: /api
+          name: api-pmccabecollector-api-cc-http-private-org
+        - mountPath: /mnt
+          name: api-pmccabe-collector-vcs-project
+        ####
+        # Mount ConfigMap params as files in FS, which are devoted to customize queries using pseudo FS API interface.
+        # Unfortunately ConfigMap mounts as read-only volumes, which stops us from creating FS API node in those directory
+        # due to lack of permissions on write: pipes cannot be created etc.
+        ####
+        # The only WA is to use `subPath`, which will mount a single file-parameter only, without touching access-right
+        # of an entire FS API. In this case FS is not read-only and we still can leverage FS API advantages
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cyclomatic_complexity/0.-regex
+          subPath: 0.-regex
+          name: cc-watch-list-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cyclomatic_complexity/1.NO_NAME_PARAM.0
+          subPath: 1.NO_NAME_PARAM.0
+          name: cc-watch-list-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cyclomatic_complexity/2.-type
+          subPath: 2.-type
+          name: cc-watch-list-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/0.-mmcc
+          subPath: 0.-mmcc
+          name: cc-statistic-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/1.-tmcc
+          subPath: 1.-tmcc
+          name: cc-statistic-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/2.-sif
+          subPath: 2.-sif
+          name: cc-statistic-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/3.-lif
+          subPath: 3.-lif
+          name: cc-statistic-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/view/0.-attr
+          subPath: 0.-attr
+          name: cc-view-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/view/flamegraph/0.--width
+          subPath: 0.--width
+          name: cc-flamegraph-query-params
+        - mountPath: /api/api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/view/flamegraph/1.--height
+          subPath: 1.--height
+          name: cc-flamegraph-query-params
+        securityContext:
+          runAsUser: 1001
+          runAsGroup: 23456
+          capabilities:
+            add:
+            - NET_RAW
+      - name: cc-http-api
+        image: code-metric-platform-cc-http-api
+        imagePullPolicy: Never
+        env:
+        - name: FLASK_RUN_PORT
+          value: "5001"
+        - name: WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS
+          value: "4"
+        - name: WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS
+          value: "10"
+        volumeMounts:
+        - mountPath: /api
+          name: api-pmccabecollector-api-cc-http-private-org
+        ports:
+        - containerPort: 5001
+        securityContext:
+          runAsUser: 1201
+          runAsGroup: 23456
+          capabilities:
+            add:
+            - NET_RAW
+
+      volumes:
+      - name: api-pmccabe-collector-vcs-project
+        emptyDir:
+            sizeLimit: 500Mi
+      - name: api-pmccabecollector-api-cc-http-private-org
+        emptyDir:
+            sizeLimit: 500Mi
+      # Query params customization leveraging k8s ConfigMap
+      - name: cc-watch-list-query-params
+        configMap:
+           name: cc-watch-list-cm
+           defaultMode: 0777
+      - name: cc-statistic-query-params
+        configMap:
+           name: cc-statistic-cm
+           defaultMode: 0777
+      - name: cc-view-query-params
+        configMap:
+           name: cc-view-cm
+           defaultMode: 0777
+      - name: cc-flamegraph-query-params
+        configMap:
+           name: cc-flamegraph-cm
+           defaultMode: 0777

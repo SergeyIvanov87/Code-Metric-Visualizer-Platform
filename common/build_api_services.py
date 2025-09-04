@@ -163,7 +163,7 @@ api_cli_schema = [
     '        (touch ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tFINISH    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}\treqNum:\t${REQUEST_NUM} " && echo "${RESULT_OUT}" | base64 -d >$pipe_result_consumer && rm -rf ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tCONSUMED [${SESSION_ID_VALUE}]: ${api_exec_node_directory} <--- ${pipe_result_consumer}") &\n',
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=$!\n",
     "        let REQUEST_NUM=${REQUEST_NUM}+1\n",
-    "    done <<< `cat $pipe_request`\n",
+    "    done <<< `cat $pipe_request || if [ $? != 0 ]; then mkfifo -m 622 ${pipe_request}; fi`\n",
     "done\n",
     "echo 'Server {0} stopped'\n",
 ]

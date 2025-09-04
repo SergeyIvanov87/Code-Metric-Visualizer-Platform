@@ -71,9 +71,10 @@ def unblock_pipes_signal_handler(sig, frame):
     print(f"{deleted_pipes.extend(exec_node_directories)}")
     sys.exit(0)
 
-signal.signal(signal.SIGINT, unblock_pipes_signal_handler)
-signal.signal(signal.SIGTERM, unblock_pipes_signal_handler)
-signal.pause()
+if __name__ == "__main__":
+    signal.signal(signal.SIGINT, unblock_pipes_signal_handler)
+    signal.signal(signal.SIGTERM, unblock_pipes_signal_handler)
+    signal.pause()
 
 '''
 def get_pids(name):

@@ -1,4 +1,4 @@
-FROM test_pseudo_fs:latest
+FROM test_pseudo_fs
 
 COPY cyclomatic_complexity/API /API
 COPY common/API /API/deps
@@ -9,7 +9,7 @@ COPY cyclomatic_complexity/tests/integrational/*.sh /tests/
 
 RUN dos2unix /tests/*
 
-ARG MICROSERVICE_NAME=cc_integrational_tester
+ARG MICROSERVICE_NAME=cc-integrational-tester
 ENV MICROSERVICE_NAME=$MICROSERVICE_NAME
 
 VOLUME ["/api", "/mnt"]

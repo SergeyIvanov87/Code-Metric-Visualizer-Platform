@@ -1,0 +1,34 @@
+services:
+  rrd-analytic:
+    build:
+      context: ../
+      dockerfile: ./rrd_analytic/Dockerfile
+    depends_on:
+      - syslog-ng
+    environment:
+        - SKIP_API_DEPS_CHECK=${SKIP_API_DEPS_CHECK:-false}
+        - MICROSERVICE_NAME=rrd_analytic
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - api.pmccabe_collector.rrd-analytic:/rrd_data
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
+
+volumes:
+  api.pmccabe_collector.project:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true
+  api.pmccabe_collector.rrd-analytic:
+    name: api.pmccabe_collector.rrd-analytic
+    external: true

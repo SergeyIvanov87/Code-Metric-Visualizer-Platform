@@ -1,0 +1,22 @@
+include:
+  - tests/compose-functional.test.yaml
+
+services:
+  rrd-analytic:
+    build:
+      context: ../
+      dockerfile: ./rrd_analytic/Dockerfile
+    #container_name: rrd_analytic_functional
+    environment:
+        - SKIP_API_DEPS_CHECK=${SKIP_API_DEPS_CHECK:-false}
+        - MICROSERVICE_NAME=rrd-analytic
+    hostname: rrd-analytic-functional
+    volumes:
+      - api.pmccabe_collector.project.rrd.test:/mnt
+      - api.pmccabe_collector.restapi.org.rrd.test:/api
+      - api.pmccabe_collector.rrd.rrd-analytic:/rrd_data
+
+volumes:
+  api.pmccabe_collector.project.rrd.test:
+  api.pmccabe_collector.restapi.org.rrd.test:
+  api.pmccabe_collector.rrd.rrd-analytic:
