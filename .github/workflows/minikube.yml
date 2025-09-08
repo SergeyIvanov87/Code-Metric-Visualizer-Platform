@@ -71,6 +71,7 @@ jobs:
               RET=0
               break
             fi
+            sleep 5
           done
           exit ${RET}
       - name: Check RRD service health
@@ -82,5 +83,6 @@ jobs:
               RET=0
               break
             fi
+            sleep 5
           done
           exit ${RET}
