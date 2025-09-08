@@ -89,6 +89,9 @@ jobs:
             echo "Try again in 5 sec, attempt: [${i}/90]"
             echo "================rrd-analytic logs:"
             kubectl logs rrd-analytic-deployment-0 -c rrd-analytic
+            echo "================rrd-http-proxy-cc logs:"
+            kubectl logs rrd-analytic-deployment-0 -c rrd-http-proxy-cc
+            sleep 5
             echo "================rrd-http-api logs:"
             kubectl logs rrd-analytic-deployment-0 -c rrd-http-api
             sleep 5
