@@ -72,7 +72,7 @@ jobs:
               RET=0
               break
             fi
-            echo "Try again in 5 sec"
+            echo "Try again in 5 sec, attempt: [${i}/90]"
             sleep 5
           done
           exit ${RET}
@@ -86,7 +86,11 @@ jobs:
               RET=0
               break
             fi
-            echo "Try again in 5 sec"
+            echo "Try again in 5 sec, attempt: [${i}/90]"
+            echo "================rrd-analytic logs:"
+            kubectl logs rrd-analytic-deployment-0 -c rrd-analytic
+            echo "================rrd-http-api logs:"
+            kubectl logs rrd-analytic-deployment-0 -c rrd-http-api
             sleep 5
           done
           exit ${RET}
