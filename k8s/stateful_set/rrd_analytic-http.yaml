@@ -181,7 +181,7 @@ spec:
         - name: DOWNSTREAM_SERVICE
           value: cyclomatic_complexity
         - name: DOWNSTREAM_SERVICE_NETWORK_ADDR
-          value: cc-visualizer-service:5001
+          value: cc-visualizer-webservice:5001
         - name: DOWNSTREAM_SERVICE_CONNECT_ATTEMPT
           value: "900"
         securityContext:
