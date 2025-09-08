@@ -66,11 +66,12 @@ jobs:
         run: |
           RET=-1
           for i in $(seq 1 90); do
-            curl --head --fail "`minikube ip`:30001//api.pmccabe_collector.restapi.org" || RET=$?
+            curl --head --fail "`minikube ip`:30001//api.pmccabe_collector.restapi.org" ; RET=$?
             if [ ${RET} -eq 0 ]; then
               RET=0
               break
             fi
+            echo "Try again in 5 sec"
             sleep 5
           done
           exit ${RET}
