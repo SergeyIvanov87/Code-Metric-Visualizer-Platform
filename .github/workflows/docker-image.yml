@@ -34,67 +34,67 @@ jobs:
     - name: TODO Remove this phase build test_pseudo_fs
       run: docker build -f common/images/test_pseudo_fs/Dockerfile -t test_pseudo_fs:latest .
     - name: Build the VCS Docker image
-      run: docker build -f observable_project_version_control/Dockerfile -t vcs_project:$DATE .
+      run: docker build -f observable_project_version_control/Dockerfile -t vcs-project:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Build the CC Docker image
-      run: docker build -f cyclomatic_complexity/Dockerfile --tag cc_visualizer:$DATE .
+      run: docker build -f cyclomatic_complexity/Dockerfile --tag cc-visualizer:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the CC Docker image
-      run: docker compose -f cyclomatic_complexity/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from cc_functional_tester
+      run: docker compose -f cyclomatic_complexity/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from cc-functional-tester
     - name: Build the RRD Docker image
-      run: docker build -f rrd/Dockerfile --tag rrd_analytic:$DATE .
+      run: docker build -f rrd_analytic/Dockerfile --tag rrd-analytic:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the RRD Docker image
-      run: docker compose -f rrd/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rrd_functional_tester
+      run: docker compose -f rrd_analytic/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rrd-functional-tester
     - name: Build the REST API Docker image
-      run: docker build -f rest_api/Dockerfile --tag rest_api:$DATE .
+      run: docker build -f rest_api/Dockerfile --tag rest-api:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the REST API Docker image
-      run: docker compose -f rest_api/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rest_api_functional_service_tester
+      run: docker compose -f rest_api/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
 
     - name: Build the HTTP_FS API PROXY Docker image
       run: docker build -f fs_api_proxy/http_proxy/Dockerfile --tag fs_api_proxy_http:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the HTTP_FS API PROXY Docker image
-      run: docker compose -f fs_api_proxy/http_proxy/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from fs_api_http_proxy_functional_tester_service_a
+      run: docker compose -f fs_api_proxy/http_proxy/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from fs-api-http-proxy-functional-tester-service-a
 
     - name: Build the Service Broker Docker image
-      run: docker build -f service_broker/Dockerfile -t service_broker:$DATE .
+      run: docker build -f service_broker/Dockerfile -t service-broker:$DATE .
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the Service Broker Docker image
-      run: docker compose -f service_broker/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from service_broker_functional_tester
+      run: docker compose -f service_broker/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from service-broker-functional-tester
     - name: Create API volume
       run: mkdir -p api && chmod 777 api && docker volume create -d local -o type=none -o device=api -o o=bind api.pmccabe_collector.restapi.org
     - name: Run VCS Docker
-      run: docker run -d --name vcs_project -v "api:/api" -e PROJECT_URL=https://github.com/SergeyIvanov87/TrafficInspector.git -e PROJECT_BRANCH=master vcs_project:$DATE
+      run: docker run -d --name vcs-project -v "api:/api" -e PROJECT_URL=https://github.com/SergeyIvanov87/TrafficInspector.git -e PROJECT_BRANCH=master vcs-project:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Run CC Docker
-      run: docker run -d --name cc_visualizer -v "api:/api" --volumes-from vcs_project cc_visualizer:$DATE
+      run: docker run -d --name cc-visualizer -v "api:/api" --volumes-from vcs-project cc-visualizer:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Create RRD volume
-      run: mkdir -p rrd_data && chmod 777 rrd_data && docker volume create -d local -o type=none -o device=rrd_data -o o=bind api.pmccabe_collector.rrd_analytic
+      run: mkdir -p rrd_data && chmod 777 rrd_data && docker volume create -d local -o type=none -o device=rrd_data -o o=bind api.pmccabe_collector.rrd-analytic
     - name: Run RRD Docker
-      run: docker run -d --name rrd_analytic -v "api:/api" -v "rrd_data:/rrd_data" --volumes-from cc_visualizer rrd_analytic:$DATE
+      run: docker run -d --name rrd-analytic -v "api:/api" -v "rrd_data:/rrd_data" --volumes-from cc-visualizer rrd-analytic:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Run REST Docker
-      run: docker run -d --name rest_api -v "api:/api" -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc_visualizer -p 5000:5000 rest_api:$DATE
+      run: docker run -d --name rest-api -v "api:/api" -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 --volumes-from cc-visualizer -p 5000:5000 rest-api:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Run Broker Docker
-      run: docker run -d --name service_broker --volumes-from vcs_project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service_broker:$DATE
+      run: docker run -d --name service-broker --volumes-from vcs-project -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service-broker:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
     - name: Stop Standalone Containers
-      run: docker stop vcs_project cc_visualizer rrd_analytic rest_api service_broker
+      run: docker stop vcs-project cc-visualizer rrd-analytic rest-api service-broker
     - name: Check filesystem API artefacts
       run: ARTEFACTS=`find api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
 
@@ -219,7 +219,7 @@ jobs:
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Create RRD snapshots volume
-      run: LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=${GITHUB_WORKSPACE}/rrd_snapshots && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd_analytic
+      run: LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=${GITHUB_WORKSPACE}/rrd_snapshots && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd-analytic
     - name: Start Analytic UC
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml up --remove-orphans -d
     - name: Start Integrational Tests on running Analytic UC
@@ -247,10 +247,10 @@ jobs:
     - name: Create Shared network
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Create RRD snapshots volume
-      run: LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=${GITHUB_WORKSPACE}/rrd_snapshots && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd_analytic
+      run: LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=${GITHUB_WORKSPACE}/rrd_snapshots && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd-analytic
     - name: Start Analytic UC
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic-http-api.yaml up --remove-orphans -d
     - name: Start Integrational Tests on running Analytic UC
-      run: EXIT_STATUS=0 && sleep 5 && docker compose -f compose-analytic-http-api-integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
+      run: EXIT_STATUS=0 && sleep 30 && docker compose -f compose-analytic-http-api-integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
     - name: Stop Analytic UC attempt
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic-http-api.yaml stop

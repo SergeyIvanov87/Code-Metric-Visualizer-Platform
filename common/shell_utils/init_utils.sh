@@ -119,7 +119,7 @@ send_ka_watchdog_query() {
         return 255
     fi
 
-    echo -e "Send watchdog query ${Cyan}${session_id}${Color_Off} to the pipe: ${pipe_in}"
+    echo -e "Send watchdog query ${Cyan}${session_id}${Color_Off} to the pipe: ${pipe_in}, timeout: ${send_ka_query_timeout}"
     local deps_query_timeout_protection_sec=${send_ka_query_timeout}
     let deps_query_timeout_protection_sec=${deps_query_timeout_protection_sec}+3
     timeout ${deps_query_timeout_protection_sec} /bin/bash -c "echo \"SESSION_ID=${session_id} --service=${downstream_service} --timeout=${send_ka_query_timeout}\"> ${pipe_in}"
@@ -186,6 +186,21 @@ launch_command_api_services() {
     launch_fs_api_services in_out_service_pids_arr "${work_dir}/aux_services"
 }
 
+doas_launch_command_api_services() {
+    local -n in_out_service_pids_arr=${1}
+    local command_api_schema_dir=${2}
+    local work_dir=${3}
+    local shared_api_dir_for_meta_fs_mount=${4}
+    local full_service_name=${5}
+
+    ${OPT_DIR}/canonize_internal_api.py ${command_api_schema_dir} ${full_service_name}
+    ${OPT_DIR}/build_common_api_services.py ${command_api_schema_dir} -os ${work_dir}/aux_services -oe ${work_dir}
+    doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${shared_api_dir_for_meta_fs_mount} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/build_api_pseudo_fs.py ${command_api_schema_dir} ${shared_api_dir_for_meta_fs_mount}
+    doas -u root chown -R $USER:$GROUPNAME ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+    ls -laR ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+    launch_fs_api_services in_out_service_pids_arr "${work_dir}/aux_services"
+}
+
 launch_inner_api_services() {
     local -n in_out_inner_service_pids_arr=${1}
     local inner_api_schema_dir=${2}
@@ -203,6 +218,29 @@ launch_inner_api_services() {
 
     launch_fs_api_services in_out_inner_service_pids_arr "${work_dir}/services"
 }
+
+doas_launch_inner_api_services() {
+    local -n in_out_inner_service_pids_arr=${1}
+    local inner_api_schema_dir=${2}
+    local work_dir=${3}
+    local shared_api_dir_for_meta_fs_mount=${4}
+    local out_readme_file_path_=${5}
+    local full_service_name=${6}
+
+    ${OPT_DIR}/build_api_executors.py ${inner_api_schema_dir} ${work_dir} -o ${work_dir}
+    ${OPT_DIR}/build_api_services.py ${inner_api_schema_dir} ${work_dir} -o ${work_dir}/services
+    doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${shared_api_dir_for_meta_fs_mount} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/build_api_pseudo_fs.py ${inner_api_schema_dir} ${shared_api_dir_for_meta_fs_mount}
+    doas -u root chown -R $USER:$GROUPNAME ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+    ls -laR ${shared_api_dir_for_meta_fs_mount}/${full_service_name}
+
+    # Do not generate readme unles the server completely started
+    #${OPT_DIR}/make_api_readme.py ${inner_api_schema_dir} > ${out_readme_file_path_}
+    #chmod g+rw ${out_readme_file_path_}
+    #${OPT_DIR}/make_api_readme.py ${inner_api_schema_dir}  | ( umask 0033; cat >> ${out_readme_file_path_} )
+
+    launch_fs_api_services in_out_inner_service_pids_arr "${work_dir}/services"
+}
+
 
 wait_for_unavailable_services() {
     local shared_api_mount_dir=${1}
@@ -303,7 +341,7 @@ wait_for_unavailable_services() {
             return 250
         fi
         let wait_dependencies_counter=$wait_dependencies_counter+1
-        echo -e "${Red}WARNING: One or more services are offline. Another attempt: ${wait_dependencies_counter}/${wait_dependencies_counter_limit} - will be made in ${wait_dependencies_sec} seconds.${Color_Off}"
+        echo -e "${Red}WARNING: One or more services are offline: ${missing_api_queries}. Another attempt: ${wait_dependencies_counter}/${wait_dependencies_counter_limit} - will be made in ${wait_dependencies_sec} seconds.${Color_Off}"
         sleep ${wait_dependencies_sec} &
         wait $!
     done

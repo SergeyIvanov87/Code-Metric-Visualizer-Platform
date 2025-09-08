@@ -34,7 +34,7 @@ termination_handler(){
     gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
     exit 0
 }
-trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM
+trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
 
 # create API directory and initialize API nodes
 mkdir -p -m 777 ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}

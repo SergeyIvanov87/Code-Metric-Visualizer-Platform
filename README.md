@@ -30,16 +30,16 @@ You can read about how to use them in my [article](https://www.linkedin.com/puls
 ### Round-Robin Database (RRD) Microservice
 
 This microservice provides functionality for accumulating measured metrics like CC (and only CC at the moment) in the [Round Robin Database](https://oss.oetiker.ch/rrdtool/) allow us watching and monitoring how the metric values are progressing or degrading during period of time (1 year by default). The microservices creates database files for collecting results gathered by CC microservice and populate API to build trends using both textual and graphical representations.
-Along with the previously described CC microservice this one can also filter databases-modules, which are comprised into trend formations, using the appropriate API [rrd_select](rrd/API/rrd_select.json)
+Along with the previously described CC microservice this one can also filter databases-modules, which are comprised into trend formations, using the appropriate API [rrd_select](rrd_analytic/API/rrd_select.json)
 
-The textual form represented by CSV format and could be obtained using the API [rrd_view](rrd/API/rrd_view.json):
-![alt text](rrd/assets/csv_view.png)
+The textual form represented by CSV format and could be obtained using the API [rrd_view](rrd_analytic/API/rrd_view.json):
+![alt text](rrd_analytic/assets/csv_view.png)
 
 The graphical form representation uses intrinsic RRD plot printing functionality and leverages image editing tool [Imagemagick](https://imagemagick.org/index.php) to depict the graphical trend of a code metric:
-![alt text](rrd/assets/plot_view_all.png)
+![alt text](rrd_analytic/assets/plot_view_all.png)
 
 Of course you can filter out non-interesting project modules or simply use Zoom-In/Out on the existing picture:
-![alt text](rrd/assets/plot_view.png)
+![alt text](rrd_analytic/assets/plot_view.png)
 
 ### REST-API Microservice
 
@@ -49,10 +49,10 @@ The HTTP service portal is depicted on the picture below:
 
 Clicking on a emphasized link mkes it possible to execute other container APIs using your browser:
 
-[rrd_view](rrd/API/rrd_view.json):
+[rrd_view](rrd_analytic/API/rrd_view.json):
 ![alt text](rest_api/assets/rrd_select.png)
 
-or [rrd_plot_view](rrd/API/rrd_plot_view.json):
+or [rrd_plot_view](rrd_analytic/API/rrd_plot_view.json):
 ![alt text](rest_api/assets/rrd_plot_view.png)
 
 or [flamegraph](cyclomatic_complexity/API/flamegraph.json) with additional images scaling parameters passed as CGI arguments of the HTTP query
@@ -71,7 +71,7 @@ The choreography of microservices depicted on the diagram placed in the [diagram
 The UC encompasses the following microservices:
 
 - [cyclomatic_complexity](cyclomatic_complexity/README.md)
-- [rrd](rrd/README.md)
+- [rrd](rrd_analytic/README.md)
 - [rest_api](rest_api/README.md)
 
 ### Analytic UC
@@ -84,7 +84,7 @@ The UC encompasses the following microservices:
 
 - [observable_project_version_control](observable_project_version_control/README.md)
 - [cyclomatic_complexity](cyclomatic_complexity/README.md)
-- [rrd](rrd/README.md)
+- [rrd](rrd_analytic/README.md)
 - [rest_api](rest_api/README.md)
 - [service_broker](service_broker/README.md)
 
@@ -104,6 +104,10 @@ Although `<local host mount point>` **SHOULD NOT** be employable by `Analytic UC
 
     `docker network create -d bridge api.pmccabe_collector.network`
 
+- As ltroubleshooting-ability is reputedly a good idea,  you **MUST** configure a logger storage space
+
+    `LOCAL_HOST_LOG_DIR=<local host logger mount point> && mkdir -p ${LOCAL_HOST_LOG_DIR}/log && chmod 777 ${LOCAL_HOST_LOG_DIR} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_LOG_DIR}/log -o o=bind api.pmccabe_collector.logger.org`
+
 - You **SHOULD** define environment variables `FLASK_RUN_HOST` and `FLASK_RUN_PORT` to determine where REST API service will listen incoming connections (default values `0.0.0.0` and `5000` respectfully).
 
 ### Analysis UC
@@ -114,9 +118,9 @@ In addition to **General** prerequisites above, you **MUST** define environment 
 
 In addition to **General** prerequisites above:
 
-- You **MUST** configure a docker volume `api.pmccabe_collector.rrd_analytic`, which will store analyzed metrics snapshots in RRDs (Round-Robin databases), by executing the following command:
+- You **MUST** configure a docker volume `api.pmccabe_collector.rrd-analytic`, which will store analyzed metrics snapshots in RRDs (Round-Robin databases), by executing the following command:
 
-    `LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=<local host RRD mount point> && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd_analytic`
+    `LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT=<local host RRD mount point> && mkdir -p ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && chmod 777 ${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} && docker volume create -d local -o type=none -o device=${LOCAL_HOST_RRD_SHAPSHOT_MOUNT_POINT} -o o=bind api.pmccabe_collector.rrd-analytic`
 
 - You **MUST** define environment variables `PROJECT_URL` and `PROJECT_BRANCH` when launching both `docker compose  -f compose-analytic.yaml` and `docker build`, which specify your project repository and branch( `git` by default).
 
@@ -151,14 +155,14 @@ To build the images please follow up the corresponding section `Build & Run Imag
 ### Analysis UC
 
 - [cyclomatic_complexity](cyclomatic_complexity/README.md)
-- [rrd](rrd/README.md)
+- [rrd](rrd_analytic/README.md)
 - [rest_api](rest_api/README.md)
 
 ### Analytic UC
 
 - [observable_project_version_control](observable_project_version_control/README.md)
 - [cyclomatic_complexity](cyclomatic_complexity/README.md)
-- [rrd](rrd/README.md)
+- [rrd](rrd_analytic/README.md)
 - [rest_api](rest_api/README.md)
 - [service_broker](service_broker/README.md)
 
@@ -184,14 +188,14 @@ To test the images please follow up the corresponding section `Testing the conta
 ### Analysis UC
 
 - [cyclomatic_complexity](cyclomatic_complexity/README.md)
-- [rrd](rrd/README.md)
+- [rrd](rrd_analytic/README.md)
 - [rest_api](rest_api/README.md)
 
 ### Analytic UC
 
 - [observable_project_version_control](observable_project_version_control/README.md)
 - [cyclomatic_complexity](cyclomatic_complexity/README.md)
-- [rrd](rrd/README.md)
+- [rrd](rrd_analytic/README.md)
 - [rest_api](rest_api/README.md)
 - [service_broker](service_broker/README.md)
 

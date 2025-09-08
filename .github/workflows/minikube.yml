@@ -1,0 +1,99 @@
+name: Minikube CI
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# See https://github.com/marketplace/actions/setup-minikube
+jobs:
+  minikube_setup_job:
+    runs-on: ubuntu-latest
+    name: minikube_setup_job
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: start minikube
+        uses: medyagh/setup-minikube@latest
+      - name: kubectl
+        run: kubectl get pods -A
+      - name: Activate docker env & Build Docker images locally
+        run: |
+          minikube addons enable storage-provisioner-rancher
+          eval $(minikube docker-env)
+          docker --version
+          docker compose -f compose-analytic-http-api.yaml build
+      - name: Deploy CC
+        run: |
+          kubectl apply -f k8s/configMap/cc_visualizer-http.yaml
+          kubectl apply -f k8s/deployment/cc_visualizer-http.yaml
+      - name: Deploy CC Service
+        run: |
+          kubectl apply -f k8s/service/cc_visualizer-http.yaml
+      - name: Check CC PODs and SVC
+        run: |
+          kubectl wait --for=condition=ready pod -l app=cc_visualizer_app --timeout 10s
+          kubectl get cm
+          kubectl describe pods
+          kubectl describe svc
+      - name: Create an RRD storage persistent value claim
+        run: |
+          kubectl apply -f k8s/pvc/rrd_analytic_data_pvc.yaml
+          kubectl get pvc
+      - name: Deploy RRD statefull set && headless service
+        run: |
+          kubectl apply -f k8s/configMap/rrd_analytic-http.yaml
+          kubectl apply -f k8s/stateful_set/rrd_analytic-http.yaml
+          kubectl apply -f k8s/stateful_set/rrd_analytic-headless-service.yaml
+      - name: Deploy RRD Service
+        run: |
+          kubectl apply -f k8s/service/rrd_analytic-http.yaml
+      - name: Check RRD PODs and SVC
+        run: |
+          echo "RRD START:"
+          kubectl get cm
+          kubectl describe pods
+          kubectl describe svc
+          kubectl wait --for=condition=ready pod -l app=rrd_analytic_app --timeout 90s
+          EXIT_STATUS=$?
+          if [ $EXIT_STATUS != 0 ]; then
+            kubectl get cm
+            kubectl describe pods
+            kubectl describe svc
+            exit ${EXIT_STATUS}
+          fi
+      - name: Check CC service health
+        run: |
+          set +e  # revert the default `set -e`
+          RET=-1
+          for i in $(seq 1 90); do
+            curl --head --fail "`minikube ip`:30001//api.pmccabe_collector.restapi.org" ; RET=$?
+            if [ ${RET} -eq 0 ]; then
+              RET=0
+              break
+            fi
+            echo "Try again in 5 sec, attempt: [${i}/90]"
+            sleep 5
+          done
+          exit ${RET}
+      - name: Check RRD service health
+        run: |
+          set +e  # revert the default `set -e`
+          RET=-1
+          for i in $(seq 1 90); do
+            curl --head --fail "`minikube ip`:30002//api.pmccabe_collector.restapi.org" ; RET=$?
+            if [ ${RET} -eq 0 ]; then
+              RET=0
+              break
+            fi
+            echo "Try again in 5 sec, attempt: [${i}/90]"
+            echo "================rrd-analytic logs:"
+            kubectl logs rrd-analytic-deployment-0 -c rrd-analytic
+            echo "================rrd-http-proxy-cc logs:"
+            kubectl logs rrd-analytic-deployment-0 -c rrd-http-proxy-cc
+            sleep 5
+            echo "================rrd-http-api logs:"
+            kubectl logs rrd-analytic-deployment-0 -c rrd-http-api
+            sleep 5
+          done
+          exit ${RET}

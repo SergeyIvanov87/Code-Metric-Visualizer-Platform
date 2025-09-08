@@ -1,12 +1,12 @@
 
 include:
   - common/images/syslog-ng_image/compose.yaml
-  - rrd/compose-analytic.yaml
+  - rrd_analytic/compose-analytic.yaml
   - rest_api/compose.yaml
   - cyclomatic_complexity/compose-analytic.yaml
 
 services:
-  service_broker:
+  service-broker:
     build:
       context: ./
       dockerfile: ./service_broker/Dockerfile
@@ -24,7 +24,7 @@ services:
     volumes:
       - api.pmccabe_collector.restapi.org:/api
 
-  vcs_project:
+  vcs-project:
     build:
       context: ./
       dockerfile: ./observable_project_version_control/Dockerfile
@@ -54,6 +54,6 @@ volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
-  api.pmccabe_collector.rrd_analytic:
-    name: api.pmccabe_collector.rrd_analytic
+  api.pmccabe_collector.rrd-analytic:
+    name: api.pmccabe_collector.rrd-analytic
     external: true

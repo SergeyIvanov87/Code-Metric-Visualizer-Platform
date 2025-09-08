@@ -1,0 +1,45 @@
+include:
+  - tests/compose-analytic.http-api.integrational-test.yaml
+
+services:
+  http-integrational-test-http-proxy-rrd:
+    build:
+      context: ../
+      dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
+    environment:
+        - UPSTREAM_SERVICE=rrd-integrational-tester
+        - DOWNSTREAM_SERVICE=rrd_analytic
+        - DOWNSTREAM_SERVICE_NETWORK_ADDR=rrd-http-api:5002
+        - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT:-900}
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.rrd.private.org:/api
+      - api.pmccabe_collector.project.rrd.private:/mnt
+      - api.pmccabe_collector.rrd-analytic.private:/rrd_data
+
+  http-integrational-test-http-proxy-cc-for-rrd:
+    build:
+      context: ../
+      dockerfile: ./fs_api_proxy/http_proxy/Dockerfile
+    environment:
+        - UPSTREAM_SERVICE=rrd-integrational-tester
+        - DOWNSTREAM_SERVICE=cyclomatic_complexity
+        - DOWNSTREAM_SERVICE_NETWORK_ADDR=cc-http-api:5001
+        - DOWNSTREAM_SERVICE_CONNECT_ATTEMPT=${DOWNSTREAM_SERVICE_CONNECT_ATTEMPT:-900}
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.rrd.private.org:/api
+      - api.pmccabe_collector.project.rrd.private:/mnt
+
+volumes:
+  api.pmccabe_collector.restapi.rrd.private.org:
+    name: api.pmccabe_collector.restapi.rrd.private.org
+    external: false
+  api.pmccabe_collector.project.rrd.private:
+    name: api.pmccabe_collector.project.rrd.private
+    external: false
+  api.pmccabe_collector.rrd-analytic.private:
+    name: api.pmccabe_collector.rrd-analytic.private
+    external: false

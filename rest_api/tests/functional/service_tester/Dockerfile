@@ -1,11 +1,11 @@
-FROM test_pseudo_fs:latest
+FROM test_pseudo_fs
 
 ARG UID=9202
 ENV UID=$UID
 ARG GID=23456
 ENV GID=$GID
 
-ARG USER=rest_api_functional_service_tester
+ARG USER=rest-api-functional-service-tester
 ENV USER=$USER
 ENV GROUPNAME=pmccabe
 

@@ -1,0 +1,24 @@
+services:
+  rrd-integrational-tester:
+    build:
+      context: ../../../
+      dockerfile: rrd_analytic/tests/integrational/Dockerfile
+      additional_contexts:
+        test_pseudo_fs: "service:test_pseudo_fs"
+    environment:
+      - EXIT_ONCE_DONE=false
+      - MICROSERVICE_NAME=rrd-integrational-tester
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - api.pmccabe_collector.project:/mnt
+      - api.pmccabe_collector.rrd-analytic:/rrd_data
+    depends_on:
+      test_aggregator:
+        condition: service_healthy
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network

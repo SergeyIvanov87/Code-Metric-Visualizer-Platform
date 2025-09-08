@@ -20,12 +20,12 @@ def execute_query(name, query):
 
     iteration_number=0
     wait_for_restart_iteration_limit=30
-    while not service_tester_utils.ping_service("rest_api", 5000) and iteration_number <= wait_for_restart_iteration_limit:
+    while not service_tester_utils.ping_service("rest-api", 5000) and iteration_number <= wait_for_restart_iteration_limit:
         print(f"{get_timestamp()}\tWaiting for service up, iteration: {iteration_number}/{wait_for_restart_iteration_limit}")
         time.sleep(1)
         iteration_number+=1
 
-    url = 'http://rest_api:5000/' + query["Query"]
+    url = 'http://rest-api:5000/' + query["Query"]
     headers = {'Accept-Charset': 'UTF-8'}
     match query["Method"].lower():
         case "get":

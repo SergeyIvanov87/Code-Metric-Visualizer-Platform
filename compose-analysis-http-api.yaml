@@ -1,7 +1,7 @@
 
 include:
   - common/images/syslog-ng_image/compose.yaml
-  - rrd/compose-analysis-http-api.yaml
+  - rrd_analytic/compose-analysis-http-api.yaml
   - cyclomatic_complexity/compose-analysis-http-api.yaml
 
 networks:

@@ -38,7 +38,7 @@ def portal():
     global is_global_available
 
     host_addr_info = socket.gethostbyaddr(request.remote_addr)
-    if host_addr_info[0].find("service_unreachable_a") != -1:
+    if host_addr_info[0].find("service-unreachable-a") != -1:
         if not is_service_unrechable_a_available:
             return "Page not found", 404
     return "Available", 200
@@ -58,7 +58,7 @@ def set_service_availability():
             available = v
             continue
 
-    if (service_name == "service_unreachable_a") and (available is not None):
+    if (service_name == "service-unreachable-a") and (available is not None):
         is_service_unrechable_a_available = (available.lower() in ['true', '1'])
 
     if (service_name == ".*") and (available is not None):

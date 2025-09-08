@@ -3,7 +3,7 @@
     "Method" : "GET",
     "Query": "+/all_dependencies",
     "Params": {
-        "--service" : ".*"
+        "--service" : "\".*\""
     },
     "Description": {
         "header": "Ask for external API and services which a current service depends on ",

@@ -1,4 +1,4 @@
-FROM test_pseudo_fs:latest
+FROM test_pseudo_fs
 
 ARG UID=10001
 ENV UID=$UID
@@ -30,7 +30,7 @@ COPY fs_api_proxy/http_proxy//tests/functional/stub_downstream_service_network_a
 
 RUN dos2unix /tests/*
 
-ARG DOWNSTREAM_SERVICE_NETWORK_ADDR=stub_downstream_service_network_addr
+ARG DOWNSTREAM_SERVICE_NETWORK_ADDR=stub-downstream-service-network-addr
 ENV DOWNSTREAM_SERVICE_NETWORK_ADDR=$DOWNSTREAM_SERVICE_NETWORK_ADDR
 
 VOLUME ["/api", "/mnt"]
