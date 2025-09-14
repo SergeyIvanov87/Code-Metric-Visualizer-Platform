@@ -152,3 +152,19 @@ or
 4. To log-in into a container on a POD
 
     `kubectl exec <POD> -it -c <container>  -- /bin/bash`
+
+
+### Ingress
+
+minikube addons enable ingress
+minikube addons enable ingress-dns   to be able to resolve ingress (extrenal) service using cluster resoutces  `nslookup myservice.test $(minikube ip)` Find out mode on https://minikube.sigs.k8s.io/docs/handbook/addons/ingress-dns/#Linux
+
+check config
+
+kubectl -n ingress-nginx get pod -o yaml
+
+kubectl get pods --namespace=ingress-nginx
+
+
+https://kubernetes.io/docs/concepts/services-networking/ingress/
+https://minikube.sigs.k8s.io/docs/handbook/addons/ingress-dns/#Linux

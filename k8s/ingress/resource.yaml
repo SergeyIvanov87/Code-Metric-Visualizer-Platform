@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minimal-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  #ingressClassName: nginx-example
+  ingressClassName: nginx
+  rules:
+  - host: "cc.test"
+    http:
+      paths:
+      - path: "/"
+        pathType: Prefix
+        backend:
+          service:
+            name: cc-visualizer-webservice
+            port:
+              number: 5001
+  - host: "rrd.test"
+    http:
+      paths:
+      - path: "/"
+        pathType: Prefix
+        backend:
+          service:
+            name: rrd-analytic-webservice
+            port:
+              number: 5002
