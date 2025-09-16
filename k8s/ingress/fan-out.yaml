@@ -1,0 +1,38 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fanout-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    #nginx.ingress.kubernetes.io/rewrite-target: /api.pmccabe_collector.restapi.org
+    nginx.ingress.kubernetes.io/rewrite-target: /api.pmccabe_collector.restapi.org/$1/$3
+    #nginx.ingress.kubernetes.io/app-root: /api.pmccabe_collector.restapi.org
+spec:
+  #ingressClassName: nginx-example
+  ingressClassName: nginx
+  rules:
+  - host: "metrics.test"
+    http:
+      paths:
+      - path: /api.pmccabe_collector.restapi.org/(cyclomatic_complexity)(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: cc-visualizer-webservice
+            port:
+              number: 5001
+    # trailing slash problem: flask treat /url/ as invalid in contrast to /url
+      - path: /cc(/|$)(.*)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: cc-visualizer-webservice
+            port:
+              number: 5001
+      - path: /api.pmccabe_collector.restapi.org/(rrd)(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: rrd-analytic-webservice
+            port:
+              number: 5002
