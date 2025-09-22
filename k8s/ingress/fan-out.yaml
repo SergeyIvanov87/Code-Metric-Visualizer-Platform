@@ -3,25 +3,34 @@ kind: Ingress
 metadata:
   name: fanout-ingress
   annotations:
+    # allow to use regex matching in backed path descriptions
     nginx.ingress.kubernetes.io/use-regex: "true"
-    #nginx.ingress.kubernetes.io/rewrite-target: /api.pmccabe_collector.restapi.org
-    nginx.ingress.kubernetes.io/rewrite-target: /api.pmccabe_collector.restapi.org/$1/$3
-    #nginx.ingress.kubernetes.io/app-root: /api.pmccabe_collector.restapi.org
+    # will send that request to upstream services using regex substitutions
+    # where $1,$2, etc. are groups that match
+    # The enourmous problem here with fan-out ingress is that this rewrite-target
+    # must be choosen carefully as it must give correct substitution when we deals
+    # with an upstream service welcoming page, where all APIs are enumerated, and
+    # when we deals with a particular APi from that API list.
+    # For the entire API list, initial outter query  must be rewrited as "/api.pmccabe_collector.restapi.org" only.
+    # For any query from the API list, the quesry must be "/api.pmccabe_collector.restapi.org/<query>"
+    # That's why I capture 2nd group and 3rd, where
+    # for the welcoming query: 2nd/3rd groups give EMPTY always, so the query is being rewritten as "/api.pmccabe_collector.restapi.org",
+    #       which gives a welcoming page,
+    # for any particular query from that welcoming page: 2nd groups is a main service name(rrd or cyclomatic_complexity) and 3rd group is a sub query
+    nginx.ingress.kubernetes.io/rewrite-target: /api.pmccabe_collector.restapi.org/$2$3
 spec:
-  #ingressClassName: nginx-example
   ingressClassName: nginx
   rules:
   - host: "metrics.test"
     http:
       paths:
-      - path: /api.pmccabe_collector.restapi.org/(cyclomatic_complexity)(/|$)(.*)
+      - path: /(api.pmccabe_collector.restapi.org)/(cyclomatic_complexity)(.*)
         pathType: ImplementationSpecific
         backend:
           service:
             name: cc-visualizer-webservice
             port:
               number: 5001
-    # trailing slash problem: flask treat /url/ as invalid in contrast to /url
       - path: /cc(/|$)(.*)(.*)
         pathType: ImplementationSpecific
         backend:
@@ -29,7 +38,14 @@ spec:
             name: cc-visualizer-webservice
             port:
               number: 5001
-      - path: /api.pmccabe_collector.restapi.org/(rrd)(/|$)(.*)
+      - path: /(api.pmccabe_collector.restapi.org)/(rrd)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: rrd-analytic-webservice
+            port:
+              number: 5002
+      - path: /rrd(/|$)(.*)(.*)
         pathType: ImplementationSpecific
         backend:
           service:
