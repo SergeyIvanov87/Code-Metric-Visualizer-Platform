@@ -134,7 +134,7 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
                              r'        return "",200'
     ]
 
-    cgi_schema = [ r'@app.route("/{}",  methods=[{}])'.format(req_api, methods),
+    cgi_schema = [ r'@app.route("/{}",  methods=[{}], strict_slashes=False)'.format(req_api, methods),
                    r'def {}():'.format(canonize_api_method_name),
                    r'    global queries_in_progress',
                    *make_session_id,
@@ -159,7 +159,7 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
 
 
 # print the main portal page
-cgi_portal_main = [ r'@app.route("/", methods=["GET"])',
+cgi_portal_main = [ r'@app.route("/", methods=["GET"], strict_slashes=False)',
              r'def portal():',
              r'    return redirect("/api.pmccabe_collector.restapi.org")'
 ]
@@ -168,7 +168,7 @@ print("")
 
 
 # print the main page
-cgi_main = [ r'@app.route("/api.pmccabe_collector.restapi.org", methods=["GET"])',
+cgi_main = [ r'@app.route("/api.pmccabe_collector.restapi.org", methods=["GET"], strict_slashes=False)',
              r'def index():',
              r'    with open("rest_api_server/templates/index.md", "r") as readme_file:',
              r'        api_description = readme_file.read()',

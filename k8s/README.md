@@ -80,6 +80,12 @@ where `node-name` can be found using:
 
 `minikube node list`
 
+#### Dashboard
+
+To access a dashboard, execute in different shell:
+
+`minikube dashboard`
+
 #### Using a local machine docker storage
 
 If you want to pull out docker images on pods inside the minikube cluster using a local machine docker storage rather than DockerHub etc., give access minikube to the local docker environment
@@ -149,6 +155,23 @@ or
 
     ```curl  --head --fail "`minikube ip`:30001//api.pmccabe_collector.restapi.org"```
 
+4. Run the stateful set representing RRD analytic service
+
+    4.1.  Enable storage-provisioner-rancher addon to create local storage class for minikube:
+
+        minikube addons enable storage-provisioner-rancher
+
+    4.2. Create persistent volume claim so that each of RRD-analytic node could allocate a persisten storage for RRD files
+
+        kubectl apply -f k8s/pvc/rrd_analytic_data_pvc.yaml
+
+    4.3. Run a statefull set executing the following commands:
+
+        kubectl apply -f k8s/configMap/rrd_analytic-http.yaml
+        kubectl apply -f k8s/stateful_set/rrd_analytic-http.yaml
+        kubectl apply -f k8s/stateful_set/rrd_analytic-headless-service.yaml
+        kubectl apply -f k8s/service/rrd_analytic-http.yaml
+
 4. To log-in into a container on a POD
 
     `kubectl exec <POD> -it -c <container>  -- /bin/bash`
@@ -156,8 +179,15 @@ or
 
 ### Ingress
 
-minikube addons enable ingress
-minikube addons enable ingress-dns   to be able to resolve ingress (extrenal) service using cluster resoutces  `nslookup myservice.test $(minikube ip)` Find out mode on https://minikube.sigs.k8s.io/docs/handbook/addons/ingress-dns/#Linux
+#### Minikube
+
+https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/
+
+    `minikube addons enable ingress`
+
+  to be able to resolve ingress (extrenal) service using cluster resources  `nslookup myservice.test $(minikube ip)` Find out mode on https://minikube.sigs.k8s.io/docs/handbook/addons/ingress-dns/#Linux
+
+    `minikube addons enable ingress-dns`
 
 check config
 
