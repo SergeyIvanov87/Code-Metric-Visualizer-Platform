@@ -21,7 +21,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: "metrics.test"
+  - host: "metrics.api"
     http:
       paths:
       - path: /(api.pmccabe_collector.restapi.org)/(cyclomatic_complexity)(.*)

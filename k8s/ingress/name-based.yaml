@@ -8,7 +8,7 @@ spec:
   #ingressClassName: nginx-example
   ingressClassName: nginx
   rules:
-  - host: "cc.test"
+  - host: "cc.api"
     http:
       paths:
       - path: "/"
@@ -18,7 +18,7 @@ spec:
             name: cc-visualizer-webservice
             port:
               number: 5001
-  - host: "rrd.test"
+  - host: "rrd.api"
     http:
       paths:
       - path: "/"
