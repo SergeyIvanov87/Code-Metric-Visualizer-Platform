@@ -125,7 +125,7 @@ jobs:
         run: |
           echo "$(minikube ip) cc.api" | sudo tee -a /etc/hosts
           echo "$(minikube ip) rrd.api" | sudo tee -a /etc/hosts
-          echo "$(minikube ip) metrics.api | sudo tee -a /etc/hosts
+          echo "$(minikube ip) metrics.api" | sudo tee -a /etc/hosts
 
       - name: Query Ingress
         run: |
