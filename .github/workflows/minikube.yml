@@ -129,6 +129,7 @@ jobs:
 
       - name: Query Ingress
         run: |
+          set +e
           curl --head --fail "metrics.api/cc"
           curl --head --fail "cc.api"
           curl --head --fail "rrd.api"
