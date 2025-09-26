@@ -97,3 +97,26 @@ jobs:
             sleep 5
           done
           exit ${RET}
+      - name: Setup Ingress Controller
+        run: |
+          minikube addons enable ingress
+          minikube addons enable ingress-dns
+          kubectl -n ingress-nginx get pod -o yaml
+          kubectl get pods --namespace=ingress-nginx
+      - name: Run host-based ingress
+        run: |
+          kubectl apply -f k8s/ingress/name-based.yaml
+      - name: Run fan-out ingress
+        run: |
+          kubectl apply -f k8s/ingress/fan-out.yaml
+      - name: Update DNS records using IP from minikube
+        run: |
+          echo "$(minikube ip) cc.api" | sudo tee -a /etc/hosts
+          echo "$(minikube ip) rrd.api" | sudo tee -a /etc/hosts
+          echo "$(minikube ip) metrics.api | sudo tee -a /etc/hosts
+
+      - name: Query Ingress
+        run: |
+          curl --head --fail "metrics.api/cc"
+          curl --head --fail "cc.api"
+          curl --head --fail "rrd.api"
