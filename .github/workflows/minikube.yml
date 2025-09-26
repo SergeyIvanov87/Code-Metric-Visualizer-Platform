@@ -103,6 +103,18 @@ jobs:
           minikube addons enable ingress-dns
           kubectl -n ingress-nginx get pod -o yaml
           kubectl get pods --namespace=ingress-nginx
+          set +e  # revert the default `set -e`
+          RET=-1
+          for i in $(seq 1 90); do
+            kubectl get pods -n ingress-nginx | grep ingress-nginx-controller | grep Running; RET=$?
+            if [ ${RET} -eq 0 ]; then
+              RET=0
+              break
+            fi
+            echo "Try again in 5 sec, attempt: [${i}/90]"
+            sleep 5
+          done
+          exit ${RET}
       - name: Run host-based ingress
         run: |
           kubectl apply -f k8s/ingress/name-based.yaml
