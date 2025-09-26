@@ -106,7 +106,7 @@ jobs:
           set +e  # revert the default `set -e`
           RET=-1
           for i in $(seq 1 90); do
-            kubectl get pods -n ingress-nginx | grep ingress-nginx-controller | grep Running; RET=$?
+            kubectl get pods -n ingress-nginx | grep ingress-nginx-controller | grep Running | grep "1/1"; RET=$?
             if [ ${RET} -eq 0 ]; then
               RET=0
               break
