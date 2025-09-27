@@ -126,10 +126,9 @@ jobs:
           echo "$(minikube ip) cc.api" | sudo tee -a /etc/hosts
           echo "$(minikube ip) rrd.api" | sudo tee -a /etc/hosts
           echo "$(minikube ip) metrics.api" | sudo tee -a /etc/hosts
-
       - name: Query Ingress
         run: |
           set +e
-          curl --head --fail "metrics.api/cc"
-          curl --head --fail "cc.api"
-          curl --head --fail "rrd.api"
+          curl --resolve "metrics.api:80:$( minikube ip )" -i  --head --fail "metrics.api/cc"
+          curl --resolve "cc.api:80:$( minikube ip )" -i  --head --fail "cc.api"
+          curl --resolve "rrd.api:80:$( minikube ip )" -i  --head --fail "rrd.api"
