@@ -75,7 +75,7 @@ def check_unmet_dependencies_api(query, pipes):
 
             time_millisecond = round(time.time() * 1000)
             temporary_replaced_result_pipe_file_path = os.path.join(api_exec_node_directory, "../", str(time_millisecond))
-            os.mkdir(temporary_replaced_result_pipe_file_path, exist_ok=True)
+            os.makedirs(temporary_replaced_result_pipe_file_path, exist_ok=True)
             pipes_to_move_search_glob = ("result." + result_pipe_ext + "*") if result_pipe_ext != "" else "result*"
             for file in glob.glob(os.path.join(api_exec_node_directory,pipes_to_move_search_glob)):
                 print(f"{get_timestamp()}\tmove pipe {file} temporary to a new place {temporary_replaced_result_pipe_file_path}")
