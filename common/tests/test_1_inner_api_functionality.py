@@ -5,6 +5,7 @@ import os
 import pathlib
 import pytest
 import stat
+import time
 import glob, shutil
 import sys
 
@@ -72,7 +73,9 @@ def check_unmet_dependencies_api(query, pipes):
             api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
                 "/api", req_api, req_type)
 
-            temporary_replaced_result_pipe_file_path = "/tmp"
+            time_millisecond = round(time.time() * 1000)
+            temporary_replaced_result_pipe_file_path = os.path.join(api_exec_node_directory, "../", str(time_millisecond))
+            os.mkdir(temporary_replaced_result_pipe_file_path, exist_ok=True)
             pipes_to_move_search_glob = ("result." + result_pipe_ext + "*") if result_pipe_ext != "" else "result*"
             for file in glob.glob(os.path.join(api_exec_node_directory,pipes_to_move_search_glob)):
                 print(f"{get_timestamp()}\tmove pipe {file} temporary to a new place {temporary_replaced_result_pipe_file_path}")
@@ -93,6 +96,7 @@ def check_unmet_dependencies_api(query, pipes):
                 print(f"{get_timestamp()}\tmove pipe {file} back to an old place {api_exec_node_directory}")
                 shutil.move(file, api_exec_node_directory)
 
+            shutil.rmtree(temporary_replaced_result_pipe_file_path, ignore_errors=True)
             assert len(after_deps_json_str)
 
             after_deps_json_str = after_deps_json_str.rstrip()
