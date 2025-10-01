@@ -68,7 +68,7 @@ After that it's possible to launch the minikube cluster
 
 `minikube start`
 
-To enable local filesystem resources to be mounted as persistent volumes, use this command:
+To enable local filesystem resources mounted as persistent volumes, use this command:
 
 `minikube addons enable storage-provisioner-rancher`
 
@@ -79,6 +79,12 @@ Having configured and launched your pods which consumes an associated persistent
 where `node-name` can be found using:
 
 `minikube node list`
+
+#### Dashboard
+
+To access a dashboard, execute in different shell:
+
+`minikube dashboard`
 
 #### Using a local machine docker storage
 
@@ -149,6 +155,72 @@ or
 
     ```curl  --head --fail "`minikube ip`:30001//api.pmccabe_collector.restapi.org"```
 
-4. To log-in into a container on a POD
+4. Run the stateful set representing RRD analytic service in the same way:
+
+    4.1. Enable storage-provisioner-rancher addon to create local storage class for minikube:
+
+        minikube addons enable storage-provisioner-rancher
+
+    4.2. Create persistent volume claim so that each of RRD-analytic node could allocate a persisten storage for RRD files
+
+        kubectl apply -f k8s/pvc/rrd_analytic_data_pvc.yaml
+
+    4.3. Run a statefull set executing the following commands:
+
+        kubectl apply -f k8s/configMap/rrd_analytic-http.yaml
+        kubectl apply -f k8s/stateful_set/rrd_analytic-http.yaml
+        kubectl apply -f k8s/stateful_set/rrd_analytic-headless-service.yaml
+        kubectl apply -f k8s/service/rrd_analytic-http.yaml
+
+    4.4. Check health of the service by executing the command:
+
+    ```curl  --head --fail "`minikube ip`:30002//api.pmccabe_collector.restapi.org"```
+
+5. To log-in into a container on a POD
 
     `kubectl exec <POD> -it -c <container>  -- /bin/bash`
+
+
+### Ingress
+
+#### Minikube
+
+Very recent documentation regarding how to configure ingress on minikube can be found [on the official sites](https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube) and [this](https://kubernetes.io/docs/concepts/services-networking/ingress/)
+This section will have describing the required setup briefly:
+
+1. Enable Ingress addon
+
+    `minikube addons enable ingress`
+
+2. To be able to resolve ingress service as "external" service, in relation to the cluster, using cluster DNS resources `nslookup myservice.test $(minikube ip)`
+
+    Find out mode on useful pages of [the handbook](https://minikube.sigs.k8s.io/docs/handbook/addons/ingress-dns/#Linux).
+    To proceed with the configuration enablind DNS resolution execute:
+
+    `minikube addons enable ingress-dns`
+
+3. Check config
+
+    kubectl -n ingress-nginx get pod -o yaml
+
+    kubectl get pods --namespace=ingress-nginx
+
+4. Launch Ingress resource with routing either hostname-based or query-based (fan-out)
+
+    4.1. Host based
+
+        kubectl apply -f k8s/ingress/name-based.yaml
+
+    4.2. Fan Out
+
+        kubectl apply -f k8s/ingress/fan-out.yaml
+
+5. Assuming you accomplished those steps from [the handbook](https://minikube.sigs.k8s.io/docs/handbook/addons/ingress-dns/#Linux) you can access the cluster API by reaching out either
+
+    5.1. Host based Ingress
+
+        `http://cc.api` and `http://rrd.api` for [the cyclomatic_complexity API](http://cc.api) and [the rrd API](http://rrd.api) respectively.
+
+    5.2. Fan Out Ingress
+
+        `http://metrics.api/cc` and `http://metrics.api/rrd` for [the cyclomatic_complexity API](http://metrics.api/cc) and [the rrd API](http://metrics.api/rrd) respectively.

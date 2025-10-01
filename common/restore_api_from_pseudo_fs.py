@@ -46,7 +46,7 @@ for name, query in API_table.items():
     # inject relative link onto HTTP query into markdown content
     for i in range(0, len(index_markdown_content)):
         if index_markdown_content[i].find("### " + query_url + "/" + query["Method"]) != -1:
-            index_markdown_content[i] += f" [execute]({query_url})"
+            index_markdown_content[i] += f" [execute](/{query_url})"
 
 if len(directories_for_markdown) != 0:
     with open(os.path.join(args.output_api_dir, "index.md"), "w") as index_markdown:

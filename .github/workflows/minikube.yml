@@ -97,3 +97,38 @@ jobs:
             sleep 5
           done
           exit ${RET}
+      - name: Setup Ingress Controller
+        run: |
+          minikube addons enable ingress
+          minikube addons enable ingress-dns
+          kubectl -n ingress-nginx get pod -o yaml
+          kubectl get pods --namespace=ingress-nginx
+          set +e  # revert the default `set -e`
+          RET=-1
+          for i in $(seq 1 90); do
+            kubectl get pods -n ingress-nginx | grep ingress-nginx-controller | grep Running | grep "1/1"; RET=$?
+            if [ ${RET} -eq 0 ]; then
+              RET=0
+              break
+            fi
+            echo "Try again in 5 sec, attempt: [${i}/90]"
+            sleep 5
+          done
+          exit ${RET}
+      - name: Run host-based ingress
+        run: |
+          kubectl apply -f k8s/ingress/name-based.yaml
+      - name: Run fan-out ingress
+        run: |
+          kubectl apply -f k8s/ingress/fan-out.yaml
+      - name: Update DNS records using IP from minikube
+        run: |
+          echo "$(minikube ip) cc.api" | sudo tee -a /etc/hosts
+          echo "$(minikube ip) rrd.api" | sudo tee -a /etc/hosts
+          echo "$(minikube ip) metrics.api" | sudo tee -a /etc/hosts
+      - name: Query Ingress
+        run: |
+          set +e
+          curl --resolve "metrics.api:80:$( minikube ip )" -i  --head --fail "metrics.api/cc"
+          curl --resolve "cc.api:80:$( minikube ip )" -i  --head --fail "cc.api"
+          curl --resolve "rrd.api:80:$( minikube ip )" -i  --head --fail "rrd.api"
