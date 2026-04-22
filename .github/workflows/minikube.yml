@@ -129,6 +129,7 @@ jobs:
       - name: Query Ingress
         run: |
           set +e
+          sleep 10
           curl --resolve "metrics.api:80:$( minikube ip )" -i  --head --fail "metrics.api/cc"
           curl --resolve "cc.api:80:$( minikube ip )" -i  --head --fail "cc.api"
           curl --resolve "rrd.api:80:$( minikube ip )" -i  --head --fail "rrd.api"
