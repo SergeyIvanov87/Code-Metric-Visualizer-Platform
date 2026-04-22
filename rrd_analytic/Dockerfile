@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.3-labs
 
-FROM alpine:latest
+FROM alpine:3.20.6
 WORKDIR package
 ARG SCRIPT_GEN_LOC=services
 

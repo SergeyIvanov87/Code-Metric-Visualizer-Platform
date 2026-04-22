@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:3.20.6
 WORKDIR package
 
 ARG EXIT_ON_INIT_FAIL=true

@@ -1,5 +1,5 @@
 # supplementary image for build prerequisites only
-FROM alpine:latest as build
+FROM alpine:3.20.6 as build
 WORKDIR package
 # install app dependencies
 RUN apk add --no-cache git gcc musl-dev make

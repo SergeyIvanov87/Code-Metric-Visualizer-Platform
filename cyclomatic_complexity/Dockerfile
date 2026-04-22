@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.3-labs
 
-FROM alpine:latest as build
+FROM alpine:3.20.6 as build
 WORKDIR /package
 # install app dependencies
 RUN apk add --no-cache git gcc musl-dev make
@@ -10,7 +10,7 @@ RUN git clone https://gitlab.com/pmccabe/pmccabe.git && cd pmccabe && make -e DE
 RUN git clone https://github.com/SergeyIvanov87/pmccabe_visualizer.git && git clone https://github.com/brendangregg/FlameGraph.git
 
 
-FROM alpine:latest
+FROM alpine:3.20.6
 
 WORKDIR /package
 ARG SCRIPT_GEN_LOC=services
