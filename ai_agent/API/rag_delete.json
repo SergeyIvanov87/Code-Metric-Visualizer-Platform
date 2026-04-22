@@ -1,0 +1,13 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "POST",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/delete/v1",
+    "Params": {
+        "URI": ""
+    },
+    "Description": {
+        "header": "\n",
+        "body": "\n",
+        "footer": ""
+    }
+}

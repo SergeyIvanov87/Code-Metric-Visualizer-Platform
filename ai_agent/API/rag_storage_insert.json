@@ -1,0 +1,16 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "POST",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/storage/insert/v1",
+    "Params": {
+        "URI": "",
+        "data": "",
+        "name": "",
+        "metadata": ""
+    },
+    "Description": {
+        "header": "Insert a document in the RAG storage determined by URI.\n",
+        "body": "\n",
+        "footer": ""
+    }
+}

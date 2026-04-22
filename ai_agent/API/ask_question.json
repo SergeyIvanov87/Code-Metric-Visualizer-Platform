@@ -1,0 +1,13 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "POST",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent/ask_question/v1",
+    "Params": {
+        "question": ""
+    },
+    "Description": {
+        "header": "Ask question.\n",
+        "body": "Ask question\n\n",
+        "footer": "Ask question"
+    }
+}
