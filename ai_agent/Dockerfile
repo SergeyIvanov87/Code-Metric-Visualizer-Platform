@@ -1,10 +1,10 @@
-FROM ubuntu:latest
+FROM ubuntu@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
 
 SHELL ["/bin/bash", "-c"]
 
 RUN <<EOF
     apt-get update
-    apt-get install -y --no-install-recommends coreutils python3 python3-pip dos2unix inotify-tools bash doas git cmake clang libgomp1 gcc g++
+    apt-get install -y --no-install-recommends coreutils python3 python3-pip python-is-python3 dos2unix inotify-tools bash doas git cmake clang libgomp1 gcc g++
 EOF
 
 # gcc g++ are both required for installion of llama-cpp-python
@@ -62,4 +62,4 @@ EOF
 
 
 USER ${USER}
-CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
+ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/opt", "/api"]
