@@ -1,0 +1,14 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "PUT",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/add/v1",
+    "Params": {
+        "URI": "",
+        "metadata": ""
+    },
+    "Description": {
+        "header": "\n",
+        "body": "\n",
+        "footer": ""
+    }
+}
