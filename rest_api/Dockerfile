@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.3-labs
 
-FROM alpine:latest
+FROM alpine:3.20.6
 WORKDIR package
 
 ARG FLASK_APP=rest_api_server FLASK_RUN_HOST=0.0.0.0 FLASK_RUN_PORT=5000
