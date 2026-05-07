@@ -292,7 +292,7 @@ def build_api_services(api_schema_path, executor_generated_scripts_path, output_
             continue
 
         #generate CLI API server
-        cli_server_content = create_cli_server_content_from_schema(req_name, request_data)
+        cli_server_content = create_cli_server_content_from_schema(req_name, request_data, executor_generated_scripts_path)
         api_server_script_file_path = get_api_cli_service_script_path(generated_api_server_scripts_path, req_name)
         with open(api_server_script_file_path, "w") as server_file:
             server_file.write("#!/bin/bash\n\n")
