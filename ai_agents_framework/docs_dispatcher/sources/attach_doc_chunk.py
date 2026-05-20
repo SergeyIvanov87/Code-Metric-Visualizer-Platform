@@ -9,7 +9,7 @@ from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser(prog="Attach document chunk using assigned backend")
-    parser.add_argument("doc_id", type=int, help="Parent document id")
+    parser.add_argument("-doc_id", "--doc_id", type=int, help="Parent document id")
     parser.add_argument("-m", "--metadata", type=str, help="chunk metadata")
 
     args = parser.parse_args()

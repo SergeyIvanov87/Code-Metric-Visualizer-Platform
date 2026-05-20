@@ -57,7 +57,7 @@ def add_abstract_document(storage_uri: Path, file_uri: Path, unique_id: int, doc
     storage_entry_path.mkdir(parents=True, exist_ok=False)
 
     doc_file_path = (storage_entry_path / file_uri).with_suffix(StorageRecordEntry.doc_suffix)
-    with doc_file_path.open(mode='w', encoding='utf-8') as doc_file:
+    with doc_file_path.open(mode='wb') as doc_file:
         doc_file.write(doc_data)
 
 

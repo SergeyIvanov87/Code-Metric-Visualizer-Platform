@@ -3,8 +3,8 @@
     "Method" : "PUT",
     "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/attach_doc_chunk/v1",
     "Params": {
-        "doc_id": "",
-        "metadata": ""
+        "-doc_id": "",
+        "-metadata": ""
     },
     "Description": {
         "header": "Insert a chunk of a document into persistent storage",

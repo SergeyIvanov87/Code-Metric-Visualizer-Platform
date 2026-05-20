@@ -63,24 +63,38 @@ def main():
         engine = create_engine(args.db_uri)
 
     Base.metadata.create_all(engine)
+    deleted_from_storage = 0
+    deleted_from_db = 0
+    error_messages: list[str] = []
+    try:
+        with create_session(engine) as session:
+            target_records = _storage_delete_candidates(session, args.id)
+            if not target_records:
+                raise ValueError(f"Record id={args.id} does not exist")
 
-    with create_session(engine) as session:
-        target_records = _storage_delete_candidates(session, args.id)
-        if not target_records:
-            raise ValueError(f"Record id={args.id} does not exist")
-
-        deleted_ids: list[int] = []
-        for record in target_records:
-            record_id = int(record["id"])
-            if doc_storage_operations.delete_record(args.storage_uri, record_id):
+            deleted_ids: list[int] = []
+            for record in target_records:
+                record_id = int(record["id"])
+                if doc_storage_operations.delete_record(args.storage_uri, record_id):
+                    deleted_from_storage += 1
                 deleted_ids.append(record_id)
 
-        delete_query = _delete_sql(deleted_ids)
-        if delete_query:
-            crud.execute_query(session, delete_query)
+            delete_query = _delete_sql(deleted_ids)
+            if delete_query:
+                crud.execute_query(session, delete_query)
+                deleted_from_db += len(deleted_ids)
+    except ValueError as ex:
+        error_messages.append(str(ex))
+        pass
 
-    print({"error_code": 0})
-    return 0
+    ret = {"deleted from DB": deleted_from_db, "deleted from storage": deleted_from_storage}
+    error_code = 0
+    if len(error_messages):
+        error_code = 1
+        ret["description"] = "\n".join(error_messages)
+    ret["error"] = error_code
+    print(ret)
+    return error_code
 
 
 if __name__ == "__main__":

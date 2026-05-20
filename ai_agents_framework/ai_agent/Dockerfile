@@ -34,7 +34,7 @@ RUN <<EOF
 EOF
 
 #TODO COPY ["ai_agent/*.sh", "ai_agent/*.py", "/package/"]
-COPY ai_agent/API /API
+COPY ai_agents_framework/ai_agent/API /API
 
 VOLUME ["/api", "/mnt", "/assets/rag", "/assets/models", "/package"]
 
