@@ -8,10 +8,7 @@ import sys
 from pathlib import Path
 
 def main():
-    parser = argparse.ArgumentParser(prog="Insert document using assigned backend")
-    parser.add_argument("-URI", "--URI", type=Path, help="file URI")
-    parser.add_argument("-metadata", "--metadata", type=Path, help="file metadata")
-
+    parser = argparse.ArgumentParser(prog="Sync documents on a persistent storage")
     args = parser.parse_args()
 
     secrets_path = Path("/run/secrets")
@@ -25,29 +22,23 @@ def main():
     storage_uri = "/package/file_storage"
 
     sys.path.insert(0, backends_path)
-    document_data = sys.stdin.read()
     exec_status = subprocess.run(
         [
             "python",
             "-m",
-            "mysql.put_document",
+            "mysql.synchronize_data",
             db_login_secret_path,
             db_pwd_secret_path,
             mysql_db_uri,
             storage_uri,
-            args.URI,
-            "-m",
-            args.metadata,
         ],
-        input=document_data.encode(),
         capture_output=True,
         cwd=backends_path,
         text=False,
         shell=False,
     )
 
-    return_data = {"error_code": exec_status.returncode, "error_msg": exec_status.stderr, "unique_id": exec_status.stdout }
-    #print(json.dumps(return_data))
+    return_data = {"error_code": exec_status.returncode, "error_msg": exec_status.stderr, "output": exec_status.stdout }
     print(return_data)
 
 

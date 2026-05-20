@@ -10,6 +10,7 @@ from mysql.app.models import FileRecord
 from mysql.doc_storage import operations as doc_storage_operations
 from mysql.doc_storage.models import StorageRecord
 from mysql.doc_storage.operations import add_abstract_document
+from mysql.utils import prepare_doc_data
 
 parent_id_for_orphants = 0
 
@@ -26,8 +27,7 @@ def main():
 
     # read stdin
     document_data = sys.stdin.read()
-
-
+    document_data = prepare_doc_data(document_data)
 
     login = None
     password = None
