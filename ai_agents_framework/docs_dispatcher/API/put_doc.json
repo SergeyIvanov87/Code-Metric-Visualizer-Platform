@@ -1,0 +1,14 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "PUT",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/put_doc/v1",
+    "Params": {
+        "URI": "",
+        "metadata": ""
+    },
+    "Description": {
+        "header": "Insert a document into persistent storage",
+        "body": "Returns a 'unique_id' of the document if the insertion succeeded",
+        "footer": ""
+    }
+}

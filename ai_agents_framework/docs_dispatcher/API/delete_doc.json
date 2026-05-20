@@ -1,0 +1,14 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "PUT",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/delete_doc/v1",
+    "Params": {
+        "id": "",
+        "metadata": ""
+    },
+    "Description": {
+        "header": "Delete a document or a chunk of the document",
+        "body": "Delete a document of a chunk by its 'id', these entities must exist. Returns 'error_code', where '0' describes success",
+        "footer": ""
+    }
+}
