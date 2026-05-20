@@ -3,8 +3,8 @@
     "Method" : "PUT",
     "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/delete_doc/v1",
     "Params": {
-        "id": "",
-        "metadata": ""
+        "-id": "",
+        "-metadata": ""
     },
     "Description": {
         "header": "Delete a document or a chunk of the document",
