@@ -1,0 +1,5 @@
+*.pyc
+*.pyo
+__pycache__/
+.bash_history
+.python_history
