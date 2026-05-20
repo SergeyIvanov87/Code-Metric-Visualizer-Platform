@@ -9,7 +9,7 @@ from mysql.app.database import Base, create_engine, create_session
 from mysql.doc_storage import operations as doc_storage_operations
 from mysql.doc_storage.fs_entity import StorageRecordEntry
 from mysql.doc_storage.models import StorageRecord
-
+from mysql.utils import prepare_doc_data
 
 parent_id_for_orphans = 0
 
@@ -52,8 +52,7 @@ def main():
 
     stdin_stream = getattr(sys.stdin, "buffer", sys.stdin)
     chunk_data = stdin_stream.read()
-    if isinstance(chunk_data, str):
-        chunk_data = chunk_data.encode("utf-8")
+    chunk_data = prepare_doc_data(chunk_data)
     metadata_text = _read_metadata_text(args.metadata)
 
     login = None
@@ -84,6 +83,10 @@ def main():
         if parent_storage_record.parent_id != parent_storage_record.unique_id:
             raise ValueError(f"Storage record id={args.doc_id} is not a full document")
 
+        chunk_offset, chunk_size = _extract_chunk_bounds(args.storage_uri, parent_storage_record, chunk_data)
+        if parent_db_record.size >= 0 and chunk_offset + chunk_size > parent_db_record.size:
+            raise ValueError(f"chunk with offset: {chunk_offset} and size: {chunk_size} does not fit into the parent document of size: {parent_db_record.size}")
+
         created_db_record = crud.create_file_record(
             session,
             str(parent_db_record.file_path),
@@ -100,10 +103,6 @@ def main():
                 created_db_record.id,
                 metadata_text,
             )
-
-            chunk_offset, chunk_size = _extract_chunk_bounds(args.storage_uri, parent_storage_record, chunk_data)
-            if parent_db_record.size >= 0 and chunk_offset + chunk_size > parent_db_record.size:
-                raise ValueError("chunk does not fit into the parent document")
 
             created_storage_record.update_record(
                 args.storage_uri,
