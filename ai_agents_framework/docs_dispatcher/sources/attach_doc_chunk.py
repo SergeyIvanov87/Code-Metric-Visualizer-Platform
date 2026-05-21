@@ -46,12 +46,11 @@ def main():
         shell=False,
     )
 
-    return_data = {
-        "error_code": exec_status.returncode,
-        "error_msg": exec_status.stderr,
-        "unique_id": exec_status.stdout,
-    }
-    print(return_data)
+    output = json.loads(exec_status.stdout.decode('utf-8'))
+    return_data = {}
+    return_data = return_data | output
+    print(json.dumps(return_data))
+
 
 
 if __name__ == "__main__":

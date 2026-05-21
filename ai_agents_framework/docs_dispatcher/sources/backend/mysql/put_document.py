@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import json
 import sys
 
 from pathlib import Path
@@ -32,29 +33,35 @@ def main():
     login = None
     password = None
     engine = None
-    if args.db_uri.find("sqlite:///") == -1:
-        login = args.login
-        password = args.pwd
-        engine = create_engine(login, password, args.db_uri)
-    else:
-        engine = create_engine(args.db_uri)
 
-    Base.metadata.create_all(engine)
+    ret = {"error_code": 0}
+    try:
+        if args.db_uri.find("sqlite:///") == -1:
+            login = args.login
+            password = args.pwd
+            engine = create_engine(login, password, args.db_uri)
+        else:
+            engine = create_engine(args.db_uri)
 
-    document_db_record = None
-    global parent_id_for_orphants
-    with create_session(engine) as session:
-        document_db_record = crud.create_file_record(session, str(args.file_uri), 0, len(document_data), parent_id_for_orphants)
+        Base.metadata.create_all(engine)
 
-    storage_record = add_abstract_document(args.storage_uri, args.file_uri, document_db_record.id, document_data)
-    storage_record.commit_doc(args.storage_uri, offset = document_db_record.offset)
+        document_db_record = None
+        global parent_id_for_orphants
+        with create_session(engine) as session:
+            document_db_record = crud.create_file_record(session, str(args.file_uri), 0, len(document_data), parent_id_for_orphants)
 
-    document_db_record.parent_id = storage_record.unique_id
-    crud.update_file_record_ext(session, document_db_record.id, document_db_record)
+        storage_record = add_abstract_document(args.storage_uri, args.file_uri, document_db_record.id, document_data)
+        storage_record.commit_doc(args.storage_uri, offset = document_db_record.offset)
 
-    ret = {}
-    ret["unique_id"] = storage_record.unique_id
-    print(ret)
+        document_db_record.parent_id = storage_record.unique_id
+        crud.update_file_record_ext(session, document_db_record.id, document_db_record)
+
+        ret["unique_id"] = storage_record.unique_id
+    except Exception as ex:
+        ret["error_code"] = -1
+        ret["error_msg"] = str(ex)
+
+    print(json.dumps(ret))
 
 if __name__ == "__main__":
     sys.exit(main())
