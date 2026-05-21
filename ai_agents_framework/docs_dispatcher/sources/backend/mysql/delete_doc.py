@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -91,9 +92,9 @@ def main():
     error_code = 0
     if len(error_messages):
         error_code = 1
-        ret["description"] = "\n".join(error_messages)
+        ret["error_msg"] = "\n".join(error_messages)
     ret["error"] = error_code
-    print(ret)
+    print(json.dumps(ret))
     return error_code
 
 
