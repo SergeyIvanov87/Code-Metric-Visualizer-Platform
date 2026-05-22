@@ -1,0 +1,22 @@
+include:
+  - ../../../../common/images/test_pseudo_fs/compose.yaml
+
+services:
+  docs-dispatcher-functional-tester:
+    build:
+      context: ../../../../
+      dockerfile: ai_agents_framework/docs_dispatcher/tests/functional/Dockerfile
+      additional_contexts:
+        test_pseudo_fs: "service:test_pseudo_fs"
+    environment:
+      - EXIT_ONCE_DONE=true
+    volumes:
+      - api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.test:/api
+      - api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.persistent.storage:/mnt
+    depends_on:
+       - docs_dispatcher
+       - test_pseudo_fs
+
+#volumes:
+#  api.pmccabe_collector.project.cc.test:
+#  api.pmccabe_collector.restapi.org.cc.test:
