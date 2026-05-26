@@ -10,7 +10,7 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser(prog="Delete document or chunk using assigned backend")
     parser.add_argument("-id", "--id", type=int, help="Record id")
-    parser.add_argument("-m", "--metadata", type=str, help="delete metadata")
+    parser.add_argument("-metadata", "--metadata", type=str, help="delete metadata")
 
     args = parser.parse_args()
 
