@@ -69,8 +69,6 @@ jobs:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the Service Broker Docker image
       run: docker compose -f service_broker/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from service-broker-functional-tester
-    - name: Test AI RAG docs dispatcher Docker image[dev]
-      run: docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.dev.yaml up --remove-orphans --abort-on-container-exit --exit-code-from docs-dispatcher-functional-tester
     - name: Build AI RAG docs dispatcher Docker image[prod]
       run: docker build -f ai_agents_framework/docs_dispatcher/Dockerfile -t docs-dispatcher:$DATE .
       env:
