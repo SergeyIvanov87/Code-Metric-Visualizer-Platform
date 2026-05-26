@@ -3,3 +3,6 @@
 __pycache__/
 .bash_history
 .python_history
+*.local
+*.config
+
