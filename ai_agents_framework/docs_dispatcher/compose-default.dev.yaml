@@ -8,7 +8,7 @@ services:
        BE_MYSQL_LOGIN_FILE: /run/secrets/backend_mysql_db_login
        BE_MYSQL_MYSQL_DATABASE: rag_docs_database
     volumes:
-      - api.pmccabe_collector.project.ai_agents_framework.docs_dispatcher.src:/package
+      - api.pmccabe_collector.project.ai-agents-framework.docs-dispatcher.src:/package
       - api.pmccabe_collector.restapi.org:/api
     secrets:
        - backend_mysql_db_login
@@ -18,7 +18,7 @@ volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
-  api.pmccabe_collector.project.ai_agents_framework.docs_dispatcher.src:
+  api.pmccabe_collector.project.ai-agents-framework.docs-dispatcher.src:
     driver: local
     driver_opts:
       o: bind
