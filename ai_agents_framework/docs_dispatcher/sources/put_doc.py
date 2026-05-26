@@ -48,10 +48,13 @@ def main():
         shell=False,
     )
 
-    output = json.loads(exec_status.stdout.decode('utf-8'))
+    out_output = exec_status.stdout.decode('utf-8').strip()
+    output_msg = ""
+    if out_output:
+        output_msg = json.loads(out_output)
 
     return_data = {}
-    return_data = return_data | output
+    return_data = return_data | output_msg
     print(json.dumps(return_data))
 
 
