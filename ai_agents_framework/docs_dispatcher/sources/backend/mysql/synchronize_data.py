@@ -10,7 +10,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from mysql.app import crud
-from mysql.app.database import create_engine, create_session
+from mysql.app.database import Base, create_engine, create_session
 from mysql.app.models import FileRecord
 from mysql.doc_storage import operations as doc_storage_operations
 from mysql.doc_storage.models import StorageRecord
@@ -134,10 +134,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     engine = None
-    if args.db_uri.find("sqlite:///") == -1:
-        engine = create_engine(args.login, args.pwd, args.db_uri)
-    else:
-        engine = create_engine(args.db_uri)
+    try:
+        if args.db_uri.find("sqlite:///") == -1:
+            engine = create_engine(args.login, args.pwd, args.db_uri)
+        else:
+            engine = create_engine(args.db_uri)
+
+        Base.metadata.create_all(engine)
+    except Exception as ex:
+        print(f"{str(ex)}", file=sys.stderr, flush=True)
+        return -1
 
     result = synchronize_from_file_storage(engine, args.storage_uri)
     print(json.dumps(result))
