@@ -24,7 +24,7 @@ def make_attach_doc_chunk(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
         r'documen_data="${OVERRIDEN_CMD_ARGS[@]: -1}"',
         r'all_others="${OVERRIDEN_CMD_ARGS[@]::${#OVERRIDEN_CMD_ARGS[@]}-2}"',
-        "echo \"${all_others[@]}\" | xargs -I% -- sh -c \"echo '${documen_data}' | ${WORK_DIR}/put_doc.py %\""
+        "echo \"${all_others[@]}\" | xargs -I% -- sh -c \"echo '${documen_data}' | ${WORK_DIR}/attach_doc_chunk.py %\""
     )
     script.writelines(line + "\n" for line in body)
 

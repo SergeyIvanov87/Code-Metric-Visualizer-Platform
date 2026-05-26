@@ -27,10 +27,10 @@ RUN <<EOF
     dos2unix /opt/modules*
 EOF
 
+#TODO COPY ["ai_agent/*.sh", "ai_agent/*.py", "/package/"]
 COPY ai_agents_framework/docs_dispatcher/API /API
-COPY ai_agents_framework/docs_dispatcher/sources /package
 
-VOLUME ["/api", "/etc/dispatcher"]
+VOLUME ["/api", "/etc/dispatcher", "/package"]
 
 # user creation
 ARG UID=1511 GID=23456 USER=rag_docs_dispatcher

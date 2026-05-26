@@ -5,12 +5,13 @@ services:
   docs_dispatcher:
     build:
       context: ../../
-      dockerfile: ./ai_agents_framework/docs_dispatcher/Dockerfile
+      dockerfile: ./ai_agents_framework/docs_dispatcher/Dockerfile.dev
     environment:
        BE_MYSQL_PASSWORD_FILE: /run/secrets/backend_mysql_db_password
        BE_MYSQL_LOGIN_FILE: /run/secrets/backend_mysql_db_login
        BE_MYSQL_MYSQL_DATABASE: test_docs_database
     volumes:
+      - api.pmccabe_collector.project.ai_agents_framework.docs_dispatcher.src:/package
       - api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.test:/api
       - api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.persistent.storage.test:/package/file_storage
     secrets:
@@ -20,6 +21,12 @@ services:
 volumes:
   api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.persistent.storage.test:
   api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.test:
+  api.pmccabe_collector.project.ai_agents_framework.docs_dispatcher.src:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ./sources
 
 secrets:
    backend_mysql_db_login:

@@ -30,9 +30,7 @@ def _extract_chunk_bounds(
     parent_storage_record: StorageRecord,
     chunk_data: bytes,
 ) -> tuple[int, int]:
-    parent_doc_path = (storage_uri / str(parent_storage_record.unique_id) / parent_storage_record.file_uri).with_suffix(
-        StorageRecordEntry.doc_suffix
-    )
+    parent_doc_path = StorageRecord.canonize_file_uri(storage_uri / str(parent_storage_record.unique_id) / parent_storage_record.file_uri)
     parent_data = parent_doc_path.read_bytes()
     offset = parent_data.find(chunk_data)
     if offset < 0:
