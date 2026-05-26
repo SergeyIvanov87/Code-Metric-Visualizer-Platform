@@ -8,8 +8,8 @@ services:
       - EXIT_ONCE_DONE=false
       - RAG_URI=rag-host-test:8000
     networks:
-      - api.pmccabe_collector.network.rag.test
+      - api.pmccabe_collector.network
     volumes:
-      - api.pmccabe_collector.project.ai_agents_framework.rag.test:/mnt
+      - api.pmccabe_collector.project.ai-agents-framework.rag.test:/mnt
     depends_on:
        - rag

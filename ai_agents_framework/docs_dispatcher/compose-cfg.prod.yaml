@@ -4,13 +4,13 @@ services:
       context: ../../
       dockerfile: ./ai_agents_framework/docs_dispatcher/Dockerfile
     volumes:
-      - api.pmccabe_collector.project.ai_agents_framework.docs_dispatcher.cfg:/etc/dispatcher
+      - api.pmccabe_collector.project.ai-agents-framework.docs-dispatcher.cfg:/etc/dispatcher
       - api.pmccabe_collector.restapi.org:/api
 
 volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
-  api.pmccabe_collector.project.ai_agents_framework.docs_dispatcher.cfg:
-    name: api.pmccabe_collector.project.ai_agents_framework.docs_dispatcher.cfg
+  api.pmccabe_collector.project.ai-agents-framework.docs-dispatcher.cfg:
+    name: api.pmccabe_collector.project.ai-agents-framework.docs-dispatcher.cfg
     external: true

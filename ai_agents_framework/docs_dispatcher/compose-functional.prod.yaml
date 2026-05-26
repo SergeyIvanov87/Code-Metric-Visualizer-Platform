@@ -2,7 +2,7 @@ include:
   - tests/functional/compose-functional.test.yaml
 
 services:
-  docs_dispatcher:
+  docs-dispatcher:
     build:
       context: ../../
       dockerfile: ./ai_agents_framework/docs_dispatcher/Dockerfile
@@ -11,15 +11,15 @@ services:
        BE_MYSQL_LOGIN_FILE: /run/secrets/backend_mysql_db_login
        BE_MYSQL_MYSQL_DATABASE: test_docs_database
     volumes:
-      - api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.test:/api
-      - api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.persistent.storage.test:/package/file_storage
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/package/file_storage
     secrets:
        - backend_mysql_db_login
        - backend_mysql_db_password
 
 volumes:
-  api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.persistent.storage.test:
-  api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.test:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:
 
 secrets:
    backend_mysql_db_login:
