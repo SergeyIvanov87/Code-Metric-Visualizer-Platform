@@ -74,6 +74,37 @@ services:
     networks:
       - api.pmccabe_collector.network
 
+  docs-dispatcher:
+    extends:
+      file: ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml
+      service: docs-dispatcher
+    depends_on:             # explicit dependency
+      test_aggregator:
+        condition: service_healthy
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  rag:
+    extends:
+      file: ai_agents_framework/RAG/compose-functional.test.yaml
+      service: rag
+    depends_on:             # explicit dependency
+      test_aggregator:
+        condition: service_healthy
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+
   rest-api-functional-api-initializer:
     extends:
       file: rest_api/tests/functional/api_initializer/compose-functional.test.yaml
@@ -151,3 +182,12 @@ volumes:
   api.pmccabe_collector.restapi.org.rrd.test:
   api.pmccabe_collector.restapi.org.rest-api.test:
   api.pmccabe_collector.restapi.org.service-broker.test:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:
+  api.pmccabe_collector.project.ai-agents-framework.rag.test:
+
+secrets:
+   backend_mysql_db_login:
+     file: ai_agents_framework/docs_dispatcher/tests/backend_mysql_default_user.txt
+   backend_mysql_db_password:
+     file: ai_agents_framework/docs_dispatcher/tests/backend_mysql_default_pwd.txt
