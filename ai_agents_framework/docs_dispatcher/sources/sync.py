@@ -44,7 +44,7 @@ def main():
     error_output = exec_status.stderr.decode('utf-8').strip()
     error_msg = ""
     if error_output:
-        error_msg = json.loads(error_output)
+        error_msg = str(error_output)#json.loads(error_output)
 
     out_output = exec_status.stdout.decode('utf-8').strip()
     output_msg = ""
