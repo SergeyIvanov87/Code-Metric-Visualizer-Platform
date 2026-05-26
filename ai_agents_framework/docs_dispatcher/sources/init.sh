@@ -22,10 +22,22 @@ echo -e "export WORK_DIR=${WORK_DIR}\nexport WORK_DIR_TMP=${WORK_DIR_TMP}\nexpor
 cp -r /API ${WORK_DIR_TMP}
 source ${OPT_DIR}/shell_utils/init_utils.sh
 
-echo "Premature cleanup..."
+echo "set premature cleanup handlers..."
 rm -f ${README_FILE_PATH}
 doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${SHARED_API_DIR} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
-doas -u root kill -15 $!
+api_management_pid=$!
+while true
+do
+    doas -u root kill -s 0 ${api_management_pid} > /dev/null 2>&1
+    RESULT=$?
+    if [ $RESULT != 0 ]; then
+        sleep 1
+        continue
+    fi
+    break
+done
+echo "make premature cleanup handlers..."
+doas -u root kill -s SIGTERM ${api_management_pid}
 
 ${OPT_DIR}/api_management.py ${INNER_API_SCHEMA_DIR} ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
 API_MANAGEMENT_PID=$!
@@ -46,6 +58,10 @@ doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${SHARED_API_DIR} MAIN_
 doas -u root chown -R $USER:$GROUPNAME ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/ai_agent_rag_dispatcher
 
 launch_fs_api_services SERVICE_WATCH_PIDS "${WORK_DIR_TMP}/services/"
+
+# sync data
+${WORK_DIR}/sync.py
+
 
 echo -e "${BBlue}Populating README file...${Color_Off}"
 ${OPT_DIR}/make_api_readme.py ${INNER_API_SCHEMA_DIR}  | ( umask 0033; cat >> ${README_FILE_PATH} )
