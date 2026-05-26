@@ -12,11 +12,7 @@ services:
       - EXIT_ONCE_DONE=true
     volumes:
       - api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.test:/api
-      - api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.persistent.storage:/mnt
+      - api.pmccabe_collector.restapi.org.ai_agents_framework.docs_dispatcher.persistent.storage.test:/mnt/file_storage
     depends_on:
        - docs_dispatcher
        - test_pseudo_fs
-
-#volumes:
-#  api.pmccabe_collector.project.cc.test:
-#  api.pmccabe_collector.restapi.org.cc.test:

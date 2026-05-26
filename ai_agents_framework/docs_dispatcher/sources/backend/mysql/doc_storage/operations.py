@@ -56,7 +56,7 @@ def add_abstract_document(storage_uri: Path, file_uri: Path, unique_id: int, doc
     storage_entry_path = storage_uri / str(unique_id)
     storage_entry_path.mkdir(parents=True, exist_ok=False)
 
-    doc_file_path = (storage_entry_path / file_uri).with_suffix(StorageRecordEntry.doc_suffix)
+    doc_file_path = StorageRecord.canonize_file_uri(storage_entry_path / file_uri)
     with doc_file_path.open(mode='wb') as doc_file:
         doc_file.write(doc_data)
 
@@ -85,7 +85,7 @@ def add_abstract_chunk(
     storage_entry_path = storage_uri / str(unique_id)
     storage_entry_path.mkdir(parents=True, exist_ok=False)
 
-    chunk_file_path = (storage_entry_path / file_uri).with_suffix(StorageRecordEntry.doc_suffix)
+    chunk_file_path = StorageRecord.canonize_file_uri(storage_entry_path / file_uri)
     chunk_file_path.touch(exist_ok=False)
 
     parent_id_file_path = storage_entry_path / StorageRecordEntry.parent_id
