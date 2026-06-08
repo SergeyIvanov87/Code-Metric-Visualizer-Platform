@@ -7,6 +7,7 @@ from pathlib import Path
 
 from mysql.app import crud
 from mysql.app.database import Base, create_engine, create_session
+from mysql.config import load_mysql_backend_config
 from mysql.doc_storage import operations as doc_storage_operations
 from mysql.doc_storage.fs_entity import StorageRecordEntry
 from mysql.doc_storage.models import StorageRecord
@@ -40,14 +41,11 @@ def _extract_chunk_bounds(
 
 def main():
     parser = argparse.ArgumentParser(prog="Insert document chunk using MYSQL backend")
-    parser.add_argument("login", type=Path, help="Login secret file path")
-    parser.add_argument("pwd", type=Path, help="Password secret file path")
-    parser.add_argument("db_uri", help="Database URI suffix (host/db)")
-    parser.add_argument("storage_uri", type=Path, help="Path to local storage root")
     parser.add_argument("doc_id", type=int, help="Parent document id")
     parser.add_argument("-m", "--metadata", type=str, help="chunk metadata")
 
     args = parser.parse_args()
+    backend_config = load_mysql_backend_config()
 
     stdin_stream = getattr(sys.stdin, "buffer", sys.stdin)
     chunk_data = stdin_stream.read()
@@ -60,12 +58,12 @@ def main():
         login = None
         password = None
         engine = None
-        if args.db_uri.find("sqlite:///") == -1:
-            login = args.login
-            password = args.pwd
-            engine = create_engine(login, password, args.db_uri)
+        if backend_config.db_uri.find("sqlite:///") == -1:
+            login = backend_config.db_login_secret_path
+            password = backend_config.db_pwd_secret_path
+            engine = create_engine(login, password, backend_config.db_uri)
         else:
-            engine = create_engine(args.db_uri)
+            engine = create_engine(backend_config.db_uri)
 
         Base.metadata.create_all(engine)
 
@@ -74,7 +72,7 @@ def main():
 
         with create_session(engine) as session:
             parent_db_record = crud.get_file_record(session, args.doc_id)
-            parent_storage_record = doc_storage_operations.get_record(args.storage_uri, args.doc_id)
+            parent_storage_record = doc_storage_operations.get_record(backend_config.storage_uri, args.doc_id)
 
             if parent_db_record is None:
                 raise ValueError(f"Parent document id={args.doc_id} does not exist in DB")
@@ -85,7 +83,7 @@ def main():
             if parent_storage_record.parent_id != parent_storage_record.unique_id:
                 raise ValueError(f"Storage record id={args.doc_id} is not a full document")
 
-            chunk_offset, chunk_size = _extract_chunk_bounds(args.storage_uri, parent_storage_record, chunk_data)
+            chunk_offset, chunk_size = _extract_chunk_bounds(backend_config.storage_uri, parent_storage_record, chunk_data)
             if parent_db_record.size >= 0 and chunk_offset + chunk_size > parent_db_record.size:
                 raise ValueError(f"chunk with offset: {chunk_offset} and size: {chunk_size} does not fit into the parent document of size: {parent_db_record.size}")
 
@@ -100,14 +98,14 @@ def main():
 
             try:
                 created_storage_record = doc_storage_operations.add_abstract_chunk(
-                    args.storage_uri,
+                    backend_config.storage_uri,
                     Path(str(parent_storage_record.file_uri)),
                     created_db_record.id,
                     metadata_text,
                 )
 
                 created_storage_record.update_record(
-                    args.storage_uri,
+                    backend_config.storage_uri,
                     parent_id=args.doc_id,
                     offset_size=(chunk_offset, chunk_size),
                 )
@@ -117,7 +115,7 @@ def main():
                 crud.update_file_record_ext(session, created_db_record.id, created_db_record)
             except Exception:
                 if created_storage_record is not None:
-                    doc_storage_operations.delete_record(args.storage_uri, created_storage_record.unique_id)
+                    doc_storage_operations.delete_record(backend_config.storage_uri, created_storage_record.unique_id)
                 if created_db_record is not None:
                     crud.delete_file_record(session, created_db_record.id)
                 raise

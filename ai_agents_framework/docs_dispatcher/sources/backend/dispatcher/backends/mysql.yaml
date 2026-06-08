@@ -1,0 +1,5 @@
+name: mysql
+db_login_secret: /run/secrets/backend_mysql_db_login
+db_pwd_secret: /run/secrets/backend_mysql_db_password
+mysql_db_uri: sqlite:///rag_docs_database.db
+storage_uri: /mnt/file_storage

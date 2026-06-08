@@ -2,38 +2,25 @@
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 
-from pathlib import Path
+from dispatcher_backend_config import load_backend_config
+
 
 def main():
     parser = argparse.ArgumentParser(prog="Sync documents on a persistent storage")
-    args = parser.parse_args()
+    parser.parse_args()
 
-    secrets_path = Path("/run/secrets")
-    db_login_secret_path = secrets_path / "backend_mysql_db_login"
-    db_pwd_secret_path = secrets_path / "backend_mysql_db_password"
+    backend_config = load_backend_config()
+    backends_path = backend_config.backends_code_dir
 
-    backends_path = Path("./backend")
-    mysql_backend = backends_path / "mysql"
-
-    mysql_db_uri = "sqlite:///rag_docs_database.db"
-    # TODO move all DB and FS creation in the init.sh
-    storage_uri = "/package/file_storage"
-    os.makedirs(storage_uri, mode=0o777, exist_ok=True)
-
-    sys.path.insert(0, backends_path)
+    sys.path.insert(0, str(backends_path))
     exec_status = subprocess.run(
         [
             "python",
             "-m",
-            "mysql.synchronize_data",
-            db_login_secret_path,
-            db_pwd_secret_path,
-            mysql_db_uri,
-            storage_uri,
+            backend_config.command_module("sync"),
         ],
         capture_output=True,
         cwd=backends_path,
