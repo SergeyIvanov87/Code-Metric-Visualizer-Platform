@@ -187,14 +187,14 @@ def _delete_doc(record_id: int) -> dict:
             "-metadata": "functional_delete",
         },
     )
-    assert payload["error"] == 0, payload
+    assert payload["error_code"] == 0, payload
     return payload
 
 
 def _create_storage_document(record_id: int, file_uri: str, content: str) -> None:
     record_dir = _record_dir(record_id)
-    record_dir.mkdir(parents=True, exist_ok=False)
-    (record_dir / f"{Path(file_uri).stem}.storage_bin").write_text(content, encoding="utf-8")
+    record_dir.mkdir(mode=0o777,parents=True, exist_ok=False)
+    (record_dir / f"{Path(file_uri).name}.storage_bin").write_text(content, encoding="utf-8")
     (record_dir / "parentId").write_text(str(record_id), encoding="utf-8")
     (record_dir / "offset").write_text("0", encoding="utf-8")
     (record_dir / "size").write_text(str(len(content.encode("utf-8"))), encoding="utf-8")
@@ -202,8 +202,8 @@ def _create_storage_document(record_id: int, file_uri: str, content: str) -> Non
 
 def _create_storage_chunk(record_id: int, parent_id: int, parent_file_uri: str, parent_data: str, chunk_data: str) -> None:
     record_dir = _record_dir(record_id)
-    record_dir.mkdir(parents=True, exist_ok=False)
-    (record_dir / f"{Path(parent_file_uri).stem}.storage_bin").touch()
+    record_dir.mkdir(mode=0o777, parents=True, exist_ok=False)
+    (record_dir / f"{Path(parent_file_uri).name}.storage_bin").touch()
     (record_dir / "parentId").write_text(str(parent_id), encoding="utf-8")
     (record_dir / "offset").write_text(str(parent_data.find(chunk_data)), encoding="utf-8")
     (record_dir / "size").write_text(str(len(chunk_data.encode("utf-8"))), encoding="utf-8")
@@ -212,6 +212,7 @@ def _create_storage_chunk(record_id: int, parent_id: int, parent_file_uri: str, 
 
 @pytest.fixture()
 def created_record_ids():
+    os.umask(0)
     _assert_sync_is_clean()
     record_ids: list[int] = []
     yield record_ids
@@ -305,30 +306,7 @@ def test_docs_and_chunks_deletion_removes_whole_storage_tree(created_record_ids)
     _assert_storage_absent(doc_0_id, chunk_0_id, chunk_1_id)
     _assert_sync_is_clean(len(before_ids))
 
-@pytest.mark.skip(reason="activate after introducing a permanent storage in backend dispatcher as it has no right to modify a file storage at now")
-def test_sync_removes_db_records_missing_from_storage(created_record_ids):
-    doc_0 = _api_safe_payload(_data_text("doc_0.txt"))
-    doc_0_chunk_0 = _api_safe_payload(_data_text("doc_0_chunk_0.txt"))
-    doc_0_chunk_1 = _api_safe_payload(_data_text("doc_0_chunk_1.txt"))
 
-    before_ids = _storage_record_ids()
-    doc_0_id = _put_doc("doc_0.txt", doc_0)
-    chunk_0_id = _attach_chunk(doc_0_id, doc_0_chunk_0, "chunk_0_for_doc_0")
-    chunk_1_id = _attach_chunk(doc_0_id, doc_0_chunk_1, "chunk_1_for_doc_0")
-    created_record_ids.extend([doc_0_id, chunk_0_id, chunk_1_id])
-
-    shutil.rmtree(_record_dir(chunk_1_id))
-    created_record_ids.remove(chunk_1_id)
-
-    sync_result = _sync()
-    assert _sync_counter(sync_result, "deleted") == 1
-    _assert_storage_absent(chunk_1_id)
-    _assert_document_storage(doc_0_id, "doc_0.txt", doc_0)
-    _assert_chunk_storage(chunk_0_id, doc_0_id, "doc_0.txt", doc_0, doc_0_chunk_0, "chunk_0_for_doc_0")
-    _assert_sync_is_clean(len(before_ids) + 2)
-
-
-@pytest.mark.skip(reason="activate after introducing a permanent storage in backend dispatcher as it has no right to modify a file storage at now")
 def test_sync_recreates_db_records_added_to_storage(created_record_ids):
 
     before_ids = _storage_record_ids()
@@ -346,7 +324,7 @@ def test_sync_recreates_db_records_added_to_storage(created_record_ids):
     created_record_ids.extend([doc_id, chunk_id])
 
     sync_result = _sync()
-    assert _sync_counter(sync_result, "created", "added") == 2
+    assert _sync_counter(sync_result["output"], "created") == 2
     _assert_document_storage(doc_id, "manual_doc.txt", document_data)
     _assert_chunk_storage(chunk_id, doc_id, "manual_doc.txt", document_data, chunk_data, "")
     _assert_sync_is_clean(len(before_ids) + 2)

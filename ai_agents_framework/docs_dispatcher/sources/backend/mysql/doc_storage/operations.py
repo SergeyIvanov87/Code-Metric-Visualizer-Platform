@@ -47,14 +47,11 @@ def get_records_by_parent_id(storage_uri: Path, parent_id: int) -> dict[int, Sto
 
 
 def add_abstract_document(storage_uri: Path, file_uri: Path, unique_id: int, doc_data: bytearray) -> StorageRecord:
-    if not storage_uri.exists():
-        storage_uri.mkdir(parents=True, exist_ok=True)
-
     if not storage_uri.is_dir():
         raise RuntimeError(f"Cannot add the main document: {file_uri}, the storage path doesn't exist: {storage_uri}")
 
     storage_entry_path = storage_uri / str(unique_id)
-    storage_entry_path.mkdir(parents=True, exist_ok=False)
+    storage_entry_path.mkdir(mode=0o777, parents=True, exist_ok=False) # r+w permission
 
     doc_file_path = StorageRecord.canonize_file_uri(storage_entry_path / file_uri)
     with doc_file_path.open(mode='wb') as doc_file:
@@ -74,16 +71,13 @@ def add_abstract_chunk(
     unique_id: int,
     metadata_text: str,
 ) -> StorageRecord:
-    if not storage_uri.exists():
-        storage_uri.mkdir(parents=True, exist_ok=True)
-
     if not storage_uri.is_dir():
         raise RuntimeError(
             f"Cannot add a chunk: {file_uri}, the storage path doesn't exist: {storage_uri}"
         )
 
     storage_entry_path = storage_uri / str(unique_id)
-    storage_entry_path.mkdir(parents=True, exist_ok=False)
+    storage_entry_path.mkdir(mode=0o777, parents=True, exist_ok=False)
 
     chunk_file_path = StorageRecord.canonize_file_uri(storage_entry_path / file_uri)
     chunk_file_path.touch(exist_ok=False)

@@ -29,8 +29,7 @@ EOF
 
 COPY ai_agents_framework/docs_dispatcher/API /API
 COPY ai_agents_framework/docs_dispatcher/sources /package
-
-VOLUME ["/api", "/etc/dispatcher"]
+COPY ai_agents_framework/docs_dispatcher/sources/backend/dispatcher /etc/dispatcher
 
 # user creation
 ARG UID=1511 GID=23456 USER=rag_docs_dispatcher
@@ -53,6 +52,7 @@ RUN addgroup \
 RUN <<EOF
     mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
     mkdir -p -m 777 /etc/dispatcher
+    chown -R ${USER}:${GROUPNAME} /etc/dispatcher
     mkdir -p -m 777 /api
     chown -R ${USER}:${GROUPNAME} /mnt
     chown -R ${USER}:${GROUPNAME} /api
@@ -62,6 +62,7 @@ RUN <<EOF
     chown -R ${USER}:${GROUPNAME} /API
 EOF
 
+VOLUME ["/api", "/etc/dispatcher"]
 
 USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/etc/dispatcher", "/opt", "/api"]

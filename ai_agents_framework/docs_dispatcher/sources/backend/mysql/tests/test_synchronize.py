@@ -17,7 +17,7 @@ from mysql.app.crud import (
     delete_file_record
 )
 
-from mysql.synchronize_data import synchronize_records
+from mysql.sync import synchronize_records
 from mysql.doc_storage.models import StorageRecord
 
 TEST_DATABASE_URL = "sqlite:///:memory:"

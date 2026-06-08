@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, TypedDict
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 from mysql.app import crud
 from mysql.app.database import Base, create_engine, create_session
 from mysql.app.models import FileRecord
+from mysql.config import load_mysql_backend_config
 from mysql.doc_storage import operations as doc_storage_operations
 from mysql.doc_storage.models import StorageRecord
 
@@ -60,7 +62,7 @@ def synchronize_records(
 
     deleted = 0
     updated = 0
-    untouched = 0
+    untouched = len(remaining_storage)
 
     db_records_to_update: list[FileRecord] = []
     for db_record in all_db_records:
@@ -81,7 +83,6 @@ def synchronize_records(
             updated += 1
 
         remaining_storage.pop(db_record.id)
-        untouched += 1
 
     created = len(remaining_storage)
     untouched = untouched - updated - created
@@ -126,26 +127,28 @@ def synchronize_from_file_storage(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="MYSQL backend interaction")
-    parser.add_argument("login", type=Path, help="Login secret file path")
-    parser.add_argument("pwd", type=Path, help="Password secret file path")
-    parser.add_argument("db_uri", help="Database URI suffix (host/db)")
-    parser.add_argument("storage_uri", type=Path, help="Path to local storage root")
 
-    args = parser.parse_args(argv)
+    parser.parse_args(argv)
+    backend_config = load_mysql_backend_config()
 
     engine = None
     try:
-        if args.db_uri.find("sqlite:///") == -1:
-            engine = create_engine(args.login, args.pwd, args.db_uri)
+        if backend_config.db_uri.find("sqlite:///") == -1:
+            engine = create_engine(
+                backend_config.db_login_secret_path,
+                backend_config.db_pwd_secret_path,
+                backend_config.db_uri,
+            )
         else:
-            engine = create_engine(args.db_uri)
+            engine = create_engine(backend_config.db_uri)
 
         Base.metadata.create_all(engine)
     except Exception as ex:
         print(f"{str(ex)}", file=sys.stderr, flush=True)
         return -1
 
-    result = synchronize_from_file_storage(engine, args.storage_uri)
+    os.makedirs(backend_config.storage_uri, mode=0o777, exist_ok=True)
+    result = synchronize_from_file_storage(engine, backend_config.storage_uri)
     print(json.dumps(result))
     return 0
 

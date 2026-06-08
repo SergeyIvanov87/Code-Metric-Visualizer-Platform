@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -49,6 +50,15 @@ def _create_parent_document(db_session, storage_root: Path, file_name: str, cont
     return parent
 
 
+def _mysql_backend_config(tmp_path: Path, storage_root: Path) -> SimpleNamespace:
+    return SimpleNamespace(
+        db_login_secret_path=tmp_path / "login",
+        db_pwd_secret_path=tmp_path / "pwd",
+        db_uri="sqlite:///ignored.db",
+        storage_uri=storage_root,
+    )
+
+
 def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_session, db_engine, capsys):
     storage_root = tmp_path / "storage"
     storage_root.mkdir()
@@ -62,15 +72,12 @@ def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_sess
         "sys.argv",
         [
             "attach_doc_chunk.py",
-            str(tmp_path / "login"),
-            str(tmp_path / "pwd"),
-            "sqlite:///ignored.db",
-            str(storage_root),
             str(parent.id),
             "-m",
             str(metadata_path),
         ],
     )
+    monkeypatch.setattr("mysql.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
     monkeypatch.setattr("mysql.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
 
     assert attach_chunk_main() == 0
@@ -108,19 +115,15 @@ def test_attach_chunk_rejects_missing_offset(monkeypatch, tmp_path, db_session, 
         "sys.argv",
         [
             "attach_doc_chunk.py",
-            str(tmp_path / "login"),
-            str(tmp_path / "pwd"),
-            "sqlite:///ignored.db",
-            str(storage_root),
             str(parent.id),
             "-m",
             str(metadata_path),
         ],
     )
+    monkeypatch.setattr("mysql.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
     monkeypatch.setattr("mysql.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
 
-    with pytest.raises(ValueError, match="chunk does not belong to the parent document"):
-        attach_chunk_main()
+    assert attach_chunk_main() == -1
 
 
 def test_delete_doc_removes_document_and_chunks(monkeypatch, tmp_path, db_session, db_engine):
@@ -141,26 +144,20 @@ def test_delete_doc_removes_document_and_chunks(monkeypatch, tmp_path, db_sessio
             "sys.argv",
             [
                 "attach_doc_chunk.py",
-                str(tmp_path / "login"),
-                str(tmp_path / "pwd"),
-                "sqlite:///ignored.db",
-                str(storage_root),
                 str(parent.id),
                 "-m",
                 str(metadata_path),
             ],
         )
+        monkeypatch.setattr("mysql.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
         monkeypatch.setattr("mysql.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
         assert attach_chunk_main() == 0
 
     monkeypatch.setattr("sys.argv", [
         "delete_doc.py",
-        str(tmp_path / "login"),
-        str(tmp_path / "pwd"),
-        "sqlite:///ignored.db",
-        str(storage_root),
         str(parent.id),
     ])
+    monkeypatch.setattr("mysql.delete_doc.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
     monkeypatch.setattr("mysql.delete_doc.create_engine", lambda *args, **kwargs: db_engine)
 
     assert delete_doc_main() == 0

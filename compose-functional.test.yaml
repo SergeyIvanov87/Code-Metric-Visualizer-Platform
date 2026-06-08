@@ -81,11 +81,22 @@ services:
     depends_on:             # explicit dependency
       test_aggregator:
         condition: service_healthy
+      docs-dispatcher-file-storage-permissions:
+        condition: service_completed_successfully
     logging:
       driver: syslog
       options:
         syslog-address: "tcp://localhost:13601"
         tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  docs-dispatcher-file-storage-permissions:
+    image: alpine:3.20.6
+    user: root
+    command: sh -c "mkdir -p /mnt/file_storage && chmod -R 0777 /mnt/file_storage"
+    volumes:
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/mnt/file_storage
     networks:
       - api.pmccabe_collector.network
 
@@ -184,6 +195,7 @@ volumes:
   api.pmccabe_collector.restapi.org.service-broker.test:
   api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:
   api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.cfg.test:
   api.pmccabe_collector.project.ai-agents-framework.rag.test:
 
 secrets:

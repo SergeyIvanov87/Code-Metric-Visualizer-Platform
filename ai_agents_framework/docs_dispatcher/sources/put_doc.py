@@ -7,6 +7,9 @@ import sys
 
 from pathlib import Path
 
+from dispatcher_backend_config import load_backend_config
+
+
 def main():
     parser = argparse.ArgumentParser(prog="Insert document using assigned backend")
     parser.add_argument("-URI", "--URI", type=Path, help="file URI")
@@ -14,33 +17,24 @@ def main():
 
     args = parser.parse_args()
 
-    secrets_path = Path("/run/secrets")
-    db_login_secret_path = secrets_path / "backend_mysql_db_login"
-    db_pwd_secret_path = secrets_path / "backend_mysql_db_password"
+    backend_config = load_backend_config()
+    backends_path = backend_config.backends_code_dir
 
-    backends_path = Path("./backend")
-    mysql_backend = backends_path / "mysql"
-
-    mysql_db_uri = "sqlite:///rag_docs_database.db"
-    storage_uri = "/package/file_storage"
-
-    sys.path.insert(0, backends_path)
+    sys.path.insert(0, str(backends_path))
     document_data = sys.stdin.read()
 
     # TODO base64 decode document_data
+    command = [
+        "python",
+        "-m",
+        backend_config.command_module("put_doc"),
+        str(args.URI),
+    ]
+    if args.metadata is not None:
+        command.extend(["-m", str(args.metadata)])
+
     exec_status = subprocess.run(
-        [
-            "python",
-            "-m",
-            "mysql.put_document",
-            db_login_secret_path,
-            db_pwd_secret_path,
-            mysql_db_uri,
-            storage_uri,
-            args.URI,
-            "-m",
-            args.metadata,
-        ],
+        command,
         input=document_data.encode(),
         capture_output=True,
         cwd=backends_path,
