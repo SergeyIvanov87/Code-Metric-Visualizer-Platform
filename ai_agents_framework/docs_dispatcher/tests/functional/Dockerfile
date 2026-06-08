@@ -20,7 +20,6 @@ COPY ai_agents_framework/docs_dispatcher/tests/functional/data /package/test_dat
 
 RUN dos2unix /tests/*
 
-VOLUME ["/api", "/mnt"]
 RUN addgroup \
     --gid "$GID" \
     "$GROUPNAME" \
@@ -33,9 +32,15 @@ RUN addgroup \
     --no-create-home \
     $USER
 
-RUN mkdir -p -m 777 /mnt && chown -R ${USER}:${GROUPNAME} /mnt
-#RUN mkdir -p -m 777 /api && chown -R ${USER}:${GROUPNAME} /api
-RUN chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /tests
+RUN <<EOF
+mkdir -p -m 777 /mnt
+chown -R ${USER}:${GROUPNAME} /mnt
+mkdir -p -m 777 /api
+chown -R ${USER}:${GROUPNAME} /api
+RUN chown -R ${USER}:${GROUPNAME} /package
+chown -R ${USER}:${GROUPNAME} /tests
+EOF
+VOLUME ["/api", "/mnt"]
 
 USER ${USER}
 ENTRYPOINT ["/tests/init.sh", "/tests", "/mnt", "/api"]
