@@ -7,6 +7,7 @@ from pathlib import Path
 
 from mysql.app import crud
 from mysql.app.database import Base, create_engine, create_session
+from mysql.config import load_mysql_backend_config
 from mysql.doc_storage import operations as doc_storage_operations
 
 
@@ -42,26 +43,23 @@ def _delete_sql(record_ids: list[int]) -> str:
 
 def main():
     parser = argparse.ArgumentParser(prog="Delete document or chunk using MYSQL backend")
-    parser.add_argument("login", type=Path, help="Login secret file path")
-    parser.add_argument("pwd", type=Path, help="Password secret file path")
-    parser.add_argument("db_uri", help="Database URI suffix (host/db)")
-    parser.add_argument("storage_uri", type=Path, help="Path to local storage root")
     parser.add_argument("id", type=int, help="Record id")
     parser.add_argument("-m", "--metadata", type=str, help="delete metadata")
 
     args = parser.parse_args()
+    backend_config = load_mysql_backend_config()
 
     _ = _load_metadata_text(args.metadata)
 
     login = None
     password = None
     engine = None
-    if args.db_uri.find("sqlite:///") == -1:
-        login = args.login
-        password = args.pwd
-        engine = create_engine(login, password, args.db_uri)
+    if backend_config.db_uri.find("sqlite:///") == -1:
+        login = backend_config.db_login_secret_path
+        password = backend_config.db_pwd_secret_path
+        engine = create_engine(login, password, backend_config.db_uri)
     else:
-        engine = create_engine(args.db_uri)
+        engine = create_engine(backend_config.db_uri)
 
     Base.metadata.create_all(engine)
     deleted_from_storage = 0
@@ -76,7 +74,7 @@ def main():
             deleted_ids: list[int] = []
             for record in target_records:
                 record_id = int(record["id"])
-                if doc_storage_operations.delete_record(args.storage_uri, record_id):
+                if doc_storage_operations.delete_record(backend_config.storage_uri, record_id):
                     deleted_from_storage += 1
                 deleted_ids.append(record_id)
 
@@ -84,7 +82,7 @@ def main():
             if delete_query:
                 crud.execute_query(session, delete_query)
                 deleted_from_db += len(deleted_ids)
-    except ValueError as ex:
+    except Exception as ex:
         error_messages.append(str(ex))
         pass
 
@@ -93,7 +91,7 @@ def main():
     if len(error_messages):
         error_code = 1
         ret["error_msg"] = "\n".join(error_messages)
-    ret["error"] = error_code
+    ret["error_code"] = error_code
     print(json.dumps(ret))
     return error_code
 
