@@ -12,7 +12,11 @@ services:
        BE_MYSQL_MYSQL_DATABASE: test_docs_database
     volumes:
       - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
-      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/package/file_storage
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.cfg.test:/etc/dispatcher
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/mnt/file_storage
+    depends_on:
+      docs-dispatcher-file-storage-permissions:
+        condition: service_completed_successfully
     secrets:
        - backend_mysql_db_login
        - backend_mysql_db_password
@@ -20,6 +24,7 @@ services:
 volumes:
   api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:
   api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.cfg.test:
 
 secrets:
    backend_mysql_db_login:
