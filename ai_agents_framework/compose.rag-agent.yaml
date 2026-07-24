@@ -1,0 +1,76 @@
+include:
+  - ../common/images/syslog-ng_image/compose.yaml
+  - ../common/images/test_aggregator_image/compose.yaml
+
+services:
+  rag-agent:
+    build:
+      context: ../
+      dockerfile: ./ai_agents_framework/ai_agent/Dockerfile
+    depends_on:
+      - syslog-ng
+    hostname: rag-agent
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - api.pmccabe_collector.project.ai-agents-framework.src:/package
+
+  rag-db:
+    extends:
+      file: ./RAG/compose.yaml
+      service: rag-db
+    hostname: rag-db
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    ports:
+      - 8000:8000
+    volumes:
+      - api.pmccabe_collector.project.ai-agents-framework.rag.db:/mnt
+    networks:
+      - api.pmccabe_collector.network
+
+  rag-doc-storage-dispatcher:
+    extends:
+      file: ./docs_dispatcher/compose-default.prod.yaml
+      service: docs_dispatcher
+    hostname: rag-doc-storage-dispatcher
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:601"
+        tag: "{{.Name}}"
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+    networks:
+      - api.pmccabe_collector.network
+
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
+
+secrets:
+   backend_mysql_db_login:
+     file: ./docs_dispatcher/sources/backend/mysql/default_user.txt
+   backend_mysql_db_password:
+     file: ./docs_dispatcher/sources/backend/mysql/default_pwd.txt
+
+
+volumes:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true
+  api.pmccabe_collector.project.ai-agents-framework.src:
+    name: api.pmccabe_collector.ai_agent.src
+    external: true
+  api.pmccabe_collector.project.ai-agents-framework.rag.db:
