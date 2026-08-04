@@ -168,6 +168,44 @@ def execute_attach_doc_chunks_query(
     return chunk_unique_ids, chunk_metadata
 
 
+def execute_delete_doc_query(
+    query: APIQueryInterruptible,
+    session_id,
+    timeout_elapsed,
+    doc_id,
+    doc_metadata,
+):
+    exec_args = " ".join(
+        [
+            f"SESSION_ID={session_id}",
+            f"-id={doc_id}",
+            f"-metadata={doc_metadata}",
+        ]
+    )
+    status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
+    if not status:
+        raise RuntimeError(
+            f"Cannot delete the doc by id: {doc_id} using the rag_doc_dispater, status: {status}, elapsed timeout: {timeout_elapsed}, session: {session_id}"
+        )
+
+    # TODO Reconsile timeout_elapsed and wait for pipe creation sleep duration and cycles
+    status, result, timeout_elapsed = query.wait_result(
+        timeout_elapsed, session_id, 0.1, timeout_elapsed / 0.1, False
+    )
+    if not status:
+        raise RuntimeError(
+            f"Cannot delete the doc by id: {doc_id} using the rag_doc_dispater: waiting of result failed, status: {status}, result: {result}, elapsed timeout: {timeout_elapsed}, session: {session_id}"
+        )
+
+    delete_doc_result = json.loads(result)
+    if delete_doc_result["error_code"] != 0:
+        raise RuntimeError(
+            f"Cannot delete the doc by id: {doc_id} using the rag_doc_dispater, error: {delete_doc_result['error_msg']}"
+        )
+
+    return delete_doc_result
+
+
 def get_last_query_version(api_query_lhs, api_query_rhs):
     lhs = Path(api_query_lhs["Query"]).name
     rhs = Path(api_query_rhs["Query"]).name
