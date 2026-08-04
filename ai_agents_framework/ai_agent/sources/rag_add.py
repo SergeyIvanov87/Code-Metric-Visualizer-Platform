@@ -21,6 +21,7 @@ from fs_api_wrappers import (
     generate_inner_session_id,
     execute_put_doc_query,
     execute_attach_doc_chunks_query,
+    execute_delete_doc_query,
 )
 
 
@@ -58,34 +59,7 @@ def main(
     doc_metadata: str,
     doc_data: str,
 ):
-    normalized_api_queries = get_normalized_api_queries(
-        shared_api_dir,
-        main_service_name,
-        {
-            "put_doc": re.compile(r".*ai_agent_rag_dispatcher.*put_doc.*"),
-            "attach_doc_chunk": re.compile(
-                ".*ai_agent_rag_dispatcher.*attach_doc_chunk.*"
-            ),
-        },
-    )
-
-    # Create API handles
-    session_id = generate_inner_session_id(sess_id)
-    put_doc_query = create_api_query_interruptible(
-        shared_api_dir, normalized_api_queries["put_doc"], session_id
-    )
-    attach_doc_chunk_query = create_api_query_interruptible(
-        shared_api_dir, normalized_api_queries["attach_doc_chunk"], session_id
-    )
-
-    # insert doc
-    timeout_elapsed = 10
-    put_doc_result = execute_put_doc_query(
-        put_doc_query, session_id, timeout_elapsed, doc_uri, doc_data, doc_metadata
-    )
-    doc_unique_id = put_doc_result["unique_id"]
-
-    # push chunks into doc storage
+    # Break down a doc onto chunks
     # the main limitation is important: text beyond 256 word pieces is truncated. It is intended for sentences and short
     model_name = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_model = HuggingFaceEmbeddings(
@@ -103,27 +77,98 @@ def main(
         doc_data, doc_metadata, max_chunk_size=220, max_chunk_overlap_count=30
     )
     if len(doc_chunks) == 0:
-        raise RuntimeError("TODO! rollback main document insertion!!!")
+        raise RuntimeError(
+            f"The document: {doc_uri} cannot be split onto chunks, session: {sess_id}"
+        )
 
     chunk_texts = [chunk.page_content for chunk in doc_chunks]
     chunk_embeddings = embedding_model.embed_documents(chunk_texts)
 
-    # insert the chunks of the doc
+    # Create API handles
+    normalized_api_queries = get_normalized_api_queries(
+        shared_api_dir,
+        main_service_name,
+        {
+            "put_doc": re.compile(r".*ai_agent_rag_dispatcher.*put_doc.*"),
+            "attach_doc_chunk": re.compile(
+                ".*ai_agent_rag_dispatcher.*attach_doc_chunk.*"
+            ),
+            "delete_doc": re.compile(r".*ai_agent_rag_dispatcher.*delete_doc.*"),
+        },
+    )
+    session_id = generate_inner_session_id(sess_id)
+    put_doc_query = create_api_query_interruptible(
+        shared_api_dir, normalized_api_queries["put_doc"], session_id
+    )
+    attach_doc_chunk_query = create_api_query_interruptible(
+        shared_api_dir, normalized_api_queries["attach_doc_chunk"], session_id
+    )
+    delete_doc_query = create_api_query_interruptible(
+        shared_api_dir, normalized_api_queries["delete_doc"], session_id
+    )
+
+    # insert the main doc
     timeout_elapsed = 10
-    chunk_unique_ids, chunk_metadata = execute_attach_doc_chunks_query(
-        attach_doc_chunk_query, session_id, timeout_elapsed, doc_unique_id, chunk_texts
+    put_doc_result = execute_put_doc_query(
+        put_doc_query, session_id, timeout_elapsed, doc_uri, doc_data, doc_metadata
     )
+    doc_unique_id = put_doc_result["unique_id"]
 
-    print(f"chunk_unique_ids: {chunk_unique_ids}, chunk_metadata: {chunk_metadata}")
-    # eventually push doc & chunks into chroma
-    chromadb_client = chromadb.HttpClient(host=db_host, port=db_port)
-    vectordb_client = Chroma(client=chromadb_client)  # not realy needed.
-    my_collection_name = main_service_name
+    # push chunks into doc storage
+    chunk_unique_ids = []
+    chunk_metadata = []
 
-    collection = chromadb_client.get_or_create_collection(name=my_collection_name)
-    collection.add(
-        ids=chunk_unique_ids, embeddings=chunk_embeddings, metadatas=chunk_metadata
-    )
+    try:
+        try:
+            timeout_elapsed = 10
+            chunk_unique_ids, chunk_metadata = execute_attach_doc_chunks_query(
+                attach_doc_chunk_query,
+                session_id,
+                timeout_elapsed,
+                doc_unique_id,
+                chunk_texts,
+            )
+        except Exception as ex:
+            raise RuntimeError(
+                f"Cannot attach chunks: {len(chunk_texts)} to the doc id: {doc_unique_id}, session: {session_id}, exception: {ex}"
+            ) from ex
+
+        # eventually push doc & chunks into chroma
+        my_collection_name = main_service_name
+        try:
+
+            chromadb_client = chromadb.HttpClient(host=db_host, port=db_port)
+            vectordb_client = Chroma(client=chromadb_client)  # not realy needed.
+
+            collection = chromadb_client.get_or_create_collection(
+                name=my_collection_name
+            )
+            collection.add(
+                ids=chunk_unique_ids,
+                embeddings=chunk_embeddings,
+                metadatas=chunk_metadata,
+            )
+        except Exception as ex:
+            raise RuntimeError(
+                f"Cannot insert embeddings: {len(chunk_embeddings)} into ChromaDB: {db_host}:{db_port} for collectiond: {my_collection_name}, session: {session_id}, exception: {ex}"
+            ) from ex
+    except RuntimeError as ex:
+        timeout_elapsed = 10
+        try:
+            delete_doc_result = execute_delete_doc_query(
+                delete_doc_query,
+                session_id,
+                timeout_elapsed,
+                doc_unique_id,
+                doc_metadata,
+            )
+        except RuntimeError as delete_ex:
+            raise RuntimeError(
+                f"Cannot rollback state be deleting the main document by id: {doc_unique_id}, session: {session_id}\nInitial exception: {delete_ex}.\nRecords can be inconsistent"
+            ) from delete_ex
+        raise RuntimeError(
+            f"The error had happened:\n{ex}\nRollback was finished. Records are consistent"
+        ) from ex
     """
     use this to retrive
     ~$ chroma browse api.pmccabe_collector.restapi.org --host http://rag-db:8000
@@ -187,19 +232,19 @@ if __name__ == "__main__":
     doc_data = "111111111"
     args = parser.parse_args()
     error_code = 0
-    # try:
-    main(
-        args.shared_api_dir,
-        args.main_service_name,
-        args.session_id,
-        args.db_host,
-        args.db_port,
-        args.uri,
-        args.metadata,
-        doc_data,
-    )
-    # except Exception as ex:
-    #    print(f"Execution of {__file__} failed, exception: {ex}", file=sys.stderr)
-    #    error_code = -1
+    try:
+        main(
+            args.shared_api_dir,
+            args.main_service_name,
+            args.session_id,
+            args.db_host,
+            args.db_port,
+            args.uri,
+            args.metadata,
+            doc_data,
+        )
+    except Exception as ex:
+        print(f"Execution of {__file__} failed, exception: {ex}", file=sys.stderr)
+        error_code = -1
 
     sys.exit(error_code)
