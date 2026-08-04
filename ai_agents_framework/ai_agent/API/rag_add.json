@@ -1,14 +1,15 @@
 {
     "Content-Type" : "application/json",
     "Method" : "PUT",
-    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/add/v1",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1",
     "Params": {
-        "URI": "",
-        "metadata": ""
+        "-URI": "",
+        "-metadata": ""
+        "data": ""
     },
     "Description": {
-        "header": "\n",
-        "body": "\n",
+        "header": "Insert a document into RAG",
+        "body": "Returns a 'unique_id' of the document if the insertion succeeded",
         "footer": ""
     }
 }

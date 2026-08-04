@@ -12,9 +12,9 @@ EOF
 WORKDIR /package
 
 RUN <<EOF
-    pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain-text-splitters sentence-transformers
+    pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain-text-splitters tiktoken sentence-transformers
     pip install --break-system-packages llama-cpp-python
-    pip install --break-system-packages chromadb pypdf requests pydantic tqdm
+    pip install --break-system-packages chromadb chromadb-client sentence_transformers pypdf requests pydantic tqdm
 EOF
 
 RUN <<EOF

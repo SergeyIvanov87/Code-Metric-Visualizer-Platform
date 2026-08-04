@@ -1,13 +1,14 @@
 {
     "Content-Type" : "application/json",
     "Method" : "POST",
-    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/delete/v1",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/delete_doc/v1",
     "Params": {
-        "URI": ""
+        "-id": "",
+        "-metadata": "\"\""
     },
     "Description": {
-        "header": "\n",
-        "body": "\n",
+        "header": "Delete a document from RAG",
+        "body": "Delete a document by its 'id', the document must exist. Returns 'error_code', where '0' describes success",
         "footer": ""
     }
 }

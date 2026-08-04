@@ -1,19 +1,45 @@
 include:
-  - ../common/images/syslog-ng_image/compose.yaml
   - ../common/images/test_aggregator_image/compose.yaml
 
 services:
+  syslog-ng:
+    build:
+      context: ../
+      dockerfile: ./common/images/syslog-ng_image/Dockerfile
+    env_file:
+      - path: ../common/images/syslog-ng_image/.env
+        required: true
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ= # timezone
+    container_name: api.pmccabe_collector.syslog-ng
+    hostname: api.pmccabe_collector.syslog-ng
+    volumes:
+      - api.pmccabe_collector.logger.org:/var/log
+    ports:
+      - 1514:5514/udp
+      - 1601:6601/tcp
+    restart: unless-stopped
+    networks:
+      - api.pmccabe_collector.network
+    logging:
+      driver: "json-file"
+
   rag-agent:
     build:
       context: ../
       dockerfile: ./ai_agents_framework/ai_agent/Dockerfile
+    environment:
+      - VECTORDB_HOST=rag-db
+      - VECTORDB_PRT=8000
     depends_on:
       - syslog-ng
     hostname: rag-agent
     logging:
       driver: syslog
       options:
-        syslog-address: "tcp://localhost:601"
+        syslog-address: "tcp://localhost:1601"
         tag: "{{.Name}}"
     networks:
       - api.pmccabe_collector.network
@@ -29,7 +55,7 @@ services:
     logging:
       driver: syslog
       options:
-        syslog-address: "tcp://localhost:601"
+        syslog-address: "tcp://localhost:1601"
         tag: "{{.Name}}"
     ports:
       - 8000:8000
@@ -46,7 +72,7 @@ services:
     logging:
       driver: syslog
       options:
-        syslog-address: "tcp://localhost:601"
+        syslog-address: "tcp://localhost:1601"
         tag: "{{.Name}}"
     volumes:
       - api.pmccabe_collector.restapi.org:/api
@@ -67,6 +93,9 @@ secrets:
 
 
 volumes:
+  api.pmccabe_collector.logger.org:
+    name: api.pmccabe_collector.logger.org
+    external: true
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true

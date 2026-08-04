@@ -22,7 +22,7 @@ def make_script_rag_add(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}"'
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | ${WORK_DIR}/rag_add.py --session_id="${SESSION_ID_VALUE} -db_host=${VECTOR_DB_HOST} -db_port=${VECTOR_DB_PORT}"'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -45,7 +45,7 @@ def make_script_rag_delete(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}"'
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | ${WORK_DIR}/rag_delete.py'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -69,86 +69,12 @@ def make_script_rag_list(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}"'
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | ${WORK_DIR}/rag_list.py'
     )
     script.writelines(line + "\n" for line in body)
 
 def make_script_rag_list_help():
     return "make_script_rag_list_help"
-
-
-
-def make_script_rag_storage_delete(script, desired_file_ext=""):
-    if len(desired_file_ext) == 0:
-        file_extension = ""
-    else:
-        file_extension = "." + desired_file_ext
-
-    body = (
-        *api_fs_exec_utils.generate_exec_header(), r"",
-        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
-        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
-        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
-        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
-        *api_fs_exec_utils.generate_api_node_env_init(), r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
-        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}"'
-    )
-    script.writelines(line + "\n" for line in body)
-
-def make_script_rag_storage_delete_help():
-    return "make_script_rag_storage_delete_help"
-
-
-
-def make_script_rag_storage_insert(script, desired_file_ext=""):
-    if len(desired_file_ext) == 0:
-        file_extension = ""
-    else:
-        file_extension = "." + desired_file_ext
-
-    body = (
-        *api_fs_exec_utils.generate_exec_header(), r"",
-        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
-        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
-        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
-        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
-        *api_fs_exec_utils.generate_api_node_env_init(), r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
-        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}"'
-    )
-    script.writelines(line + "\n" for line in body)
-
-
-def make_script_rag_storage_insert_help():
-    return "make_script_rag_storage_insert_help"
-
-
-
-def make_script_rag_storage_list(script, desired_file_ext=""):
-    if len(desired_file_ext) == 0:
-        file_extension = ""
-    else:
-        file_extension = "." + desired_file_ext
-
-    body = (
-        *api_fs_exec_utils.generate_exec_header(), r"",
-        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
-        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
-        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
-        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
-        *api_fs_exec_utils.generate_api_node_env_init(), r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
-        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}"'
-    )
-    script.writelines(line + "\n" for line in body)
-
-def make_script_rag_storage_list_help():
-    return "make_script_rag_storage_list_help"
-
 
 
 def make_script_ask_question(script, desired_file_ext=""):
@@ -204,9 +130,6 @@ def get():
         "rag_add": make_script_rag_add,
         "rag_delete": make_script_rag_delete,
         "rag_list": make_script_rag_list,
-        "rag_storage_delete": make_script_rag_storage_delete,
-        "rag_storage_insert": make_script_rag_storage_insert,
-        "rag_storage_list": make_script_rag_storage_list,
         "ask_question": make_script_ask_question,
         "hello": make_script_hello
     }
@@ -215,9 +138,6 @@ def get():
         "rag_add": make_script_rag_add_help,
         "rag_delete": make_script_rag_delete_help,
         "rag_list": make_script_rag_list_help,
-        "rag_storage_delete": make_script_rag_storage_delete_help,
-        "rag_storage_insert": make_script_rag_storage_insert_help,
-        "rag_storage_list": make_script_rag_storage_list_help,
         "ask_question": make_script_ask_question_help,
         "hello": make_script_hello_help
     }
