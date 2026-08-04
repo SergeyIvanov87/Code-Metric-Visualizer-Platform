@@ -14,7 +14,7 @@ mkdir -p ${WORK_DIR_TMP}
 
 export INNER_API_SCHEMA_DIR=${WORK_DIR_TMP}/API
 
-README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/ai_agent_rag_dispatcher/README-API-STATISTIC.md
+README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/ai_agent_rag_dispatcher/README-API-DOCS-DISPATCHER.md
 
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport WORK_DIR_TMP=${WORK_DIR_TMP}\nexport DISPATCHER_SETTINGS_DIR=${DISPATCHER_SETTINGS_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
