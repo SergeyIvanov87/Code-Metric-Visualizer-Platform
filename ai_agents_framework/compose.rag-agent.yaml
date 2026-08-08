@@ -32,7 +32,7 @@ services:
       dockerfile: ./ai_agents_framework/ai_agent/Dockerfile
     environment:
       - VECTORDB_HOST=rag-db
-      - VECTORDB_PRT=8000
+      - VECTORDB_PORT=8000
     depends_on:
       - syslog-ng
     hostname: rag-agent
