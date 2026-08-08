@@ -22,7 +22,18 @@ def make_script_rag_add(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | ${WORK_DIR}/rag_add.py --session_id="${SESSION_ID_VALUE} -db_host=${VECTOR_DB_HOST} -db_port=${VECTOR_DB_PORT}"'
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"-URI\" \"${2}\" \"\" '=' URI_VALUE", r"",
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"doc_data\" \"${2}\" \"\" '=' DOC_DATA_VALUE", r"",
+        r'if [ -z "${URI_VALUE}" ]; then',
+        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/-URI}" )',
+        r'fi',
+        r'document_data="${DOC_DATA_VALUE}"',
+        r'OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/doc_data}" )',
+        r'if [ ! -z "${document_data}" ]; then',
+        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/$document_data}" )',
+        r'fi',
+        "echo \"${OVERRIDEN_CMD_ARGS[@]}\" | xargs -I% -- sh -c \"echo '${document_data}' | ${WORK_DIR}/rag_add.py --session_id='${SESSION_ID_VALUE}' -db_host=${VECTOR_DB_HOST} -db_port=${VECTOR_DB_PORT} % ${SHARED_API_DIR} ${MAIN_SERVICE_NAME}\""
+        #r'echo "${OVERRIDEN_CMD_ARGS[@]}" | ${WORK_DIR}/rag_add.py --session_id="${SESSION_ID_VALUE} -db_host=${VECTOR_DB_HOST} -db_port=${VECTOR_DB_PORT}"'
     )
     script.writelines(line + "\n" for line in body)
 

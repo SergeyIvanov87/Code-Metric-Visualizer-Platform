@@ -14,12 +14,13 @@ def main():
     parser.add_argument("-metadata", "--metadata", type=str, help="chunk metadata")
 
     args = parser.parse_args()
+    chunk_data = sys.stdin.read()
+    chunk_data = chunk_data.encode('utf-8')
 
     backend_config = load_backend_config()
     backends_path = backend_config.backends_code_dir
-
     sys.path.insert(0, str(backends_path))
-    chunk_data = sys.stdin.read()
+
     command = [
         "python",
         "-m",
@@ -31,7 +32,7 @@ def main():
 
     exec_status = subprocess.run(
         command,
-        input=chunk_data.encode(),
+        input=chunk_data,
         capture_output=True,
         cwd=backends_path,
         text=False,

@@ -4,12 +4,12 @@
     "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1",
     "Params": {
         "-URI": "",
-        "-metadata": ""
-        "data": ""
+        "-metadata": "",
+        "doc_data": ""
     },
     "Description": {
         "header": "Insert a document into RAG",
-        "body": "Returns a 'unique_id' of the document if the insertion succeeded",
-        "footer": ""
+        "body": "Don't use both `-URI` and `doc_data`. If `-URI` is specified, the document data will be read from the path specified by `-URI`, which must be available for a processor of the current API, typically it is a docker container. Otherwise if `doc_data` is specified, the document data will be used as a value of `doc_data`. The value must be encoded in BASE64. Use `base64 -w 0 <FILE PATH>` to encode the data. Returns a 'unique_id' of the document if the insertion succeeded",
+        "footer": "Examples of correct queries: `echo \"-metadata=txt doc_data=`base64 -w 0 <FILE PATH>`\"> /api/api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1/PUT/exec` or `echo \"-URI=<FILE PATH> -metadata=txt\"> /api/api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1/PUT/exec`"
     }
 }

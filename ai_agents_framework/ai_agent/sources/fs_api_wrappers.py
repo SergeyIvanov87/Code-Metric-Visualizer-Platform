@@ -82,7 +82,7 @@ def execute_put_doc_query(
             f"SESSION_ID={session_id}",
             f"-URI={doc_uri}",
             f"-metadata={doc_metadata}",
-            f"data={doc_data}",
+            f"doc_data={doc_data}",
         ]
     )
     status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
@@ -101,7 +101,6 @@ def execute_put_doc_query(
         )
 
     put_doc_result = json.loads(result)
-    print(f"Doc insertion result: {put_doc_result}")
     if put_doc_result["error_code"] != 0:
         raise RuntimeError(
             f"Cannot put the entire doc by URI: {doc_uri} into the rag_doc_dispater, error: {put_doc_result['error_msg']}"
@@ -118,19 +117,19 @@ def execute_attach_doc_chunks_query(
     session_id,
     timeout_elapsed,
     doc_unique_id,
-    chunk_texts,
+    chunks_metadata,
+    chunk_data_array,
 ):
     # execute query
-    chunk_num = 0
     chunk_unique_ids = []
     chunk_metadata = []
-    for ch in chunk_texts:
+    for chunk_num, ch in enumerate(chunk_data_array):
         exec_args = " ".join(
             [
                 f"SESSION_ID={session_id}",
                 f"-doc_id={doc_unique_id}",
-                f"-metadata={chunk_num}",
-                f"data={ch}",
+                f"-metadata={chunks_metadata}_{chunk_num}",
+                f"doc_data={ch}",
             ]
         )
         status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
