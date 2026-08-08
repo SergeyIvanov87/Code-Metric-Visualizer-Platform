@@ -22,9 +22,13 @@ def make_attach_doc_chunk(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'documen_data="${OVERRIDEN_CMD_ARGS[@]: -1}"',
-        r'all_others="${OVERRIDEN_CMD_ARGS[@]::${#OVERRIDEN_CMD_ARGS[@]}-2}"',
-        "echo \"${all_others[@]}\" | xargs -I% -- sh -c \"echo '${documen_data}' | ${WORK_DIR}/attach_doc_chunk.py %\""
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"doc_data\" \"${2}\" \"\" '=' DOC_DATA_VALUE", r"",
+        r'document_data="${DOC_DATA_VALUE}"',
+        r'OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/doc_data}" )',
+        r'if [ ! -z "${document_data}" ]; then',
+        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/$document_data}" )',
+        r'fi',
+        "echo \"${OVERRIDEN_CMD_ARGS[@]}\" | xargs -I% -- sh -c \"echo '${document_data}' | ${WORK_DIR}/attach_doc_chunk.py %\""
     )
     script.writelines(line + "\n" for line in body)
 
@@ -72,9 +76,17 @@ def make_put_doc(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'documen_data="${OVERRIDEN_CMD_ARGS[@]: -1}"',
-        r'all_others="${OVERRIDEN_CMD_ARGS[@]::${#OVERRIDEN_CMD_ARGS[@]}-2}"',
-        "echo \"${all_others[@]}\" | xargs -I% -- sh -c \"echo '${documen_data}' | ${WORK_DIR}/put_doc.py %\""
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"-URI\" \"${2}\" \"\" '=' URI_VALUE", r"",
+        api_fs_bash_utils.extract_attr_value_from_string() + " \"doc_data\" \"${2}\" \"\" '=' DOC_DATA_VALUE", r"",
+        r'if [ -z "${URI_VALUE}" ]; then',
+        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/-URI}" )',
+        r'fi',
+        r'document_data="${DOC_DATA_VALUE}"',
+        r'OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/doc_data}" )',
+        r'if [ ! -z "${document_data}" ]; then',
+        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/$document_data}" )',
+        r'fi',
+        "echo \"${OVERRIDEN_CMD_ARGS[@]}\" | xargs -I% -- sh -c \"echo '${document_data}' | ${WORK_DIR}/put_doc.py %\""
     )
     script.writelines(line + "\n" for line in body)
 
