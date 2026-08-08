@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import base64
 import json
 import sys
 
@@ -24,8 +25,15 @@ def main():
     args = parser.parse_args()
     backend_config = load_mysql_backend_config()
 
-    # read stdin
-    document_data = sys.stdin.read()
+    # read document data
+    if args.file_uri is None:
+        document_data_str = sys.stdin.read().encode('utf-8')
+        if args.metadata.find("base64") != -1:
+            document_data = base64.b64decode(document_data_bytes)
+    else:
+        with open(args.file_uri,'rb') as f:
+            document_data = f.read()
+
     document_data = prepare_doc_data(document_data)
 
     login = None
