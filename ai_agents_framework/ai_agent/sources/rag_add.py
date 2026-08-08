@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import base64
 import json
 import re
 import sys
@@ -85,6 +86,8 @@ def main(
     chunk_embeddings = embedding_model.embed_documents(chunk_texts)
 
     # Create API handles
+    doc_encoding_type = "base64"
+    docs_encoding_metadata_prefix = doc_encoding_type + ","
     normalized_api_queries = get_normalized_api_queries(
         shared_api_dir,
         main_service_name,
@@ -109,8 +112,10 @@ def main(
 
     # insert the main doc
     timeout_elapsed = 10
+    doc_data_bytes = doc_data.encode('utf-8')
+    doc_data_bytes = base64.b64encode(doc_data_bytes)
     put_doc_result = execute_put_doc_query(
-        put_doc_query, session_id, timeout_elapsed, doc_uri, doc_data, doc_metadata
+        put_doc_query, session_id, timeout_elapsed, doc_uri, doc_data_bytes, docs_encoding_metadata_prefix + doc_metadata
     )
     doc_unique_id = put_doc_result["unique_id"]
 
@@ -120,13 +125,16 @@ def main(
 
     try:
         try:
-            timeout_elapsed = 10
+            chunk_bytes = [base64.b64encode(c.encode('utf-8')).decode('utf-8') for c in chunk_texts]
+
+            timeout_elapsed = 10 * len(chunk_bytes)
             chunk_unique_ids, chunk_metadata = execute_attach_doc_chunks_query(
                 attach_doc_chunk_query,
                 session_id,
                 timeout_elapsed,
                 doc_unique_id,
-                chunk_texts,
+                docs_encoding_metadata_prefix + doc_metadata,
+                chunk_bytes,
             )
         except Exception as ex:
             raise RuntimeError(
@@ -229,8 +237,16 @@ if __name__ == "__main__":
     parser.add_argument("-URI", "--uri", type=str, help="The URi of a document")
     parser.add_argument("-metadata", "--metadata", type=str, help="document metadata")
 
-    doc_data = "111111111"
     args = parser.parse_args()
+    if args.uri is None:
+        document_data_bytes = sys.stdin.read().encode('utf-8')
+        document_data = base64.b64decode(document_data_bytes).decode('utf-8')
+    else:
+        with open(args.uri,'rb') as f:
+            document_data = f.read()
+            document_data=document_data.decode('utf-8')
+
+
     error_code = 0
     try:
         main(
@@ -241,7 +257,7 @@ if __name__ == "__main__":
             args.db_port,
             args.uri,
             args.metadata,
-            doc_data,
+            document_data,
         )
     except Exception as ex:
         print(f"Execution of {__file__} failed, exception: {ex}", file=sys.stderr)
