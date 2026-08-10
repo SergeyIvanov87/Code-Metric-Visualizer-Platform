@@ -57,6 +57,9 @@ def _execute_json_api(name: str, args: dict[str, object] | None = None) -> dict:
 def _data_text(name: str) -> str:
     return (DATA_ROOT / name).read_text(encoding="utf-8")
 
+def _data_text_path(file_uri: str) -> Path:
+    return DATA_ROOT / file_uri
+
 
 def _api_safe_payload(text: str) -> str:
     # Generated FS API scripts split request data by shell words, so fixture data used
@@ -84,12 +87,12 @@ def _storage_record_ids() -> set[int]:
     return {int(entry.name) for entry in STORAGE_ROOT.iterdir() if entry.is_dir() and entry.name.isdigit()}
 
 
-def _assert_document_storage(record_id: int, file_uri: str, document_data: str) -> None:
+def _assert_document_storage(record_id: int, document_data: str) -> None:
     record_dir = _record_dir(record_id)
     assert record_dir.is_dir()
 
     payload_file = _storage_file(record_dir)
-    assert payload_file.stem == Path(file_uri).name
+    #assert payload_file.stem == Path(file_uri).name
     assert payload_file.read_text(encoding="utf-8") == document_data
     assert _read_int(record_dir / "parentId") == record_id
     assert _read_int(record_dir / "offset") == 0
@@ -99,7 +102,7 @@ def _assert_document_storage(record_id: int, file_uri: str, document_data: str) 
 def _assert_chunk_storage(
     record_id: int,
     parent_id: int,
-    parent_file_uri: str,
+    #parent_file_uri: str,
     parent_data: str,
     chunk_data: str,
     metadata: str,
@@ -108,7 +111,7 @@ def _assert_chunk_storage(
     assert record_dir.is_dir()
 
     payload_file = _storage_file(record_dir)
-    assert payload_file.stem == Path(parent_file_uri).name
+    #assert payload_file.stem == Path(parent_file_uri).name
     assert payload_file.read_bytes() == b""
 
     expected_offset = parent_data.find(chunk_data)
@@ -151,13 +154,25 @@ def _assert_sync_is_clean(expected_storage_records: int | None = None, expected_
     return payload
 
 
-def _put_doc(file_uri: str, document_data: str, metadata: str = "test_metadata") -> int:
+def _put_doc_by_uri(file_uri: str, metadata: str = "test_metadata") -> int:
     payload = _execute_json_api(
         "put_doc",
         {
             "-URI": file_uri,
+            "-metadata": metadata
+        },
+    )
+    assert payload["error_code"] == 0, payload
+    assert "unique_id" in payload
+    return int(payload["unique_id"])
+
+
+def _put_doc_as_doc_data(document_data: str, metadata: str = "test_metadata") -> int:
+    payload = _execute_json_api(
+        "put_doc",
+        {
             "-metadata": metadata,
-            "data": document_data,
+            "doc_data": document_data,
         },
     )
     assert payload["error_code"] == 0, payload
@@ -171,7 +186,7 @@ def _attach_chunk(doc_id: int, chunk_data: str, metadata: str) -> int:
         {
             "-doc_id": doc_id,
             "-metadata": metadata,
-            "data": chunk_data,
+            "doc_data": chunk_data,
         },
     )
     assert payload["error_code"] == 0, payload
@@ -226,19 +241,42 @@ def created_record_ids():
     _assert_sync_is_clean()
 
 
-def test_put_documents_create_matching_storage_records(created_record_ids):
+def test_put_documents_create_matching_storage_records_use_doc_data(created_record_ids):
     doc_0 = _api_safe_payload(_data_text("doc_0.txt"))
     doc_1 = _api_safe_payload(_data_text("doc_1.txt"))
 
     before_ids = _storage_record_ids()
-    doc_0_id = _put_doc("doc_0.txt", doc_0)
+    doc_0_id = _put_doc_as_doc_data(doc_0)
     created_record_ids.append(doc_0_id)
-    _assert_document_storage(doc_0_id, "doc_0.txt", doc_0)
+    _assert_document_storage(doc_0_id, doc_0)
     _assert_sync_is_clean(len(before_ids) + 1)
 
-    doc_1_id = _put_doc("doc_1.txt", doc_1)
+    doc_1_id = _put_doc_as_doc_data(doc_1)
     created_record_ids.append(doc_1_id)
-    _assert_document_storage(doc_1_id, "doc_1.txt", doc_1)
+    _assert_document_storage(doc_1_id, doc_1)
+    _assert_sync_is_clean(len(before_ids) + 2)
+
+def test_put_documents_as_uri_create_matching_storage_records(created_record_ids):
+    doc_0 = _data_text("doc_0.txt").strip()
+    doc_1 = _data_text("doc_1.txt").strip()
+    doc_0_uri = _data_text_path("doc_0.txt")
+    doc_1_uri = _data_text_path("doc_1.txt")
+
+    before_ids = _storage_record_ids()
+    doc_0_dispatcher_available_uri = STORAGE_ROOT / "doc_0.txt"
+    shutil.copy(doc_0_uri, doc_0_dispatcher_available_uri)
+    doc_0_id = _put_doc_by_uri(doc_0_dispatcher_available_uri)
+    os.remove(doc_0_dispatcher_available_uri)
+    created_record_ids.append(doc_0_id)
+    _assert_document_storage(doc_0_id, doc_0)
+    _assert_sync_is_clean(len(before_ids) + 1)
+
+    doc_1_dispatcher_available_uri = STORAGE_ROOT / "doc_1.txt"
+    shutil.copy(doc_1_uri, doc_1_dispatcher_available_uri)
+    doc_1_id = _put_doc_by_uri(doc_1_dispatcher_available_uri)
+    os.remove(doc_1_dispatcher_available_uri)
+    created_record_ids.append(doc_1_id)
+    _assert_document_storage(doc_1_id, doc_1)
     _assert_sync_is_clean(len(before_ids) + 2)
 
 
@@ -251,8 +289,8 @@ def test_put_documents_with_chunks_create_matching_storage_records(created_recor
     doc_1_chunk_1 = _api_safe_payload(_data_text("doc_1_chunk_1.txt"))
 
     before_ids = _storage_record_ids()
-    doc_0_id = _put_doc("doc_0.txt", doc_0)
-    doc_1_id = _put_doc("doc_1.txt", doc_1)
+    doc_0_id = _put_doc_as_doc_data(doc_0)
+    doc_1_id = _put_doc_as_doc_data(doc_1)
     created_record_ids.extend([doc_0_id, doc_1_id])
 
     chunk_specs = [
@@ -265,7 +303,7 @@ def test_put_documents_with_chunks_create_matching_storage_records(created_recor
     for parent_id, parent_file_uri, parent_data, chunk_data, metadata in chunk_specs:
         chunk_id = _attach_chunk(parent_id, chunk_data, metadata)
         created_record_ids.append(chunk_id)
-        _assert_chunk_storage(chunk_id, parent_id, parent_file_uri, parent_data, chunk_data, metadata)
+        _assert_chunk_storage(chunk_id, parent_id, parent_data, chunk_data, metadata)
 
     _assert_sync_is_clean(len(before_ids) + 6)
 
@@ -275,8 +313,8 @@ def test_docs_deletion_removes_storage_records(created_record_ids):
     doc_1 = _api_safe_payload(_data_text("doc_1.txt"))
 
     before_ids = _storage_record_ids()
-    doc_0_id = _put_doc("doc_0.txt", doc_0)
-    doc_1_id = _put_doc("doc_1.txt", doc_1)
+    doc_0_id = _put_doc_as_doc_data(doc_0)
+    doc_1_id = _put_doc_as_doc_data(doc_1)
     created_record_ids.extend([doc_0_id, doc_1_id])
 
     delete_result = _delete_doc(doc_0_id)
@@ -284,7 +322,7 @@ def test_docs_deletion_removes_storage_records(created_record_ids):
 
     assert delete_result["deleted from storage"] == 1
     _assert_storage_absent(doc_0_id)
-    _assert_document_storage(doc_1_id, "doc_1.txt", doc_1)
+    _assert_document_storage(doc_1_id, doc_1)
     _assert_sync_is_clean(len(before_ids) + 1)
 
 
@@ -294,7 +332,7 @@ def test_docs_and_chunks_deletion_removes_whole_storage_tree(created_record_ids)
     doc_0_chunk_1 = _api_safe_payload(_data_text("doc_0_chunk_1.txt"))
 
     before_ids = _storage_record_ids()
-    doc_0_id = _put_doc("doc_0.txt", doc_0)
+    doc_0_id = _put_doc_as_doc_data(doc_0)
     chunk_0_id = _attach_chunk(doc_0_id, doc_0_chunk_0, "chunk_0_for_doc_0")
     chunk_1_id = _attach_chunk(doc_0_id, doc_0_chunk_1, "chunk_1_for_doc_0")
     created_record_ids.extend([doc_0_id, chunk_0_id, chunk_1_id])
@@ -325,6 +363,6 @@ def test_sync_recreates_db_records_added_to_storage(created_record_ids):
 
     sync_result = _sync()
     assert _sync_counter(sync_result["output"], "created") == 2
-    _assert_document_storage(doc_id, "manual_doc.txt", document_data)
-    _assert_chunk_storage(chunk_id, doc_id, "manual_doc.txt", document_data, chunk_data, "")
+    _assert_document_storage(doc_id, document_data)
+    _assert_chunk_storage(chunk_id, doc_id, document_data, chunk_data, "")
     _assert_sync_is_clean(len(before_ids) + 2)

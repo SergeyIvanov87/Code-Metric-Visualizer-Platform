@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import base64
 import json
 import sys
 from pathlib import Path
@@ -31,7 +32,7 @@ def _extract_chunk_bounds(
     parent_storage_record: StorageRecord,
     chunk_data: bytes,
 ) -> tuple[int, int]:
-    parent_doc_path = StorageRecord.canonize_file_uri(storage_uri / str(parent_storage_record.unique_id) / parent_storage_record.file_uri)
+    parent_doc_path = StorageRecord.canonize_file_uri(storage_uri / str(parent_storage_record.unique_id), parent_storage_record.file_uri)
     parent_data = parent_doc_path.read_bytes()
     offset = parent_data.find(chunk_data)
     if offset < 0:
@@ -47,13 +48,20 @@ def main():
     args = parser.parse_args()
     backend_config = load_mysql_backend_config()
 
-    stdin_stream = getattr(sys.stdin, "buffer", sys.stdin)
-    chunk_data = stdin_stream.read()
     error_code = 0
     ret = {}
     try:
+        stdin_stream = getattr(sys.stdin, "buffer", sys.stdin)
+        chunk_data = stdin_stream.read()
+        metadata_array = args.metadata.split(',')
+        while len(metadata_array) > 1:
+            if metadata_array[0] == "base64":
+                chunk_data = base64.b64decode(prepare_doc_data(chunk_data))
+            metadata_array.pop(0)
+        metadata = "".join(metadata_array)
+
         chunk_data = prepare_doc_data(chunk_data)
-        metadata_text = _read_metadata_text(args.metadata)
+        metadata_text = _read_metadata_text(metadata)
 
         login = None
         password = None
