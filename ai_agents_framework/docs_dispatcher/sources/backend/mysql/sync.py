@@ -148,7 +148,12 @@ def main(argv: list[str] | None = None) -> int:
         return -1
 
     os.makedirs(backend_config.storage_uri, mode=0o777, exist_ok=True)
-    result = synchronize_from_file_storage(engine, backend_config.storage_uri)
+    result = {}
+    try:
+        result = result | synchronize_from_file_storage(engine, backend_config.storage_uri)
+    except Exception as ex:
+        ret["error_code"] = -1
+        ret["error_msg"] = str(ex)
     print(json.dumps(result))
     return 0
 

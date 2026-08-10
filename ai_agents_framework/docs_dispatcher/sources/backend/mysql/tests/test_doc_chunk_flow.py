@@ -43,7 +43,7 @@ def _create_parent_document(db_session, storage_root: Path, file_name: str, cont
         parent_id=0,
         metadata_json={"kind": "document"},
     )
-    storage_record = add_abstract_document(storage_root, Path(file_name), parent.id, content)
+    storage_record = add_abstract_document(storage_root, Path(file_name), parent.id, content.encode('utf-8'))
     storage_record.commit_doc(storage_root, offset=parent.offset)
     parent.parent_id = parent.id
     update_file_record_ext(db_session, parent.id, parent)
@@ -99,7 +99,7 @@ def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_sess
     assert storage_chunk.offset == 3
     assert storage_chunk.size == 4
     assert storage_chunk.metadata == {"comment": "chunk comment"}
-    assert (storage_root / str(chunk.id) / "parent.storage_bin").read_bytes() == b""
+    assert (storage_root / str(chunk.id) / "parent.txt.storage_bin").read_bytes() == b""
 
 
 def test_attach_chunk_rejects_missing_offset(monkeypatch, tmp_path, db_session, db_engine):

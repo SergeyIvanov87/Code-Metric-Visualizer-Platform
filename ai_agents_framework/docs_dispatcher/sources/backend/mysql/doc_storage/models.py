@@ -15,7 +15,9 @@ class StorageRecord:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
-    def canonize_file_uri(uri: Path):
+    def canonize_file_uri(doc_dir_uri: Path, file_uri: Path):
+        file_uri = str(file_uri).replace('/', '_')
+        uri = doc_dir_uri / file_uri
         uri = uri.with_name(f"{uri.name}{StorageRecordEntry.doc_suffix.value}")
         return uri
 
@@ -71,7 +73,7 @@ class StorageRecord:
         self.offset = offset_value
 
         size_file_path = doc_entry_path / StorageRecordEntry.size
-        doc_bin_file_path = StorageRecord.canonize_file_uri(doc_entry_path / self.file_uri)
+        doc_bin_file_path = StorageRecord.canonize_file_uri(doc_entry_path, self.file_uri)
         size_bytes = doc_bin_file_path.stat().st_size
         with size_file_path.open(mode="w", encoding="utf-8") as size_file:
             size_file.write(str(size_bytes))

@@ -19,29 +19,28 @@ parent_id_for_orphants = 0
 
 def main():
     parser = argparse.ArgumentParser(prog="Insert document using MYSQL backend")
-    parser.add_argument("file_uri", type=Path, help="file URI")
+    parser.add_argument("file_uri", type=Path, nargs='?', default=None, help="file URI")
     parser.add_argument("-m", "--metadata", type=str, help="file metadata")
 
     args = parser.parse_args()
     backend_config = load_mysql_backend_config()
 
-    # read document data
-    if args.file_uri is None:
-        document_data_str = sys.stdin.read().encode('utf-8')
-        if args.metadata.find("base64") != -1:
-            document_data = base64.b64decode(document_data_bytes)
-    else:
-        with open(args.file_uri,'rb') as f:
-            document_data = f.read()
-
-    document_data = prepare_doc_data(document_data)
-
     login = None
     password = None
     engine = None
-
     ret = {"error_code": 0}
     try:
+        # read document data
+        if args.file_uri is None:
+            document_data = sys.stdin.read().encode('utf-8')
+            if args.metadata.find("base64") != -1:
+                document_data = base64.b64decode(document_data)
+        else:
+            with open(args.file_uri,'rb') as f:
+                document_data = f.read()
+
+        document_data = prepare_doc_data(document_data)
+
         if backend_config.db_uri.find("sqlite:///") == -1:
             login = backend_config.db_login_secret_path
             password = backend_config.db_pwd_secret_path
