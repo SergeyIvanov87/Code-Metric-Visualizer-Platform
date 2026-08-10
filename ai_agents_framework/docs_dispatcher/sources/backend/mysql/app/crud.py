@@ -16,6 +16,8 @@ def create_file_record(
     parent_id: int,
     metadata_json: Optional[dict[str, Any]] = None,
 ) -> FileRecord:
+
+    file_path = str(file_path).replace('/', '_')
     record = FileRecord(
         file_path=file_path,
         offset=offset,
@@ -42,6 +44,7 @@ def create_file_record_with_uid(
     if existing:
         raise ValueError(f"Record with id={uid} already exists")
 
+    file_path = str(file_path).replace('/', '_')
     record = FileRecord(
         id=uid,
         file_path=file_path,
@@ -94,6 +97,7 @@ def update_file_record(
         return None
 
     if file_path is not None:
+        file_path = str(file_path).replace('/', '_')
         record.file_path = file_path
     if offset is not None:
         record.offset = offset
