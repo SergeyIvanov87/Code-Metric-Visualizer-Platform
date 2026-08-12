@@ -331,8 +331,11 @@ def test_get_docs_returns_decanonized_uris_chunk_ids_and_document_pagination(cre
     doc_1_chunk_id = _attach_chunk(doc_1_id, "second_chunk", "get_docs_doc_1_chunk")
     created_record_ids.extend([doc_0_chunk_id, doc_1_chunk_id])
 
-    all_documents = _execute_json_api("get_docs")
-    assert isinstance(all_documents, list)
+    all_documents_result = _execute_json_api("get_docs")
+    assert all_documents_result["offset"] == 0
+    assert all_documents_result["limit"] == len(all_documents_result["docs"])
+    assert all_documents_result["remaining"] == 0
+    all_documents = all_documents_result["docs"]
 
     expected_doc_0 = {"id": doc_0_id, "file_uri": str(doc_0_uri), "chunks": [doc_0_chunk_id]}
     expected_doc_1 = {"id": doc_1_id, "file_uri": str(doc_1_uri), "chunks": [doc_1_chunk_id]}
@@ -340,11 +343,22 @@ def test_get_docs_returns_decanonized_uris_chunk_ids_and_document_pagination(cre
     assert expected_doc_1 in all_documents
 
     doc_0_position = all_documents.index(expected_doc_0)
-    assert _execute_json_api(
+    page_result = _execute_json_api(
         "get_docs",
         {"offset": doc_0_position, "limit": 1},
-    ) == [expected_doc_0]
-    assert _execute_json_api("get_docs", {"offset": 0, "limit": 0}) == []
+    )
+    assert page_result == {
+        "offset": doc_0_position,
+        "limit": 1,
+        "remaining": len(all_documents) - doc_0_position - 1,
+        "docs": [expected_doc_0],
+    }
+    assert _execute_json_api("get_docs", {"offset": 0, "limit": 0}) == {
+        "offset": 0,
+        "limit": 0,
+        "remaining": len(all_documents),
+        "docs": [],
+    }
 
 
 def test_docs_deletion_removes_storage_records(created_record_ids):
