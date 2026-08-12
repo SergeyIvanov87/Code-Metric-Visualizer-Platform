@@ -3,6 +3,7 @@ from typing import Any, Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from ..utils import decanonize_file_uri
 from .models import FileRecord
 
 _SYNC_FIELDS = ("file_path", "offset", "size", "parent_id")
@@ -17,9 +18,8 @@ def create_file_record(
     metadata_json: Optional[dict[str, Any]] = None,
 ) -> FileRecord:
 
-    file_path = str(file_path).replace('/', '_')
     record = FileRecord(
-        file_path=file_path,
+        file_path=decanonize_file_uri(file_path),
         offset=offset,
         size=size,
         parent_id=parent_id,
@@ -44,10 +44,9 @@ def create_file_record_with_uid(
     if existing:
         raise ValueError(f"Record with id={uid} already exists")
 
-    file_path = str(file_path).replace('/', '_')
     record = FileRecord(
         id=uid,
-        file_path=file_path,
+        file_path=decanonize_file_uri(file_path),
         offset=offset,
         size=size,
         parent_id=parent_id,
@@ -60,6 +59,7 @@ def create_file_record_with_uid(
 
 
 def create_file_record_ext(db: Session, record: FileRecord) -> FileRecord:
+    record.file_path = decanonize_file_uri(record.file_path)
     db.add(record)
     db.commit()
     db.refresh(record)
@@ -97,8 +97,7 @@ def update_file_record(
         return None
 
     if file_path is not None:
-        file_path = str(file_path).replace('/', '_')
-        record.file_path = file_path
+        record.file_path = decanonize_file_uri(file_path)
     if offset is not None:
         record.offset = offset
     if size is not None:
@@ -123,7 +122,10 @@ def update_file_record_ext(
         return None
 
     for field in _SYNC_FIELDS:
-        setattr(record, field, getattr(new_record, field))
+        value = getattr(new_record, field)
+        if field == "file_path":
+            value = decanonize_file_uri(value)
+        setattr(record, field, value)
 
     db.commit()
     db.refresh(record)

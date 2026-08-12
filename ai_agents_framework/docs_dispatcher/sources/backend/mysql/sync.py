@@ -16,6 +16,7 @@ from mysql.app.models import FileRecord
 from mysql.config import load_mysql_backend_config
 from mysql.doc_storage import operations as doc_storage_operations
 from mysql.doc_storage.models import StorageRecord
+from mysql.utils import decanonize_file_uri, file_uris_equal
 
 
 class SyncResult(TypedDict):
@@ -26,8 +27,9 @@ class SyncResult(TypedDict):
 
 
 def _storage_file_uri(storage_record: StorageRecord) -> str:
-    file_uri = storage_record.file_uri
-    return str(file_uri)
+    # Records read from storage contain the filesystem-safe filename. Decode it
+    # only at the DB boundary so FileRecord always retains the original URI.
+    return decanonize_file_uri(str(storage_record.file_uri))
 
 
 def apply_storage_fields_to_db_record(
@@ -37,7 +39,7 @@ def apply_storage_fields_to_db_record(
     changed = False
 
     storage_path = _storage_file_uri(storage_record)
-    if db_record.file_path != storage_path:
+    if not file_uris_equal(db_record.file_path, storage_record.file_uri):
         db_record.file_path = storage_path
         changed = True
     if db_record.offset != storage_record.offset:

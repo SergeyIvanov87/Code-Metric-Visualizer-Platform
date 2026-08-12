@@ -8,6 +8,7 @@ import shutil
 import sys
 import time
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -39,7 +40,7 @@ def _session_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex}"
 
 
-def _execute_json_api(name: str, args: dict[str, object] | None = None) -> dict:
+def _execute_json_api(name: str, args: dict[str, object] | None = None) -> Any:
     args = args or {}
     session_id = str(args.pop("SESSION_ID", _session_id(name)))
     exec_args = " ".join([f"SESSION_ID={session_id}", *[f"{key}={value}" for key, value in args.items()]])
@@ -306,6 +307,44 @@ def test_put_documents_with_chunks_create_matching_storage_records(created_recor
         _assert_chunk_storage(chunk_id, parent_id, parent_data, chunk_data, metadata)
 
     _assert_sync_is_clean(len(before_ids) + 6)
+
+
+def test_get_docs_returns_decanonized_uris_chunk_ids_and_document_pagination(created_record_ids):
+    suffix = uuid4().hex
+    doc_0_uri = STORAGE_ROOT / f"get_docs_{suffix}_0.txt"
+    doc_1_uri = STORAGE_ROOT / f"get_docs_{suffix}_1.txt"
+    doc_0_data = "prefix_first_chunk_suffix"
+    doc_1_data = "prefix_second_chunk_suffix"
+    doc_0_uri.write_text(doc_0_data, encoding="utf-8")
+    doc_1_uri.write_text(doc_1_data, encoding="utf-8")
+
+    try:
+        doc_0_id = _put_doc_by_uri(str(doc_0_uri))
+        created_record_ids.append(doc_0_id)
+        doc_1_id = _put_doc_by_uri(str(doc_1_uri))
+        created_record_ids.append(doc_1_id)
+    finally:
+        doc_0_uri.unlink(missing_ok=True)
+        doc_1_uri.unlink(missing_ok=True)
+
+    doc_0_chunk_id = _attach_chunk(doc_0_id, "first_chunk", "get_docs_doc_0_chunk")
+    doc_1_chunk_id = _attach_chunk(doc_1_id, "second_chunk", "get_docs_doc_1_chunk")
+    created_record_ids.extend([doc_0_chunk_id, doc_1_chunk_id])
+
+    all_documents = _execute_json_api("get_docs")
+    assert isinstance(all_documents, list)
+
+    expected_doc_0 = {"id": doc_0_id, "file_uri": str(doc_0_uri), "chunks": [doc_0_chunk_id]}
+    expected_doc_1 = {"id": doc_1_id, "file_uri": str(doc_1_uri), "chunks": [doc_1_chunk_id]}
+    assert expected_doc_0 in all_documents
+    assert expected_doc_1 in all_documents
+
+    doc_0_position = all_documents.index(expected_doc_0)
+    assert _execute_json_api(
+        "get_docs",
+        {"offset": doc_0_position, "limit": 1},
+    ) == [expected_doc_0]
+    assert _execute_json_api("get_docs", {"offset": 0, "limit": 0}) == []
 
 
 def test_docs_deletion_removes_storage_records(created_record_ids):

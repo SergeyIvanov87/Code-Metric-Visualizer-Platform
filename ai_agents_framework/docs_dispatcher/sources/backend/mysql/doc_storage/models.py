@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Union
 
+from ..utils import canonize_file_uri
 from .fs_entity import StorageRecordEntry
 
 
@@ -16,7 +17,7 @@ class StorageRecord:
 
     @staticmethod
     def canonize_file_uri(doc_dir_uri: Path, file_uri: Path):
-        file_uri = str(file_uri).replace('/', '_')
+        file_uri = canonize_file_uri(str(file_uri))
         uri = doc_dir_uri / file_uri
         uri = uri.with_name(f"{uri.name}{StorageRecordEntry.doc_suffix.value}")
         return uri
