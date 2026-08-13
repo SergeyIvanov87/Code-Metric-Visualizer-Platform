@@ -88,7 +88,13 @@ def _storage_record_ids() -> set[int]:
     return {int(entry.name) for entry in STORAGE_ROOT.iterdir() if entry.is_dir() and entry.name.isdigit()}
 
 
-def _assert_document_storage(record_id: int, document_data: str) -> None:
+def _assert_document_storage(
+    record_id: int,
+    document_data: str,
+    *,
+    metadata: str | None = None,
+    doc_type: str | None = None,
+) -> None:
     record_dir = _record_dir(record_id)
     assert record_dir.is_dir()
 
@@ -98,6 +104,10 @@ def _assert_document_storage(record_id: int, document_data: str) -> None:
     assert _read_int(record_dir / "parentId") == record_id
     assert _read_int(record_dir / "offset") == 0
     assert _read_int(record_dir / "size") == len(document_data.encode("utf-8"))
+    if metadata is not None:
+        assert (record_dir / "metadata").read_text(encoding="utf-8") == metadata
+    if doc_type is not None:
+        assert (record_dir / "doc_type").read_text(encoding="utf-8") == doc_type
 
 
 def _assert_chunk_storage(
@@ -155,12 +165,13 @@ def _assert_sync_is_clean(expected_storage_records: int | None = None, expected_
     return payload
 
 
-def _put_doc_by_uri(file_uri: str, metadata: str = "test_metadata") -> int:
+def _put_doc_by_uri(file_uri: str, metadata: str = "test_metadata", doc_type: str = "txt") -> int:
     payload = _execute_json_api(
         "put_doc",
         {
             "-URI": file_uri,
-            "-metadata": metadata
+            "-metadata": metadata,
+            "-doc_type": doc_type,
         },
     )
     assert payload["error_code"] == 0, payload
@@ -168,12 +179,13 @@ def _put_doc_by_uri(file_uri: str, metadata: str = "test_metadata") -> int:
     return int(payload["unique_id"])
 
 
-def _put_doc_as_doc_data(document_data: str, metadata: str = "test_metadata") -> int:
+def _put_doc_as_doc_data(document_data: str, metadata: str = "test_metadata", doc_type: str = "txt") -> int:
     payload = _execute_json_api(
         "put_doc",
         {
             "-metadata": metadata,
             "doc_data": document_data,
+            "-doc_type": doc_type,
         },
     )
     assert payload["error_code"] == 0, payload
@@ -257,6 +269,23 @@ def test_put_documents_create_matching_storage_records_use_doc_data(created_reco
     _assert_document_storage(doc_1_id, doc_1)
     _assert_sync_is_clean(len(before_ids) + 2)
 
+
+def test_put_document_stores_metadata_unchanged_and_doc_type(created_record_ids):
+    document_data = _api_safe_payload(_data_text("doc_0.txt"))
+    metadata = "base64_is_only_metadata_here"
+    doc_type = "txt"
+
+    document_id = _put_doc_as_doc_data(document_data, metadata, doc_type)
+    created_record_ids.append(document_id)
+
+    _assert_document_storage(
+        document_id,
+        document_data,
+        metadata=metadata,
+        doc_type=doc_type,
+    )
+
+
 def test_put_documents_as_uri_create_matching_storage_records(created_record_ids):
     doc_0 = _data_text("doc_0.txt").strip()
     doc_1 = _data_text("doc_1.txt").strip()
@@ -337,8 +366,8 @@ def test_get_docs_returns_decanonized_uris_chunk_ids_and_document_pagination(cre
     assert all_documents_result["remaining"] == 0
     all_documents = all_documents_result["docs"]
 
-    expected_doc_0 = {"id": doc_0_id, "file_uri": str(doc_0_uri), "chunks": [doc_0_chunk_id]}
-    expected_doc_1 = {"id": doc_1_id, "file_uri": str(doc_1_uri), "chunks": [doc_1_chunk_id]}
+    expected_doc_0 = {"id": doc_0_id, "file_uri": str(doc_0_uri), "type": "txt", "chunks": [doc_0_chunk_id]}
+    expected_doc_1 = {"id": doc_1_id, "file_uri": str(doc_1_uri), "type": "txt", "chunks": [doc_1_chunk_id]}
     assert expected_doc_0 in all_documents
     assert expected_doc_1 in all_documents
 

@@ -6,8 +6,8 @@ from mysql.app.database import Base
 from mysql.get_docs import get_documents
 
 
-def _document(session, file_uri: str):
-    document = create_file_record(session, file_uri, 0, 10, 0)
+def _document(session, file_uri: str, doc_type: str = "txt"):
+    document = create_file_record(session, file_uri, 0, 10, 0, doc_type=doc_type)
     update_file_record(session, document.id, parent_id=document.id)
     return document
 
@@ -28,7 +28,7 @@ def test_get_documents_returns_decanonized_uris_and_chunk_ids_with_limit_paginat
     )
 
     first = _document(session, "%slash%docs%slash%first.txt")
-    second = _document(session, "%slash%docs%slash%second.txt")
+    second = _document(session, "%slash%docs%slash%second.txt", "markdown")
     first_chunk = _chunk(session, first.id, first.file_path)
     second_chunk_1 = _chunk(session, second.id, second.file_path)
     second_chunk_2 = _chunk(session, second.id, second.file_path)
@@ -40,6 +40,7 @@ def test_get_documents_returns_decanonized_uris_and_chunk_ids_with_limit_paginat
         "docs": [{
             "id": second.id,
             "file_uri": "/docs/second.txt",
+            "type": "markdown",
             "chunks": [second_chunk_1.id, second_chunk_2.id],
         }],
     }
