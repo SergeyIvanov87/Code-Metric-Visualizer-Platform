@@ -41,10 +41,16 @@ def _create_parent_document(db_session, storage_root: Path, file_name: str, cont
         offset=0,
         size=len(content),
         parent_id=0,
-        metadata_json={"kind": "document"},
+        metadata_json={"comment": "document metadata"},
+        doc_type="txt",
     )
     storage_record = add_abstract_document(storage_root, Path(file_name), parent.id, content.encode('utf-8'))
-    storage_record.commit_doc(storage_root, offset=parent.offset)
+    storage_record.commit_doc(
+        storage_root,
+        offset=parent.offset,
+        metadata_text="document metadata",
+        doc_type="txt",
+    )
     parent.parent_id = parent.id
     update_file_record_ext(db_session, parent.id, parent)
     return parent
@@ -57,6 +63,20 @@ def _mysql_backend_config(tmp_path: Path, storage_root: Path) -> SimpleNamespace
         db_uri="sqlite:///ignored.db",
         storage_uri=storage_root,
     )
+
+
+def test_document_storage_round_trips_metadata_and_doc_type(tmp_path, db_session):
+    storage_root = tmp_path / "storage"
+    storage_root.mkdir()
+    parent = _create_parent_document(db_session, storage_root, "parent.txt", "abcdefghij")
+
+    storage_record = get_record(storage_root, parent.id)
+
+    assert storage_record is not None
+    assert storage_record.metadata == {"comment": "document metadata"}
+    assert storage_record.doc_type == "txt"
+    assert (storage_root / str(parent.id) / "metadata").read_text() == "document metadata"
+    assert (storage_root / str(parent.id) / "doc_type").read_text() == "txt"
 
 
 def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_session, db_engine, capsys):

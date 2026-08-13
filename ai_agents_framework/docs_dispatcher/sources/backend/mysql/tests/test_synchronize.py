@@ -17,16 +17,16 @@ from mysql.app.crud import (
     delete_file_record
 )
 
-from mysql.sync import synchronize_records
+from mysql.sync import apply_storage_fields_to_db_record, synchronize_records
 from mysql.doc_storage.models import StorageRecord
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
-stub_db_data = {"equal" : FileRecord(id=10, file_path="file_id_10", offset=0, size=1000,parent_id=10),
-                "id_mismatch" : FileRecord(id=1000, file_path="file_id_1000", offset=0, size=1000,parent_id=10),
-                "id_absent" : FileRecord(id=3000, file_path="file_id_3000", offset=0, size=1000,parent_id=10),
-                "offset_to_fix" : FileRecord(id=11, file_path="file_id_11", offset=3000, size=1000,parent_id=10),
-                "size_to_fix" : FileRecord(id=12, file_path="file_id_12", offset=0, size=3000,parent_id=10),
+stub_db_data = {"equal" : FileRecord(id=10, file_path="file_id_10", offset=0, size=1000,parent_id=10, doc_type="txt"),
+                "id_mismatch" : FileRecord(id=1000, file_path="file_id_1000", offset=0, size=1000,parent_id=10, doc_type="txt"),
+                "id_absent" : FileRecord(id=3000, file_path="file_id_3000", offset=0, size=1000,parent_id=10, doc_type="txt"),
+                "offset_to_fix" : FileRecord(id=11, file_path="file_id_11", offset=3000, size=1000,parent_id=10, doc_type="txt"),
+                "size_to_fix" : FileRecord(id=12, file_path="file_id_12", offset=0, size=3000,parent_id=10, doc_type="txt"),
                 }
 
 @pytest.fixture()
@@ -55,7 +55,7 @@ def db_session():
     db.close()
 
 def convert_to_StorageRecord(req_name, db_record: FileRecord):
-    ret = StorageRecord(file_uri = db_record.file_path, unique_id = db_record.id, offset = db_record.offset, size = db_record.size, parent_id = db_record.parent_id, metadata = db_record.metadata_json)
+    ret = StorageRecord(file_uri = db_record.file_path, unique_id = db_record.id, offset = db_record.offset, size = db_record.size, parent_id = db_record.parent_id, metadata = db_record.metadata_json, doc_type=db_record.doc_type)
     if req_name == "id_mismatch":
         ret.unique_id = db_record.id * 98765431
     if req_name == "id_absent":
@@ -69,7 +69,7 @@ def convert_to_StorageRecord(req_name, db_record: FileRecord):
 def test_amend_db_records(db_session):
     all_storage_records = { req.id: convert_to_StorageRecord(name, req) for name, req in stub_db_data.items() if convert_to_StorageRecord(name, req) != {}}
     new_added_id = 9999
-    all_storage_records[new_added_id] = StorageRecord(file_uri=f"file_id_{new_added_id}", unique_id = new_added_id, offset = 0, size=new_added_id, parent_id = new_added_id)
+    all_storage_records[new_added_id] = StorageRecord(file_uri=f"file_id_{new_added_id}", unique_id = new_added_id, offset = 0, size=new_added_id, parent_id = new_added_id, metadata={"comment": "new"}, doc_type="pdf")
     all_db_records = get_all_records(db_session)
     synchronize_records(db_session, all_db_records, all_storage_records)
 
@@ -83,4 +83,33 @@ def test_amend_db_records(db_session):
         assert db_record.offset == storage_record_data.offset, "Offsets must be equal"
         assert db_record.size == storage_record_data.size, "Sized must be equal"
         assert db_record.parent_id == storage_record_data.parent_id, "Parent Ids must be equal"
-        # assert db_record.metadata_json == storage_record_data.metadata, "Metadatas must be equal"
+        assert db_record.doc_type == storage_record_data.doc_type, "Document types must be equal"
+        if db_record.id == new_added_id:
+            assert db_record.metadata_json == storage_record_data.metadata, "Metadatas must be equal"
+
+
+def test_apply_storage_fields_updates_doc_type():
+    db_record = FileRecord(
+        id=1,
+        file_path="document.txt",
+        offset=0,
+        size=10,
+        parent_id=1,
+        doc_type="txt",
+    )
+    storage_record = StorageRecord(
+        file_uri="document.txt",
+        unique_id=1,
+        offset=0,
+        size=10,
+        parent_id=1,
+        doc_type="markdown",
+    )
+
+    changed, updated_record = apply_storage_fields_to_db_record(
+        db_record,
+        storage_record,
+    )
+
+    assert changed is True
+    assert updated_record.doc_type == "markdown"
