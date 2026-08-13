@@ -5,11 +5,12 @@
     "Params": {
         "-URI": "",
         "-metadata": "\"\"",
+        "-doc_type": "txt",
         "doc_data": ""
     },
     "Description": {
         "header": "Insert a document into persistent storage",
-        "body": "The parameter `doc_data` contains encoded bytes which encoding schema must be determined by the parameter `metadata`. If nothing is set, the type of `doc_data` is considered as a string-type. Returns a 'unique_id' of the document if the insertion succeeded",
+        "body": "The parameter `doc_data` contains encoded bytes whose encoding is described by `doc_type`; its default value is `txt`. The `metadata` parameter is stored and passed through unchanged. Returns a 'unique_id' of the document if the insertion succeeded",
         "footer": ""
     }
 }

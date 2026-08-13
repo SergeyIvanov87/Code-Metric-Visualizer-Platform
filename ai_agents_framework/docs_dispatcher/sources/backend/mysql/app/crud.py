@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..utils import decanonize_file_uri
 from .models import FileRecord
 
-_SYNC_FIELDS = ("file_path", "offset", "size", "parent_id")
+_SYNC_FIELDS = ("file_path", "offset", "size", "parent_id", "doc_type")
 
 
 def create_file_record(
@@ -16,6 +16,7 @@ def create_file_record(
     size: int,
     parent_id: int,
     metadata_json: Optional[dict[str, Any]] = None,
+    doc_type: str = "",
 ) -> FileRecord:
 
     record = FileRecord(
@@ -24,6 +25,7 @@ def create_file_record(
         size=size,
         parent_id=parent_id,
         metadata_json=metadata_json,
+        doc_type=doc_type,
     )
     db.add(record)
     db.commit()
@@ -39,6 +41,7 @@ def create_file_record_with_uid(
     size: int,
     parent_id: int,
     metadata_json: Optional[dict[str, Any]] = None,
+    doc_type: str = "",
 ) -> FileRecord:
     existing = db.query(FileRecord).filter(FileRecord.id == uid).first()
     if existing:
@@ -51,6 +54,7 @@ def create_file_record_with_uid(
         size=size,
         parent_id=parent_id,
         metadata_json=metadata_json,
+        doc_type=doc_type,
     )
     db.add(record)
     db.commit()
@@ -91,6 +95,7 @@ def update_file_record(
     size: Optional[int] = None,
     parent_id: Optional[int] = None,
     metadata_json: Optional[dict[str, Any]] = None,
+    doc_type: Optional[str] = None,
 ) -> Optional[FileRecord]:
     record = get_file_record(db, record_id)
     if not record:
@@ -106,6 +111,8 @@ def update_file_record(
         record.parent_id = parent_id
     if metadata_json is not None:
         record.metadata_json = metadata_json
+    if doc_type is not None:
+        record.doc_type = doc_type
 
     db.commit()
     db.refresh(record)

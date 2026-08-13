@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from mysql.app import crud
-from mysql.app.database import Base, create_engine, create_session
+from mysql.app.database import create_engine, create_session, initialize_schema
 from mysql.config import load_mysql_backend_config
 from mysql.doc_storage import operations as doc_storage_operations
 
@@ -61,7 +61,7 @@ def main():
     else:
         engine = create_engine(backend_config.db_uri)
 
-    Base.metadata.create_all(engine)
+    initialize_schema(engine)
     deleted_from_storage = 0
     deleted_from_db = 0
     error_messages: list[str] = []

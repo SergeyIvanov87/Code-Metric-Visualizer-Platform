@@ -6,3 +6,4 @@ class StorageRecordEntry(str,enum.Enum):
     offset = "offset"
     size = "size"
     metadata = "metadata"
+    doc_type = "doc_type"

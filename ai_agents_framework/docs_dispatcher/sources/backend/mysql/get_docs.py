@@ -5,7 +5,7 @@ import json
 import sys
 
 from mysql.app import crud
-from mysql.app.database import Base, create_engine, create_session
+from mysql.app.database import create_engine, create_session, initialize_schema
 from mysql.config import load_mysql_backend_config
 from mysql.utils import decanonize_file_uri
 
@@ -20,7 +20,7 @@ def _documents_count_query() -> str:
 def _documents_query(offset: int, limit: int) -> str:
     row_limit = _UNLIMITED_ROW_COUNT if limit == -1 else limit
     return (
-        "SELECT id, file_path FROM file_records "
+        "SELECT id, file_path, doc_type FROM file_records "
         "WHERE id = parent_id "
         "ORDER BY id "
         f"LIMIT {row_limit} OFFSET {offset}"
@@ -52,6 +52,7 @@ def get_documents(session, offset: int = 0, limit: int = -1) -> dict[str, object
             {
                 "id": int(document["id"]),
                 "file_uri": decanonize_file_uri(document["file_path"]),
+                "type": document["doc_type"],
                 "chunks": [int(chunk._mapping["id"]) for chunk in chunk_rows],
             }
         )
@@ -81,7 +82,7 @@ def main():
         else:
             engine = create_engine(backend_config.db_uri)
 
-        Base.metadata.create_all(engine)
+        initialize_schema(engine)
         with create_session(engine) as session:
             result = get_documents(session, args.offset, args.limit)
         error_code = 0

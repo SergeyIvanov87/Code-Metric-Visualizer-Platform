@@ -7,7 +7,7 @@ import sys
 
 from pathlib import Path
 from mysql.app import crud
-from mysql.app.database import create_engine, create_session, Base
+from mysql.app.database import create_engine, create_session, initialize_schema
 from mysql.app.models import FileRecord
 from mysql.config import load_mysql_backend_config
 from mysql.doc_storage import operations as doc_storage_operations
@@ -21,9 +21,12 @@ def main():
     parser = argparse.ArgumentParser(prog="Insert document using MYSQL backend")
     parser.add_argument("file_uri", type=Path, nargs='?', default=None, help="file URI")
     parser.add_argument("-m", "--metadata", type=str, help="file metadata")
+    parser.add_argument("-doc_type", "--doc_type", type=str, default="txt", help="document type")
 
     args = parser.parse_args()
     backend_config = load_mysql_backend_config()
+    metadata = args.metadata or ""
+    doc_type = args.doc_type or ""
 
     login = None
     password = None
@@ -33,7 +36,7 @@ def main():
         # read document data
         if args.file_uri is None:
             document_data = sys.stdin.read().encode('utf-8')
-            if args.metadata.find("base64") != -1:
+            if "base64" in doc_type:
                 document_data = base64.b64decode(document_data)
         else:
             with open(args.file_uri,'rb') as f:
@@ -48,15 +51,28 @@ def main():
         else:
             engine = create_engine(backend_config.db_uri)
 
-        Base.metadata.create_all(engine)
+        initialize_schema(engine)
 
         document_db_record = None
         global parent_id_for_orphants
         with create_session(engine) as session:
-            document_db_record = crud.create_file_record(session, str(args.file_uri), 0, len(document_data), parent_id_for_orphants)
+            document_db_record = crud.create_file_record(
+                session,
+                str(args.file_uri),
+                0,
+                len(document_data),
+                parent_id_for_orphants,
+                metadata_json={"comment": metadata} if metadata else {},
+                doc_type=doc_type,
+            )
 
         storage_record = add_abstract_document(backend_config.storage_uri, args.file_uri, document_db_record.id, document_data)
-        storage_record.commit_doc(backend_config.storage_uri, offset = document_db_record.offset)
+        storage_record.commit_doc(
+            backend_config.storage_uri,
+            offset=document_db_record.offset,
+            metadata_text=metadata,
+            doc_type=doc_type,
+        )
 
         document_db_record.parent_id = storage_record.unique_id
         crud.update_file_record_ext(session, document_db_record.id, document_db_record)

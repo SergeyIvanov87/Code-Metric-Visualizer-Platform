@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from mysql.app import crud
-from mysql.app.database import Base, create_engine, create_session
+from mysql.app.database import create_engine, create_session, initialize_schema
 from mysql.config import load_mysql_backend_config
 from mysql.doc_storage import operations as doc_storage_operations
 from mysql.doc_storage.fs_entity import StorageRecordEntry
@@ -73,7 +73,7 @@ def main():
         else:
             engine = create_engine(backend_config.db_uri)
 
-        Base.metadata.create_all(engine)
+        initialize_schema(engine)
 
         created_db_record = None
         created_storage_record = None

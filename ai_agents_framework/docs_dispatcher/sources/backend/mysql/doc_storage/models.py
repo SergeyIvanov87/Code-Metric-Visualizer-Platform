@@ -14,6 +14,7 @@ class StorageRecord:
     size: int = -1
     parent_id: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
+    doc_type: str = ""
 
     @staticmethod
     def canonize_file_uri(doc_dir_uri: Path, file_uri: Path):
@@ -36,6 +37,7 @@ class StorageRecord:
         size = -1
         metadata: dict[str, Any] = {}
 
+        doc_type = ""
         for entry in directory.iterdir():
             if entry.suffix == StorageRecordEntry.doc_suffix:
                 file_uri = entry.stem
@@ -49,6 +51,8 @@ class StorageRecord:
                 raw_metadata = entry.read_text()
                 if raw_metadata:
                     metadata = {"comment": raw_metadata}
+            elif entry.name == StorageRecordEntry.doc_type:
+                doc_type = entry.read_text()
 
         return cls(
             file_uri=file_uri,
@@ -57,13 +61,21 @@ class StorageRecord:
             size=size,
             parent_id=parent_id,
             metadata=metadata,
+            doc_type=doc_type,
         )
 
     @classmethod
     def create_from_path(cls, path: Path) -> "StorageRecord":
         return cls.from_directory(path)
 
-    def commit_doc(self, storage_uri: Path, *, offset: int | None = None):
+    def commit_doc(
+        self,
+        storage_uri: Path,
+        *,
+        offset: int | None = None,
+        metadata_text: str = "",
+        doc_type: str = "",
+    ):
         doc_entry_path = storage_uri / str(self.unique_id)
         assert doc_entry_path.is_dir(), f"StorageRecord must describe a valid directory: {doc_entry_path}"
 
@@ -84,6 +96,16 @@ class StorageRecord:
         with parent_id_file_path.open(mode="w", encoding="utf-8") as parent_id_file:
             parent_id_file.write(str(self.unique_id))
         self.parent_id = self.unique_id
+
+        metadata_file_path = doc_entry_path / StorageRecordEntry.metadata
+        with metadata_file_path.open(mode="w", encoding="utf-8") as metadata_file:
+            metadata_file.write(metadata_text)
+        self.metadata = {"comment": metadata_text} if metadata_text else {}
+
+        doc_type_file_path = doc_entry_path / StorageRecordEntry.doc_type
+        with doc_type_file_path.open(mode="w", encoding="utf-8") as doc_type_file:
+            doc_type_file.write(doc_type)
+        self.doc_type = doc_type
 
     def commit_chunk(
         self,

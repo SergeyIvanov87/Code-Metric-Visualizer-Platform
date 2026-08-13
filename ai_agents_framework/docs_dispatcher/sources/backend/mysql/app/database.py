@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import overload
 
 from sqlalchemy import create_engine as sa_create_engine
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -45,6 +46,7 @@ def create_engine(*args) -> Engine:
 
     raise TypeError("create_engine expects either 1 or 3 positional arguments")
 
+
 def create_session_factory(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(
         autoflush=False,
@@ -59,3 +61,19 @@ def create_session(engine: Engine) -> Session:
 
 class Base(DeclarativeBase):
     pass
+
+
+def initialize_schema(engine: Engine) -> None:
+    Base.metadata.create_all(engine)
+    inspector = inspect(engine)
+    if "file_records" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"] for column in inspector.get_columns("file_records")}
+    if "doc_type" in columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE file_records ADD COLUMN doc_type VARCHAR(255) NOT NULL DEFAULT ''")
+        )

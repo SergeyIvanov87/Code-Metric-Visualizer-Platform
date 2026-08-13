@@ -11,7 +11,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from mysql.app import crud
-from mysql.app.database import Base, create_engine, create_session
+from mysql.app.database import create_engine, create_session, initialize_schema
 from mysql.app.models import FileRecord
 from mysql.config import load_mysql_backend_config
 from mysql.doc_storage import operations as doc_storage_operations
@@ -50,6 +50,9 @@ def apply_storage_fields_to_db_record(
         changed = True
     if db_record.parent_id != storage_record.parent_id:
         db_record.parent_id = storage_record.parent_id
+        changed = True
+    if db_record.doc_type != storage_record.doc_type:
+        db_record.doc_type = storage_record.doc_type
         changed = True
 
     return changed, db_record
@@ -97,6 +100,8 @@ def synchronize_records(
             storage_record.offset,
             storage_record.size,
             storage_record.parent_id,
+            metadata_json=storage_record.metadata,
+            doc_type=storage_record.doc_type,
         )
 
     return {
@@ -144,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             engine = create_engine(backend_config.db_uri)
 
-        Base.metadata.create_all(engine)
+        initialize_schema(engine)
     except Exception as ex:
         print(f"{str(ex)}", file=sys.stderr, flush=True)
         return -1
