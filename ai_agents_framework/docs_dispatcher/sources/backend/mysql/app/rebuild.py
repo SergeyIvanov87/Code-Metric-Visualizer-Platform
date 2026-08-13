@@ -32,6 +32,7 @@ def rebuild_table_from_directory(
                 size=full_path.stat().st_size,
                 parent_id=0,
                 metadata_json={},
+                doc_type="",
             )
             db.add(record)
 

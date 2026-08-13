@@ -2,10 +2,10 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
-from mysql.app.database import Base
+from mysql.app.database import Base, initialize_schema
 from mysql.app.models import FileRecord
 from mysql.app.crud import (
     create_file_record,
@@ -47,11 +47,13 @@ def test_create_record(db_session):
         offset=0,
         size=100,
         parent_id = 0,
-        metadata_json={"key": "value"}
+        metadata_json={"key": "value"},
+        doc_type="txt",
     )
 
     assert record.id is not None
     assert record.file_path == "/tmp/test.bin"
+    assert record.doc_type == "txt"
 
 
 def test_get_record(db_session):
@@ -85,12 +87,14 @@ def test_update_record(db_session):
         created.id,
         offset=500,
         size=999,
-        parent_id = 123
+        parent_id=123,
+        doc_type="markdown",
     )
 
     assert updated.offset == 500
     assert updated.size == 999
     assert updated.parent_id == 123
+    assert updated.doc_type == "markdown"
 
 
 def test_delete_record(db_session):
@@ -143,3 +147,21 @@ def test_rebuild_table_from_directory(db_session):
 
         for record in records:
             assert record.offset == 0
+
+
+def test_initialize_schema_adds_doc_type_to_existing_table():
+    engine = create_engine(TEST_DATABASE_URL)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE file_records ("
+                "id INTEGER PRIMARY KEY, file_path VARCHAR(2048) NOT NULL, "
+                "offset BIGINT NOT NULL, size BIGINT NOT NULL, parent_id BIGINT NOT NULL, "
+                "metadata_json JSON)"
+            )
+        )
+
+    initialize_schema(engine)
+
+    columns = {column["name"] for column in inspect(engine).get_columns("file_records")}
+    assert "doc_type" in columns

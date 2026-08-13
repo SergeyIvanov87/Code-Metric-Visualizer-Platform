@@ -15,11 +15,13 @@ def main():
     parser = argparse.ArgumentParser(prog="Insert document using assigned backend")
     parser.add_argument("-URI", "--URI", type=Path, help="file URI")
     parser.add_argument("-metadata", "--metadata", type=str, help="file metadata")
+    parser.add_argument("-doc_type", "--doc_type", type=str, default="txt", help="document type")
 
     return_data = {'error_code' : 0}
     try:
         args = parser.parse_args()
         metadata = args.metadata
+        doc_type = args.doc_type
         if args.URI is None:
             # read as is
             document_data = sys.stdin.read()
@@ -27,9 +29,9 @@ def main():
         else:
             with open(args.URI, 'rb') as f:
                 document_data = f.read()
-                if metadata.find("base64") != -1:
-                    metadata = "base64," + metadata
-                    document_data.base64.b64encode(document_data)
+                if "base64" in doc_type:
+                    doc_type = "base64," + doc_type
+                    document_data = base64.b64encode(document_data)
 
         backend_config = load_backend_config()
         backends_path = backend_config.backends_code_dir
@@ -45,6 +47,9 @@ def main():
 
         if metadata is not None:
             command.extend(["-m", str(metadata)])
+
+        if doc_type is not None:
+            command.extend(["-doc_type", str(doc_type)])
 
         exec_status = subprocess.run(
             command,
