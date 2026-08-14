@@ -63,7 +63,6 @@ def __extract_attr_value_from_string_function__():
         '    printf -v "$output_name" \'%s\' "$value"\n',
         '}\n'
     ]
-    ]
 
 def generate_extract_attr_value_from_string():
     return __extract_attr_value_from_string_function__()[1]
