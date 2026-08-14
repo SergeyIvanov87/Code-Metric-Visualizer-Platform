@@ -40,7 +40,7 @@ def generate_read_api_fs_args():
              r"        do",
              r'            if [[ "${arg}" = *"${param_name}="* ]];',
              r"            then",
-             r'''                readarray -d '=' -t ARG_ARR <<< "${arg}"''',
+             r'                ARG_ARR=("${arg%%=*}" "${arg#*=}")',
              r'                readarray -t arr <<< "${ARG_ARR[1]}"',
              r"            fi",
              r"        done",
