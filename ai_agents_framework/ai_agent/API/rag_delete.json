@@ -3,8 +3,8 @@
     "Method" : "POST",
     "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/delete_doc/v1",
     "Params": {
-        "-id": "",
-        "-metadata": "\"\""
+        "-ids": "",
+        "-metadata": ""
     },
     "Description": {
         "header": "Delete a document from RAG",
