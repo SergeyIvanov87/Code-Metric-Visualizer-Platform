@@ -53,9 +53,9 @@ def get_normalized_api_queries(
     return normalized_api_queries
 
 
-def generate_inner_session_id(session_id_prefix):
+def generate_inner_session_id(session_id_prefix, query_name="rag_add"):
     hostname = socket.gethostname()
-    return f"{session_id_prefix}_{hostname}_rag_add_{uuid4().hex}"
+    return f"{session_id_prefix}_{hostname}_{query_name}_{uuid4().hex}"
 
 
 def create_api_query_interruptible(shared_api_dir, query_json_description, session_id):
@@ -213,6 +213,42 @@ def execute_delete_doc_query(
         )
 
     return delete_doc_result
+
+
+def execute_get_docs_query(
+    query: APIQueryInterruptible,
+    session_id,
+    timeout_elapsed,
+    offset,
+    limit,
+):
+    exec_args = " ".join(
+        [
+            f"SESSION_ID={session_id}",
+            f"offset={offset}",
+            f"limit={limit}",
+        ]
+    )
+    status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
+    if not status:
+        raise RuntimeError(
+            f"Cannot execute get_docs using the rag_doc_dispatcher, status: {status}, elapsed timeout: {timeout_elapsed}, session: {session_id}"
+        )
+
+    status, result, timeout_elapsed = query.wait_result(
+        timeout_elapsed, session_id, 0.1, timeout_elapsed / 0.1, False
+    )
+    if not status:
+        raise RuntimeError(
+            f"Cannot get documents using the rag_doc_dispatcher: waiting for result failed, status: {status}, result: {result}, elapsed timeout: {timeout_elapsed}, session: {session_id}"
+        )
+
+    try:
+        return json.loads(result)
+    except json.JSONDecodeError as ex:
+        raise RuntimeError(
+            f"The rag_doc_dispatcher returned invalid JSON for get_docs: {result}"
+        ) from ex
 
 
 def get_last_query_version(api_query_lhs, api_query_rhs):
