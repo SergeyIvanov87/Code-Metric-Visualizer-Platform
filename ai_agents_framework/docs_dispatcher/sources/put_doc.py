@@ -14,7 +14,7 @@ from dispatcher_backend_config import load_backend_config
 def main():
     parser = argparse.ArgumentParser(prog="Insert document using assigned backend")
     parser.add_argument("-URI", "--URI", type=Path, help="file URI")
-    parser.add_argument("-metadata", "--metadata", type=str, help="file metadata")
+    parser.add_argument("-metadata", "--metadata", type=str, default=None, help="file metadata")
     parser.add_argument("-doc_type", "--doc_type", type=str, default="txt", help="document type")
 
     return_data = {'error_code' : 0}
@@ -30,7 +30,6 @@ def main():
             with open(args.URI, 'rb') as f:
                 document_data = f.read()
                 if "base64" in doc_type:
-                    doc_type = "base64," + doc_type
                     document_data = base64.b64encode(document_data)
 
         backend_config = load_backend_config()

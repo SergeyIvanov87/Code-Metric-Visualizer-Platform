@@ -218,11 +218,12 @@ def _attach_chunk(doc_id: int, chunk_data: str, metadata: str) -> int:
     return int(payload["unique_id"])
 
 
-def _delete_doc(record_id: int) -> dict:
+def _delete_docs(record_ids: int | list[int]) -> dict:
+    ids = [record_ids] if isinstance(record_ids, int) else record_ids
     payload = _execute_json_api(
         "delete_doc",
         {
-            "-id": record_id,
+            "-ids": ",".join(str(record_id) for record_id in ids),
             "-metadata": "functional_delete",
         },
     )
@@ -259,7 +260,7 @@ def created_record_ids():
     for record_id in sorted(set(record_ids), reverse=True):
         if _record_dir(record_id).exists():
             try:
-                _delete_doc(record_id)
+                _delete_docs(record_id)
             except Exception:
                 shutil.rmtree(_record_dir(record_id), ignore_errors=True)
     _assert_sync_is_clean()
@@ -555,7 +556,7 @@ def test_read_id_returns_document_and_chunk_context(created_record_ids):
     assert _execute_text_api("read_id", {"id": absent_id}) == "<Not found ID>"
 
 
-def test_docs_deletion_removes_storage_records(created_record_ids):
+def test_multiple_docs_deletion_removes_storage_records(created_record_ids):
     doc_0 = _api_safe_payload(_data_text("doc_0.txt"))
     doc_1 = _api_safe_payload(_data_text("doc_1.txt"))
 
@@ -564,13 +565,13 @@ def test_docs_deletion_removes_storage_records(created_record_ids):
     doc_1_id = _put_doc_as_doc_data(doc_1)
     created_record_ids.extend([doc_0_id, doc_1_id])
 
-    delete_result = _delete_doc(doc_0_id)
-    created_record_ids.remove(doc_0_id)
+    delete_result = _delete_docs([doc_0_id, doc_1_id])
+    created_record_ids.clear()
 
-    assert delete_result["deleted from storage"] == 1
-    _assert_storage_absent(doc_0_id)
-    _assert_document_storage(doc_1_id, doc_1)
-    _assert_sync_is_clean(len(before_ids) + 1)
+    assert delete_result["deleted from DB"] == 2
+    assert delete_result["deleted from storage"] == 2
+    _assert_storage_absent(doc_0_id, doc_1_id)
+    _assert_sync_is_clean(len(before_ids))
 
 
 def test_docs_and_chunks_deletion_removes_whole_storage_tree(created_record_ids):
@@ -584,7 +585,7 @@ def test_docs_and_chunks_deletion_removes_whole_storage_tree(created_record_ids)
     chunk_1_id = _attach_chunk(doc_0_id, doc_0_chunk_1, "chunk_1_for_doc_0")
     created_record_ids.extend([doc_0_id, chunk_0_id, chunk_1_id])
 
-    delete_result = _delete_doc(doc_0_id)
+    delete_result = _delete_docs(doc_0_id)
     created_record_ids.clear()
 
     assert delete_result["deleted from storage"] == 3

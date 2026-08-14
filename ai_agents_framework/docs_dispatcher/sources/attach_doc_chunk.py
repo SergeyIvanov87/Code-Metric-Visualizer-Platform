@@ -11,7 +11,7 @@ from dispatcher_backend_config import load_backend_config
 def main():
     parser = argparse.ArgumentParser(prog="Attach document chunk using assigned backend")
     parser.add_argument("-doc_id", "--doc_id", type=int, help="Parent document id")
-    parser.add_argument("-metadata", "--metadata", type=str, help="chunk metadata")
+    parser.add_argument("-metadata", "--metadata", type=str, default=None, help="chunk metadata")
 
     args = parser.parse_args()
     chunk_data = sys.stdin.read()
@@ -47,7 +47,10 @@ def main():
     output_str = exec_status.stdout.decode('utf-8')
     output = {}
     if output_str:
-        output = json.loads(output_str)
+        try:
+            output = json.loads(output_str)
+        except Exception as ex:
+            return_data["error_msg"] = f"Attach document chunk using assigned backend couldn't decode string as a valid JSON obj: {output_str}"
 
     return_data = return_data | output
     print(json.dumps(return_data))
