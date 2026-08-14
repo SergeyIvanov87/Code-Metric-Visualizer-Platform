@@ -179,6 +179,7 @@ def main(
         raise RuntimeError(
             f"The error had happened:\n{ex}\nRollback was finished. Records are consistent"
         ) from ex
+    return doc_unique_id, chunk_unique_ids
     """
     use this to retrive
     ~$ chroma browse api.pmccabe_collector.restapi.org --host http://rag-db:8000
@@ -252,8 +253,9 @@ if __name__ == "__main__":
 
 
     error_code = 0
+    return_data = {"error_code": error_code, "error_msg": "success", "doc_id": "", "chunk_ids": []}
     try:
-        main(
+        doc_id, chunk_ids = main(
             args.shared_api_dir,
             args.main_service_name,
             args.session_id,
@@ -264,8 +266,12 @@ if __name__ == "__main__":
             doc_type,
             document_data,
         )
+        return_data["doc_id"] = doc_id
+        return_data["chunk_ids"] = chunk_ids
     except Exception as ex:
-        print(f"Execution of {__file__} failed, exception: {ex}", file=sys.stderr)
         error_code = -1
+        return_data["error_code"] = error_code
+        return_data["error_msg"] = f"Couldn't add doc by URI: {args.uri}, doc_type: {doc_type} into RAG, error: {ex}"
 
+    print(json.dumps(return_data))
     sys.exit(error_code)
