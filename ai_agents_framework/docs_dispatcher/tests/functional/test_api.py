@@ -55,6 +55,17 @@ def _execute_json_api(name: str, args: dict[str, object] | None = None) -> Any:
         pytest.fail(f"API query '{name}' returned non-JSON result: {raw_result!r}. Error: {exc}")
 
 
+def _execute_text_api(name: str, args: dict[str, object] | None = None) -> str:
+    args = args or {}
+    session_id = str(args.pop("SESSION_ID", _session_id(name)))
+    exec_args = " ".join([f"SESSION_ID={session_id}", *[f"{key}={value}" for key, value in args.items()]])
+
+    query = _api_query(name)
+    assert query.wait_until_valid(0.1, 100, True), f"API query '{name}' did not become ready"
+    query.execute(exec_args)
+    return query.wait_result(session_id, 0.1, 300, True)
+
+
 def _data_text(name: str) -> str:
     return (DATA_ROOT / name).read_text(encoding="utf-8")
 
@@ -516,6 +527,32 @@ def test_get_doc_info_recovers_info_for_inconsistent_documents(created_record_id
             },
         },
     }
+
+
+def test_read_id_returns_document_and_chunk_context(created_record_ids):
+    suffix = uuid4().hex
+    document_uri = STORAGE_ROOT / f"read_id_{suffix}.txt"
+    document_context = "prefix_first_chunk_middle_second_chunk_suffix"
+    document_uri.write_text(document_context, encoding="utf-8")
+
+    try:
+        document_id = _put_doc_by_uri(str(document_uri), doc_type="txt")
+        created_record_ids.append(document_id)
+    finally:
+        document_uri.unlink(missing_ok=True)
+
+    first_chunk_id = _attach_chunk(document_id, "first_chunk", "read_id_first")
+    second_chunk_id = _attach_chunk(document_id, "second_chunk", "read_id_second")
+    created_record_ids.extend([first_chunk_id, second_chunk_id])
+
+    assert _execute_text_api("read_id", {"id": document_id}) == document_context
+    assert _execute_text_api("read_id", {"id": first_chunk_id}) == "first_chunk"
+    assert _execute_text_api("read_id", {"id": second_chunk_id}) == "second_chunk"
+
+    absent_id = int(time.time() * 1000)
+    while absent_id in _storage_record_ids():
+        absent_id += 1
+    assert _execute_text_api("read_id", {"id": absent_id}) == "<Not found ID>"
 
 
 def test_docs_deletion_removes_storage_records(created_record_ids):

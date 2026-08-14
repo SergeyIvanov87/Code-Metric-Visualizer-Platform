@@ -1,0 +1,13 @@
+{
+    "Content-Type": "text/plain",
+    "Method": "GET",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/read_id/v1",
+    "Params": {
+        "id": ""
+    },
+    "Description": {
+        "header": "Read a document or document chunk by ID",
+        "body": "The required id parameter identifies either a full document or one of its chunks. For a full document, the response is its complete UTF-8 text and offset and size are ignored. For a chunk, the parent document is read and the response is the text extracted using the chunk's byte offset and size. The response is plain text without JSON wrapping. If the ID is not found, the response is <Not found ID>.",
+        "footer": ""
+    }
+}
