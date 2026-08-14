@@ -26,9 +26,9 @@ from fs_api_wrappers import (
 )
 
 
-def split_document(doc_data, doc_metadata, max_chunk_size, max_chunk_overlap_count):
+def split_document(doc_data, doc_type, max_chunk_size, max_chunk_overlap_count):
     chunks = []
-    if len(doc_metadata) == 0 or doc_metadata.lower().find("txt") != -1:
+    if "txt" in doc_type:
         splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
             encoding_name="cl100k_base",
             chunk_size=max_chunk_size,  # tokens
@@ -58,6 +58,7 @@ def main(
     db_port: int,
     doc_uri: str,
     doc_metadata: str,
+    doc_type: str,
     doc_data: str,
 ):
     # Break down a doc onto chunks
@@ -75,7 +76,7 @@ def main(
     )
 
     doc_chunks = split_document(
-        doc_data, doc_metadata, max_chunk_size=220, max_chunk_overlap_count=30
+        doc_data, doc_type, max_chunk_size=220, max_chunk_overlap_count=30
     )
     if len(doc_chunks) == 0:
         raise RuntimeError(
@@ -87,7 +88,7 @@ def main(
 
     # Create API handles
     doc_encoding_type = "base64"
-    docs_encoding_metadata_prefix = doc_encoding_type + ","
+    doc_type_for_dispatcher = doc_encoding_type + "," + doc_type
     normalized_api_queries = get_normalized_api_queries(
         shared_api_dir,
         main_service_name,
@@ -115,7 +116,7 @@ def main(
     doc_data_bytes = doc_data.encode('utf-8')
     doc_data_bytes = base64.b64encode(doc_data_bytes)
     put_doc_result = execute_put_doc_query(
-        put_doc_query, session_id, timeout_elapsed, doc_uri, doc_data_bytes, docs_encoding_metadata_prefix + doc_metadata
+        put_doc_query, session_id, timeout_elapsed, doc_uri, doc_data_bytes, doc_type_for_dispatcher, doc_metadata
     )
     doc_unique_id = put_doc_result["unique_id"]
 
@@ -133,7 +134,8 @@ def main(
                 session_id,
                 timeout_elapsed,
                 doc_unique_id,
-                docs_encoding_metadata_prefix + doc_metadata,
+                doc_type_for_dispatcher,
+                doc_metadata,
                 chunk_bytes,
             )
         except Exception as ex:
@@ -235,9 +237,11 @@ if __name__ == "__main__":
         "-session_id", "--session_id", type=str, help="Session identifier"
     )
     parser.add_argument("-URI", "--uri", type=str, help="The URi of a document")
-    parser.add_argument("-metadata", "--metadata", type=str, help="document metadata")
+    parser.add_argument("-metadata", "--metadata", type=str, default=None, help="document metadata")
+    parser.add_argument("-doc_type", "--doc_type", type=str, default="txt", help="document type")
 
     args = parser.parse_args()
+    doc_type = args.doc_type
     if args.uri is None:
         document_data_bytes = sys.stdin.read().encode('utf-8')
         document_data = base64.b64decode(document_data_bytes).decode('utf-8')
@@ -257,6 +261,7 @@ if __name__ == "__main__":
             args.db_port,
             args.uri,
             args.metadata,
+            doc_type,
             document_data,
         )
     except Exception as ex:

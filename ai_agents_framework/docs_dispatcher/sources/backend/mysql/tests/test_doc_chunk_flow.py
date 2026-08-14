@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 from types import SimpleNamespace
 from pathlib import Path
 
@@ -146,7 +147,13 @@ def test_attach_chunk_rejects_missing_offset(monkeypatch, tmp_path, db_session, 
     assert attach_chunk_main() == -1
 
 
-def test_delete_doc_removes_document_and_chunks(monkeypatch, tmp_path, db_session, db_engine):
+def test_delete_doc_removes_multiple_documents_and_chunks(
+    monkeypatch,
+    tmp_path,
+    db_session,
+    db_engine,
+    capsys,
+):
     storage_root = tmp_path / "storage"
     storage_root.mkdir()
     parent = _create_parent_document(db_session, storage_root, "parent.txt", "abcdefghij")
@@ -173,14 +180,68 @@ def test_delete_doc_removes_document_and_chunks(monkeypatch, tmp_path, db_sessio
         monkeypatch.setattr("mysql.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
         assert attach_chunk_main() == 0
 
+    second_parent = _create_parent_document(
+        db_session,
+        storage_root,
+        "second_parent.txt",
+        "klmnopqrst",
+    )
+    first_chunk = next(
+        record
+        for record in get_all_records(db_session)
+        if record.parent_id == parent.id and record.id != parent.id
+    )
+    capsys.readouterr()
     monkeypatch.setattr("sys.argv", [
         "delete_doc.py",
-        str(parent.id),
+        "-ids",
+        f"{parent.id},{first_chunk.id},{second_parent.id},{parent.id}",
     ])
     monkeypatch.setattr("mysql.delete_doc.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
     monkeypatch.setattr("mysql.delete_doc.create_engine", lambda *args, **kwargs: db_engine)
 
     assert delete_doc_main() == 0
+    result = json.loads(capsys.readouterr().out)
 
+    assert result == {
+        "deleted from DB": 4,
+        "deleted from storage": 4,
+        "error_code": 0,
+    }
+    assert get_all_records(db_session) == []
+    assert get_all_storage_records(storage_root) == {}
+
+
+def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
+    monkeypatch,
+    tmp_path,
+    db_session,
+    db_engine,
+    capsys,
+):
+    storage_root = tmp_path / "storage"
+    storage_root.mkdir()
+    parent = _create_parent_document(db_session, storage_root, "parent.txt", "abcdefghij")
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["delete_doc.py", "-ids", f"{parent.id},999"],
+    )
+    monkeypatch.setattr(
+        "mysql.delete_doc.load_mysql_backend_config",
+        lambda: _mysql_backend_config(tmp_path, storage_root),
+    )
+    monkeypatch.setattr(
+        "mysql.delete_doc.create_engine",
+        lambda *args, **kwargs: db_engine,
+    )
+
+    assert delete_doc_main() == 1
+    result = json.loads(capsys.readouterr().out)
+
+    assert result["deleted from DB"] == 1
+    assert result["deleted from storage"] == 1
+    assert result["error_code"] == 1
+    assert result["error_msg"] == "Record id=999 does not exist"
     assert get_all_records(db_session) == []
     assert get_all_storage_records(storage_root) == {}

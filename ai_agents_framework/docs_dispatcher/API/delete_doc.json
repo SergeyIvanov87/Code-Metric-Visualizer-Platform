@@ -3,12 +3,12 @@
     "Method" : "PUT",
     "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/delete_doc/v1",
     "Params": {
-        "-id": "",
+        "-ids": "",
         "-metadata": "\"\""
     },
     "Description": {
-        "header": "Delete a document or a chunk of the document",
-        "body": "Delete a document of a chunk by its 'id', these entities must exist. Returns 'error_code', where '0' describes success",
+        "header": "Delete documents or document chunks",
+        "body": "The required -ids parameter is a comma-separated list of document or chunk IDs. Deleting a document also deletes all chunks belonging to it. Duplicate and overlapping IDs are processed once. Valid IDs are deleted even if another requested ID is missing. Returns aggregate deleted from DB and deleted from storage counters. error_code is 0 when every requested ID exists and 1 when one or more IDs are missing or deletion fails.",
         "footer": ""
     }
 }

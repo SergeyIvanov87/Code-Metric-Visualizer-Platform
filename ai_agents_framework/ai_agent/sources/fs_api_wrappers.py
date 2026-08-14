@@ -75,16 +75,21 @@ def execute_put_doc_query(
     timeout_elapsed,
     doc_uri,
     doc_data,
+    doc_type,
     doc_metadata,
 ):
-    exec_args = " ".join(
-        [
-            f"SESSION_ID={session_id}",
-            f"-URI={doc_uri}",
-            f"-metadata={doc_metadata}",
-            f"doc_data={doc_data}",
-        ]
-    )
+    exec_args_array = [
+        f"SESSION_ID={session_id}",
+        f"-URI={doc_uri}",
+        f"-doc_type={doc_type}",
+    ]
+
+    if doc_metadata is not None:
+        exec_args_array.append(f"-metadata={doc_metadata}")
+
+    exec_args_array.append(f"doc_data={doc_data}")
+    exec_args = " ".join(exec_args_array)
+
     status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
     if not status:
         raise RuntimeError(
@@ -117,6 +122,7 @@ def execute_attach_doc_chunks_query(
     session_id,
     timeout_elapsed,
     doc_unique_id,
+    doc_type,
     chunks_metadata,
     chunk_data_array,
 ):
@@ -124,18 +130,22 @@ def execute_attach_doc_chunks_query(
     chunk_unique_ids = []
     chunk_metadata = []
     for chunk_num, ch in enumerate(chunk_data_array):
-        exec_args = " ".join(
-            [
-                f"SESSION_ID={session_id}",
-                f"-doc_id={doc_unique_id}",
-                f"-metadata={chunks_metadata}_{chunk_num}",
-                f"doc_data={ch}",
-            ]
-        )
+        exec_args_array = [
+            f"SESSION_ID={session_id}",
+            f"-doc_id={doc_unique_id}",
+        ]
+        single_chunk_metadata = str(chunk_num)
+        if chunks_metadata is not None:
+            single_chunk_metadata = f"{chunks_metadata}_{single_chunk_metadata}"
+
+        exec_args_array.append(f"-metadata={single_chunk_metadata}")
+        exec_args_array.append(f"doc_data={ch}")
+        exec_args = " ".join(exec_args_array)
+
         status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
         if not status:
             raise RuntimeError(
-                f"Cannot attach chunk: {chunk_num} to the doc_id: {doc_unique_id} using the rag_doc_dispater, status: {status}, elapsed timeout: {timeout_elapsed}"
+                f"Cannot attach chunk num: {chunk_num} to the doc_id: {doc_unique_id} using the rag_doc_dispater, status: {status}, elapsed timeout: {timeout_elapsed}"
             )
 
         # TODO Reconsile timeout_elapsed and wait for pipe creation sleep duration and cycles
@@ -144,13 +154,13 @@ def execute_attach_doc_chunks_query(
         )
         if not status:
             raise RuntimeError(
-                f"Cannot attach chunk: {chunk_num} to the doc_id: {doc_unique_id} using the rag_doc_dispater: waiting of result failed, status: {status}, result: {result}, elapsed timeout: {timeout_elapsed}"
+                f"Cannot attach chunk num: {chunk_num} to the doc_id: {doc_unique_id} using the rag_doc_dispater: waiting of result failed, status: {status}, result: {result}, elapsed timeout: {timeout_elapsed}"
             )
 
         attach_chunk_result = json.loads(result)
         if attach_chunk_result["error_code"] != 0:
             raise RuntimeError(
-                f"Cannot attach chunk: {chunk_num} to the doc_id: {doc_unique_id} using the rag_doc_dispater, error: {attach_chunk_result['error_msg']}"
+                f"Cannot attach chunk num: {chunk_num} to the doc_id: {doc_unique_id} using the rag_doc_dispater, error: {attach_chunk_result['error_msg']}"
             )
 
         assert (

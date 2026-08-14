@@ -53,15 +53,6 @@ def main():
     try:
         stdin_stream = getattr(sys.stdin, "buffer", sys.stdin)
         chunk_data = stdin_stream.read()
-        metadata_array = args.metadata.split(',')
-        while len(metadata_array) > 1:
-            if metadata_array[0] == "base64":
-                chunk_data = base64.b64decode(prepare_doc_data(chunk_data))
-            metadata_array.pop(0)
-        metadata = "".join(metadata_array)
-
-        chunk_data = prepare_doc_data(chunk_data)
-        metadata_text = _read_metadata_text(metadata)
 
         login = None
         password = None
@@ -75,10 +66,8 @@ def main():
 
         initialize_schema(engine)
 
-        created_db_record = None
-        created_storage_record = None
-
         with create_session(engine) as session:
+            # read parent document first
             parent_db_record = crud.get_file_record(session, args.doc_id)
             parent_storage_record = doc_storage_operations.get_record(backend_config.storage_uri, args.doc_id)
 
@@ -91,9 +80,22 @@ def main():
             if parent_storage_record.parent_id != parent_storage_record.unique_id:
                 raise ValueError(f"Storage record id={args.doc_id} is not a full document")
 
+
+            # extract doc_type as a parent doc_type
+            doc_type_array = parent_db_record.doc_type.split(',')
+            if "base64" in doc_type_array:
+                chunk_data = base64.b64decode(prepare_doc_data(chunk_data))
+            else:
+                chunk_data = prepare_doc_data(chunk_data)
+            metadata_text = _read_metadata_text(args.metadata)
+
+            created_db_record = None
+            created_storage_record = None
+
+
             chunk_offset, chunk_size = _extract_chunk_bounds(backend_config.storage_uri, parent_storage_record, chunk_data)
             if parent_db_record.size >= 0 and chunk_offset + chunk_size > parent_db_record.size:
-                raise ValueError(f"chunk with offset: {chunk_offset} and size: {chunk_size} does not fit into the parent document of size: {parent_db_record.size}")
+                raise ValueError(f"chunk with offset: {chunk_offset} and size: {chunk_size} does not fit into the parent document of size: {parent_db_record.size}, type: {parent_db_record.doc_type}")
 
             created_db_record = crud.create_file_record(
                 session,
