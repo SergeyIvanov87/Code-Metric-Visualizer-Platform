@@ -390,6 +390,134 @@ def test_get_docs_returns_decanonized_uris_chunk_ids_and_document_pagination(cre
     }
 
 
+def test_get_doc_info_returns_complete_info_and_classifies_invalid_ids(created_record_ids):
+    suffix = uuid4().hex
+    document_uri = STORAGE_ROOT / f"get_doc_info_{suffix}.txt"
+    document_data = "prefix_selected_chunk_suffix"
+    document_uri.write_text(document_data, encoding="utf-8")
+
+    try:
+        document_id = _put_doc_by_uri(str(document_uri), doc_type="markdown")
+        created_record_ids.append(document_id)
+    finally:
+        document_uri.unlink(missing_ok=True)
+
+    chunk_id = _attach_chunk(document_id, "selected_chunk", "get_doc_info_chunk")
+    created_record_ids.append(chunk_id)
+
+    absent_id = int(time.time() * 1000)
+    while absent_id in _storage_record_ids():
+        absent_id += 1
+
+    result = _execute_json_api(
+        "get_doc_info",
+        {"-doc_ids": f"{document_id},{document_id},{chunk_id},{absent_id}"},
+    )
+
+    assert result == {
+        "found": [document_id],
+        "inconsistent": [],
+        "not_found": [chunk_id, absent_id],
+        str(document_id): {
+            "error_code": 0,
+            "status": "success",
+            "info": {
+                "file_uri": str(document_uri),
+                "type": "markdown",
+                "chunks": [chunk_id],
+            },
+        },
+        str(chunk_id): {
+            "error_code": -1,
+            "status": "The doc is absent or ID is incorrect",
+        },
+        str(absent_id): {
+            "error_code": -1,
+            "status": "The doc is absent or ID is incorrect",
+        },
+    }
+
+
+def test_get_doc_info_recovers_info_for_inconsistent_documents(created_record_ids):
+    suffix = uuid4().hex
+    db_only_uri = STORAGE_ROOT / f"get_doc_info_db_only_{suffix}.txt"
+    db_only_data = "prefix_database_chunk_suffix"
+    db_only_uri.write_text(db_only_data, encoding="utf-8")
+
+    try:
+        db_only_id = _put_doc_by_uri(str(db_only_uri), doc_type="json")
+        created_record_ids.append(db_only_id)
+    finally:
+        db_only_uri.unlink(missing_ok=True)
+
+    db_only_chunk_id = _attach_chunk(
+        db_only_id,
+        "database_chunk",
+        "get_doc_info_db_only_chunk",
+    )
+    created_record_ids.append(db_only_chunk_id)
+
+    storage_only_id = int(time.time() * 1000)
+    while (
+        storage_only_id in _storage_record_ids()
+        or storage_only_id + 1 in _storage_record_ids()
+    ):
+        storage_only_id += 2
+    storage_only_chunk_id = storage_only_id + 1
+    storage_only_uri = f"get_doc_info_storage_only_{suffix}.txt"
+    storage_only_data = "prefix_storage_chunk_suffix"
+    _create_storage_document(storage_only_id, storage_only_uri, storage_only_data)
+    _create_storage_chunk(
+        storage_only_chunk_id,
+        storage_only_id,
+        storage_only_uri,
+        storage_only_data,
+        "storage_chunk",
+    )
+    created_record_ids.extend([storage_only_id, storage_only_chunk_id])
+
+    db_only_record_dir = _record_dir(db_only_id)
+    backup_id = storage_only_chunk_id + 1
+    while _record_dir(backup_id).exists():
+        backup_id += 1
+    db_only_backup_dir = _record_dir(backup_id)
+
+    # Keep the backup in the shared storage filesystem. Its name must remain
+    # numeric because storage discovery interprets every directory as an ID.
+    db_only_record_dir.rename(db_only_backup_dir)
+    try:
+        result = _execute_json_api(
+            "get_doc_info",
+            {"-doc_ids": f"{db_only_id},{storage_only_id}"},
+        )
+    finally:
+        db_only_backup_dir.rename(db_only_record_dir)
+
+    assert result == {
+        "found": [],
+        "inconsistent": [db_only_id, storage_only_id],
+        "not_found": [],
+        str(db_only_id): {
+            "error_code": 1,
+            "status": "Not found in the doc storage: file storage",
+            "info": {
+                "file_uri": str(db_only_uri),
+                "type": "json",
+                "chunks": [db_only_chunk_id],
+            },
+        },
+        str(storage_only_id): {
+            "error_code": 1,
+            "status": "Not found in the doc storage: database",
+            "info": {
+                "file_uri": storage_only_uri,
+                "type": "",
+                "chunks": [storage_only_chunk_id],
+            },
+        },
+    }
+
+
 def test_docs_deletion_removes_storage_records(created_record_ids):
     doc_0 = _api_safe_payload(_data_text("doc_0.txt"))
     doc_1 = _api_safe_payload(_data_text("doc_1.txt"))
