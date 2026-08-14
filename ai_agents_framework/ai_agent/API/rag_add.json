@@ -5,6 +5,7 @@
     "Params": {
         "-URI": "",
         "-metadata": "",
+        "-doc_type": "txt",
         "doc_data": ""
     },
     "Description": {
