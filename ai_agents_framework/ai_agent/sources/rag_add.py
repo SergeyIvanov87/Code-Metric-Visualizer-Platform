@@ -9,7 +9,6 @@ import sys
 
 from pathlib import Path
 
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -25,6 +24,7 @@ from fs_api_wrappers import (
     execute_delete_doc_query,
 )
 
+from embedding_model import get_embedding_model
 
 def split_document(doc_data, doc_type, max_chunk_size, max_chunk_overlap_count):
     chunks = []
@@ -62,18 +62,7 @@ def main(
     doc_data: str,
 ):
     # Break down a doc onto chunks
-    # the main limitation is important: text beyond 256 word pieces is truncated. It is intended for sentences and short
-    model_name = "sentence-transformers/all-MiniLM-L6-v2"
-    embedding_model = HuggingFaceEmbeddings(
-        model_name=model_name,
-        model_kwargs={
-            "device": "cpu",
-        },
-        encode_kwargs={
-            "normalize_embeddings": True,
-            "batch_size": 16,
-        },
-    )
+    embedding_model = get_embedding_model()
 
     doc_chunks = split_document(
         doc_data, doc_type, max_chunk_size=220, max_chunk_overlap_count=30
