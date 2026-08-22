@@ -4,6 +4,7 @@ export WORK_DIR=${1}
 export INITIAL_PROJECT_LOCATION=${2}
 export OPT_DIR=${3}
 export SHARED_API_DIR=${4}
+export ASSET_MODELS=${5}
 export PYTHONPATH="${3}:${3}/modules"
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
@@ -20,7 +21,7 @@ export INNER_API_SCHEMA_DIR=${WORK_DIR_TMP}/API
 README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/ai_agent/README-API-STATISTIC.md
 
 # use source this script as fast way to setup environment for debugging
-echo -e "export WORK_DIR=${WORK_DIR}\nexport WORK_DIR_TMP=${WORK_DIR_TMP}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}\nexport VECTOR_DB_HOST=${VECTOR_DB_HOST}\nexport VECTOR_DB_PORT=${VECTOR_DB_PORT}" > ${WORK_DIR_TMP}/env.sh
+echo -e "export WORK_DIR=${WORK_DIR}\nexport WORK_DIR_TMP=${WORK_DIR_TMP}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}\nexport VECTOR_DB_HOST=${VECTOR_DB_HOST}\nexport VECTOR_DB_PORT=${VECTOR_DB_PORT}\nexport ASSET_MODELS=${ASSET_MODELS}" > ${WORK_DIR_TMP}/env.sh
 
 cp -r /API ${WORK_DIR_TMP}
 source ${OPT_DIR}/shell_utils/init_utils.sh
