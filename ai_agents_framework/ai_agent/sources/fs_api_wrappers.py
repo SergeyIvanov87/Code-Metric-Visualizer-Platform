@@ -251,6 +251,40 @@ def execute_get_docs_query(
         ) from ex
 
 
+def execute_read_ids(query: APIQueryInterruptible,
+    session_id,
+    timeout_elapsed,
+    ids: list[str]
+) -> dict[str, str]:
+    # TODO not optimal version
+    # implement a bulk request
+    docs_content = {}
+    for id in ids:
+        session_id_per_doc_id = f"{session_id}_{id}"
+        exec_args = " ".join(
+            [
+                f"SESSION_ID={session_id_per_doc_id}",
+                f"id={id}",
+            ]
+        )
+        status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
+        if not status:
+            raise RuntimeError(
+                f"Cannot execute execute_read_ids using the rag_doc_dispatcher, status: {status}, elapsed timeout: {timeout_elapsed}, session: {session_id_per_doc_id}, requested id: {id}"
+            )
+
+        status, result, timeout_elapsed = query.wait_result(
+            timeout_elapsed, session_id_per_doc_id, 0.1, timeout_elapsed / 0.1, False
+        )
+        if not status:
+            raise RuntimeError(
+                f"Cannot read documents using the rag_doc_dispatcher: waiting for result failed, status: {status}, result: {result}, elapsed timeout: {timeout_elapsed}, session: {session_id_per_doc_id}, requested id: {id}"
+            )
+
+        docs_content[id] = str(result)
+    return docs_content
+
+
 def get_last_query_version(api_query_lhs, api_query_rhs):
     lhs = Path(api_query_lhs["Query"]).name
     rhs = Path(api_query_rhs["Query"]).name
