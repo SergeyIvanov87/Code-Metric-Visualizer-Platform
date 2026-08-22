@@ -1,0 +1,160 @@
+from pathlib import Path
+import sys
+
+import pytest
+
+
+SOURCES_DIR = Path(__file__).resolve().parents[1] / "sources"
+sys.path.insert(0, str(SOURCES_DIR))
+
+from rag_sync import (
+    ChromaSyncState,
+    RagSyncProgress,
+    extract_chunk_records,
+    finalize_chroma_reconciliation,
+    reconcile_chroma,
+    reconcile_chroma_pages,
+)
+
+
+class FakeCollection:
+    def __init__(self, ids):
+        self.ids = set(ids)
+        self.upserts = []
+        self.deletions = []
+
+    def get(self, include):
+        assert include == []
+        return {"ids": sorted(self.ids)}
+
+    def upsert(self, **kwargs):
+        self.upserts.append(kwargs)
+        self.ids.update(kwargs["ids"])
+
+    def delete(self, ids):
+        self.deletions.extend(ids)
+        self.ids.difference_update(ids)
+
+
+class FakeEmbeddingModel:
+    def __init__(self):
+        self.texts = []
+
+    def embed_documents(self, texts):
+        self.texts.extend(texts)
+        return [[float(len(text))] for text in texts]
+
+
+def test_reconcile_chroma_accumulates_batches_before_removing_non_chunk_ids():
+    collection = FakeCollection({"11", "21", "stale", "1"})
+    embedding_model = FakeEmbeddingModel()
+    first_page = {"docs": [{"id": 1, "chunks": [11, 12]}]}
+    second_page = {"docs": [{"id": 2, "chunks": [21]}]}
+    chunk_texts = {"11": "first", "12": "second", "21": "third"}
+    state = ChromaSyncState(initial_chroma_ids=set(collection.ids))
+
+    reconcile_chroma(
+        collection,
+        embedding_model,
+        first_page,
+        chunk_texts.__getitem__,
+        state,
+    )
+    assert collection.ids == {"1", "11", "12", "21", "stale"}
+    assert collection.deletions == []
+
+    reconcile_chroma(
+        collection,
+        embedding_model,
+        second_page,
+        chunk_texts.__getitem__,
+        state,
+    )
+    result = finalize_chroma_reconciliation(collection, state)
+
+    assert result == {
+        "created": ["12"],
+        "updated": ["11", "21"],
+        "deleted": ["1", "stale"],
+        "not_changed": [],
+        "initial_chroma_records": 4,
+        "chroma_size": 3,
+    }
+    assert collection.ids == {"11", "12", "21"}
+    assert embedding_model.texts == ["first", "second", "third"]
+    assert [call["ids"] for call in collection.upserts] == [["11"], ["12"], ["21"]]
+    assert collection.upserts[0]["metadatas"] == [
+        {"doc_id": 1, "chunk_num": 0, "chunk_id": 11}
+    ]
+
+
+def test_reconcile_chroma_pages_advances_offset_by_returned_document_count():
+    collection = FakeCollection({"stale"})
+    embedding_model = FakeEmbeddingModel()
+    calls = []
+    pages = {
+        0: {
+            "offset": 0,
+            "limit": 2,
+            "remaining": 1,
+            "docs": [
+                {"id": 1, "chunks": [11]},
+                {"id": 2, "chunks": [21]},
+            ],
+        },
+        2: {
+            "offset": 2,
+            "limit": 1,
+            "remaining": 0,
+            "docs": [{"id": 3, "chunks": [31]}],
+        },
+    }
+
+    def get_docs_page(offset, limit):
+        calls.append((offset, limit))
+        if offset == 2:
+            assert collection.deletions == []
+        return pages[offset]
+
+    result = reconcile_chroma_pages(
+        collection,
+        embedding_model,
+        batch_size=2,
+        get_docs_page=get_docs_page,
+        read_chunk=lambda chunk_id: f"text-{chunk_id}",
+    )
+
+    assert calls == [(0, 2), (2, 2)]
+    assert result["created"] == ["11", "21", "31"]
+    assert result["deleted"] == ["stale"]
+    assert collection.ids == {"11", "21", "31"}
+
+
+def test_reconcile_chroma_does_not_delete_stale_ids_when_a_chunk_read_fails():
+    collection = FakeCollection({"stale"})
+    docs = {"docs": [{"id": 1, "chunks": [11]}]}
+    state = ChromaSyncState(initial_chroma_ids=set(collection.ids))
+
+    with pytest.raises(RuntimeError, match="could not find chunk id 11"):
+        reconcile_chroma(
+            collection,
+            FakeEmbeddingModel(),
+            docs,
+            lambda _chunk_id: "<Not found ID>",
+            state,
+        )
+
+    assert collection.ids == {"stale"}
+    assert collection.deletions == []
+
+
+def test_extract_chunk_records_rejects_duplicate_chunk_ids():
+    with pytest.raises(RuntimeError, match="duplicate chunk id: 11"):
+        extract_chunk_records(
+            {
+                "docs": [
+                    {"id": 1, "chunks": [11]},
+                    {"id": 2, "chunks": [11]},
+                ]
+            }
+        )
