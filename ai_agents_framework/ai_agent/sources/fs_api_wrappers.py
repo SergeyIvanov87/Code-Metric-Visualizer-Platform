@@ -251,6 +251,37 @@ def execute_get_docs_query(
         ) from ex
 
 
+def execute_sync_query(
+    query: APIQueryInterruptible,
+    session_id,
+    timeout_elapsed,
+):
+    exec_args = f"SESSION_ID={session_id}"
+    status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
+    if not status:
+        raise RuntimeError(
+            f"Cannot execute sync using the rag_doc_dispatcher, status: {status}, "
+            f"elapsed timeout: {timeout_elapsed}, session: {session_id}"
+        )
+
+    status, result, timeout_elapsed = query.wait_result(
+        timeout_elapsed, session_id, 0.1, timeout_elapsed / 0.1, False
+    )
+    if not status:
+        raise RuntimeError(
+            "Cannot synchronize the rag_doc_dispatcher: waiting for result failed, "
+            f"status: {status}, result: {result}, elapsed timeout: "
+            f"{timeout_elapsed}, session: {session_id}"
+        )
+
+    try:
+        return json.loads(result)
+    except json.JSONDecodeError as ex:
+        raise RuntimeError(
+            f"The rag_doc_dispatcher returned invalid JSON for sync: {result}"
+        ) from ex
+
+
 def execute_read_ids(query: APIQueryInterruptible,
     session_id,
     timeout_elapsed,
