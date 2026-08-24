@@ -62,4 +62,4 @@ EOF
 
 
 USER ${USER}
-ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/opt", "/api"]
+ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/opt", "/api", "/assets/models"]

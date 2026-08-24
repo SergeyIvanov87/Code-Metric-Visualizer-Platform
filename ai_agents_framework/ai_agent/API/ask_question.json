@@ -3,7 +3,7 @@
     "Method" : "POST",
     "Query": "api.pmccabe_collector.restapi.org/ai_agent/ask_question/v1",
     "Params": {
-        "question": ""
+        "system_promt": ""
     },
     "Description": {
         "header": "Ask question.\n",
