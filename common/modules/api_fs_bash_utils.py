@@ -64,11 +64,138 @@ def __extract_attr_value_from_string_function__():
         '}\n'
     ]
 
-def generate_extract_attr_value_from_string():
-    return __extract_attr_value_from_string_function__()[1]
+def __split_quoted_arguments_function__():
+    function_name = "split_quoted_arguments"
+    # Split a string on unquoted whitespace.
+    #
+    # Examples:
+    #   A=one B=two
+    #       -> A=one
+    #       -> B=two
+    #
+    #   A="one two" B="x=y"
+    #       -> A=one two
+    #       -> B=x=y
+    #
+    return function_name, [
+        "{}()".format(function_name) + " {\n",
+        '    local input="${1}"\n',
+        '    local output_name="${2}"\n',
+        '    local -n output_ref="${output_name}"\n',
+        '    local current=""\n',
+        '    local character=""\n',
+        '    local in_quotes=0\n',
+        '    local escaped=0\n',
+        '    local argument_started=0\n',
+        '    local i\n',
+        '    output_ref=()\n',
+        '    for ((i = 0; i < ${#input}; i++)); do\n',
+        '        character="${input:i:1}"\n',
+        '        if ((escaped)); then\n',
+        '            current+="${character}"\n',
+        '            escaped=0\n',
+        '            argument_started=1\n',
+        '            continue\n',
+        '        fi\n',
+        '        case "${character}" in\n',
+        '            \'\\\\\')\n',
+        '                escaped=1\n',
+        '                argument_started=1\n',
+        '                ;;\n',
+        '            \'"\')\n',
+        '                if ((in_quotes)); then\n',
+        '                    in_quotes=0\n',
+        '                else\n',
+        '                    in_quotes=1\n',
+        '                fi\n',
+        '\n',
+        '                argument_started=1\n',
+        '                ;;\n',
+        '\n',
+        '            \' \' | $\'\\t\' | $\'\\n\')\n',
+        '                if ((in_quotes)); then\n',
+        '                    current+="${character}"\n',
+        '                elif ((argument_started)); then\n',
+        '                    output_ref+=("${current}")\n',
+        '                    current=""\n',
+        '                    argument_started=0\n',
+        '                fi\n',
+        '                ;;\n',
+        ' \n',
+        '            *)\n',
+        '                current+="${character}"\n',
+        '                argument_started=1\n',
+        '                ;;\n',
+        '        esac\n',
+        '    done\n',
+        '\n',
+        '    if ((escaped)); then\n',
+        '        # Preserve a trailing backslash.\n',
+        '        current+=\'\\\'\n',
+        '    fi\n',
+        '\n',
+        '    if ((in_quotes)); then\n',
+        '        printf "Unterminated double quote in argument string\\n" >&2\n',
+        '        return 1\n',
+        '    fi\n',
+        '\n',
+        '    if ((argument_started)); then\n',
+        '        output_ref+=("${current}")\n',
+        '    fi\n',
+        '}\n'
+    ]
 
-def extract_attr_value_from_string():
-    return __extract_attr_value_from_string_function__()[0]
+def generate_split_quoted_arguments():
+    return __split_quoted_arguments_function__()[1]
+
+def split_quoted_arguments():
+    return __split_quoted_arguments_function__()[0]
+
+
+def __extract_attr_value_from_string_using_tokenizer_function__(need_generate_split_quoted_arg_func = True):
+    function_name = "extract_avp_from_string_or_default_tokenized"
+    return function_name, [
+        *(generate_split_quoted_arguments() if need_generate_split_quoted_arg_func else []), r"",
+        "{}()".format(function_name) + " {\n",
+        '    local attr="${1}"\n',
+        '    local str="${2}"\n',
+        '    local default_value="${3}"\n',
+        '    local delimiter="${4}"\n',
+        '    local output_name="${5}"\n',
+        '    local value=""\n',
+        '    local arg\n',
+        '    local -a args\n',
+        '    if [[ -z "${delimiter}" ]]; then\n',
+        '       printf "Delimiter cannot be empty\\n" >&2\n',
+        '       return 1\n',
+        '    fi\n',
+        '    # Split the input into whitespace-separated arguments.\n',
+        '    if ! ' + split_quoted_arguments() + ' "${str}" args; then\n',
+        '        printf "Cannot split arguments: ${str} into args" >&2\n',
+        '        return 1\n',
+        '    fi\n',
+        '    for arg in "${args[@]}"; do\n',
+        '      if [[ "${arg}" == "${attr}${delimiter}"* ]]; then\n',
+        '        # Remove only the first "attribute+delimiter" prefix.\n',
+        '        value=${arg#"${attr}${delimiter}"}\n',
+        '        break\n',
+        '      fi\n',
+        '    done\n',
+        '    if [[ -z $value ]]; then\n',
+        '       value="${default_value}"\n',
+        '    fi\n',
+        '    # Assign safely to the caller-specified variable.\n',
+        '    printf -v "${output_name}" \'%s\' "${value}"\n',
+        '}\n'
+    ]
+
+
+
+def generate_extract_attr_value_from_string():
+    return __extract_attr_value_from_string_using_tokenizer_function__()[1]
+
+def extract_attr_value_from_string(need_generate_helper_func = True):
+    return __extract_attr_value_from_string_using_tokenizer_function__(need_generate_helper_func)[0]
 
 
 

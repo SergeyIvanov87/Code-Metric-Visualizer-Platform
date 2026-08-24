@@ -78,7 +78,7 @@ def build_api_executors(api_schema_path, api_exec_generator_path, output_dir):
             )
             continue
         except Exception as e:
-            errors_detected.append(str(e))
+            errors_detected.append(f"Exception: {e} during processing: {schema_file}")
             continue
 
     if len(errors_detected) != 0:
