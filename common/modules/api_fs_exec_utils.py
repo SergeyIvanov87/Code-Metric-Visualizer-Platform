@@ -1,13 +1,19 @@
 #!/usr/bin/python
 
-from api_fs_bash_utils import split_quoted_arguments
+from api_fs_bash_utils import (
+    split_quoted_arguments,
+    generate_split_quoted_arguments
+)
 
 """
 Provides utilities to generate API executor scripts
 """
 
 def generate_exec_header():
-    return [ r"#!/bin/bash" ]
+    return [ r"#!/bin/bash",
+             r"",
+             *generate_split_quoted_arguments()
+           ]
 
 def generate_get_result_type(extension):
     return [ r'if [[ ${1} == "--result_type" ]];',

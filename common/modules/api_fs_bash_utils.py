@@ -64,8 +64,8 @@ def __extract_attr_value_from_string_function__():
         '}\n'
     ]
 
-def __split_quoted_arguments_function__():
-    function_name = "split_quoted_arguments"
+def __split_quoted_arguments_function__(override_suffix):
+    function_name = "split_quoted_arguments" + override_suffix
     # Split a string on unquoted whitespace.
     #
     # Examples:
@@ -145,17 +145,17 @@ def __split_quoted_arguments_function__():
         '}\n'
     ]
 
-def generate_split_quoted_arguments():
-    return __split_quoted_arguments_function__()[1]
+def generate_split_quoted_arguments(override_suffix = ""):
+    return __split_quoted_arguments_function__(override_suffix)[1]
 
-def split_quoted_arguments():
-    return __split_quoted_arguments_function__()[0]
+def split_quoted_arguments(override_suffix = ""):
+    return __split_quoted_arguments_function__(override_suffix)[0]
 
 
-def __extract_attr_value_from_string_using_tokenizer_function__(need_generate_split_quoted_arg_func = True):
-    function_name = "extract_avp_from_string_or_default_tokenized"
+def __extract_attr_value_from_string_using_tokenizer_function__():
+    function_name = "extract_avp_from_string_or_default"
     return function_name, [
-        *(generate_split_quoted_arguments() if need_generate_split_quoted_arg_func else []), r"",
+        *generate_split_quoted_arguments("_inner"), r"",
         "{}()".format(function_name) + " {\n",
         '    local attr="${1}"\n',
         '    local str="${2}"\n',
@@ -170,18 +170,18 @@ def __extract_attr_value_from_string_using_tokenizer_function__(need_generate_sp
         '       return 1\n',
         '    fi\n',
         '    # Split the input into whitespace-separated arguments.\n',
-        '    if ! ' + split_quoted_arguments() + ' "${str}" args; then\n',
+        '    if ! ' + split_quoted_arguments("_inner") + ' "${str}" args; then\n',
         '        printf "Cannot split arguments: ${str} into args" >&2\n',
         '        return 1\n',
         '    fi\n',
         '    for arg in "${args[@]}"; do\n',
         '      if [[ "${arg}" == "${attr}${delimiter}"* ]]; then\n',
         '        # Remove only the first "attribute+delimiter" prefix.\n',
-        '        value=${arg#"${attr}${delimiter}"}\n',
+        '        value="${arg#"${attr}${delimiter}"}"\n',
         '        break\n',
         '      fi\n',
         '    done\n',
-        '    if [[ -z $value ]]; then\n',
+        '    if [[ -z "${value}" ]]; then\n',
         '       value="${default_value}"\n',
         '    fi\n',
         '    # Assign safely to the caller-specified variable.\n',
@@ -194,8 +194,8 @@ def __extract_attr_value_from_string_using_tokenizer_function__(need_generate_sp
 def generate_extract_attr_value_from_string():
     return __extract_attr_value_from_string_using_tokenizer_function__()[1]
 
-def extract_attr_value_from_string(need_generate_helper_func = True):
-    return __extract_attr_value_from_string_using_tokenizer_function__(need_generate_helper_func)[0]
+def extract_attr_value_from_string():
+    return __extract_attr_value_from_string_using_tokenizer_function__()[0]
 
 
 
