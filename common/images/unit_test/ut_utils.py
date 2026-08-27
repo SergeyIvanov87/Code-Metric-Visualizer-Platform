@@ -74,24 +74,24 @@ class APIExecutor(AsyncExecutor):
             # by other activity
             result = ""
             try:
-                print(f"APIExecutor[{obj.index}] waiting a result pipe creation", file=sys.stdout, flush=True)
-                query.__wait_result_pipe_creation__(session_id_value, 0.1, 100, True)
+                print(f"APIExecutor[{obj.index}] waiting a result pipe creation, session id: {session_id_value}", file=sys.stdout, flush=True)
+                query.__wait_result_pipe_creation__(session_id_value, 0.1, 150, True)
                 if obj.onPostExecute :
                     obj.onPostExecute(obj, exec_params, additional_params)
-                print(f"APIExecutor[{obj.index}] getting data from a result pipe", file=sys.stdout, flush=True)
-                result = query.wait_result(session_id_value, 0.1, 100, True)
+                print(f"APIExecutor[{obj.index}] getting data from a result pipe, session id: {session_id_value}", file=sys.stdout, flush=True)
+                result = query.wait_result(session_id_value, 0.1, 150, True)
                 obj.error_message=""
             except (RuntimeError,FileNotFoundError) as timeout:
                 if obj.onPostWaitResultFailed :
                     obj.onPostWaitResultFailed(obj, exec_params, additional_params, result)
 
-                obj.error_message += f'ERROR: Response pipe for session "{session_id_value}" hasn\'t been created in designated interval {0.1 * float(100)}sec'
+                obj.error_message += f'ERROR: APIExecutor[{obj.index}]: response pipe for session "{session_id_value}" hasn\'t been created in designated interval {0.1 * float(100)}sec'
 
             if obj.onPostWaitResultSuccess :
                 obj.onPostWaitResultSuccess(obj, exec_params, additional_params, result)
 
             if result == "":
-                obj.error_message += f'ERROR: Got empty result from the session "{session_id_value}"'
+                obj.error_message += f'ERROR: APIExecutor[{obj.index}]: got empty result from the session "{session_id_value}"'
 
             if len(obj.error_message):
                 break

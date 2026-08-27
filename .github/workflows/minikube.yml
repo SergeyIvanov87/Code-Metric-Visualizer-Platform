@@ -114,6 +114,12 @@ jobs:
             echo "Try again in 5 sec, attempt: [${i}/90]"
             sleep 5
           done
+          # Wait for webhook to be ready
+          for i in $(seq 1 90); do
+            kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=5s 2>/dev/null && break
+            echo "Waiting for webhook readiness, attempt: [${i}/90]"
+            sleep 5
+          done
           exit ${RET}
       - name: Run host-based ingress
         run: |

@@ -1,11 +1,19 @@
 #!/usr/bin/python
 
+from api_fs_bash_utils import (
+    split_quoted_arguments,
+    generate_split_quoted_arguments
+)
+
 """
 Provides utilities to generate API executor scripts
 """
 
 def generate_exec_header():
-    return [ r"#!/bin/bash" ]
+    return [ r"#!/bin/bash",
+             r"",
+             *generate_split_quoted_arguments()
+           ]
 
 def generate_get_result_type(extension):
     return [ r'if [[ ${1} == "--result_type" ]];',
@@ -20,38 +28,56 @@ def generate_api_node_env_init():
              r'    echo "Illegal number of parameters $#. Expected parameters: API_NODE and IN_SERVER_REQUEST_ARGS array"',
              r'    exit -1',
              r'fi',
-             r"API_NODE=${1}",
-             r'readarray -t IN_SERVER_REQUEST_ARGS <<< "${2}"'
+             r'API_NODE="${1}"',
+             r'INPUT_ARGUMENT_STRING="${2}"',
+             r'declare -a IN_SERVER_REQUEST_ARGS=()',
+             r'declare -a OVERRIDEN_CMD_ARGS=()',
+             r'if ! ' + split_quoted_arguments() + ' "${INPUT_ARGUMENT_STRING}" IN_SERVER_REQUEST_ARGS',
+             r'then',
+             r'  printf "Cannot parse arguments from: ${INPUT_ARGUMENT_STRING}" >&2',
+             r'  exit -1',
+             r'fi',
+             r''
     ]
 
 def generate_read_api_fs_args():
     return [ r'for entry in "${API_NODE}"/*.*',
              r"do",
-             r"    if [[ $entry == *.md ]]; then continue; fi",
+             r'    [[ "${entry}" == *.md ]] && continue',
+             r'    [[ -f "${entry}" ]] || continue',
              r"    ",
-             r"    file_basename=${entry##*/}",
-             r"    param_name=${file_basename#*.}",
-             r"    readarray -t arr < ${entry}",
-             r"    special_kind_param_name=${param_name%.*}",
-             r"    if [[ ${special_kind_param_name} != 'NO_NAME_PARAM' ]];",
+             r'    file_basename="${entry##*/}"',
+             r'    param_name="${file_basename#*.}"',
+             r'    special_kind_param_name="${param_name%.*}"',
+             r'    ',
+             r'    readarray -t arr < "${entry}"',
+             r'    ',
+             r'    if [[ "${special_kind_param_name}" != "NO_NAME_PARAM" ]];',
              r"    then",
-             r"        OVERRIDEN_CMD_ARGS+=(${param_name})",
-             r"        for arg in ${IN_SERVER_REQUEST_ARGS[@]}",
+             r'        OVERRIDEN_CMD_ARGS+=("${param_name}")',
+             r'        for arg in "${IN_SERVER_REQUEST_ARGS[@]}"',
              r"        do",
              r'            if [[ "${arg}" = *"${param_name}="* ]];',
              r"            then",
-             r'                ARG_ARR=("${arg%%=*}" "${arg#*=}")',
-             r'                readarray -t arr <<< "${ARG_ARR[1]}"',
+             r'                # Split only at the first \'=\'',
+             r'                value="${arg#"${param_name}="}"',
+             r'                # Preserve the complete value as one array element,',
+             r'                # including spaces and additional \'=\' characters.',
+             r'                arr=("${value}")',
+             r'                break',
              r"            fi",
              r"        done",
              r"    fi",
-             r"    for a in ${arr[@]}",
+             r'    for a in "${arr[@]}"',
              r"    do",
-             r"        if [[ ${a} == \"* ]];",
+             r'        if [[ "${a}" == \"* ]];',
              r"        then",
              r'            OVERRIDEN_CMD_ARGS+=("${a}")',
              r"        else",
-             r"            OVERRIDEN_CMD_ARGS+=(${a})",
+             r"            # Preserve the legacy behavior where an unquoted file line",
+             r"            # can contain multiple whitespace-separated arguments.",
+             r'            read -r -a line_arguments <<< "${a}"',
+             r'            OVERRIDEN_CMD_ARGS+=("${line_arguments[@]}")',
              r"        fi",
              r"    done",
              r"done"

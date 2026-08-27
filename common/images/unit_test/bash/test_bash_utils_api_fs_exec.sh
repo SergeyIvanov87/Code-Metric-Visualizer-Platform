@@ -5,8 +5,12 @@ test_suite_filename=${0}
 oneTimeSetUp() {
     read -r -d '' EXEC_STR << EOM
 from api_fs_exec_utils import *
+from api_fs_bash_utils import *
 
-print('test_function() {\n',
+print(
+      *[ l+"\n" for l in generate_split_quoted_arguments()],
+      '\n',
+      'test_function() {\n',
       *[ l+"\n" for l in generate_api_node_env_init()],
       *[ l+"\n" for l in generate_read_api_fs_args()],
       '\n}\n',
