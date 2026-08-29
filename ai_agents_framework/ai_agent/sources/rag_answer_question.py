@@ -216,6 +216,18 @@ def search_knowledge_base_impl(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="Agentic RAG")
     parser.add_argument(
+        "-system_prompt",
+        "--system_prompt",
+        type=str,
+        help="System prompt",
+    )
+    parser.add_argument(
+        "-user_prompt",
+        "--user_prompt",
+        type=str,
+        help="User prompt",
+    )
+    parser.add_argument(
         "-db_host",
         "--db_host",
         type=str,
@@ -226,6 +238,12 @@ if __name__ == "__main__":
         "--db_port",
         type=int,
         help="the listening port of a Vector DB service",
+    )
+    parser.add_argument(
+        "-session_id",
+        "--session_id",
+        type=str,
+        help="Session ID"
     )
 
     parser.add_argument(
