@@ -75,7 +75,9 @@ def write_args(directory, rparams):
         # put a leading zero as we need to get ordered params list
         param_digit_format = "{:0" + str(params_10based) + "d}"
         for param in rparams:
-            param_name, param_value = param.split("=")
+            param_array = param.split("=")
+            param_name=param_array[0]
+            param_value="=".join(param_array[1:])
             param_name_filepath = os.path.join(directory, param_digit_format.format(counter) + "." + param_name)
             counter += 1
 

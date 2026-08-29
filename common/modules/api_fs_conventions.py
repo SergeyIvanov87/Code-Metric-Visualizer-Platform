@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import collections.abc
 import json
 import os
 import stat
@@ -59,4 +60,6 @@ def get_api_request_plain_params(req_param_json):
         # access only plain data
         if isinstance(req_param_json[p], str):
             params_list.append(str(p) + "=" + req_param_json[p])
+        elif isinstance(req_param_json[p], collections.abc.Sequence):
+            params_list.append(str(p) + "=" + "\n".join(req_param_json[p]))
     return params_list
