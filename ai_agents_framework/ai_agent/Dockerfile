@@ -11,6 +11,11 @@ EOF
 
 WORKDIR /package
 
+# /package is also the runtime user's home and is replaced by a source-code
+# volume. Do not let stale packages under /package/.local shadow the coherent
+# dependency set installed into /usr/local below.
+ENV PYTHONNOUSERSITE=1
+
 RUN <<EOF
     pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain_openai langchain-text-splitters tiktoken sentence-transformers
     pip install --break-system-packages llama-cpp-python

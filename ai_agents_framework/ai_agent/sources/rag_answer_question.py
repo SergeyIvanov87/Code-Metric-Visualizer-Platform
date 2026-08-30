@@ -181,13 +181,15 @@ def search_knowledge_base_impl(
 ) -> tuple[str, list[dict[str, Any]]]:
     """Search the private knowledge base for information relevant to a question."""
 
-    records = retrieve_by_vector(
-        collection=collection,
-        query_embedder=query_embedder,
-        document_store=document_store,
-        query=query,
-        k=k,
-    )
+    records = []
+    if not collection is None:
+        records = retrieve_by_vector(
+            collection=collection,
+            query_embedder=query_embedder,
+            document_store=document_store,
+            query=query,
+            k=k,
+        )
 
     if not records:
         return "No relevant knowledge-base content was found.", []
@@ -254,9 +256,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     chroma_client = chromadb.HttpClient(host=args.db_host, port=args.db_port)
-    collection = chroma_client.get_collection(
-        name=args.main_service_name,
-    )
+    collection = None
+    try:
+        collection = chroma_client.get_collection(
+            name=args.main_service_name,
+        )
+    except chromadb.errors.NotFoundError as ex:
+        pass
 
     # This must be the same embedding model/configuration used when the
     # stored Chroma embeddings were generated.
@@ -468,11 +474,8 @@ if __name__ == "__main__":
         debug=True,
     )
 '''
-    null_safe_qwen_agent = create_agent(
-        model=null_safe_qwen_model,
-        tools=[search_knowledge_base],
-        middleware=[force_initial_retrieval],
-        system_prompt = """
+
+    """
     You are a knowledge-base assistant.
 
     You must not answer knowledge-base questions from memory.
@@ -487,7 +490,13 @@ if __name__ == "__main__":
     - If no relevant content was returned, say that no relevant information was found.
 
     Never invent content or Source IDs.
-    """,
+    """
+    print(args.system_prompt)
+    null_safe_qwen_agent = create_agent(
+        model=null_safe_qwen_model,
+        tools=[search_knowledge_base],
+        middleware=[force_initial_retrieval],
+        system_prompt = args.system_prompt,
         debug=True,
     )
 
@@ -496,7 +505,7 @@ if __name__ == "__main__":
             "messages": [
                 {
                     "role": "user",
-                    "content": "What does Round-Robin Database (RRD) Microservice do?",
+                    "content": args.user_prompt,
                 }
             ]
         }
