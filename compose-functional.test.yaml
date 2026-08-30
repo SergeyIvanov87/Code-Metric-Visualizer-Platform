@@ -82,7 +82,7 @@ services:
       test_aggregator:
         condition: service_healthy
       docs-dispatcher-file-storage-permissions:
-        condition: service_completed_successfully
+        condition: service_healthy
     logging:
       driver: syslog
       options:
@@ -94,7 +94,18 @@ services:
   docs-dispatcher-file-storage-permissions:
     image: alpine:3.20.6
     user: root
-    command: sh -c "mkdir -p /mnt/file_storage && chmod -R 0777 /mnt/file_storage"
+    command: >
+      sh -ec "
+        mkdir -p /mnt/file_storage;
+        chmod -R 0777 /mnt/file_storage;
+        touch /tmp/ready;
+        exec tail -f /dev/null
+      "
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 1s
+      timeout: 1s
+      retries: 10
     volumes:
       - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/mnt/file_storage
     networks:
