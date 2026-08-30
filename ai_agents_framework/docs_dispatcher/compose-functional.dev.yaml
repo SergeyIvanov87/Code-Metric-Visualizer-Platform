@@ -17,7 +17,7 @@ services:
       - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/mnt/file_storage
     depends_on:
       docs-dispatcher-file-storage-permissions:
-        condition: service_completed_successfully
+        condition: service_healthy
     secrets:
        - backend_mysql_db_login
        - backend_mysql_db_password
