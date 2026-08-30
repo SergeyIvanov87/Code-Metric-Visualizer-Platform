@@ -129,6 +129,100 @@ test_extract_avp_from_string_or_default_multiple_calls() {
     assertEquals "\"${INPUT_STRING}\" \"${PARAM_0_TO_SEARCH}\"" ${PARAM_0_VALUE} "FOUND_0"
     assertEquals "\"${INPUT_STRING}\" \"${PARAM_1_TO_SEARCH}\" must not be found as a partial match and default must be used" ${PARAM_1_VALUE} "MUST_NOT_BE_FOUND_1"
 }
+test_extract_avp_from_string_or_default_special_characters_multiple_calls() {
+    local INPUT_STRING
+    local VALUE
+    local STATUS
+    local -a PARSED=()
+
+    # Exercise multiple key-value extractions from one string.
+    INPUT_STRING=$'SPACE="one two" TAB="one\ttwo" MULTILINE="one\ntwo" EQUALS=one=two=three EMPTY="" CONCAT=one" two" SYMBOLS="$HOME;*.txt&x|y(a)"'
+
+    extract_avp_from_string_or_default "SPACE" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Double quotes preserve spaces" "one two" "${VALUE}"
+
+    extract_avp_from_string_or_default "TAB" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Double quotes preserve tabs" $'one\ttwo' "${VALUE}"
+
+    extract_avp_from_string_or_default "MULTILINE" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Double quotes preserve newlines" $'one\ntwo' "${VALUE}"
+
+    extract_avp_from_string_or_default "EQUALS" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Additional delimiters remain in the value" "one=two=three" "${VALUE}"
+
+    extract_avp_from_string_or_default "EMPTY" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "An empty quoted value is preserved" "" "${VALUE}"
+
+    extract_avp_from_string_or_default "CONCAT" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Quoted and unquoted parts are concatenated" "one two" "${VALUE}"
+
+    extract_avp_from_string_or_default "SYMBOLS" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Shell-special characters remain data" '$HOME;*.txt&x|y(a)' "${VALUE}"
+
+    # Unquoted spaces, repeated spaces, tabs, and newlines are separators.
+    INPUT_STRING=$'A=one     B=two\tC=three\nD=four'
+    split_quoted_arguments_inner "${INPUT_STRING}" PARSED
+    assertEquals "All unquoted whitespace separates arguments" "4" "${#PARSED[@]}"
+    assertEquals "First argument separated by spaces" "A=one" "${PARSED[0]}"
+    assertEquals "Second argument separated by a tab" "B=two" "${PARSED[1]}"
+    assertEquals "Third argument separated by a newline" "C=three" "${PARSED[2]}"
+    assertEquals "Fourth argument follows the newline" "D=four" "${PARSED[3]}"
+
+    # Quoted tabs and newlines remain in one array element.
+    INPUT_STRING=$'A="one\ttwo\nthree" B=four'
+    split_quoted_arguments_inner "${INPUT_STRING}" PARSED
+    assertEquals "Quoted whitespace does not create extra arguments" "2" "${#PARSED[@]}"
+    assertEquals "Quoted tab and newline are preserved" $'A=one\ttwo\nthree' "${PARSED[0]}"
+    assertEquals "Argument after quoted multiline value is parsed" "B=four" "${PARSED[1]}"
+
+    # Empty quoted values and entirely empty quoted arguments are preserved.
+    INPUT_STRING='A="" "" B=two'
+    split_quoted_arguments_inner "${INPUT_STRING}" PARSED
+    assertEquals "Empty quoted argument participates in parsing" "3" "${#PARSED[@]}"
+    assertEquals "Empty quoted key value is preserved" "A=" "${PARSED[0]}"
+    assertEquals "Entirely empty quoted argument is preserved" "" "${PARSED[1]}"
+    assertEquals "Argument after an empty argument is parsed" "B=two" "${PARSED[2]}"
+
+    # Each backslash case uses an independent input so a failure cannot alter
+    # the parsing state of subsequent cases.
+    INPUT_STRING=$'A=one\\ two B=three'
+    extract_avp_from_string_or_default "A" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Backslash preserves an unquoted space" "one two" "${VALUE}"
+
+    INPUT_STRING=$'A=one\\"two B=three'
+    extract_avp_from_string_or_default "A" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Backslash preserves a quote outside quotes" 'one"two' "${VALUE}"
+
+    INPUT_STRING=$'A="one \\"quoted\\" value" B=three'
+    extract_avp_from_string_or_default "A" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Backslash preserves quotes inside a quoted value" 'one "quoted" value' "${VALUE}"
+
+    INPUT_STRING=$'A="one\\\\two" B=three'
+    extract_avp_from_string_or_default "A" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Two backslashes inside quotes produce one backslash" 'one\two' "${VALUE}"
+
+    INPUT_STRING=$'A="path\\to\\file" B=three'
+    extract_avp_from_string_or_default "A" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Ordinary backslashes inside quotes are preserved" 'path\to\file' "${VALUE}"
+
+    INPUT_STRING=$'A=value\\'
+    extract_avp_from_string_or_default "A" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "A trailing backslash is preserved" 'value\' "${VALUE}"
+
+    # Single quotes are literal characters and do not group whitespace.
+    INPUT_STRING=$'A=\'one two\' B=three'
+    split_quoted_arguments_inner "${INPUT_STRING}" PARSED
+    assertEquals "Single quotes do not group whitespace" "3" "${#PARSED[@]}"
+    assertEquals "Opening single quote remains literal" "A='one" "${PARSED[0]}"
+    assertEquals "Closing single quote remains literal" "two'" "${PARSED[1]}"
+    assertEquals "Argument after single-quoted text is parsed" "B=three" "${PARSED[2]}"
+
+    # An unmatched double quote must fail instead of returning partial data.
+    INPUT_STRING='A="one two'
+    split_quoted_arguments_inner "${INPUT_STRING}" PARSED 2>/dev/null
+    STATUS=$?
+    assertNotEquals "Unmatched double quote returns an error" "0" "${STATUS}"
+}
 
 test_add_suffix_if_exist() {
     local SUFFIX_TO_ADD=
@@ -291,3 +385,4 @@ test_unblock_readers_of_result_pipe_array_by_owner_multiple_request_stuck() {
 }
 
 . shunit2
+
