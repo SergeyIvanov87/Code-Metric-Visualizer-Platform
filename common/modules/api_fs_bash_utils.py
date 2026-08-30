@@ -64,19 +64,125 @@ def __extract_attr_value_from_string_function__():
         '}\n'
     ]
 
-def __split_quoted_arguments_function__(override_suffix):
-    function_name = "split_quoted_arguments" + override_suffix
+def __split_quoted_arguments_function__(override_function_name):
+    function_name = "split_quoted_arguments" if not override_function_name else override_function_name
     # Split a string on unquoted whitespace.
     #
-    # Examples:
+    # Unquoted spaces separate arguments:
+    #
     #   A=one B=two
     #       -> A=one
     #       -> B=two
     #
-    #   A="one two" B="x=y"
-    #       -> A=one two
-    #       -> B=x=y
+    # Multiple unquoted whitespace characters are treated as separators:
     #
+    #   A=one     B=two
+    #       -> A=one
+    #       -> B=two
+    #
+    # Tabs and newlines also separate unquoted arguments:
+    #
+    #   A=one
+    #   B=two
+    #       -> A=one
+    #       -> B=two
+    #
+    # Double quotes preserve spaces in a value.
+    # The grouping quotation marks are removed:
+    #
+    #   A="one two" B=three
+    #       -> A=one two
+    #       -> B=three
+    #
+    # Double quotes preserve tabs and newlines:
+    #
+    #   A="one
+    #   two" B=three
+    #       -> A=one\ntwo
+    #       -> B=three
+    #
+    # In the example above, \n represents a real newline character,
+    # not the two literal characters '\' and 'n'.
+    #
+    # Additional '=' characters do not split an argument:
+    #
+    #   A=one=two B="x=y=z"
+    #       -> A=one=two
+    #       -> B=x=y=z
+    #
+    # Empty quoted values are supported:
+    #
+    #   A="" B=two
+    #       -> A=
+    #       -> B=two
+    #
+    # Quoted and unquoted parts of the same argument are concatenated:
+    #
+    #   A=one" two" B="x"y
+    #       -> A=one two
+    #       -> B=xy
+    #
+    # An entirely empty quoted argument is preserved:
+    #
+    #   A=one "" B=two
+    #       -> A=one
+    #       -> <empty argument>
+    #       -> B=two
+    #
+    # Outside double quotes, backslash escapes the next character:
+    #
+    #   A=one\ two B=three
+    #       -> A=one two
+    #       -> B=three
+    #
+    # Outside double quotes, backslash can preserve a literal quote:
+    #
+    #   A=one\"two B=three
+    #       -> A=one"two
+    #       -> B=three
+    #
+    # Inside double quotes, \" produces a literal double quote:
+    #
+    #   A="one \"quoted\" value" B=three
+    #       -> A=one "quoted" value
+    #       -> B=three
+    #
+    # Inside double quotes, \\ produces one literal backslash:
+    #
+    #   A="one\\two" B=three
+    #       -> A=one\two
+    #       -> B=three
+    #
+    # In the result above, '\' is a literal backslash; '\t' is not
+    # converted into a tab character.
+    #
+    # An ordinary backslash inside double quotes is preserved:
+    #
+    #   A="path\to\file" B=three
+    #       -> A=path\to\file
+    #       -> B=three
+    #
+    # A trailing backslash is preserved:
+    #
+    #   A=value\
+    #       -> A=value\
+    #
+    # Shell-special characters are treated as ordinary data. They are
+    # not expanded or executed by this parser:
+    #
+    #   A='$HOME;*.txt' B="x&y|z" C="a(b)"
+    #       -> A='$HOME;*.txt'
+    #       -> B=x&y|z
+    #       -> C=a(b)
+    #
+    # Note: single quotes have no grouping meaning to this parser.
+    # They are treated as literal characters. Use double quotes when
+    # a value contains whitespace.
+    #
+    # An unmatched double quote is an error:
+    #
+    #   A="one two
+    #       -> error: Unterminated double quote in argument string
     return function_name, [
         "{}()".format(function_name) + " {\n",
         '    local input="${1}"\n',
@@ -99,7 +205,18 @@ def __split_quoted_arguments_function__(override_suffix):
         '        fi\n',
         '        case "${character}" in\n',
         '            \'\\\\\')\n',
-        '                escaped=1\n',
+        '                # Within quotes, keep ordinary backslashes literal. A\n',
+        '                # backslash only escapes a quote or another backslash.\n',
+        '                if ((in_quotes)); then\n',
+        '                    if ((i + 1 < ${#input})) &&\n',
+        '                       [[ "${input:i+1:1}" == \'"\' || "${input:i+1:1}" == \'\\\\\' ]]; then\n',
+        '                         escaped=1\n',
+        '                    else\n',
+        "                       current+='\'\n",
+        '                    fi\n',
+        '                else\n',
+        '                    escaped=1\n',
+        '                fi\n',
         '                argument_started=1\n',
         '                ;;\n',
         '            \'"\')\n',
@@ -145,17 +262,17 @@ def __split_quoted_arguments_function__(override_suffix):
         '}\n'
     ]
 
-def generate_split_quoted_arguments(override_suffix = ""):
-    return __split_quoted_arguments_function__(override_suffix)[1]
+def generate_split_quoted_arguments(override_function_name = "split_quoted_arguments"):
+    return __split_quoted_arguments_function__(override_function_name)[1]
 
-def split_quoted_arguments(override_suffix = ""):
-    return __split_quoted_arguments_function__(override_suffix)[0]
+def split_quoted_arguments(override_function_name = "split_quoted_arguments"):
+    return __split_quoted_arguments_function__(override_function_name)[0]
 
 
 def __extract_attr_value_from_string_using_tokenizer_function__():
     function_name = "extract_avp_from_string_or_default"
     return function_name, [
-        *generate_split_quoted_arguments("_inner"), r"",
+        *generate_split_quoted_arguments("split_quoted_arguments_inner"), r"",
         "{}()".format(function_name) + " {\n",
         '    local attr="${1}"\n',
         '    local str="${2}"\n',
@@ -170,7 +287,7 @@ def __extract_attr_value_from_string_using_tokenizer_function__():
         '       return 1\n',
         '    fi\n',
         '    # Split the input into whitespace-separated arguments.\n',
-        '    if ! ' + split_quoted_arguments("_inner") + ' "${str}" args; then\n',
+        '    if ! ' + split_quoted_arguments("split_quoted_arguments_inner") + ' "${str}" args; then\n',
         '        printf "Cannot split arguments: ${str} into args" >&2\n',
         '        return 1\n',
         '    fi\n',
