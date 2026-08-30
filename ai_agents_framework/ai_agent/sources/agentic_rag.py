@@ -181,13 +181,15 @@ def search_knowledge_base_impl(
 ) -> tuple[str, list[dict[str, Any]]]:
     """Search the private knowledge base for information relevant to a question."""
 
-    records = retrieve_by_vector(
-        collection=collection,
-        query_embedder=query_embedder,
-        document_store=document_store,
-        query=query,
-        k=k,
-    )
+    records = []
+    if not collection is None:
+        records = retrieve_by_vector(
+            collection=collection,
+            query_embedder=query_embedder,
+            document_store=document_store,
+            query=query,
+            k=k,
+        )
 
     if not records:
         return "No relevant knowledge-base content was found.", []
@@ -215,6 +217,18 @@ def search_knowledge_base_impl(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="Agentic RAG")
+        parser.add_argument(
+        "-system_prompt",
+        "--system_prompt",
+        type=str,
+        help="System prompt",
+    )
+    parser.add_argument(
+        "-user_prompt",
+        "--user_prompt",
+        type=str,
+        help="User prompt",
+    )
     parser.add_argument(
         "-db_host",
         "--db_host",
@@ -236,9 +250,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     chroma_client = chromadb.HttpClient(host=args.db_host, port=args.db_port)
-    collection = chroma_client.get_collection(
-        name=args.main_service_name,
-    )
+    collection = None
+    try:
+        collection = chroma_client.get_collection(
+            name=args.main_service_name,
+        )
+    except chromadb.errors.NotFoundError as ex:
+        pass
 
     # This must be the same embedding model/configuration used when the
     # stored Chroma embeddings were generated.
@@ -393,7 +411,7 @@ if __name__ == "__main__":
 
     direct_result = search_knowledge_base.invoke(
         {
-            "query": "What is Code Metric Visualizer Platform?",
+            "query": args.user_prompt,
           #  "k": 5,
         }
     )
@@ -454,22 +472,7 @@ if __name__ == "__main__":
         model=null_safe_qwen_model,
         tools=[search_knowledge_base],
         middleware=[force_initial_retrieval],
-        system_prompt = """
-    You are a knowledge-base assistant.
-
-    You must not answer knowledge-base questions from memory.
-
-    A successful search_knowledge_base result is the only permitted source of
-    factual information. A ToolMessage with status="error" contains no search
-    results and must never be treated as evidence.
-
-    After successful retrieval:
-    - Answer only from the returned content.
-    - Cite only Source IDs actually present in the returned content.
-    - If no relevant content was returned, say that no relevant information was found.
-
-    Never invent content or Source IDs.
-    """,
+        system_prompt = args.system_prompt,
         debug=True,
     )
 
@@ -478,7 +481,7 @@ if __name__ == "__main__":
             "messages": [
                 {
                     "role": "user",
-                    "content": "What does Round-Robin Database (RRD) Microservice do?",
+                    "content": args.user_prompt,
                 }
             ]
         }
