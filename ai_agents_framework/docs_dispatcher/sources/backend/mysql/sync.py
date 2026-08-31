@@ -159,8 +159,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result = result | synchronize_from_file_storage(engine, backend_config.storage_uri)
     except Exception as ex:
-        ret["error_code"] = -1
-        ret["error_msg"] = str(ex)
+        result["error_code"] = -1
+        result["error_msg"] = str(ex)
     print(json.dumps(result))
     return 0
 

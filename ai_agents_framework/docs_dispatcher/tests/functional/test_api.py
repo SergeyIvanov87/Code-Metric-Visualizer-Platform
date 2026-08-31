@@ -265,18 +265,22 @@ def created_record_ids():
                 shutil.rmtree(_record_dir(record_id), ignore_errors=True)
     _assert_sync_is_clean()
 
+def shield_special_symbols(doc_data_str):
+    return doc_data_str.replace('"', '\\"')
 
 def test_put_documents_create_matching_storage_records_use_doc_data(created_record_ids):
     doc_0 = _api_safe_payload(_data_text("doc_0.txt"))
     doc_1 = _api_safe_payload(_data_text("doc_1.txt"))
 
     before_ids = _storage_record_ids()
-    doc_0_id = _put_doc_as_doc_data(doc_0)
+    # need to shield each " with \"
+    doc_0_id = _put_doc_as_doc_data(shield_special_symbols(doc_0))
     created_record_ids.append(doc_0_id)
     _assert_document_storage(doc_0_id, doc_0)
     _assert_sync_is_clean(len(before_ids) + 1)
 
-    doc_1_id = _put_doc_as_doc_data(doc_1)
+    # need to shield each " with \". Probably I need to put that into _put_doc_as_doc_data
+    doc_1_id = _put_doc_as_doc_data(shield_special_symbols(doc_1))
     created_record_ids.append(doc_1_id)
     _assert_document_storage(doc_1_id, doc_1)
     _assert_sync_is_clean(len(before_ids) + 2)
@@ -287,7 +291,8 @@ def test_put_document_stores_metadata_unchanged_and_doc_type(created_record_ids)
     metadata = "base64_is_only_metadata_here"
     doc_type = "txt"
 
-    document_id = _put_doc_as_doc_data(document_data, metadata, doc_type)
+    # need to shield each " with \". Probably I need to put that into _put_doc_as_doc_data
+    document_id = _put_doc_as_doc_data(shield_special_symbols(document_data), metadata, doc_type)
     created_record_ids.append(document_id)
 
     _assert_document_storage(
