@@ -131,7 +131,7 @@ def make_script_chat(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'${WORK_DIR}/rag_answer_question.py "${OVERRIDEN_CMD_ARGS[@]}" --session_id="${SESSION_ID_VALUE}" -db_host="${VECTOR_DB_HOST}" -db_port="${VECTOR_DB_PORT}" "${SHARED_API_DIR}" "${MAIN_SERVICE_NAME}" "${ASSET_MODELS}"'
+        r'${WORK_DIR}/agentic_rag.py "${OVERRIDEN_CMD_ARGS[@]}" --session_id="${SESSION_ID_VALUE}" -db_host="${VECTOR_DB_HOST}" -db_port="${VECTOR_DB_PORT}" "${SHARED_API_DIR}" "${MAIN_SERVICE_NAME}" "${ASSET_MODELS}"'
     )
     script.writelines(line + "\n" for line in body)
 
