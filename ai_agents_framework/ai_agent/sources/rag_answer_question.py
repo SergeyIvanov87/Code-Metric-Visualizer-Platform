@@ -491,7 +491,6 @@ if __name__ == "__main__":
 
     Never invent content or Source IDs.
     """
-    print(args.system_prompt)
     null_safe_qwen_agent = create_agent(
         model=null_safe_qwen_model,
         tools=[search_knowledge_base],

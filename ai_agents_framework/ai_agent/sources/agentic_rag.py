@@ -217,7 +217,7 @@ def search_knowledge_base_impl(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="Agentic RAG")
-        parser.add_argument(
+    parser.add_argument(
         "-system_prompt",
         "--system_prompt",
         type=str,
@@ -242,6 +242,12 @@ if __name__ == "__main__":
         help="the listening port of a Vector DB service",
     )
 
+    parser.add_argument(
+        "-session_id",
+        "--session_id",
+        type=str,
+        help="Session ID"
+    )
     parser.add_argument(
         "shared_api_dir", type=Path, help="Root path of the mounted API dir"
     )
