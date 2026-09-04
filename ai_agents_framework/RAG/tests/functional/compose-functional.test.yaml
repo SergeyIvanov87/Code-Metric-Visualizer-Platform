@@ -5,7 +5,7 @@ services:
       dockerfile: ./ai_agents_framework/RAG/tests/functional/Dockerfile
 
     environment:
-      - EXIT_ONCE_DONE=false
+      - EXIT_ONCE_DONE=true
       - RAG_URI=rag-host-test:8000
     networks:
       - api.pmccabe_collector.network
