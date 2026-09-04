@@ -76,7 +76,7 @@ jobs:
     - name: Test AI RAG docs dispatcher Docker image[prod]
       run: docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml up --remove-orphans --abort-on-container-exit --exit-code-from docs-dispatcher-functional-tester
     - name: Test AI RAG impl
-      run: docker compose -f  ai_agents_framework/RAG/compose-functional.test.yaml --remove-orphans --abort-on-container-exit --exit-code-from rag-functional-tester
+      run: docker compose -f  ai_agents_framework/RAG/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rag-functional-tester
     - name: Create API volume
       run: mkdir -p api && chmod 777 api && docker volume create -d local -o type=none -o device=api -o o=bind api.pmccabe_collector.restapi.org
     - name: Run VCS Docker
