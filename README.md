@@ -110,6 +110,19 @@ Although `<local host mount point>` **SHOULD NOT** be employable by `Analytic UC
 
 - You **SHOULD** define environment variables `FLASK_RUN_HOST` and `FLASK_RUN_PORT` to determine where REST API service will listen incoming connections (default values `0.0.0.0` and `5000` respectfully).
 
+- In order to use logging facility, you **SHOULD** configure a logging driver by adding these lines into the file `/etc/docker/daemon.json` (create it if it doesn't exist):
+
+```
+{
+  "log-driver": "syslog",
+  "log-opts": {
+    "syslog-address": "udp://1.2.3.4:1111"
+  }
+}
+```
+
+see the [official docker docmunetation](https://docs.docker.com/engine/logging/drivers/syslog/)
+
 ### Analysis UC
 
 In addition to **General** prerequisites above, you **MUST** define environment variable `PROJECT_PATH` when launching `docker compose  -f compose-analysis.yaml` (or use the following bind mount `--mount type=bind,src=${PROJECT_PATH}/,target=/mnt` for `docker run`), which **MUST** specify your source code project path.

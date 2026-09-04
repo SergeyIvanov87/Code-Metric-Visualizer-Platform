@@ -1,0 +1,16 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "PUT",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/put_doc/v1",
+    "Params": {
+        "-URI": "",
+        "-metadata": "\"\"",
+        "-doc_type": "txt",
+        "doc_data": ""
+    },
+    "Description": {
+        "header": "Insert a document into persistent storage",
+        "body": "The parameter `doc_data` contains encoded bytes whose encoding is described by `doc_type`; its default value is `txt`. The `metadata` parameter is stored and passed through unchanged. Returns a 'unique_id' of the document if the insertion succeeded",
+        "footer": ""
+    }
+}

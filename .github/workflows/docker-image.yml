@@ -69,6 +69,14 @@ jobs:
         DATE: ${{ steps.date.outputs.date }}
     - name: Test the Service Broker Docker image
       run: docker compose -f service_broker/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from service-broker-functional-tester
+    - name: Build AI RAG docs dispatcher Docker image[prod]
+      run: docker build -f ai_agents_framework/docs_dispatcher/Dockerfile -t docs-dispatcher:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test AI RAG docs dispatcher Docker image[prod]
+      run: docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml up --remove-orphans --abort-on-container-exit --exit-code-from docs-dispatcher-functional-tester
+    - name: Test AI RAG impl
+      run: docker compose -f  ai_agents_framework/RAG/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rag-functional-tester
     - name: Create API volume
       run: mkdir -p api && chmod 777 api && docker volume create -d local -o type=none -o device=api -o o=bind api.pmccabe_collector.restapi.org
     - name: Run VCS Docker
