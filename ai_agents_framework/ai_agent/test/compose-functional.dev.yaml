@@ -1,0 +1,83 @@
+include:
+  - ../../../common/images/test_pseudo_fs/compose.yaml
+
+services:
+  ai_agent:
+    extends:
+      file: ../compose-default.dev.yaml
+      service: ai_agent
+    environment:
+      VECTORDB_HOST: ai_agent_rag_db
+      VECTORDB_PORT: 8000
+    volumes:
+      - ai_agent_api:/api
+      - ai_agent_models:/assets/models
+      - ai_agent_source:/package
+    depends_on:
+      ai_agent_rag_db:
+        condition: service_started
+      ai_agent_docs_dispatcher:
+        condition: service_started
+
+  ai_agent_rag_db:
+    build:
+      context: ../../..
+      dockerfile: ai_agents_framework/RAG/Dockerfile
+    volumes:
+      - ai_agent_rag_data:/mnt
+
+  ai_agent_docs_dispatcher:
+    extends:
+      file: ../../docs_dispatcher/compose-default.prod.yaml
+      service: docs_dispatcher
+    volumes:
+      - ai_agent_api:/api
+      - ai_agent_dispatcher_config:/etc/dispatcher
+      - ai_agent_document_storage:/mnt/file_storage
+    depends_on:
+      ai_agent_document_storage_permissions:
+        condition: service_healthy
+
+  ai_agent_document_storage_permissions:
+    image: alpine:3.20.6
+    command: >
+      sh -ec "mkdir -p /mnt/file_storage;
+      chmod -R 0777 /mnt/file_storage;
+      touch /tmp/ready;
+      exec tail -f /dev/null"
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 1s
+      timeout: 1s
+      retries: 10
+    volumes:
+      - ai_agent_document_storage:/mnt/file_storage
+
+  ai_aent_rag_functional_tester:
+    build:
+      context: ../../..
+      dockerfile: ai_agents_framework/ai_agent/test/Dockerfile
+      additional_contexts:
+        test_pseudo_fs: service:test_pseudo_fs
+    environment:
+      EXIT_ONCE_DONE: "true"
+    volumes:
+      - ai_agent_api:/api
+    depends_on:
+      ai_agent:
+        condition: service_started
+      test_pseudo_fs:
+        condition: service_started
+
+volumes:
+  ai_agent_api:
+  ai_agent_models:
+  ai_agent_rag_data:
+  ai_agent_dispatcher_config:
+  ai_agent_document_storage:
+  ai_agent_source:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ../sources
