@@ -77,6 +77,12 @@ jobs:
       run: docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml up --remove-orphans --abort-on-container-exit --exit-code-from docs-dispatcher-functional-tester
     - name: Test AI RAG impl
       run: docker compose -f  ai_agents_framework/RAG/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rag-functional-tester
+    - name: Build AI agent Docker image
+      run: docker build -f ai_agents_framework/ai_agent/Dockerfile -t ai-agent:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test AI agent RAG filesystem API
+      run: docker compose -f ai_agents_framework/ai_agent/test/compose-functional.prod.yaml up --remove-orphans --abort-on-container-exit --exit-code-from ai_aent_rag_functional_tester
     - name: Create API volume
       run: mkdir -p api && chmod 777 api && docker volume create -d local -o type=none -o device=api -o o=bind api.pmccabe_collector.restapi.org
     - name: Run VCS Docker
@@ -124,6 +130,8 @@ jobs:
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Prepare shared volume for SYSLOG-NG
       run: rm -rf ${GITHUB_WORKSPACE}/log && mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
+    - name: Build AI agent RAG functional test services
+      run: docker compose -f compose-functional.test.yaml build ai_agent ai_aent_rag_functional_tester
     - name: All together functional tests
       run: EXIT_STATUS=0 && docker compose -f compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
 
