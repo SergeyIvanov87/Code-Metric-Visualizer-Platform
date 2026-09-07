@@ -3,7 +3,6 @@
 import base64
 import json
 import os
-import shlex
 from pathlib import Path
 from uuid import uuid4
 
@@ -17,6 +16,12 @@ DATA_DIR = Path("/tests/data")
 QUESTION = "What is the RRD microservice?"
 
 
+def quote_api_value(value: str) -> str:
+    """Quote a value for the filesystem API's double-quote-aware parser."""
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
 def execute_api(
     api_dir: str, query_schema: dict, arguments: dict[str, str], timeout: float = 900
 ) -> str:
@@ -27,7 +32,7 @@ def execute_api(
     command = " ".join(
         [
             f"SESSION_ID={session_id}",
-            *(f"{key}={shlex.quote(value)}" for key, value in arguments.items()),
+            *(f"{key}={quote_api_value(value)}" for key, value in arguments.items()),
         ]
     )
 
