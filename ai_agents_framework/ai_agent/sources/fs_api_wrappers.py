@@ -80,14 +80,17 @@ def execute_put_doc_query(
 ):
     exec_args_array = [
         f"SESSION_ID={session_id}",
-        f"-URI={doc_uri}",
         f"-doc_type={doc_type}",
     ]
+
+    if doc_data is None:
+        exec_args_array.append(f"-URI={doc_uri}")
 
     if doc_metadata is not None:
         exec_args_array.append(f"-metadata={doc_metadata}")
 
-    exec_args_array.append(f"doc_data={doc_data}")
+    if doc_data is not None:
+        exec_args_array.append(f"doc_data={doc_data}")
     exec_args = " ".join(exec_args_array)
 
     status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
