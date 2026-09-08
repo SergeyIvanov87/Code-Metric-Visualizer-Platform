@@ -28,7 +28,7 @@ def execute_api(
     """Execute a public filesystem API with a bounded, interruptible query."""
     session_id = f"ai_agent_test_{uuid4().hex}"
     pipes = compose_api_queries_pipe_names(api_dir, query_schema, session_id)
-    query = APIQueryInterruptible(pipes, remove_session_pipe_on_result_done=True)
+    query = APIQueryInterruptible(pipes, remove_session_pipe_on_result_done=False)
     command = " ".join(
         [
             f"SESSION_ID={session_id}",
