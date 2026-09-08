@@ -126,6 +126,48 @@ services:
     networks:
       - api.pmccabe_collector.network
 
+  ai_agent:
+    extends:
+      file: ai_agents_framework/ai_agent/compose-default.prod.yaml
+      service: ai_agent
+    environment:
+      VECTORDB_HOST: rag
+      VECTORDB_PORT: 8000
+    volumes:
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
+      - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models.test:/assets/models
+    depends_on:
+      docs-dispatcher:
+        condition: service_started
+      rag:
+        condition: service_started
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  ai_aent_rag_functional_tester:
+    extends:
+      file: ai_agents_framework/ai_agent/test/compose-functional.prod.yaml
+      service: ai_aent_rag_functional_tester
+    environment:
+      EXIT_ONCE_DONE: "false"
+    volumes:
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
+    depends_on:
+      ai_agent:
+        condition: service_started
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
 
   rest-api-functional-api-initializer:
     extends:
@@ -208,6 +250,7 @@ volumes:
   api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:
   api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.cfg.test:
   api.pmccabe_collector.project.ai-agents-framework.rag.test:
+  api.pmccabe_collector.project.ai-agents-framework.ai-agent.models.test:
 
 secrets:
    backend_mysql_db_login:
