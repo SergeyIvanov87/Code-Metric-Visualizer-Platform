@@ -78,6 +78,9 @@ def execute_put_doc_query(
     doc_type,
     doc_metadata,
 ):
+    if doc_data is not None and not isinstance(doc_data, str):
+        raise TypeError("doc_data must be textual data")
+
     exec_args_array = [
         f"SESSION_ID={session_id}",
         f"-doc_type={doc_type}",
