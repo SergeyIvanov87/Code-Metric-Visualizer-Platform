@@ -37,7 +37,7 @@ def test_execute_put_doc_query_omits_uri_when_doc_data_is_specified():
 
     assert query.exec_args == (
         "SESSION_ID=session -doc_type=base64,txt "
-        "-metadata=metadata doc_data=encoded-document"
+        '-metadata=metadata doc_data="encoded-document"'
     )
     assert "-URI" not in query.exec_args
 
@@ -72,3 +72,20 @@ def test_execute_put_doc_query_rejects_binary_doc_data():
             "base64,txt",
             "metadata",
         )
+
+
+def test_execute_put_doc_query_quotes_doc_data_for_dispatcher():
+    query = FakeQuery()
+    encoded_document = "prefix/with+shell-sensitive=base64"
+
+    execute_put_doc_query(
+        query,
+        "session",
+        10,
+        None,
+        encoded_document,
+        "base64,txt",
+        "metadata",
+    )
+
+    assert query.exec_args.endswith(f'doc_data="{encoded_document}"')
