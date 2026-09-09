@@ -43,14 +43,14 @@ def execute_api(
     return result.strip()
 
 
-def add_document(path: Path) -> dict:
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+def add_document_data(document_data: bytes, metadata: str) -> dict:
+    encoded = base64.b64encode(document_data).decode("ascii")
     result = json.loads(
         execute_api(
             os.environ["SHARED_API_DIR"],
             API_SCHEMAS["rag_add"],
             {
-                "-metadata": f"functional_test_{path.stem}",
+                "-metadata": metadata,
                 "-doc_type": "txt",
                 "doc_data": encoded,
             },
@@ -60,6 +60,10 @@ def add_document(path: Path) -> dict:
     assert result["doc_id"]
     assert result["chunk_ids"]
     return result
+
+
+def add_document(path: Path) -> dict:
+    return add_document_data(path.read_bytes(), f"functional_test_{path.stem}")
 
 
 def ask_rrd_question() -> str:
@@ -75,6 +79,17 @@ def ask_rrd_question() -> str:
         },
         timeout=300,
     )
+
+
+def test_put_doc_accepts_long_inline_data():
+    """Exercise the long doc_data forwarding path before chat functionality."""
+    document_data = ("Unrelated transport regression fixture ÿ.\n" * 400).encode()
+    encoded = base64.b64encode(document_data).decode("ascii")
+    assert "/" in encoded
+
+    result = add_document_data(document_data, "functional_test_long_put_doc")
+
+    assert result["error_code"] == 0
 
 
 def test_chat_becomes_grounded_after_readme_is_added():
