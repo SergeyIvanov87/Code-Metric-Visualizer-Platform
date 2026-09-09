@@ -93,7 +93,12 @@ def execute_put_doc_query(
         exec_args_array.append(f"-metadata={doc_metadata}")
 
     if doc_data is not None:
-        exec_args_array.append(f"doc_data={doc_data}")
+        # Keep inline data as one explicitly quoted filesystem-API value.  Apart
+        # from preserving whitespace, the quotes prevent the generated shell
+        # dispatcher from interpreting characters in a long base64 payload
+        # while it extracts doc_data from the argument list.
+        escaped_doc_data = doc_data.replace("\\", "\\\\").replace('"', '\\"')
+        exec_args_array.append(f'doc_data="{escaped_doc_data}"')
     exec_args = " ".join(exec_args_array)
 
     status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
