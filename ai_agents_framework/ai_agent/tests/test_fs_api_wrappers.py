@@ -1,6 +1,8 @@
 from pathlib import Path
 import sys
 
+import pytest
+
 
 SOURCES_DIR = Path(__file__).resolve().parents[1] / "sources"
 sys.path.insert(0, str(SOURCES_DIR))
@@ -28,14 +30,14 @@ def test_execute_put_doc_query_omits_uri_when_doc_data_is_specified():
         "session",
         10,
         None,
-        b"encoded-document",
+        "encoded-document",
         "base64,txt",
         "metadata",
     )
 
     assert query.exec_args == (
         "SESSION_ID=session -doc_type=base64,txt "
-        "-metadata=metadata doc_data=b'encoded-document'"
+        "-metadata=metadata doc_data=encoded-document"
     )
     assert "-URI" not in query.exec_args
 
@@ -57,3 +59,16 @@ def test_execute_put_doc_query_passes_uri_when_doc_data_is_not_specified():
         "SESSION_ID=session -doc_type=txt -URI=/documents/example.txt"
     )
     assert "doc_data=" not in query.exec_args
+
+
+def test_execute_put_doc_query_rejects_binary_doc_data():
+    with pytest.raises(TypeError, match="doc_data must be textual data"):
+        execute_put_doc_query(
+            FakeQuery(),
+            "session",
+            10,
+            None,
+            b"encoded-document",
+            "base64,txt",
+            "metadata",
+        )
