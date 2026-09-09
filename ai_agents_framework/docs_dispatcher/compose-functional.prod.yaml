@@ -1,0 +1,33 @@
+include:
+  - tests/functional/compose-functional.test.yaml
+
+services:
+  docs-dispatcher:
+    build:
+      context: ../../
+      dockerfile: ./ai_agents_framework/docs_dispatcher/Dockerfile
+    environment:
+       BE_MYSQL_PASSWORD_FILE: /run/secrets/backend_mysql_db_password
+       BE_MYSQL_LOGIN_FILE: /run/secrets/backend_mysql_db_login
+       BE_MYSQL_MYSQL_DATABASE: test_docs_database
+    volumes:
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.cfg.test:/etc/dispatcher
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/mnt/file_storage
+    depends_on:
+      docs-dispatcher-file-storage-permissions:
+        condition: service_healthy
+    secrets:
+       - backend_mysql_db_login
+       - backend_mysql_db_password
+
+volumes:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.cfg.test:
+
+secrets:
+   backend_mysql_db_login:
+     file: tests/backend_mysql_default_user.txt
+   backend_mysql_db_password:
+     file: tests/backend_mysql_default_pwd.txt

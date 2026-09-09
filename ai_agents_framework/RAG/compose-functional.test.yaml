@@ -1,0 +1,21 @@
+include:
+  - tests/compose-functional.test.yaml
+
+services:
+  rag:
+    build:
+      context: ../../
+      dockerfile: ./ai_agents_framework/RAG/Dockerfile
+    hostname: rag-host-test
+    volumes:
+      - api.pmccabe_collector.project.ai-agents-framework.rag.test:/mnt
+    networks:
+      - api.pmccabe_collector.network
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: false
+
+volumes:
+  api.pmccabe_collector.project.ai-agents-framework.rag.test:

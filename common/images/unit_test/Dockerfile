@@ -47,4 +47,7 @@ dos2unix /tests/*
 dos2unix /tests/bash/*
 EOF
 
+#Set the display environment variable
+ENV DISPLAY=:0
+
 ENTRYPOINT ["/init.sh", "/tests", "/api"]

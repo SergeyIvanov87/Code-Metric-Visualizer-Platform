@@ -68,7 +68,7 @@ def get_fs_watch_event_for_request_type(req_type):
 api_gui_schema = [
     "{} > {}/help 2>&1\n",
     "shopt -s extglob\n",
-    "EXT=`${0}/{1} --result_type`\n",
+    "EXT=`{0}/{1} --result_type`\n",
     "inotifywait -m {0} -e {1} --include '{2}' |\n",
     "\twhile read dir action file; do\n",
     '\t\techo "file: ${file}, action; ${action}, dir: ${dir}"\n',
@@ -76,7 +76,7 @@ api_gui_schema = [
     "\t\t\tACCESS|ATTRIB|MODIFY )\n",
     "\t\t\t\tdate=`date +%Y-%m-%dT%H:%M:%S`\n",
     "\t\t\t\ttouch {0}/in_progress\n",
-    '\t\t\t\t"${0}/{1}" {2} 0 > {3}${4}\n',
+    '\t\t\t\t"{0}/{1}" {2} 0 > {3}${4}\n',
     '\t\t\t\tchmod +rw {0}${1}\n',
     "\t\t\t\trm -f {0}/in_progress\n",
     "\t\t\t;;\n",
@@ -168,12 +168,12 @@ api_cli_schema = [
     "echo 'Server {0} stopped'\n",
 ]
 
-def generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type):
+def generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type, req_exec_script_root_dir= "${WORK_DIR}"):
     req_executor_name = compose_api_exec_script_name(req_name)
     api_gui_schema_concrete = api_gui_schema.copy()
     template_schema_row_index = 0
     api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
-        "${WORK_DIR}/" + compose_api_help_script_name(req_name), api_req_directory
+        req_exec_script_root_dir + "/" + compose_api_help_script_name(req_name), api_req_directory
     )
 
     # determine result type: either from JSON or from script renerated
@@ -181,7 +181,7 @@ def generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_
     if len(content_type) != 0:
         api_gui_schema_concrete[template_schema_row_index] = "EXT=." + file_extension_from_content_type(content_type) + "\n"
     else:
-        api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format("{WORK_DIR}",req_executor_name)
+        api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(req_exec_script_root_dir, req_executor_name)
 
     template_schema_row_index += 1
     api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
@@ -194,7 +194,7 @@ def generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_
 
     template_schema_row_index += 1
     api_gui_schema_concrete[template_schema_row_index] = api_gui_schema_concrete[template_schema_row_index].format(
-        "{WORK_DIR}",
+        req_exec_script_root_dir,
         req_executor_name,
         api_req_directory,
         os.path.join(api_exec_node_directory, "result_${date}"),
@@ -248,7 +248,7 @@ def generate_cli_server_content(req_name, req_api, req_type, content_type, req_e
     api_cli_schema_concrete[-1] = api_cli_schema_concrete[-1].format(req_name)
     return api_cli_schema_concrete
 
-def create_gui_server_content_from_schema(req_name, req_schema):
+def create_gui_server_content_from_schema(req_name, req_schema, req_exec_script_root_dir = "${WORK_DIR}"):
     req_type = req_schema["Method"]
     req_api = req_schema["Query"]
     req_params = req_schema["Params"]
@@ -261,7 +261,7 @@ def create_gui_server_content_from_schema(req_name, req_schema):
             "${SHARED_API_DIR}", req_api, req_type
     )
 
-    return generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type)
+    return generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_node_directory, content_type, req_exec_script_root_dir)
 
 
 def create_cli_server_content_from_schema(req_name, req_schema, req_exec_script_root_dir = "${WORK_DIR}"):
@@ -292,7 +292,7 @@ def build_api_services(api_schema_path, executor_generated_scripts_path, output_
             continue
 
         #generate CLI API server
-        cli_server_content = create_cli_server_content_from_schema(req_name, request_data)
+        cli_server_content = create_cli_server_content_from_schema(req_name, request_data, executor_generated_scripts_path)
         api_server_script_file_path = get_api_cli_service_script_path(generated_api_server_scripts_path, req_name)
         with open(api_server_script_file_path, "w") as server_file:
             server_file.write("#!/bin/bash\n\n")
@@ -301,7 +301,7 @@ def build_api_services(api_schema_path, executor_generated_scripts_path, output_
 
 
         # generate GUI API listener
-        gui_server_content = create_gui_server_content_from_schema(req_name, request_data)
+        gui_server_content = create_gui_server_content_from_schema(req_name, request_data, executor_generated_scripts_path)
         api_server_script_file_path = get_api_gui_service_script_path(generated_api_server_scripts_path, req_name)
         with open(api_server_script_file_path, "w") as listener_file:
             listener_file.write("#!/bin/bash\n\n")

@@ -315,6 +315,54 @@ def extract_attr_value_from_string():
     return __extract_attr_value_from_string_using_tokenizer_function__()[0]
 
 
+def __cut_first_avp_from_string_function__():
+    function_name = "cut_first_avp_from_string"
+    return function_name, [
+        "{}()".format(function_name) + " {\n",
+        '   local input="${1}"\n',
+        '   local parameter_name="${2}"\n',
+        '   local value_output="${3}"\n',
+        '   local text_output="${4}"\n',
+        '   local delimiter=${5:-=}\n',
+        '   local first_field\n',
+        '   local value\n',
+        '   local remaining_text\n',
+
+        '   if [[ -z $parameter_name || -z $delimiter ]]; then\n',
+        '       printf "Parameter name and delimiter cannot be empty\n" >&2\n',
+        '       return 2\n',
+        '   fi\n',
+
+        '   # Get the first whitespace-separated field.\n',
+        '   first_field=${input%%[[:space:]]*}\n',
+
+        '   if [[ $first_field == "${parameter_name}${delimiter}"* ]]; then\n',
+        '       # Remove only "<parameter><delimiter>".\n',
+        '       value=${first_field#"${parameter_name}${delimiter}"}\n',
+
+        '       # Remove the complete parameter from the input.\n',
+        '       remaining_text=${input#"$first_field"}\n',
+
+        '       # Remove whitespace following the parameter.\n',
+        '       remaining_text=${remaining_text#"${remaining_text%%[![:space:]]*}"}\n',
+        '   else\n',
+        '       # Parameter was not found at the start.\n',
+        '       printf -v "$value_output" \'%s\' ""\n',
+        '       printf -v "$text_output" \'%s\' "$input"\n',
+        '       return 1\n',
+        '   fi\n',
+
+        '   printf -v "$value_output" \'%s\' "$value"\n',
+        '   printf -v "$text_output" \'%s\' "$remaining_text"\n',
+        '}\n'
+    ]
+
+def generate_cut_first_avp_from_string():
+    return __cut_first_avp_from_string_function__()[1]
+
+def cut_first_avp_from_string():
+    return __cut_first_avp_from_string_function__()[0]
+
 
 def __add_suffix_if_exist_function__():
     function_name = "add_suffix_if_exist"

@@ -1,0 +1,14 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "GET",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/get_docs/v1",
+    "Params": {
+        "offset": "0",
+        "limit":"-1"
+    },
+    "Description": {
+        "header": "Return document IDs with all theirs chunk IDs",
+        "body": "As the list of documents may be quite large, the API introduces parameters: \"offset\" and \"limit\". While \"offset\" specifies how many documents the query must skip, \"limit\" determines the maximum number of documents to return. By default all documents will be returned starting from the beginning of the list. The response contains the requested offset, the actual number of returned documents as limit, the number of documents remaining after the current page as remaining, and the documents in the docs array. Each document contains its id, decanonized file_uri, type supplied as doc_type when the document was stored, and chunk IDs",
+        "footer": ""
+    }
+}

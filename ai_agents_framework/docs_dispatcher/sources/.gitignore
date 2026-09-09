@@ -1,0 +1,6 @@
+.bash_history
+.python_history
+.venv*
+__pycache__
+docs
+generated

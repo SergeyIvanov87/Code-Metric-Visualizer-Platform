@@ -1,0 +1,13 @@
+{
+    "Content-Type": "application/json",
+    "Method": "GET",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/get_doc_info/v1",
+    "Params": {
+        "-doc_ids": ""
+    },
+    "Description": {
+        "header": "Return storage status and information for selected documents",
+        "body": "The required -doc_ids parameter is a comma-separated list of numeric document IDs. The response contains mutually exclusive found, inconsistent, and not_found ID arrays followed by an entry keyed by each requested ID. A document found in both the database and file storage is listed in found and has error_code 0 and status success. A document found in only one store is listed in inconsistent and has error_code 1, a status naming the missing store, and an info object recovered from the available store. An ID absent as a document from both stores is listed in not_found and has error_code -1 and status The doc is absent or ID is incorrect. Each available info object contains file_uri, type, and the IDs of chunks belonging to the document. Duplicate requested IDs are returned once in their original order.",
+        "footer": ""
+    }
+}
