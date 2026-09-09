@@ -102,10 +102,16 @@ def main(
 
     # insert the main doc
     timeout_elapsed = 10
-    doc_data_bytes = doc_data.encode('utf-8')
-    doc_data_bytes = base64.b64encode(doc_data_bytes)
+    doc_data_bytes = doc_data.encode("utf-8")
+    encoded_doc_data = base64.b64encode(doc_data_bytes).decode("ascii")
     put_doc_result = execute_put_doc_query(
-        put_doc_query, session_id, timeout_elapsed, doc_uri, doc_data_bytes, doc_type_for_dispatcher, doc_metadata
+        put_doc_query,
+        session_id,
+        timeout_elapsed,
+        doc_uri,
+        encoded_doc_data,
+        doc_type_for_dispatcher,
+        doc_metadata,
     )
     doc_unique_id = put_doc_result["unique_id"]
 
