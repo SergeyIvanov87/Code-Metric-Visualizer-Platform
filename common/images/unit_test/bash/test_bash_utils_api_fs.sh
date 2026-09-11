@@ -224,6 +224,22 @@ test_extract_avp_from_string_or_default_special_characters_multiple_calls() {
     assertNotEquals "Unmatched double quote returns an error" "0" "${STATUS}"
 }
 
+test_extract_avp_from_string_or_default_long_value() {
+    local INPUT_STRING
+    local EXPECTED_VALUE
+    local VALUE
+    local START_SECONDS=${SECONDS}
+
+    printf -v EXPECTED_VALUE '%*s' 24000 ''
+    EXPECTED_VALUE=${EXPECTED_VALUE// /a}
+    INPUT_STRING="A=\"${EXPECTED_VALUE}\" B=two"
+
+    extract_avp_from_string_or_default "A" "${INPUT_STRING}" "" '=' VALUE
+    assertEquals "Long quoted values are parsed completely" "${EXPECTED_VALUE}" "${VALUE}"
+    assertTrue "Long quoted values are parsed without a quadratic scan" \
+        "[ $((SECONDS - START_SECONDS)) -lt 3 ]"
+}
+
 test_add_suffix_if_exist() {
     local SUFFIX_TO_ADD=
     local STR_FOR_ADDING_SUFFIX="my_string"
