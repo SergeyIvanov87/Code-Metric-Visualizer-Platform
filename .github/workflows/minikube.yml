@@ -14,7 +14,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: start minikube
-        uses: medyagh/setup-minikube@v0.0.40
+        uses: medyagh/setup-minikube@v0.0.21
       - name: kubectl
         run: kubectl get pods -A
       - name: Activate docker env & Build Docker images locally
