@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from api_fs_query import APIQueryInterruptible
 from api_schema_utils import compose_api_queries_pipe_names
+from heartbeat import Heartbeat
 from utils import get_api_queries
 
 
@@ -36,11 +37,25 @@ def execute_api(
         ]
     )
 
-    status, remaining = query.execute(timeout, command)
-    assert status, f"API did not accept the query within {timeout} seconds"
-    status, result, _ = query.wait_result(remaining, session_id, 0.1, 9000, True)
-    assert status, f"API did not return a result within {timeout} seconds"
-    return result.strip()
+    heartbeat = Heartbeat()
+    heartbeat.run(
+        f"AI-agent filesystem API query is in progress; session={session_id}"
+    )
+    try:
+        status, remaining = query.execute(timeout, command)
+        assert status, f"API did not accept the query within {timeout} seconds"
+
+        status, result, _ = query.wait_result(
+            remaining,
+            session_id,
+            0.1,
+            9000,
+            True,
+        )
+        assert status, f"API did not return a result within {timeout} seconds"
+        return result.strip()
+    finally:
+        heartbeat.stop()
 
 
 def add_document_data(document_data: bytes, metadata: str) -> dict:
