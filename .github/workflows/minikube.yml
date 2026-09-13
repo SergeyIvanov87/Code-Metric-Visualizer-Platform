@@ -125,10 +125,26 @@ jobs:
             --timeout=180s
       - name: Run host-based ingress
         run: |
-          kubectl apply -f k8s/ingress/name-based.yaml
+          for attempt in $(seq 1 30); do
+            if kubectl apply -f k8s/ingress/name-based.yaml; then
+              exit 0
+            fi
+            echo "Ingress apply failed, attempt: [${attempt}/30]"
+            sleep 5
+          done
+          kubectl get pods,jobs,endpoints -n ingress-nginx
+          exit 1
       - name: Run fan-out ingress
         run: |
-          kubectl apply -f k8s/ingress/fan-out.yaml
+          for attempt in $(seq 1 30); do
+            if kubectl apply -f k8s/ingress/fan-out.yaml; then
+              exit 0
+            fi
+            echo "Ingress apply failed, attempt: [${attempt}/30]"
+            sleep 5
+          done
+          kubectl get pods,jobs,endpoints -n ingress-nginx
+          exit 1
       - name: Update DNS records using IP from minikube
         run: |
           echo "$(minikube ip) cc.api" | sudo tee -a /etc/hosts
