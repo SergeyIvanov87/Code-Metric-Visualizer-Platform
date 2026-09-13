@@ -14,7 +14,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: start minikube
-        uses: medyagh/setup-minikube@v0.0.21
+        # v0.0.21 is the latest setup-minikube action release. Pin its commit
+        # rather than the mutable `latest` ref so CI executes reviewed code.
+        uses: medyagh/setup-minikube@e9e035a86bbc3caea26a450bd4dbf9d0c453682e # v0.0.21
+        with:
+          # This independently selects the Minikube binary installed by the
+          # action. Keep the last known-good binary instead of its `latest`.
+          minikube-version: v1.38.1
+          driver: docker
       - name: kubectl
         run: kubectl get pods -A
       - name: Activate docker env & Build Docker images locally
