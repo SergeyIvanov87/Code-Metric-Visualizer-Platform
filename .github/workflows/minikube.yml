@@ -20,7 +20,8 @@ jobs:
         with:
           # This independently selects the Minikube binary installed by the
           # action. Keep the last known-good binary instead of its `latest`.
-          minikube-version: v1.38.1
+          # setup-minikube expects X.Y.Z here (unlike Minikube's vX.Y.Z tag).
+          minikube-version: 1.38.1
           driver: docker
       - name: kubectl
         run: kubectl get pods -A
