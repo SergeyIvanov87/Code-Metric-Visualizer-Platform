@@ -14,7 +14,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: start minikube
-        uses: medyagh/setup-minikube@v0.0.21
+        # v0.0.21 is the latest setup-minikube action release. Pin its commit
+        # rather than the mutable `latest` ref so CI executes reviewed code.
+        uses: medyagh/setup-minikube@e9e035a86bbc3caea26a450bd4dbf9d0c453682e # v0.0.21
+        with:
+          # This independently selects the Minikube binary installed by the
+          # action. Keep the last known-good binary instead of its `latest`.
+          # setup-minikube expects X.Y.Z here (unlike Minikube's vX.Y.Z tag).
+          minikube-version: 1.38.1
+          driver: docker
       - name: kubectl
         run: kubectl get pods -A
       - name: Activate docker env & Build Docker images locally
@@ -103,30 +111,40 @@ jobs:
           minikube addons enable ingress-dns
           kubectl -n ingress-nginx get pod -o yaml
           kubectl get pods --namespace=ingress-nginx
-          set +e  # revert the default `set -e`
-          RET=-1
-          for i in $(seq 1 90); do
-            kubectl get pods -n ingress-nginx | grep ingress-nginx-controller | grep Running | grep "1/1"; RET=$?
-            if [ ${RET} -eq 0 ]; then
-              RET=0
-              break
-            fi
-            echo "Try again in 5 sec, attempt: [${i}/90]"
-            sleep 5
-          done
-          # Wait for webhook to be ready
-          for i in $(seq 1 90); do
-            kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=5s 2>/dev/null && break
-            echo "Waiting for webhook readiness, attempt: [${i}/90]"
-            sleep 5
-          done
-          exit ${RET}
+          # A Ready controller pod does not mean its validating webhook has
+          # been configured yet. Applying an Ingress before these jobs finish
+          # races the webhook certificate creation and patching.
+          kubectl wait --namespace=ingress-nginx \
+            --for=condition=complete job/ingress-nginx-admission-create \
+            --timeout=180s
+          kubectl wait --namespace=ingress-nginx \
+            --for=condition=complete job/ingress-nginx-admission-patch \
+            --timeout=180s
+          kubectl wait --namespace=ingress-nginx \
+            --for=condition=available deployment/ingress-nginx-controller \
+            --timeout=180s
       - name: Run host-based ingress
         run: |
-          kubectl apply -f k8s/ingress/name-based.yaml
+          for attempt in $(seq 1 30); do
+            if kubectl apply -f k8s/ingress/name-based.yaml; then
+              exit 0
+            fi
+            echo "Ingress apply failed, attempt: [${attempt}/30]"
+            sleep 5
+          done
+          kubectl get pods,jobs,endpoints -n ingress-nginx
+          exit 1
       - name: Run fan-out ingress
         run: |
-          kubectl apply -f k8s/ingress/fan-out.yaml
+          for attempt in $(seq 1 30); do
+            if kubectl apply -f k8s/ingress/fan-out.yaml; then
+              exit 0
+            fi
+            echo "Ingress apply failed, attempt: [${attempt}/30]"
+            sleep 5
+          done
+          kubectl get pods,jobs,endpoints -n ingress-nginx
+          exit 1
       - name: Update DNS records using IP from minikube
         run: |
           echo "$(minikube ip) cc.api" | sudo tee -a /etc/hosts
