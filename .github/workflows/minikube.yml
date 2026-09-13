@@ -111,24 +111,18 @@ jobs:
           minikube addons enable ingress-dns
           kubectl -n ingress-nginx get pod -o yaml
           kubectl get pods --namespace=ingress-nginx
-          set +e  # revert the default `set -e`
-          RET=-1
-          for i in $(seq 1 90); do
-            kubectl get pods -n ingress-nginx | grep ingress-nginx-controller | grep Running | grep "1/1"; RET=$?
-            if [ ${RET} -eq 0 ]; then
-              RET=0
-              break
-            fi
-            echo "Try again in 5 sec, attempt: [${i}/90]"
-            sleep 5
-          done
-          # Wait for webhook to be ready
-          for i in $(seq 1 90); do
-            kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=5s 2>/dev/null && break
-            echo "Waiting for webhook readiness, attempt: [${i}/90]"
-            sleep 5
-          done
-          exit ${RET}
+          # A Ready controller pod does not mean its validating webhook has
+          # been configured yet. Applying an Ingress before these jobs finish
+          # races the webhook certificate creation and patching.
+          kubectl wait --namespace=ingress-nginx \
+            --for=condition=complete job/ingress-nginx-admission-create \
+            --timeout=180s
+          kubectl wait --namespace=ingress-nginx \
+            --for=condition=complete job/ingress-nginx-admission-patch \
+            --timeout=180s
+          kubectl wait --namespace=ingress-nginx \
+            --for=condition=available deployment/ingress-nginx-controller \
+            --timeout=180s
       - name: Run host-based ingress
         run: |
           kubectl apply -f k8s/ingress/name-based.yaml
