@@ -162,7 +162,12 @@ class LogDispatcher:
         if file_name not in self.files_offset_bytes.keys():
             self.files_offset_bytes[file_name] = 0
 
-        with open(file_name, "r") as file:
+        # Work in bytes so the saved offset always remains a byte offset and a
+        # concurrent writer cannot make TextIOWrapper decode an incomplete
+        # multi-byte UTF-8 sequence. The packet capture may also split a UTF-8
+        # character across records, so malformed sequences are replaced rather
+        # than allowed to terminate the aggregator.
+        with open(file_name, "rb") as file:
             file.seek(0, 2)
             size = file.tell()
             if size < self.files_offset_bytes[file_name]:
@@ -181,12 +186,13 @@ class LogDispatcher:
             #
             # Once a line terminated bye EOL, it indicates a complete syslog-ng packet,
             # which might be recognized later
-            for line in file:
-                if line[-1] != '\n':
+            for raw_line in file:
+                if raw_line[-1:] != b'\n':
                     print (f"Partial record detected: wait for a whole packet, file offset: {self.files_offset_bytes[file_name]}")
                     raise BufferError()
 
-                self.files_offset_bytes[file_name] += len(line)
+                self.files_offset_bytes[file_name] += len(raw_line)
+                line = raw_line.decode("utf-8", errors="replace")
                 container_name_match = self.container_name_regex.match(line)
                 if not container_name_match or len(container_name_match.groups()) < 1:
                     continue
