@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -24,7 +25,14 @@ def streamed_read_message(chunk, *, truncated=False):
     return encode_varint32(len(payload)) + payload
 
 
-def run_decoder(tmp_path, chunks, *, name_by_producer=False, truncated=False):
+def run_decoder(
+    tmp_path,
+    chunks,
+    *,
+    name_by_producer=False,
+    truncated=False,
+    max_buffered_rx_bytes="16777216",
+):
     tap_file = tmp_path / "connection_1.pb"
     output_file = tmp_path / "connection_1.log"
     tap_file.write_bytes(
@@ -38,10 +46,13 @@ def run_decoder(tmp_path, chunks, *, name_by_producer=False, truncated=False):
     if name_by_producer:
         command.append("--name-by-producer")
 
+    environment = os.environ.copy()
+    environment["MAX_BUFFERED_RX_BYTES"] = max_buffered_rx_bytes
     result = subprocess.run(
         command,
         capture_output=True,
         text=True,
+        env=environment,
     )
     return result, output_file
 
@@ -105,8 +116,11 @@ def test_decoder_rejects_truncated_tap_body(tmp_path):
         tmp_path,
         [b"<30>Sep 14 11:13:13 service-tester[7]: incomplete"],
         truncated=True,
+        max_buffered_rx_bytes="33554432",
     )
 
     assert result.returncode != 0
     assert "captured body as truncated" in result.stderr
+    assert "max_buffered_rx_bytes is 33554432 bytes" in result.stderr
+    assert "Increase MAX_BUFFERED_RX_BYTES in the Docker Compose" in result.stderr
     assert not output_file.exists()

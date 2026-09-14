@@ -3,6 +3,7 @@
 """Decode one completed Envoy socket-tap trace into syslog records."""
 
 import argparse
+import os
 import re
 from pathlib import Path
 
@@ -19,6 +20,20 @@ SYSLOG_HEADER = re.compile(
     rb"(?:(?P<hostname>[^\s:\[]+) )?"
     rb"(?P<producer>[^\s:\[]+)(?:\[\d+\])?: ?"
 )
+
+
+DEFAULT_MAX_BUFFERED_RX_BYTES = "16777216"
+
+
+def truncation_error(subject):
+    configured_limit = os.environ.get(
+        "MAX_BUFFERED_RX_BYTES", DEFAULT_MAX_BUFFERED_RX_BYTES
+    )
+    return ValueError(
+        f"Envoy marked {subject} as truncated. Configured max_buffered_rx_bytes "
+        f"is {configured_limit} bytes. Increase MAX_BUFFERED_RX_BYTES in the "
+        "Docker Compose configuration and retry."
+    )
 
 
 def decode_varint32(data, offset):
@@ -70,7 +85,7 @@ def iter_trace_wrappers(data):
 
 def decode_body(body):
     if body.truncated:
-        raise ValueError("Envoy marked a captured body as truncated")
+        raise truncation_error("a captured body")
     body_type = body.WhichOneof("body_type")
     if body_type == "as_bytes":
         return bytes(body.as_bytes)
@@ -90,7 +105,7 @@ def events_from_trace(trace):
     if trace_type == "socket_buffered_trace":
         buffered = trace.socket_buffered_trace
         if buffered.read_truncated:
-            raise ValueError("Envoy marked the downstream socket trace as truncated")
+            raise truncation_error("the downstream socket trace")
         yield from buffered.events
         return
 

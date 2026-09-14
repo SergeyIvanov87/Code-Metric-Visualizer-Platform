@@ -1,13 +1,14 @@
 #!/bin/bash
 
-# Observe Envoy's per-connection tap files. Activity keeps the service alive,
-# but a trace is decoded only after Envoy closes it.
+# Observe Envoy's per-connection tap files. Envoy's downstream byte counter
+# keeps the service alive; a trace is decoded only after Envoy closes it.
 
 tap_path=$1
 decoded_path=$2
 quiet_msec=$3
 result_path=$4
 max_wait_msec=${5:-900000}
+envoy_admin_url=${6:-http://127.0.0.1:9901}
 
 quiet_seconds=$(( (quiet_msec + 999) / 1000 ))
 max_wait_seconds=$(( (max_wait_msec + 999) / 1000 ))
@@ -20,13 +21,16 @@ declare -A active_files
 declare -a workers
 start_second=$SECONDS
 last_activity_second=$SECONDS
+last_stats_poll_second=-1
+last_rx_bytes=
+stats_ready=0
 capture_stop_requested=0
 capture_stop_second=0
 shutdown_grace_seconds=30
 
 coproc TAP_EVENTS {
     inotifywait --monitor \
-        --event create --event modify --event close_write \
+        --event create --event close_write \
         --format '%e|%w%f' "${tap_path}" 2>&1
 }
 event_fd=${TAP_EVENTS[0]}
@@ -52,7 +56,6 @@ fi
 
 while true; do
     if IFS='|' read -r -t 1 event_name event_path <&${event_fd}; then
-        last_activity_second=$SECONDS
         case "${event_name}" in
             *CREATE*)
                 active_files["${event_path}"]=1
@@ -70,34 +73,59 @@ while true; do
                 workers+=("$!")
                 ;;
         esac
-    else
-        if (( SECONDS - start_second >= max_wait_seconds )); then
-            echo "Timed out waiting for Envoy tap connections to close" \
+    fi
+
+    if (( SECONDS - start_second >= max_wait_seconds )); then
+        echo "Timed out waiting for Envoy tap connections to close" \
+            > "${result_path}/result_log_stderr"
+        echo 255 > "${result_path}/result"
+        kill "${inotify_pid}" 2>/dev/null
+        kill -s SIGTERM "$(pidof envoy)" 2>/dev/null
+        exit 255
+    fi
+
+    # File-per-tap output is buffered by Envoy, so inotify MODIFY events are
+    # not a reliable indication of live traffic. Poll the TCP proxy's
+    # monotonic downstream byte counter instead.
+    if (( SECONDS != last_stats_poll_second )); then
+        last_stats_poll_second=$SECONDS
+        current_rx_bytes=$(
+            curl --silent --fail --max-time 1 --get \
+                --data-urlencode 'filter=^tcp\.destination\.downstream_cx_rx_bytes_total$' \
+                "${envoy_admin_url}/stats" 2>/dev/null |
+                awk -F': ' \
+                    '$1 == "tcp.destination.downstream_cx_rx_bytes_total" { print $2; exit }'
+        )
+        if [[ "${current_rx_bytes}" =~ ^[0-9]+$ ]]; then
+            if (( stats_ready == 0 )); then
+                stats_ready=1
+                last_rx_bytes=$current_rx_bytes
+                last_activity_second=$SECONDS
+            elif [[ "${current_rx_bytes}" != "${last_rx_bytes}" ]]; then
+                last_rx_bytes=$current_rx_bytes
+                last_activity_second=$SECONDS
+            fi
+        fi
+    fi
+
+    if (( capture_stop_requested != 0 )); then
+        if (( ${#active_files[@]} == 0 )); then
+            break
+        fi
+        if (( SECONDS - capture_stop_second >= shutdown_grace_seconds )); then
+            echo "Envoy did not close all tap files after capture stopped" \
                 > "${result_path}/result_log_stderr"
             echo 255 > "${result_path}/result"
             kill "${inotify_pid}" 2>/dev/null
-            kill -s SIGTERM "$(pidof envoy)" 2>/dev/null
             exit 255
         fi
-        if (( capture_stop_requested != 0 )); then
-            if (( ${#active_files[@]} == 0 )); then
-                break
-            fi
-            if (( SECONDS - capture_stop_second >= shutdown_grace_seconds )); then
-                echo "Envoy did not close all tap files after capture stopped" \
-                    > "${result_path}/result_log_stderr"
-                echo 255 > "${result_path}/result"
-                kill "${inotify_pid}" 2>/dev/null
-                exit 255
-            fi
-        elif (( SECONDS - last_activity_second >= quiet_seconds )); then
-            # Persistent Docker logger connections keep tap files open after
-            # tests finish. Ask bootstrap to stop Envoy after the global quiet
-            # period; its shutdown closes every trace before decoding starts.
-            : > "${result_path}/capture_stop_requested"
-            capture_stop_requested=1
-            capture_stop_second=$SECONDS
-        fi
+    elif (( stats_ready != 0 && SECONDS - last_activity_second >= quiet_seconds )); then
+        # Persistent Docker logger connections keep tap files open after tests
+        # finish. Ask bootstrap to stop Envoy after the global traffic-quiet
+        # period; its shutdown closes every trace before decoding starts.
+        : > "${result_path}/capture_stop_requested"
+        capture_stop_requested=1
+        capture_stop_second=$SECONDS
     fi
 done
 

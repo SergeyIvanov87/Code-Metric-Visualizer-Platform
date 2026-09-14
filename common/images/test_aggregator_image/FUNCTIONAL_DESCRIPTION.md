@@ -35,7 +35,7 @@ flowchart LR
 | --- | --- |
 | `bootstrap.sh` | Initializes storage, waits for syslog-ng, starts the watcher and Envoy, coordinates capture shutdown, and reports the final result. |
 | `envoy.yaml` | Defines the TCP listener, downstream tap transport socket, and TCP proxy to syslog-ng. |
-| `tap_watcher_service.sh` | Watches raw tap files, detects global inactivity, requests Envoy shutdown, starts per-file decoders, and invokes aggregation. |
+| `tap_watcher_service.sh` | Tracks tap-file creation and closure, polls Envoy's downstream RX-byte counter for global inactivity, starts per-file decoders, and invokes aggregation. |
 | `decode_envoy_tap.py` | Parses one completed length-delimited Envoy protobuf tap with `xds-protos`, reassembles downstream TCP bytes, frames syslog records, and writes one reconstructed connection log. |
 | `log_watcher_service.sh` | Runs the existing Python statistics aggregator and stores its exit status. |
 | `log_aggregator.py` | Selects tester records, groups them by container tag, parses pytest summaries, validates totals, and determines success or failure. |
@@ -52,8 +52,8 @@ flowchart LR
    the virtual network.
 4. Bootstrap waits for the syslog-ng SSH endpoint and runs the remote
    syslog-ng health check.
-5. Port and downstream-host placeholders in `/etc/envoy/envoy.yaml` are
-   replaced from environment variables.
+5. Admin, listener-port, and downstream-host placeholders in
+   `/etc/envoy/envoy.yaml` are replaced from environment variables.
 6. The tap watcher starts before Envoy. Bootstrap waits up to 10 seconds for
    `/logs/aggregator/watcher_ready`, which is created only after
    `inotifywait` has installed its filesystem watch.
@@ -65,6 +65,8 @@ flowchart LR
 
 Envoy listens on `UPSTREAM_AGGREGATOR_TCP_PORT` and proxies every accepted TCP
 connection to `DOWNSTREAM_SYSLOG_HOSTNAME:DOWNSTREAM_SYSLOG_TCP_PORT`.
+A loopback-only admin listener exposes the TCP proxy byte counters to the
+watcher on `ENVOY_ADMIN_PORT`; it is not published outside the container.
 
 The downstream tap transport socket uses:
 
@@ -72,18 +74,23 @@ The downstream tap transport socket uses:
 - streamed `PROTO_BINARY_LENGTH_DELIMITED` output;
 - one file per connection under
   `/logs/taps/connection_<envoy-connection-id>.pb`;
-- a 16 MiB receive-buffer limit, so larger syslog reads are not silently
-  represented as truncated tap bodies.
+- a configurable receive-buffer limit controlled by `MAX_BUFFERED_RX_BYTES`,
+  defaulting to 16 MiB (`16777216` bytes).
 
 The raw connection ID is retained for correlation with Envoy diagnostics and
 to prevent collisions when one container reconnects.
 
 ## Deciding when capture is complete
 
-`WAIT_MSEC_UNTIL_FINISH` is a global inactivity period, not a maximum test
-duration. Every tap-file create or modify event resets the inactivity clock.
-With the default value of `15000`, capture stops only after no tap file has
-changed for 15 seconds.
+`WAIT_MSEC_UNTIL_FINISH` is a global traffic-inactivity period, not a maximum
+test duration. Once per second, the watcher polls Envoy's monotonic
+`tcp.destination.downstream_cx_rx_bytes_total` counter. Every increase resets
+the inactivity clock. With the default value of `15000`, capture stops only
+after Envoy has received no downstream bytes for 15 seconds.
+
+The byte counter is used instead of tap-file `MODIFY` events because Envoy
+buffers file-per-tap output. A heartbeat can therefore reach Envoy before its
+protobuf representation becomes visible as a filesystem write.
 
 Docker logger TCP connections can remain open after pytest finishes.
 Consequently, the watcher does not require connections to close before the
@@ -118,7 +125,9 @@ The decoder:
 3. Concatenates binary `as_bytes` bodies in trace order, reconstructing the TCP
    byte stream.
 4. Rejects a body marked `truncated`; incomplete evidence must not be used to
-   calculate test totals.
+   calculate test totals. The error reports the effective
+   `max_buffered_rx_bytes` value and recommends increasing
+   `MAX_BUFFERED_RX_BYTES` in the Docker Compose configuration.
 5. Finds RFC3164-like Docker syslog headers and splits the reconstructed stream
    at complete record boundaries.
 6. Supports both formats used by Docker/syslog deployments:
@@ -207,8 +216,10 @@ automatically on success, test failure, or infrastructure failure.
 
 | Variable | Default | Meaning |
 | --- | ---: | --- |
-| `WAIT_MSEC_UNTIL_FINISH` | `15000` | Required interval with no tap writes before capture shutdown. |
+| `WAIT_MSEC_UNTIL_FINISH` | `15000` | Required interval with no downstream bytes before capture shutdown. |
 | `MAX_WAIT_MSEC_UNTIL_FINISH` | `900000` | Hard limit for the capture phase. |
+| `ENVOY_ADMIN_PORT` | `9901` | Loopback-only Envoy admin port used to read the downstream RX-byte counter. |
+| `MAX_BUFFERED_RX_BYTES` | `16777216` | Maximum downstream tap bytes buffered by Envoy; 16 MiB by default. |
 | `UPSTREAM_AGGREGATOR_TCP_PORT` | `13601` | Envoy listener port receiving Docker syslog traffic. |
 | `HOST_UPSTREAM_AGGREGATOR_TCP_PORT` | `13601` | Host-published TCP port. |
 | `DOWNSTREAM_SYSLOG_HOSTNAME` | `syslog-ng` | Compose-network DNS name of the downstream syslog service. |
@@ -218,9 +229,9 @@ automatically on success, test failure, or infrastructure failure.
 ## Functional assumptions and limitations
 
 - All relevant logging traffic must pass through the Envoy listener.
-- The inactivity interval must exceed legitimate silent gaps between test log
-  messages. A test that remains silent longer than this interval can cause
-  capture to stop before that test finishes.
+- The inactivity interval must exceed legitimate gaps in downstream traffic.
+  Long-running tests must send heartbeats more frequently than this interval;
+  otherwise capture can stop before a test finishes.
 - Each Docker logger TCP connection is expected to represent one syslog
   producer.
 - Test summaries must use one of the pytest formats currently recognized by
@@ -230,5 +241,6 @@ automatically on success, test failure, or infrastructure failure.
   and all tap fields are parsed by the generated bindings from `xds-protos`.
 - A trace marked truncated is treated as an infrastructure error rather than
   producing potentially incorrect statistics.
-- The 16 MiB receive limit is finite. A larger pre-match buffered stream can
-  still be marked truncated and will fail decoding.
+- `MAX_BUFFERED_RX_BYTES` is finite. A larger pre-match buffered stream can be
+  marked truncated and will fail decoding with the effective limit and
+  remediation included in the error.

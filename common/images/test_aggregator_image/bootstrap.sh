@@ -78,18 +78,22 @@ echo "Setup signal handlers"
 trap termination_handler QUIT TERM EXIT
 
 # Bootstrap the port/address placeholders before starting Envoy.
+sed -i "s/ENVOY_ADMIN_PORT/${ENVOY_ADMIN_PORT}/" /etc/envoy/envoy.yaml
+sed -i "s/MAX_BUFFERED_RX_BYTES/${MAX_BUFFERED_RX_BYTES}/" /etc/envoy/envoy.yaml
 sed -i "s/UPSTREAM_AGGREGATOR_TCP_PORT/${UPSTREAM_AGGREGATOR_TCP_PORT}/" /etc/envoy/envoy.yaml
 sed -i "s/DOWNSTREAM_SYSLOG_TCP_PORT/${DOWNSTREAM_SYSLOG_TCP_PORT}/" /etc/envoy/envoy.yaml
 sed -i "s/DOWNSTREAM_SYSLOG_HOSTNAME/${DOWNSTREAM_SYSLOG_HOSTNAME}/" /etc/envoy/envoy.yaml
 
 # The watcher is ready before Envoy accepts its first connection. It resets its
-# inactivity timer on tap writes and decodes a connection only on CLOSE_WRITE.
+# inactivity timer from Envoy's downstream RX-byte counter and decodes a
+# connection only on CLOSE_WRITE.
 /package/tap_watcher_service.sh \
     "${TAP_PATH}" \
     "${DECODED_LOG_PATH}" \
     "${WAIT_MSEC_UNTIL_FINISH}" \
     "${LOG_AGGREGATED_RESULT_PATH}" \
-    "${MAX_WAIT_MSEC_UNTIL_FINISH:-900000}" &
+    "${MAX_WAIT_MSEC_UNTIL_FINISH:-900000}" \
+    "http://127.0.0.1:${ENVOY_ADMIN_PORT}" &
 tap_watcher_pid=$!
 
 watcher_start_second=$SECONDS

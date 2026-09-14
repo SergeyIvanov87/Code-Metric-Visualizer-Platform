@@ -1,5 +1,5 @@
 FROM envoyproxy/envoy:dev-5451efd9b8f8a444431197050e45ba974ed4e9d8
-RUN apt-get update && apt-get install -y openssh-client sshpass python3 python3-pip python3-pyinotify inotify-tools dos2unix
+RUN apt-get update && apt-get install -y openssh-client sshpass python3 python3-pip python3-pyinotify curl inotify-tools dos2unix
 RUN python3 -m pip install --no-cache-dir --target=/opt/test-aggregator-python xds-protos==1.83.1
 ENV PYTHONPATH=/opt/test-aggregator-python
 
@@ -30,6 +30,12 @@ RUN dos2unix /package/* && chmod +x /package/*.sh
 
 ARG WAIT_MSEC_UNTIL_FINISH=15000
 ENV WAIT_MSEC_UNTIL_FINISH=$WAIT_MSEC_UNTIL_FINISH
+
+ARG ENVOY_ADMIN_PORT=9901
+ENV ENVOY_ADMIN_PORT=${ENVOY_ADMIN_PORT}
+
+ARG MAX_BUFFERED_RX_BYTES=16777216
+ENV MAX_BUFFERED_RX_BYTES=${MAX_BUFFERED_RX_BYTES}
 
 ARG UPSTREAM_SYSLOG_TCP_PORT=13601
 ENV UPSTREAM_SYSLOG_TCP_PORT=${UPSTREAM_SYSLOG_TCP_PORT}
