@@ -3,9 +3,6 @@ services:
     build:
       context: ../../../
       dockerfile: common/images/test_aggregator_image/Dockerfile
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
     env_file:
       - path: ./.env
         required: true
@@ -13,8 +10,13 @@ services:
         required: true # values from that files used only for container runtime, not for the current compose!!!
     environment:
         - WAIT_MSEC_UNTIL_FINISH=${WAIT_MSEC_UNTIL_FINISH}
+        - MAX_WAIT_MSEC_UNTIL_FINISH=${MAX_WAIT_MSEC_UNTIL_FINISH:-900000}
         - UPSTREAM_AGGREGATOR_TCP_PORT=${UPSTREAM_AGGREGATOR_TCP_PORT}
         - HOST_UPSTREAM_AGGREGATOR_TCP_PORT=${HOST_UPSTREAM_AGGREGATOR_TCP_PORT}
+        # Use the Compose service alias for container-to-container DNS. The
+        # DOWNSTREAM_SYSLOG_HOSTNAME value from syslog-ng's .env is its custom
+        # container name and is not a portable DNS name.
+        - DOWNSTREAM_SYSLOG_HOSTNAME=syslog-ng
     networks:
       - api.pmccabe_collector.network
     ports:
