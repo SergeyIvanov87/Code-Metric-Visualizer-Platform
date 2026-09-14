@@ -4,6 +4,7 @@ import json
 import os
 import pathlib
 import pytest
+import socket
 import stat
 import time
 import glob, shutil
@@ -47,7 +48,7 @@ def check_all_dependencies_api(query, pipes):
     except Exception as e:
         assert 0
 
-def check_unmet_dependencies_api(query, pipes):
+def check_unmet_dependencies_api(query, pipes, hostname):
     print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
     api_query = APIQuery(pipes)
     api_query.execute()
@@ -74,7 +75,7 @@ def check_unmet_dependencies_api(query, pipes):
                 "/api", req_api, req_type)
 
             time_millisecond = round(time.time() * 1000)
-            temporary_replaced_result_pipe_file_path = os.path.join(api_exec_node_directory, "../", str(time_millisecond))
+            temporary_replaced_result_pipe_file_path = os.path.join(api_exec_node_directory, "../", hostname, str(time_millisecond))
 
             # Ensure the temporary directory doesn't exist before creating it
             if os.path.exists(temporary_replaced_result_pipe_file_path):
@@ -130,9 +131,11 @@ def test_inner_api(name, query):
     # compose expected pipe names, based on query data
     pipes = compose_api_queries_pipe_names(global_settings.api_dir, query)
 
+    hostname = socket.gethostname()
+
     if name == "all_dependencies":
         check_all_dependencies_api(query, pipes)
     elif name == "unmet_dependencies":
-        check_unmet_dependencies_api(query, pipes)
+        check_unmet_dependencies_api(query, pipes, hostname)
     else:
         assert 0
