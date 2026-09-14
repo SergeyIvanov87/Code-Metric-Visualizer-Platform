@@ -36,7 +36,7 @@ flowchart LR
 | `bootstrap.sh` | Initializes storage, waits for syslog-ng, starts the watcher and Envoy, coordinates capture shutdown, and reports the final result. |
 | `envoy.yaml` | Defines the TCP listener, downstream tap transport socket, and TCP proxy to syslog-ng. |
 | `tap_watcher_service.sh` | Watches raw tap files, detects global inactivity, requests Envoy shutdown, starts per-file decoders, and invokes aggregation. |
-| `decode_envoy_tap.py` | Parses one completed Envoy JSON tap, reassembles downstream TCP bytes, frames syslog records, and writes one reconstructed connection log. |
+| `decode_envoy_tap.py` | Parses one completed length-delimited Envoy protobuf tap with `xds-protos`, reassembles downstream TCP bytes, frames syslog records, and writes one reconstructed connection log. |
 | `log_watcher_service.sh` | Runs the existing Python statistics aggregator and stores its exit status. |
 | `log_aggregator.py` | Selects tester records, groups them by container tag, parses pytest summaries, validates totals, and determines success or failure. |
 
@@ -69,9 +69,9 @@ connection to `DOWNSTREAM_SYSLOG_HOSTNAME:DOWNSTREAM_SYSLOG_TCP_PORT`.
 The downstream tap transport socket uses:
 
 - `any_match: true` to capture every connection;
-- streamed `JSON_BODY_AS_BYTES` output;
+- streamed `PROTO_BINARY_LENGTH_DELIMITED` output;
 - one file per connection under
-  `/logs/taps/connection_<envoy-connection-id>.json`;
+  `/logs/taps/connection_<envoy-connection-id>.pb`;
 - a 16 MiB receive-buffer limit, so larger syslog reads are not silently
   represented as truncated tap bodies.
 
@@ -110,33 +110,34 @@ Each `CLOSE_WRITE` event starts an independent
 
 The decoder:
 
-1. Reads the sequence of JSON `TraceWrapper` documents in the tap file.
-2. Accepts snake-case and camel-case Envoy field names.
-3. Extracts only downstream socket `read` events. These are bytes sent by the
+1. Reads each protobuf varint length prefix and parses the corresponding
+   `envoy.data.tap.v3.TraceWrapper` with the generated classes supplied by
+   `xds-protos`.
+2. Extracts only downstream socket `read` events. These are bytes sent by the
    logging container to the aggregator.
-4. Base64-decodes each `as_bytes` body and concatenates chunks in trace order,
-   reconstructing the TCP byte stream.
-5. Rejects a body marked `truncated`; incomplete evidence must not be used to
+3. Concatenates binary `as_bytes` bodies in trace order, reconstructing the TCP
+   byte stream.
+4. Rejects a body marked `truncated`; incomplete evidence must not be used to
    calculate test totals.
-6. Finds RFC3164-like Docker syslog headers and splits the reconstructed stream
+5. Finds RFC3164-like Docker syslog headers and splits the reconstructed stream
    at complete record boundaries.
-7. Supports both formats used by Docker/syslog deployments:
+6. Supports both formats used by Docker/syslog deployments:
 
    ```text
    <PRI>Mon DD HH:MM:SS producer[pid]: message
    <PRI>Mon DD HH:MM:SS hostname producer[pid]: message
    ```
 
-8. Ignores the RFC5424 octet-counted connection created by the container health
+7. Ignores the RFC5424 octet-counted connection created by the container health
    check when it contains no tester data.
-9. Verifies that a connection contains at most one syslog producer.
-10. Sanitizes the producer tag and atomically publishes the reconstructed log.
+8. Verifies that a connection contains at most one syslog producer.
+9. Sanitizes the producer tag and atomically publishes the reconstructed log.
 
 Raw files keep their Envoy names. Decoded files include the Docker syslog tag
 configured by `tag: "{{.Name}}"` and the connection ID:
 
 ```text
-/logs/taps/connection_18.json
+/logs/taps/connection_18.pb
 /logs/syslog-streams/code-metric-platform-rrd-functional-tester-1__connection_18.log
 ```
 
@@ -148,7 +149,7 @@ connection, the decoded file keeps its generic connection name and is empty.
 After every decoder exits, the watcher checks their statuses. If any trace
 cannot be decoded, aggregation is skipped and the overall result is failure.
 Decoder errors are preserved as
-`/logs/aggregator/connection_<id>.json.decode_stderr`.
+`/logs/aggregator/connection_<id>.pb.decode_stderr`.
 
 When all traces decode successfully, `log_watcher_service.sh` runs
 `log_aggregator.py` against the immutable reconstructed directory. Although
@@ -186,7 +187,7 @@ When all checks pass, stdout contains `All tests PASSED: (passed/total)`.
 
 | Path | Content |
 | --- | --- |
-| `/logs/taps/` | Raw streamed Envoy JSON taps, one file per TCP connection. |
+| `/logs/taps/` | Raw streamed length-delimited Envoy protobuf taps, one file per TCP connection. |
 | `/logs/syslog-streams/` | Reconstructed, newline-delimited syslog records, normally named by producer and connection ID. |
 | `/logs/aggregator/result_log_stdout` | Per-container statistics and the success recap. |
 | `/logs/aggregator/result_log_stderr` | Skips, failed/inconsistent statistics, watcher failures, or decoder failures. |
@@ -198,21 +199,9 @@ as `255`; watcher and decoding infrastructure failures also use `255`.
 On failure or termination, bootstrap prints the reconstructed logs and the
 aggregation/decoding errors to container output.
 
-### Current debug hold
-
-The current `bootstrap.sh` contains:
-
-```bash
-# TODO for tests
-sleep infinity
-exit "${result}"
-```
-
-Therefore, after the result is computed and Envoy has stopped, the container
-intentionally remains alive and does not reach the normal exit statement.
-Stopping the container invokes the termination handler, which reads and
-reports the stored result. For automatic CI completion, this debug hold must
-not be present.
+After the watcher has produced a result and Envoy has stopped, bootstrap exits
+with the stored result code. The aggregator container therefore terminates
+automatically on success, test failure, or infrastructure failure.
 
 ## Configuration
 
@@ -237,8 +226,8 @@ not be present.
 - Test summaries must use one of the pytest formats currently recognized by
   `log_aggregator.py`. Other combinations or output formats require an
   additional statistic parser.
-- Tap JSON is parsed as concatenated JSON documents by project code. It is not
-  currently parsed through Envoy protobuf bindings.
+- The protobuf length delimiter is decoded locally; the `TraceWrapper` schema
+  and all tap fields are parsed by the generated bindings from `xds-protos`.
 - A trace marked truncated is treated as an infrastructure error rather than
   producing potentially incorrect statistics.
 - The 16 MiB receive limit is finite. A larger pre-match buffered stream can

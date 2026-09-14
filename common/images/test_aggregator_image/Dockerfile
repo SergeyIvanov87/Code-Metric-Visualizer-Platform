@@ -1,5 +1,7 @@
 FROM envoyproxy/envoy:dev-5451efd9b8f8a444431197050e45ba974ed4e9d8
-RUN apt-get update && apt-get install -y openssh-client sshpass python3 python3-pyinotify inotify-tools dos2unix
+RUN apt-get update && apt-get install -y openssh-client sshpass python3 python3-pip python3-pyinotify inotify-tools dos2unix
+RUN python3 -m pip install --no-cache-dir --target=/opt/test-aggregator-python xds-protos==1.83.1
+ENV PYTHONPATH=/opt/test-aggregator-python
 
 COPY common/images/test_aggregator_image/envoy.yaml /etc/envoy/envoy.yaml
 RUN chmod go+r /etc/envoy/envoy.yaml

@@ -3,11 +3,11 @@
 """Decode one completed Envoy socket-tap trace into syslog records."""
 
 import argparse
-import base64
-import binascii
-import json
 import re
 from pathlib import Path
+
+from envoy.data.tap.v3 import wrapper_pb2
+from google.protobuf.message import DecodeError
 
 
 # Docker's default Unix syslog formatter emits RFC3164-like records. Its TCP
@@ -21,74 +21,97 @@ SYSLOG_HEADER = re.compile(
 )
 
 
-def iter_json_documents(data):
-    decoder = json.JSONDecoder()
+def decode_varint32(data, offset):
+    """Decode one protobuf uint32 length prefix without parsing its message."""
+    value = 0
+    start = offset
+    for shift in range(0, 35, 7):
+        if offset >= len(data):
+            raise ValueError(
+                f"truncated protobuf length prefix at byte offset {start}"
+            )
+        byte = data[offset]
+        offset += 1
+        value |= (byte & 0x7F) << shift
+        if byte < 0x80:
+            if value > 0xFFFFFFFF:
+                raise ValueError(
+                    f"protobuf message length exceeds uint32 at byte offset {start}"
+                )
+            return value, offset
+    raise ValueError(f"invalid protobuf length prefix at byte offset {start}")
+
+
+def iter_trace_wrappers(data):
+    """Yield TraceWrapper messages from Envoy's length-delimited tap format."""
     offset = 0
+    message_number = 0
     while offset < len(data):
-        while offset < len(data) and data[offset].isspace():
-            offset += 1
-        if offset == len(data):
-            return
-        document, offset = decoder.raw_decode(data, offset)
-        yield document
+        message_number += 1
+        length, payload_offset = decode_varint32(data, offset)
+        end = payload_offset + length
+        if end > len(data):
+            raise ValueError(
+                "truncated protobuf message "
+                f"{message_number}: declared {length} bytes at byte offset {offset}, "
+                f"only {len(data) - payload_offset} remain"
+            )
 
-
-def get_field(mapping, snake_name, camel_name=None):
-    if not isinstance(mapping, dict):
-        return None
-    if snake_name in mapping:
-        return mapping[snake_name]
-    return mapping.get(camel_name) if camel_name else None
+        trace = wrapper_pb2.TraceWrapper()
+        try:
+            trace.ParseFromString(data[payload_offset:end])
+        except DecodeError as error:
+            raise ValueError(
+                f"invalid Envoy TraceWrapper protobuf message {message_number}"
+            ) from error
+        yield trace
+        offset = end
 
 
 def decode_body(body):
-    if not isinstance(body, dict):
-        return b""
-    if body.get("truncated"):
+    if body.truncated:
         raise ValueError("Envoy marked a captured body as truncated")
-    encoded = get_field(body, "as_bytes", "asBytes")
-    if encoded is not None:
-        try:
-            return base64.b64decode(encoded, validate=True)
-        except (binascii.Error, ValueError) as error:
-            raise ValueError("invalid base64 body in Envoy tap trace") from error
-    string = get_field(body, "as_string", "asString")
-    if string is not None:
-        return string.encode("utf-8")
+    body_type = body.WhichOneof("body_type")
+    if body_type == "as_bytes":
+        return bytes(body.as_bytes)
+    if body_type == "as_string":
+        return body.as_string.encode("utf-8")
     return b""
 
 
 def bytes_from_event(event):
-    if not isinstance(event, dict) or "read" not in event:
+    if event.WhichOneof("event_selector") != "read":
         return b""
-    return decode_body(event["read"].get("data", {}))
+    return decode_body(event.read.data)
 
 
-def events_from_document(document):
-    buffered = get_field(document, "socket_buffered_trace", "socketBufferedTrace")
-    if buffered is not None:
-        if get_field(buffered, "read_truncated", "readTruncated"):
+def events_from_trace(trace):
+    trace_type = trace.WhichOneof("trace")
+    if trace_type == "socket_buffered_trace":
+        buffered = trace.socket_buffered_trace
+        if buffered.read_truncated:
             raise ValueError("Envoy marked the downstream socket trace as truncated")
-        yield from buffered.get("events", [])
+        yield from buffered.events
         return
 
-    streamed = get_field(
-        document, "socket_streamed_trace_segment", "socketStreamedTraceSegment"
-    )
-    if streamed is None:
+    if trace_type == "socket_streamed_trace_segment":
+        streamed = trace.socket_streamed_trace_segment
+        message_piece = streamed.WhichOneof("message_piece")
+        if message_piece == "event":
+            yield streamed.event
+        elif message_piece == "events":
+            yield from streamed.events.events
         return
-    event = streamed.get("event")
-    if event is not None:
-        yield event
-    event_group = streamed.get("events", {})
-    if isinstance(event_group, dict):
-        yield from event_group.get("events", [])
+
+    if trace_type is None:
+        raise ValueError("Envoy TraceWrapper contains no trace")
+    raise ValueError(f"unsupported Envoy tap trace type: {trace_type}")
 
 
-def extract_downstream_bytes(trace_text):
+def extract_downstream_bytes(trace_data):
     chunks = []
-    for document in iter_json_documents(trace_text):
-        for event in events_from_document(document):
+    for trace in iter_trace_wrappers(trace_data):
+        for event in events_from_trace(trace):
             chunk = bytes_from_event(event)
             if chunk:
                 chunks.append(chunk)
@@ -156,8 +179,8 @@ def main():
     )
     args = parser.parse_args()
 
-    trace_text = args.tap_file.read_text(encoding="utf-8")
-    stream = extract_downstream_bytes(trace_text)
+    trace_data = args.tap_file.read_bytes()
+    stream = extract_downstream_bytes(trace_data)
     records = frame_syslog_stream(stream)
 
     output_file = args.output_file
