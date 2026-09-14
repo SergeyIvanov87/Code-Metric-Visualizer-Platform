@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import errno
-import fcntl
 import os
 import stat
 import sys
@@ -198,11 +197,10 @@ class APIQueryInterruptible(APIQuery):
                 pass
         if wait_second_before_interrupt <= 0:
             return False, wait_second_before_interrupt
-        # As we have successfully opened it without blocking,
-        # then we no longer need to keep the handle as non-blocking
-        flags = fcntl.fcntl(pin, fcntl.F_GETFL)
-        flags &= ~os.O_NONBLOCK
-        fcntl.fcntl(pin, fcntl.F_SETFL, flags)
+        # Keep the descriptor non-blocking for writes too.  A reader can have
+        # the FIFO open without consuming from it; in that case a payload
+        # larger than the available pipe capacity must reach the timeout path
+        # below instead of blocking forever inside os.write().
 
         # the data to write in, must be terminated by \n
         data_to_write = canonize_args(exec_args_str)
@@ -213,6 +211,7 @@ class APIQueryInterruptible(APIQuery):
         if data_to_write_size > 0 and data_to_write[-1] == '\n':
             data_to_write_size -= 1
         offset_to_write=0
+        backpressure_events=0
 
         data_to_write = data_to_write.encode()
         try:
@@ -225,6 +224,15 @@ class APIQueryInterruptible(APIQuery):
                 except OSError as err:
                     if err.errno != errno.EAGAIN and err.errno != errno.EWOULDBLOCK:
                         raise
+                    backpressure_events += 1
+                    if backpressure_events == 1:
+                        print(
+                            f"Query::execute FIFO backpressure on '{exec_pipe_path}': "
+                            f"written {offset_to_write}/{data_to_write_size} bytes; "
+                            f"retrying for up to {wait_second_before_interrupt:.3f}s",
+                            file=sys.stderr,
+                            flush=True,
+                        )
                     time.sleep(relax_sleep_sec)
                 except Exception as e:
                     time.sleep(relax_sleep_sec)
@@ -236,7 +244,18 @@ class APIQueryInterruptible(APIQuery):
 
         # API is available if utter data portion has been written
         wait_second_before_interrupt, end_ts = get_elapsed_duration(wait_second_before_interrupt, local_begin_ts)
-        return offset_to_write == data_to_write_size, wait_second_before_interrupt
+        complete = offset_to_write == data_to_write_size
+        if backpressure_events:
+            outcome = "recovered" if complete else "timed out"
+            print(
+                f"Query::execute FIFO backpressure {outcome} on '{exec_pipe_path}': "
+                f"written {offset_to_write}/{data_to_write_size} bytes after "
+                f"{backpressure_events} retry event(s); "
+                f"remaining timeout {wait_second_before_interrupt:.3f}s",
+                file=sys.stderr,
+                flush=True,
+            )
+        return complete, wait_second_before_interrupt
 
 
     def __wait_result_with_pipe_mode_impl__(self, mode, session_id, sleep_between_cycles, max_cycles_count, console_ping, wait_second_before_interrupt, local_begin_ts):

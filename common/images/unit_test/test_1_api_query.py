@@ -198,6 +198,64 @@ def test_api_interruptible_interruption_check():
     assert not status, f"wait_result() must be interrupted"
     assert timeout < 0.5, f"wait_result() must run out of time, timeout: {timeout}"
 
+
+def test_api_interruptible_large_write_times_out_when_reader_stalls():
+    pipe = "exec"
+    if os.path.exists(pipe):
+        os.unlink(pipe)
+    os.mkfifo(pipe)
+
+    # Keep a reader connected, but deliberately do not drain the FIFO. This
+    # reproduces a service which accepts a query and then stops consuming it.
+    reader = os.open(pipe, os.O_RDONLY | os.O_NONBLOCK)
+    try:
+        query = APIQueryInterruptible([pipe, "result"])
+        started = time.monotonic()
+        status, timeout = query.execute(0.2, "VALUE=" + ("x" * 1_000_000))
+        elapsed = time.monotonic() - started
+    finally:
+        os.close(reader)
+
+    assert not status, "a partially written query must not be reported as accepted"
+    assert timeout == 0
+    assert elapsed < 1.5, f"stalled FIFO write did not respect its timeout: {elapsed}"
+
+
+def test_api_interruptible_large_write_retries_while_reader_is_slow():
+    pipe = "slow_exec"
+    if os.path.exists(pipe):
+        os.unlink(pipe)
+    os.mkfifo(pipe)
+
+    payload = "VALUE=" + ("x" * 128_000)
+    expected = (payload + os.linesep).encode()
+    received = bytearray()
+    stop_reader = threading.Event()
+    reader = os.open(pipe, os.O_RDONLY | os.O_NONBLOCK)
+
+    def drain_slowly():
+        while len(received) < len(expected) and not stop_reader.is_set():
+            chunk = os.read(reader, 1024)
+            if chunk:
+                received.extend(chunk)
+            time.sleep(0.01)
+
+    reader_thread = threading.Thread(target=drain_slowly)
+    reader_thread.start()
+    try:
+        query = APIQueryInterruptible([pipe, "result"])
+        status, timeout = query.execute(5, payload)
+        reader_thread.join(timeout=2)
+    finally:
+        stop_reader.set()
+        reader_thread.join(timeout=1)
+        os.close(reader)
+
+    assert status, "a slow reader must be allowed to drain and accept the full query"
+    assert timeout > 0
+    assert bytes(received) == expected
+
+
 def parallel_exec(index, query, message_to_send, polling_second_count = 1):
         status, timeout = query.execute(30, message_to_send)
         print(f"Process: {index} has finished, status: {status}, timeout: {timeout}")
