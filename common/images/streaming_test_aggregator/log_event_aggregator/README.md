@@ -13,3 +13,9 @@ for a capture use the capture ID as their Kafka key, preserving order within a
 partition so `capture_complete` follows its connection logs.
 
 Broker metadata readiness is retried for `KAFKA_STARTUP_TIMEOUT_SECONDS`; container startup does not rely solely on the broker container health status.
+
+The image uses Python 3.12. `pyinotify` still imports the standard-library
+`asyncore` module removed in Python 3.12, so the image installs the maintained
+`pyasyncore` compatibility package explicitly. Its Docker build also imports
+all third-party runtime dependencies to fail immediately if the dependency set
+is incomplete.

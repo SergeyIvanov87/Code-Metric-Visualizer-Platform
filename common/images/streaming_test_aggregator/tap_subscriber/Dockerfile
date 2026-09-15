@@ -1,6 +1,10 @@
 FROM python:3.12-slim
 
-RUN python3 -m pip install --no-cache-dir xds-protos==1.83.1 confluent-kafka==2.11.1
+RUN python3 -m pip install --no-cache-dir \
+    xds-protos==1.83.1 \
+    confluent-kafka==2.11.1
+RUN python3 -m pip check && python3 -c \
+    "from confluent_kafka import Producer; from envoy.data.tap.v3 import wrapper_pb2; from google.protobuf import json_format"
 RUN mkdir -p /logs /package
 VOLUME ["/logs"]
 

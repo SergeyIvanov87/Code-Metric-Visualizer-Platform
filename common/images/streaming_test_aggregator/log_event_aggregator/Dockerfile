@@ -1,5 +1,10 @@
 FROM python:3.12-slim
-RUN python3 -m pip install --no-cache-dir confluent-kafka==2.11.1 pyinotify==0.9.6
+RUN python3 -m pip install --no-cache-dir \
+    confluent-kafka==2.11.1 \
+    pyinotify==0.9.6 \
+    pyasyncore==1.0.5
+RUN python3 -m pip check && \
+    python3 -c "import asyncore, pyinotify; from confluent_kafka import Consumer"
 RUN mkdir -p /logs /package
 VOLUME ["/logs"]
 COPY common/images/streaming_test_aggregator/log_event_aggregator/bootstrap.sh /etc/bootstrap.sh
