@@ -26,6 +26,13 @@ The complete subsystem test topology lives in `tests/functional` rather than
 inside either component. Run it from this directory with:
 
 ```sh
-docker compose -f tests/functional/compose-functional.test.yaml up \
-  --build --abort-on-container-exit --exit-code-from functional-tests
+compose_file=tests/functional/compose-functional.test.yaml
+docker compose -f "${compose_file}" up --build --detach
+functional_tests_id=$(docker compose -f "${compose_file}" ps --all --quiet functional-tests)
+docker wait "${functional_tests_id}"
+docker compose -f "${compose_file}" down --volumes
 ```
+
+The dedicated GitHub Actions workflow uses the same detached orchestration,
+propagates the functional-test container's exit code, and prints all service
+logs before cleanup.

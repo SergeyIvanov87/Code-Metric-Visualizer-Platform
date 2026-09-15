@@ -1,0 +1,47 @@
+name: Streaming Test Aggregator CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  functional_testing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: Run streaming test aggregator functional tests
+      shell: bash
+      run: |
+        set -euo pipefail
+        compose_file="common/images/streaming_test_aggregator/tests/functional/compose-functional.test.yaml"
+
+        cleanup() {
+          status=$?
+          docker compose -f "${compose_file}" ps --all || true
+          docker compose -f "${compose_file}" logs --no-color || true
+          docker compose -f "${compose_file}" down --volumes --remove-orphans || true
+          exit "${status}"
+        }
+        trap cleanup EXIT
+
+        docker compose -f "${compose_file}" up --build --detach --remove-orphans
+        functional_tests_id=$(docker compose -f "${compose_file}" ps --all --quiet functional-tests)
+        if [[ -z "${functional_tests_id}" ]]; then
+          echo "The functional-tests container was not created" >&2
+          exit 1
+        fi
+
+        functional_tests_exit_code=$(docker wait "${functional_tests_id}")
+        if [[ "${functional_tests_exit_code}" != "0" ]]; then
+          echo "Functional tests exited with ${functional_tests_exit_code}" >&2
+          exit "${functional_tests_exit_code}"
+        fi
