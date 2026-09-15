@@ -21,7 +21,7 @@ services:
 
   log_event_aggregator:
     build:
-      context: ../../../../../..
+      context: ../../../../..
       dockerfile: common/images/streaming_test_aggregator/log_event_aggregator/Dockerfile
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -52,7 +52,7 @@ services:
 
   tap_subscriber:
     build:
-      context: ../../../../../..
+      context: ../../../../..
       dockerfile: common/images/streaming_test_aggregator/tap_subscriber/Dockerfile
     environment:
       ENVOY_ADMIN_HOST: envoy
@@ -95,8 +95,8 @@ services:
 
   functional-tests:
     build:
-      context: ../../../../../..
-      dockerfile: common/images/streaming_test_aggregator/tap_subscriber/tests/functional/Dockerfile
+      context: ../../../../..
+      dockerfile: common/images/streaming_test_aggregator/tests/functional/Dockerfile
     volumes:
       - streaming-test-aggregator-logs:/logs:ro
     depends_on:

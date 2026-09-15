@@ -28,9 +28,8 @@ the other's runtime filesystem.
 | `MAX_WAIT_MSEC_UNTIL_FINISH` | `900000` | Capture deadline. |
 | `RETAIN_RAW_TAPS` | `false` | Retain diagnostic protobuf tap files locally. |
 
-See [the Kafka event contract](EVENT_SCHEMA.md), the
-[architecture evaluation](ARCHITECTURE_EVALUATION.md), and the
-[event-pipeline evaluation](EVENT_PIPELINE_EVALUATION.md).
+See [the event contract](EVENT_SCHEMA.md) and the subsystem
+[architecture decision record](../EVENT_PIPELINE_ARCHITECTURE_DECISION_RECORD_v1_0.md).
 
 ## Streaming and temporary files
 
@@ -40,14 +39,3 @@ under `/logs/subscriber/streams/.spool` because TCP records can span frames and
 keeping every active stream in RAM would be unbounded. The finalized log is
 published to Kafka and immediately removed. Set `RETAIN_RAW_TAPS=true` only for
 diagnostics or replay experiments.
-
-## Functional test
-
-```sh
-docker compose -f tests/functional/compose-functional.test.yaml up \
-  --build --abort-on-container-exit --exit-code-from functional-tests
-```
-
-The fixture starts a single-node Kafka KRaft broker, native Envoy, syslog-ng,
-three Docker syslog producers, this tap subscriber, the standalone Kafka test
-aggregator, and a pytest assertion container.

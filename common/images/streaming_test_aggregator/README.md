@@ -15,3 +15,15 @@ The subsystem contains two images:
 
 The names describe responsibilities rather than the current event-broker
 implementation, allowing the transport to evolve without renaming the images.
+
+## Documentation and functional tests
+
+The architecture and simian-army evolution plan are recorded in
+[`EVENT_PIPELINE_ARCHITECTURE_DECISION_RECORD_v1_0.md`](EVENT_PIPELINE_ARCHITECTURE_DECISION_RECORD_v1_0.md).
+The complete subsystem test topology lives in `tests/functional` rather than
+inside either component. Run it from this directory with:
+
+```sh
+docker compose -f tests/functional/compose-functional.test.yaml up \
+  --build --abort-on-container-exit --exit-code-from functional-tests
+```
