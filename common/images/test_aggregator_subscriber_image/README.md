@@ -2,7 +2,8 @@
 
 > **Status: experimental bounded-batch alternative.** This decomposition makes
 > Envoy thinner, but it is not yet a session-aware replacement for the canonical
-> aggregator. See [the architecture evaluation](ARCHITECTURE_EVALUATION.md).
+> aggregator. See [the architecture evaluation](ARCHITECTURE_EVALUATION.md)
+> and the [durable event-pipeline evaluation](EVENT_PIPELINE_EVALUATION.md).
 
 This image keeps traffic proxying and test-result analysis in separate
 containers. Envoy owns the TCP listener and forwards Docker syslog traffic to
