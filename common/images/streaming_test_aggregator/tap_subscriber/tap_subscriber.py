@@ -42,23 +42,29 @@ class StreamingJsonTraceReader:
         self.decoder = json.JSONDecoder()
         self.utf8_decoder = codecs.getincrementaldecoder("utf-8")()
 
+    def pop_buffered(self):
+        """Return a complete buffered trace without reading the socket."""
+        self.buffer = self.buffer.lstrip()
+        if not self.buffer:
+            return None
+        try:
+            value, end = self.decoder.raw_decode(self.buffer)
+        except json.JSONDecodeError:
+            return None
+
+        self.buffer = self.buffer[end:]
+        trace = wrapper_pb2.TraceWrapper()
+        # Envoy may add event metadata before the bundled xDS Python
+        # descriptors are updated (for example seq_num). Unknown metadata is
+        # safe to ignore: capture uses only identity, event kind, and bytes.
+        json_format.ParseDict(value, trace, ignore_unknown_fields=True)
+        return trace
+
     def read(self):
         while True:
-            self.buffer = self.buffer.lstrip()
-            if self.buffer:
-                try:
-                    value, end = self.decoder.raw_decode(self.buffer)
-                except json.JSONDecodeError:
-                    pass
-                else:
-                    self.buffer = self.buffer[end:]
-                    trace = wrapper_pb2.TraceWrapper()
-                    # Envoy may add event metadata before the bundled xDS
-                    # Python descriptors are updated (for example seq_num).
-                    # Unknown metadata is safe to ignore: capture uses only
-                    # trace identity, event kind, and body bytes.
-                    json_format.ParseDict(value, trace, ignore_unknown_fields=True)
-                    return trace
+            trace = self.pop_buffered()
+            if trace is not None:
+                return trace
 
             # read1 returns currently available response data instead of waiting
             # for a full buffer, which is essential for a never-ending stream.
@@ -276,9 +282,15 @@ def main():
     try:
         while time.monotonic() - started < args.max_wait_msec / 1000:
             try:
-                if not select.select([connection.sock], [], [], 1)[0]:
-                    raise TimeoutError
-                trace = trace_reader.read()
+                # One socket read may contain several adjacent JSON objects.
+                # Drain those objects before waiting for more network data;
+                # otherwise the quiet timer can end the capture while complete
+                # trace events are still buffered in this process.
+                trace = trace_reader.pop_buffered()
+                if trace is None:
+                    if not select.select([connection.sock], [], [], 1)[0]:
+                        raise TimeoutError
+                    trace = trace_reader.read()
                 if trace is None:
                     raise RuntimeError("Envoy closed the streaming admin tap")
                 trace_id, closed = trace_id_and_closed(trace)

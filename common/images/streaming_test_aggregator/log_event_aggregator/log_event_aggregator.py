@@ -30,6 +30,22 @@ def write_terminal_result(result_directory, exit_code, message):
     (result_directory / "result").write_text(f"{exit_code}\n")
 
 
+def report_analysis_result(result_directory):
+    """Mirror analyzer artifacts to container logs and return its exit code."""
+    stdout = (result_directory / "result_log_stdout").read_text()
+    stderr = (result_directory / "result_log_stderr").read_text()
+    if stdout:
+        print(stdout, end="" if stdout.endswith("\n") else "\n", flush=True)
+    if stderr:
+        print(
+            stderr,
+            end="" if stderr.endswith("\n") else "\n",
+            file=sys.stderr,
+            flush=True,
+        )
+    return int((result_directory / "result").read_text().strip())
+
+
 def consume_capture(consumer, topic, capture_id, output_directory, timeout_seconds):
     deadline = time.monotonic() + timeout_seconds
     received = 0
@@ -141,7 +157,7 @@ def main():
         ],
         check=False,
     )
-    return int((args.result_directory / "result").read_text().strip())
+    return report_analysis_result(args.result_directory)
 
 
 if __name__ == "__main__":

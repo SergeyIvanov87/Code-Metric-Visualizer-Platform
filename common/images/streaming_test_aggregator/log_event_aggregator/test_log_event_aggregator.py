@@ -91,6 +91,17 @@ def test_capture_start_timeout_has_distinguishable_result(tmp_path):
     assert "no capture data" in (tmp_path / "result_log_stderr").read_text()
 
 
+def test_reports_analyzer_artifacts_to_container_logs(tmp_path, capsys):
+    (tmp_path / "result_log_stdout").write_text("analysis summary\n")
+    (tmp_path / "result_log_stderr").write_text("inconsistent statistics\n")
+    (tmp_path / "result").write_text("1\n")
+
+    assert aggregator.report_analysis_result(tmp_path) == 1
+    captured = capsys.readouterr()
+    assert captured.out == "analysis summary\n"
+    assert captured.err == "inconsistent statistics\n"
+
+
 class EventuallyReadyBroker:
     def __init__(self, failures):
         self.failures = failures

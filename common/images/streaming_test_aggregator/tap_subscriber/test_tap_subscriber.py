@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 import pytest
-from google.protobuf import json_format
 
 pytest.importorskip("envoy.data.tap.v3.wrapper_pb2")
+json_format = pytest.importorskip("google.protobuf.json_format")
 MODULE_PATH = Path(__file__).with_name("tap_subscriber.py")
 sys.path.insert(0, str(MODULE_PATH.parent))
 spec = importlib.util.spec_from_file_location("tap_subscriber", MODULE_PATH)
@@ -40,7 +40,9 @@ def test_reads_adjacent_streaming_admin_json_traces():
     reader = tap.StreamingJsonTraceReader(response)
 
     assert tap.trace_id_and_closed(reader.read()) == (7, True)
-    assert tap.trace_id_and_closed(reader.read()) == (8, True)
+    # The second object was returned by the same underlying response read. It
+    # must be drained without waiting for the socket to become readable again.
+    assert tap.trace_id_and_closed(reader.pop_buffered()) == (8, True)
     assert reader.read() is None
 
 
