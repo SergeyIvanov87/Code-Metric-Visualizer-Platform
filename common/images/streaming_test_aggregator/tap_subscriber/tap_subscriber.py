@@ -5,6 +5,7 @@ import argparse
 import base64
 import http.client
 import json
+import sys
 import time
 import urllib.parse
 from pathlib import Path
@@ -107,12 +108,15 @@ def subscribe(args):
 
 
 def append_received_bytes(trace, stream_path):
-    """Decode one protobuf segment and append only downstream RX bytes."""
+    """Decode one protobuf segment and return the downstream RX byte count."""
+    received = 0
     with stream_path.open("ab") as output:
         for event in events_from_trace(trace):
             chunk = bytes_from_event(event)
             if chunk:
                 output.write(chunk)
+                received += len(chunk)
+    return received
 
 
 def finalize_stream(stream_path, destination):
@@ -130,6 +134,7 @@ def finalize_stream(stream_path, destination):
 
 
 
+CAPTURE_START_TIMEOUT_EXIT_CODE = 10
 DELIVERY_ERRORS = []
 
 
@@ -150,6 +155,13 @@ def publish_event(producer, topic, capture_id, event):
     producer.poll(0)
 
 
+def flush_events(producer):
+    remaining = producer.flush(30)
+    if remaining or DELIVERY_ERRORS:
+        details = "; ".join(DELIVERY_ERRORS) or "delivery timeout"
+        raise RuntimeError(f"Kafka event delivery failed: {details}")
+
+
 def publish_connection(producer, topic, capture_id, trace_id, path):
     publish_event(producer, topic, capture_id, {
         "type": "connection_log",
@@ -159,6 +171,13 @@ def publish_connection(producer, topic, capture_id, trace_id, path):
     })
 
 
+
+def capture_start_expired(started, last_activity, wait_msec, now=None):
+    if last_activity is not None:
+        return False
+    now = time.monotonic() if now is None else now
+    return now - started >= wait_msec / 1000
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--admin-url", required=True)
@@ -166,6 +185,7 @@ def main():
     parser.add_argument("--tap-directory", type=Path, required=True)
     parser.add_argument("--decoded-directory", type=Path, required=True)
     parser.add_argument("--quiet-msec", type=int, required=True)
+    parser.add_argument("--wait-before-start-msec", type=int, required=True)
     parser.add_argument("--max-wait-msec", type=int, required=True)
     parser.add_argument("--max-buffered-rx-bytes", type=int, default=16777216)
     parser.add_argument("--retain-raw-taps", action="store_true")
@@ -174,6 +194,10 @@ def main():
     parser.add_argument("--capture-id", required=True)
     parser.add_argument("--ready-file", type=Path)
     args = parser.parse_args()
+    if args.wait_before_start_msec < 1:
+        parser.error("--wait-before-start-msec must be positive")
+    if args.max_wait_msec < args.wait_before_start_msec:
+        parser.error("--max-wait-msec must not be shorter than --wait-before-start-msec")
     args.tap_directory.mkdir(parents=True, exist_ok=True)
     args.decoded_directory.mkdir(parents=True, exist_ok=True)
     spool_directory = args.decoded_directory / ".spool"
@@ -189,9 +213,12 @@ def main():
     if args.ready_file:
         args.ready_file.touch()
     admin = urllib.parse.urlsplit(args.admin_url)
-    started = last_activity = time.monotonic()
+    started = time.monotonic()
+    last_activity = None
     last_rx = stats_rx_bytes(admin)
     active_trace_ids = set()
+    traces_with_data = set()
+    start_timed_out = False
     try:
         while time.monotonic() - started < args.max_wait_msec / 1000:
             try:
@@ -209,32 +236,67 @@ def main():
                 # Protobuf decoding happens here, while the admin response is
                 # live. Only reconstructed downstream bytes are spooled.
                 stream_path = spool_directory / f"connection_{trace_id}.stream"
-                append_received_bytes(trace, stream_path)
+                received_bytes = append_received_bytes(trace, stream_path)
                 if args.retain_raw_taps:
                     raw_path = args.tap_directory / f"connection_{trace_id}.pb"
                     with raw_path.open("ab") as raw_output:
                         raw_output.write(encode_varint(length) + payload)
 
-                last_activity = time.monotonic()
+                if received_bytes:
+                    traces_with_data.add(trace_id)
+                    last_activity = time.monotonic()
                 if closed:
-                    destination = args.decoded_directory / f"connection_{trace_id}.log"
-                    published_path = finalize_stream(stream_path, destination)
-                    publish_connection(
-                        producer, args.kafka_topic, args.capture_id, trace_id, published_path
-                    )
-                    published_path.unlink()
+                    if trace_id in traces_with_data:
+                        destination = args.decoded_directory / f"connection_{trace_id}.log"
+                        published_path = finalize_stream(stream_path, destination)
+                        publish_connection(
+                            producer,
+                            args.kafka_topic,
+                            args.capture_id,
+                            trace_id,
+                            published_path,
+                        )
+                        published_path.unlink()
+                        traces_with_data.remove(trace_id)
+                    else:
+                        stream_path.unlink(missing_ok=True)
                     active_trace_ids.remove(trace_id)
+                if capture_start_expired(
+                    started, last_activity, args.wait_before_start_msec
+                ):
+                    start_timed_out = True
+                    break
             except TimeoutError:
+                now = time.monotonic()
+                if last_activity is None:
+                    if capture_start_expired(
+                        started, last_activity, args.wait_before_start_msec, now
+                    ):
+                        start_timed_out = True
+                        break
+                    continue
                 current_rx = stats_rx_bytes(admin)
                 if current_rx is not None and current_rx != last_rx:
                     last_rx = current_rx
-                    last_activity = time.monotonic()
-                if time.monotonic() - last_activity >= args.quiet_msec / 1000:
+                    last_activity = now
+                if now - last_activity >= args.quiet_msec / 1000:
                     break
         else:
             raise TimeoutError("timed out waiting for tapped traffic to become quiet")
     finally:
         connection.close()
+
+    if start_timed_out:
+        for stream_path in spool_directory.glob("*.stream"):
+            stream_path.unlink()
+        spool_directory.rmdir()
+        publish_event(producer, args.kafka_topic, args.capture_id, {
+            "type": "capture_start_timeout",
+            "wait_msec": args.wait_before_start_msec,
+            "exit_code": CAPTURE_START_TIMEOUT_EXIT_CODE,
+        })
+        flush_events(producer)
+        return CAPTURE_START_TIMEOUT_EXIT_CODE
 
     # Docker logging connections commonly stay open. At the bounded-batch
     # quiet boundary, publish every complete protobuf segment received so far.
@@ -248,11 +310,9 @@ def main():
         published_path.unlink()
     spool_directory.rmdir()
     publish_event(producer, args.kafka_topic, args.capture_id, {"type": "capture_complete"})
-    remaining = producer.flush(30)
-    if remaining or DELIVERY_ERRORS:
-        details = "; ".join(DELIVERY_ERRORS) or "delivery timeout"
-        raise RuntimeError(f"Kafka event delivery failed: {details}")
+    flush_events(producer)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

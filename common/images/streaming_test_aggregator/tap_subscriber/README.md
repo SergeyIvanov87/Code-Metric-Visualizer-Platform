@@ -7,8 +7,10 @@ It posts an `any_match` configuration to Envoy's `/tap` admin endpoint, decodes
 length-delimited `TraceWrapper` protobuf messages as they arrive, groups
 transport reads by connection, reconstructs syslog records, and publishes
 `connection_log` events to Kafka. After the bounded-batch RX quiet interval it
-publishes `capture_complete`. Fatal capture errors are published as
-`capture_failed` by bootstrap.
+publishes `capture_complete`. If no downstream data arrives during
+`WAIT_MSEC_BEFORE_START`, it publishes `capture_start_timeout` and exits with
+code `10`. Other fatal capture errors are published as `capture_failed` by
+bootstrap.
 
 The standalone analyzer is `../log_event_aggregator`. Kafka
 is the only data-plane contract between the two services; neither service reads
@@ -24,7 +26,8 @@ the other's runtime filesystem.
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:9092` | Kafka bootstrap brokers. |
 | `KAFKA_TOPIC` | `test-capture-events` | Capture event topic. |
 | `CAPTURE_ID` | `functional-test` | Bounded capture identity and Kafka record key. |
-| `WAIT_MSEC_UNTIL_FINISH` | `15000` | Global RX quiet interval for compatibility mode. |
+| `WAIT_MSEC_BEFORE_START` | `60000` | Maximum wait for the first downstream capture bytes. |
+| `WAIT_MSEC_UNTIL_FINISH` | `15000` | RX quiet interval after capture has started. |
 | `MAX_WAIT_MSEC_UNTIL_FINISH` | `900000` | Capture deadline. |
 | `RETAIN_RAW_TAPS` | `false` | Retain diagnostic protobuf tap files locally. |
 

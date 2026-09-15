@@ -18,6 +18,7 @@ python3 /package/tap_subscriber.py \
   --tap-directory "${TAP_PATH}" \
   --decoded-directory "${DECODED_LOG_PATH}" \
   --quiet-msec "${WAIT_MSEC_UNTIL_FINISH}" \
+  --wait-before-start-msec "${WAIT_MSEC_BEFORE_START}" \
   --max-wait-msec "${MAX_WAIT_MSEC_UNTIL_FINISH}" \
   --max-buffered-rx-bytes "${MAX_BUFFERED_RX_BYTES:-16777216}" \
   --ready-file "${RESULT_PATH}/subscriber_ready" \
@@ -29,7 +30,7 @@ python3 /package/tap_subscriber.py \
   2> "${RESULT_PATH}/subscriber_stderr"
 subscriber_result=$?
 
-if (( subscriber_result != 0 )); then
+if (( subscriber_result != 0 && subscriber_result != 10 )); then
   python3 /package/publish_capture_failure.py \
     --brokers "${KAFKA_BOOTSTRAP_SERVERS}" \
     --topic "${KAFKA_TOPIC}" \

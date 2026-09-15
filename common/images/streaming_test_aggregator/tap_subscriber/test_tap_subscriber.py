@@ -43,8 +43,9 @@ def test_decodes_streamed_rx_bytes_without_a_raw_tap_file(tmp_path):
     )
     spool = tmp_path / "connection_7.stream"
 
-    tap.append_received_bytes(trace, spool)
+    received = tap.append_received_bytes(trace, spool)
 
+    assert received == len(segment.event.read.data.as_bytes)
     assert spool.read_bytes().endswith(b"collected 1 item")
     assert not list(tmp_path.glob("*.pb"))
 
@@ -93,3 +94,29 @@ def test_publishes_versioned_capture_keyed_event():
         "capture_id": "capture-42",
         "type": "capture_complete",
     }
+
+
+def test_publishes_distinct_capture_start_timeout_event():
+    producer = FakeProducer()
+
+    tap.publish_event(
+        producer,
+        "capture-events",
+        "capture-42",
+        {
+            "type": "capture_start_timeout",
+            "wait_msec": 60000,
+            "exit_code": tap.CAPTURE_START_TIMEOUT_EXIT_CODE,
+        },
+    )
+
+    value = tap.json.loads(producer.records[0][1]["value"])
+    assert value["type"] == "capture_start_timeout"
+    assert value["wait_msec"] == 60000
+    assert value["exit_code"] == 10
+
+
+def test_start_wait_applies_only_before_first_capture_data():
+    assert not tap.capture_start_expired(10.0, None, 60000, now=69.999)
+    assert tap.capture_start_expired(10.0, None, 60000, now=70.0)
+    assert not tap.capture_start_expired(10.0, 20.0, 60000, now=1000.0)

@@ -205,8 +205,17 @@ Every record has a versioned envelope. A target envelope is:
 ```
 
 The bounded version-1 slice currently defines `connection_log`,
-`capture_complete`, and `capture_failed`. Its concrete contract is documented
-in `tap_subscriber/EVENT_SCHEMA.md`.
+`capture_complete`, `capture_start_timeout`, and `capture_failed`. Its concrete
+contract is documented in `tap_subscriber/EVENT_SCHEMA.md`.
+
+Two timing phases are intentionally separate. `WAIT_MSEC_BEFORE_START` is the
+admission interval between establishing the admin subscription and receiving
+the first downstream capture bytes. Expiry emits `capture_start_timeout` and
+produces exit code `10`, identifying an orchestration/startup failure rather
+than an empty successful run. Only after capture begins does
+`WAIT_MSEC_UNTIL_FINISH` measure inactivity. This separation lets a subscriber
+become ready well before test containers start without prematurely applying the
+post-start heartbeat timeout.
 
 Recommended shared event streams are:
 

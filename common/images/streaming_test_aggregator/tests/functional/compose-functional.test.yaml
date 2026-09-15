@@ -59,6 +59,7 @@ services:
       ENVOY_ADMIN_PORT: 9901
       ENVOY_TAP_CONFIG_ID: test_aggregator
       WAIT_MSEC_UNTIL_FINISH: 5000
+      WAIT_MSEC_BEFORE_START: 15000
       MAX_WAIT_MSEC_UNTIL_FINISH: 60000
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: test-capture-events

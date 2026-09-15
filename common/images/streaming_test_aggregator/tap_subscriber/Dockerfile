@@ -11,6 +11,7 @@ COPY common/images/streaming_test_aggregator/tap_subscriber/decode_envoy_tap.py 
 RUN chmod +x /etc/bootstrap.sh /package/*.sh /package/*.py
 
 ENV WAIT_MSEC_UNTIL_FINISH=15000 \
+    WAIT_MSEC_BEFORE_START=60000 \
     MAX_WAIT_MSEC_UNTIL_FINISH=900000 \
     MAX_BUFFERED_RX_BYTES=16777216 \
     RETAIN_RAW_TAPS=false \

@@ -13,10 +13,21 @@ from pathlib import Path
 from confluent_kafka import Consumer, KafkaError
 
 SAFE_NAME = re.compile(r"[^A-Za-z0-9_.-]+")
+CAPTURE_START_TIMEOUT_EXIT_CODE = 10
+
+
+class CaptureStartTimeout(RuntimeError):
+    pass
 
 
 def safe_name(value):
     return SAFE_NAME.sub("_", value).strip("._") or "connection.log"
+
+
+def write_terminal_result(result_directory, exit_code, message):
+    (result_directory / "result_log_stdout").write_text("")
+    (result_directory / "result_log_stderr").write_text(f"{message}\n")
+    (result_directory / "result").write_text(f"{exit_code}\n")
 
 
 def consume_capture(consumer, topic, capture_id, output_directory, timeout_seconds):
@@ -46,6 +57,12 @@ def consume_capture(consumer, topic, capture_id, output_directory, timeout_secon
         elif event_type == "capture_complete":
             consumer.commit(message=message, asynchronous=False)
             return received
+        elif event_type == "capture_start_timeout":
+            consumer.commit(message=message, asynchronous=False)
+            wait_msec = event.get("wait_msec", "unknown")
+            raise CaptureStartTimeout(
+                f"no capture data arrived during the {wait_msec} ms initialization interval"
+            )
         elif event_type == "capture_failed":
             raise RuntimeError(event.get("error", "tap subscriber reported failure"))
         else:
@@ -78,13 +95,19 @@ def main():
         consumer.subscribe([args.topic])
         if args.ready_file:
             args.ready_file.touch()
-        received = consume_capture(
-            consumer,
-            args.topic,
-            args.capture_id,
-            args.output_directory,
-            args.timeout_seconds,
-        )
+        try:
+            received = consume_capture(
+                consumer,
+                args.topic,
+                args.capture_id,
+                args.output_directory,
+                args.timeout_seconds,
+            )
+        except CaptureStartTimeout as error:
+            write_terminal_result(
+                args.result_directory, CAPTURE_START_TIMEOUT_EXIT_CODE, error
+            )
+            return CAPTURE_START_TIMEOUT_EXIT_CODE
     finally:
         consumer.close()
 

@@ -72,3 +72,20 @@ def test_capture_failure_is_not_interpreted_as_test_result(tmp_path):
     consumer = Consumer([event("capture_failed", error="tap disconnected")])
     with pytest.raises(RuntimeError, match="tap disconnected"):
         aggregator.consume_capture(consumer, "events", "capture-1", tmp_path, 1)
+
+
+def test_capture_start_timeout_has_distinguishable_result(tmp_path):
+    consumer = Consumer([
+        event("capture_start_timeout", wait_msec=60000, exit_code=10)
+    ])
+    with pytest.raises(aggregator.CaptureStartTimeout, match="60000 ms"):
+        aggregator.consume_capture(consumer, "events", "capture-1", tmp_path, 1)
+    assert consumer.committed
+
+    aggregator.write_terminal_result(
+        tmp_path,
+        aggregator.CAPTURE_START_TIMEOUT_EXIT_CODE,
+        "no capture data arrived",
+    )
+    assert (tmp_path / "result").read_text().strip() == "10"
+    assert "no capture data" in (tmp_path / "result_log_stderr").read_text()
