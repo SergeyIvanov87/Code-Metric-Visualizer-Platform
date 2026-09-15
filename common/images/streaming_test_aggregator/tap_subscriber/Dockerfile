@@ -4,10 +4,10 @@ RUN python3 -m pip install --no-cache-dir xds-protos==1.83.1 confluent-kafka==2.
 RUN mkdir -p /logs /package
 VOLUME ["/logs"]
 
-COPY common/images/test_aggregator_subscriber_image/bootstrap.sh /etc/bootstrap.sh
-COPY common/images/test_aggregator_subscriber_image/streaming_admin_tap.py /package/streaming_admin_tap.py
-COPY common/images/test_aggregator_subscriber_image/publish_capture_failure.py /package/publish_capture_failure.py
-COPY common/images/test_aggregator_subscriber_image/decode_envoy_tap.py /package/decode_envoy_tap.py
+COPY common/images/streaming_test_aggregator/tap_subscriber/bootstrap.sh /etc/bootstrap.sh
+COPY common/images/streaming_test_aggregator/tap_subscriber/tap_subscriber.py /package/tap_subscriber.py
+COPY common/images/streaming_test_aggregator/tap_subscriber/publish_capture_failure.py /package/publish_capture_failure.py
+COPY common/images/streaming_test_aggregator/tap_subscriber/decode_envoy_tap.py /package/decode_envoy_tap.py
 RUN chmod +x /etc/bootstrap.sh /package/*.sh /package/*.py
 
 ENV WAIT_MSEC_UNTIL_FINISH=15000 \

@@ -1,4 +1,4 @@
-# Kafka test aggregator image
+# Log event aggregator image
 
 This service is the test analyzer. It consumes `connection_log` records for one
 `CAPTURE_ID` from Kafka until it receives `capture_complete`, writes the decoded

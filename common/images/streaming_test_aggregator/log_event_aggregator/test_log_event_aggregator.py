@@ -11,8 +11,8 @@ fake_module = types.ModuleType("confluent_kafka")
 fake_module.Consumer = object
 fake_module.KafkaError = types.SimpleNamespace(_PARTITION_EOF=-191)
 sys.modules.setdefault("confluent_kafka", fake_module)
-module_path = Path(__file__).with_name("kafka_test_aggregator.py")
-spec = importlib.util.spec_from_file_location("kafka_test_aggregator", module_path)
+module_path = Path(__file__).with_name("log_event_aggregator.py")
+spec = importlib.util.spec_from_file_location("log_event_aggregator", module_path)
 aggregator = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(aggregator)
 

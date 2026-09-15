@@ -23,12 +23,12 @@ mechanism.
 
 ```text
                          private, local admin connection
-  Envoy instance A  <------------------------------------  tap-subscriber A
+  Envoy instance A  <------------------------------------  tap_subscriber A
        |                                                         |
        v                                                         | idempotent producer
    syslog-ng                                                     v
                                                           Kafka topic(s)
-  Envoy instance B  <------------------------------------  tap-subscriber B
+  Envoy instance B  <------------------------------------  tap_subscriber B
        |                                                         |
        v                                                         |
    syslog-ng                                                     |
@@ -267,9 +267,9 @@ It still does not solve, without additional protocol work:
 
 The repository now implements the first vertical slice of this split:
 
-- `test_aggregator_subscriber_image` contains Envoy capture, transport decoding,
+- `tap_subscriber` contains Envoy capture, transport decoding,
   and an idempotent Kafka producer, but no pytest analyzer;
-- `test_aggregator_kafka_image` contains a Kafka consumer and an independent
+- `log_event_aggregator` contains a Kafka consumer and an independent
   copy of the pytest analyzer;
 - the version-1 bounded contract publishes `connection_log` records followed by
   `capture_complete`, or a terminal `capture_failed` infrastructure event;
@@ -281,7 +281,7 @@ recoverable implementation described above.
 
 ## Recommended rollout
 
-1. Extract `streaming_admin_tap.py` into a `tap-subscriber` image and remove
+1. Extract `tap_subscriber.py` into a `tap_subscriber` image and remove
    pytest aggregation from that image.
 2. Define the event envelope, identity, partition key, and compatibility rules
    before selecting client libraries.

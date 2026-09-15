@@ -1,5 +1,5 @@
 FROM python:3.12-alpine
 RUN pip install --no-cache-dir pytest
-COPY common/images/test_aggregator_subscriber_image/tests/functional /tests
+COPY common/images/streaming_test_aggregator/tap_subscriber/tests/functional /tests
 RUN chmod +x /tests/init.sh
 ENTRYPOINT ["/tests/init.sh"]

@@ -12,7 +12,7 @@ if [[ "${RETAIN_RAW_TAPS:-false}" == "true" ]]; then
   subscriber_options+=(--retain-raw-taps)
 fi
 
-python3 /package/streaming_admin_tap.py \
+python3 /package/tap_subscriber.py \
   --admin-url "http://${ENVOY_ADMIN_HOST}:${ENVOY_ADMIN_PORT}" \
   --config-id "${ENVOY_TAP_CONFIG_ID}" \
   --tap-directory "${TAP_PATH}" \

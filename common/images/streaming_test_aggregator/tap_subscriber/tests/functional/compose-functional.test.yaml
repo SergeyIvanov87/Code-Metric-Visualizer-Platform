@@ -19,18 +19,18 @@ services:
       timeout: 5s
       retries: 30
 
-  test-aggregator:
+  log_event_aggregator:
     build:
-      context: ../../../../..
-      dockerfile: common/images/test_aggregator_kafka_image/Dockerfile
+      context: ../../../../../..
+      dockerfile: common/images/streaming_test_aggregator/log_event_aggregator/Dockerfile
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: test-capture-events
-      KAFKA_CONSUMER_GROUP: functional-test-aggregator
+      KAFKA_CONSUMER_GROUP: functional-log_event_aggregator
       CAPTURE_ID: functional-test
       MAX_WAIT_SECONDS: 60
     volumes:
-      - subscriber-logs:/logs
+      - streaming-test-aggregator-logs:/logs
     depends_on:
       kafka: { condition: service_healthy }
 
@@ -50,10 +50,10 @@ services:
     depends_on:
       - syslog-ng
 
-  test-aggregator-subscriber:
+  tap_subscriber:
     build:
-      context: ../../../../..
-      dockerfile: common/images/test_aggregator_subscriber_image/Dockerfile
+      context: ../../../../../..
+      dockerfile: common/images/streaming_test_aggregator/tap_subscriber/Dockerfile
     environment:
       ENVOY_ADMIN_HOST: envoy
       ENVOY_ADMIN_PORT: 9901
@@ -64,17 +64,17 @@ services:
       KAFKA_TOPIC: test-capture-events
       CAPTURE_ID: functional-test
     volumes:
-      - subscriber-logs:/logs
+      - streaming-test-aggregator-logs:/logs
     depends_on:
       envoy: { condition: service_started }
       kafka: { condition: service_healthy }
-      test-aggregator: { condition: service_healthy }
+      log_event_aggregator: { condition: service_healthy }
 
   passed-tester:
     image: alpine:3.20
     command: ["sh", "-c", "printf 'collected 2 items\\n================ 2 passed in 0.02s ================\\n'"]
     depends_on:
-      test-aggregator-subscriber: { condition: service_healthy }
+      tap_subscriber: { condition: service_healthy }
     logging: &tester-logging
       driver: syslog
       options: { syslog-address: "tcp://localhost:14601", tag: "{{.Name}}" }
@@ -83,24 +83,24 @@ services:
     image: alpine:3.20
     command: ["sh", "-c", "printf 'collected 2 items\\n================ 1 passed in 0.02s ================\\n================ 1 skipped in 0.01s ================\\n'"]
     depends_on:
-      test-aggregator-subscriber: { condition: service_healthy }
+      tap_subscriber: { condition: service_healthy }
     logging: *tester-logging
 
   mixed-tester:
     image: alpine:3.20
     command: ["sh", "-c", "printf 'collected 2 items\\n================ 2 passed in 0.02s ================\\n'"]
     depends_on:
-      test-aggregator-subscriber: { condition: service_healthy }
+      tap_subscriber: { condition: service_healthy }
     logging: *tester-logging
 
   functional-tests:
     build:
-      context: ../../../../..
-      dockerfile: common/images/test_aggregator_subscriber_image/tests/functional/Dockerfile
+      context: ../../../../../..
+      dockerfile: common/images/streaming_test_aggregator/tap_subscriber/tests/functional/Dockerfile
     volumes:
-      - subscriber-logs:/logs:ro
+      - streaming-test-aggregator-logs:/logs:ro
     depends_on:
-      test-aggregator: { condition: service_completed_successfully }
+      log_event_aggregator: { condition: service_completed_successfully }
 
 volumes:
-  subscriber-logs:
+  streaming-test-aggregator-logs:

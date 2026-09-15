@@ -10,7 +10,7 @@ transport reads by connection, reconstructs syslog records, and publishes
 publishes `capture_complete`. Fatal capture errors are published as
 `capture_failed` by bootstrap.
 
-The standalone analyzer is `common/images/test_aggregator_kafka_image`. Kafka
+The standalone analyzer is `../log_event_aggregator`. Kafka
 is the only data-plane contract between the two services; neither service reads
 the other's runtime filesystem.
 
@@ -28,7 +28,7 @@ the other's runtime filesystem.
 | `MAX_WAIT_MSEC_UNTIL_FINISH` | `900000` | Capture deadline. |
 | `RETAIN_RAW_TAPS` | `false` | Retain diagnostic protobuf tap files locally. |
 
-See [the Kafka event contract](KAFKA_EVENT_SCHEMA.md), the
+See [the Kafka event contract](EVENT_SCHEMA.md), the
 [architecture evaluation](ARCHITECTURE_EVALUATION.md), and the
 [event-pipeline evaluation](EVENT_PIPELINE_EVALUATION.md).
 

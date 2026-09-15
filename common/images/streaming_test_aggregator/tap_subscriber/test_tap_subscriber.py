@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("envoy.data.tap.v3.wrapper_pb2")
-MODULE_PATH = Path(__file__).with_name("streaming_admin_tap.py")
+MODULE_PATH = Path(__file__).with_name("tap_subscriber.py")
 sys.path.insert(0, str(MODULE_PATH.parent))
-spec = importlib.util.spec_from_file_location("streaming_admin_tap", MODULE_PATH)
+spec = importlib.util.spec_from_file_location("tap_subscriber", MODULE_PATH)
 tap = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tap)
 

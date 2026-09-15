@@ -2,7 +2,7 @@
 
 > Historical evaluation of the bounded combined prototype. The implementation
 > has since been split into a pure Kafka-producing tap subscriber and
-> `test_aggregator_kafka_image`; see `EVENT_PIPELINE_EVALUATION.md`.
+> `log_event_aggregator`; see `EVENT_PIPELINE_EVALUATION.md`.
 
 ## Decision
 
@@ -180,6 +180,6 @@ Until then, choose by workload:
 
 - use `test_aggregator_image` for the most conservative finite CI batch and
   immutable close-before-decode behavior;
-- use `test_aggregator_subscriber_image` to evaluate proxy/analysis decoupling
+- use `tap_subscriber` to evaluate proxy/analysis decoupling
   in a controlled finite batch;
 - use neither as the final army-of-monkeys/session-aware architecture.

@@ -1,18 +1,18 @@
 services:
-  test_aggregator:
+  log_event_aggregator:
     build:
-      context: ../../../
-      dockerfile: common/images/test_aggregator_kafka_image/Dockerfile
+      context: ../../../../
+      dockerfile: common/images/streaming_test_aggregator/log_event_aggregator/Dockerfile
     env_file:
       - ./.env
     environment:
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       KAFKA_TOPIC: ${KAFKA_TOPIC:-test-capture-events}
-      KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-test-aggregator}
+      KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-log_event_aggregator}
       CAPTURE_ID: ${CAPTURE_ID:-functional-test}
       MAX_WAIT_SECONDS: ${MAX_WAIT_SECONDS:-900}
     volumes:
-      - test_aggregator_logs:/logs
+      - log_event_aggregator_logs:/logs
 
 volumes:
-  test_aggregator_logs:
+  log_event_aggregator_logs:

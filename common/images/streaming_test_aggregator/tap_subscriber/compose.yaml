@@ -1,8 +1,8 @@
 services:
-  test_aggregator_subscriber:
+  tap_subscriber:
     build:
-      context: ../../../
-      dockerfile: common/images/test_aggregator_subscriber_image/Dockerfile
+      context: ../../../../
+      dockerfile: common/images/streaming_test_aggregator/tap_subscriber/Dockerfile
     env_file:
       - ./.env
     environment:
@@ -17,7 +17,7 @@ services:
       KAFKA_TOPIC: ${KAFKA_TOPIC:-test-capture-events}
       CAPTURE_ID: ${CAPTURE_ID:-functional-test}
     volumes:
-      - test_aggregator_subscriber_logs:/logs
+      - tap_subscriber_logs:/logs
 
 volumes:
-  test_aggregator_subscriber_logs:
+  tap_subscriber_logs:

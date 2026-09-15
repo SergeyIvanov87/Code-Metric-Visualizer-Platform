@@ -4,7 +4,7 @@ DECODED_LOG_PATH=/logs/syslog-streams
 RESULT_PATH=/logs/aggregator
 rm -rf "${DECODED_LOG_PATH}" "${RESULT_PATH}"
 mkdir -p "${DECODED_LOG_PATH}" "${RESULT_PATH}"
-python3 /package/kafka_test_aggregator.py \
+python3 /package/log_event_aggregator.py \
   --brokers "${KAFKA_BOOTSTRAP_SERVERS}" \
   --topic "${KAFKA_TOPIC}" \
   --group-id "${KAFKA_CONSUMER_GROUP}" \
