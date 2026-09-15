@@ -6,7 +6,11 @@ COPY common/images/streaming_test_aggregator/log_event_aggregator/bootstrap.sh /
 COPY common/images/streaming_test_aggregator/log_event_aggregator/log_event_aggregator.py /package/log_event_aggregator.py
 COPY common/images/streaming_test_aggregator/log_event_aggregator/log_aggregator.py /package/log_aggregator.py
 COPY common/images/streaming_test_aggregator/log_event_aggregator/log_watcher_service.sh /package/log_watcher_service.sh
-RUN chmod +x /etc/bootstrap.sh /package/*.py /package/*.sh
+RUN chmod +x \
+    /etc/bootstrap.sh \
+    /package/log_event_aggregator.py \
+    /package/log_aggregator.py \
+    /package/log_watcher_service.sh
 ENV KAFKA_BOOTSTRAP_SERVERS=kafka:9092 KAFKA_TOPIC=test-capture-events \
     KAFKA_CONSUMER_GROUP=log_event_aggregator CAPTURE_ID=functional-test MAX_WAIT_SECONDS=900
 HEALTHCHECK --interval=2s --timeout=1s --retries=30 CMD test -f /logs/aggregator/consumer_ready || exit 1

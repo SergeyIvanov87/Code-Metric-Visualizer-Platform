@@ -8,7 +8,11 @@ COPY common/images/streaming_test_aggregator/tap_subscriber/bootstrap.sh /etc/bo
 COPY common/images/streaming_test_aggregator/tap_subscriber/tap_subscriber.py /package/tap_subscriber.py
 COPY common/images/streaming_test_aggregator/tap_subscriber/publish_capture_failure.py /package/publish_capture_failure.py
 COPY common/images/streaming_test_aggregator/tap_subscriber/decode_envoy_tap.py /package/decode_envoy_tap.py
-RUN chmod +x /etc/bootstrap.sh /package/*.sh /package/*.py
+RUN chmod +x \
+    /etc/bootstrap.sh \
+    /package/tap_subscriber.py \
+    /package/publish_capture_failure.py \
+    /package/decode_envoy_tap.py
 
 ENV WAIT_MSEC_UNTIL_FINISH=15000 \
     WAIT_MSEC_BEFORE_START=60000 \
