@@ -1,0 +1,66 @@
+services:
+  syslog-ng:
+    image: balabit/syslog-ng:4.8.1
+    command: ["-F", "-f", "/etc/syslog-ng/syslog-ng.conf"]
+    volumes:
+      - ./syslog-ng.conf:/etc/syslog-ng/syslog-ng.conf:ro
+
+  envoy:
+    image: envoyproxy/envoy:dev-5451efd9b8f8a444431197050e45ba974ed4e9d8
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml"]
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "14601:14601"
+    depends_on:
+      - syslog-ng
+
+  test-aggregator-subscriber:
+    build:
+      context: ../../../../..
+      dockerfile: common/images/test_aggregator_subscriber_image/Dockerfile
+    environment:
+      ENVOY_ADMIN_HOST: envoy
+      ENVOY_ADMIN_PORT: 9901
+      ENVOY_TAP_CONFIG_ID: test_aggregator
+      WAIT_MSEC_UNTIL_FINISH: 5000
+      MAX_WAIT_MSEC_UNTIL_FINISH: 60000
+    volumes:
+      - subscriber-logs:/logs
+    depends_on:
+      - envoy
+
+  passed-tester:
+    image: alpine:3.20
+    command: ["sh", "-c", "printf 'collected 2 items\\n================ 2 passed in 0.02s ================\\n'"]
+    depends_on:
+      test-aggregator-subscriber: { condition: service_healthy }
+    logging: &tester-logging
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:14601", tag: "{{.Name}}" }
+
+  skipped-tester:
+    image: alpine:3.20
+    command: ["sh", "-c", "printf 'collected 2 items\\n================ 1 passed in 0.02s ================\\n================ 1 skipped in 0.01s ================\\n'"]
+    depends_on:
+      test-aggregator-subscriber: { condition: service_healthy }
+    logging: *tester-logging
+
+  mixed-tester:
+    image: alpine:3.20
+    command: ["sh", "-c", "printf 'collected 2 items\\n================ 2 passed in 0.02s ================\\n'"]
+    depends_on:
+      test-aggregator-subscriber: { condition: service_healthy }
+    logging: *tester-logging
+
+  functional-tests:
+    build:
+      context: ../../../../..
+      dockerfile: common/images/test_aggregator_subscriber_image/tests/functional/Dockerfile
+    volumes:
+      - subscriber-logs:/logs:ro
+    depends_on:
+      test-aggregator-subscriber: { condition: service_completed_successfully }
+
+volumes:
+  subscriber-logs:

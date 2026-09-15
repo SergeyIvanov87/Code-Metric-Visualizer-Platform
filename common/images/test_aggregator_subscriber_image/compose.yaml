@@ -1,0 +1,19 @@
+services:
+  test_aggregator_subscriber:
+    build:
+      context: ../../../
+      dockerfile: common/images/test_aggregator_subscriber_image/Dockerfile
+    env_file:
+      - ./.env
+    environment:
+      ENVOY_ADMIN_HOST: ${ENVOY_ADMIN_HOST:-envoy}
+      ENVOY_ADMIN_PORT: ${ENVOY_ADMIN_PORT:-9901}
+      ENVOY_TAP_CONFIG_ID: ${ENVOY_TAP_CONFIG_ID:-test_aggregator}
+      WAIT_MSEC_UNTIL_FINISH: ${WAIT_MSEC_UNTIL_FINISH:-15000}
+      MAX_WAIT_MSEC_UNTIL_FINISH: ${MAX_WAIT_MSEC_UNTIL_FINISH:-900000}
+      MAX_BUFFERED_RX_BYTES: ${MAX_BUFFERED_RX_BYTES:-16777216}
+    volumes:
+      - test_aggregator_subscriber_logs:/logs
+
+volumes:
+  test_aggregator_subscriber_logs:
