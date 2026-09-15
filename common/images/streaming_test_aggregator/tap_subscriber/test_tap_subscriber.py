@@ -77,11 +77,20 @@ def test_decodes_streamed_rx_bytes_without_a_raw_tap_file(tmp_path):
     )
     spool = tmp_path / "connection_7.stream"
 
-    received = tap.append_received_bytes(trace, spool)
+    received_data = tap.append_received_data(trace, spool)
 
-    assert received == len(segment.event.read.data.as_bytes)
+    assert received_data
     assert spool.read_bytes().endswith(b"collected 1 item")
     assert not list(tmp_path.glob("*.pb"))
+
+
+def test_reports_no_activity_for_trace_without_downstream_data(tmp_path):
+    trace = tap.wrapper_pb2.TraceWrapper()
+    segment = trace.socket_streamed_trace_segment
+    segment.trace_id = 8
+    segment.event.closed.SetInParent()
+
+    assert not tap.append_received_data(trace, tmp_path / "connection_8.stream")
 
 
 def test_finalizes_reconstructed_stream_atomically(tmp_path):

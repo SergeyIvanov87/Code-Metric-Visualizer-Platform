@@ -7,7 +7,7 @@ It posts an `any_match` configuration to Envoy's `/tap` admin endpoint, parses
 the adjacent `JSON_BODY_AS_BYTES` trace objects as they arrive, converts them
 to `TraceWrapper` messages, groups
 transport reads by connection, reconstructs syslog records, and publishes
-`connection_log` events to Kafka. After the bounded-batch RX quiet interval it
+`connection_log` events to Kafka. After the bounded-batch tap quiet interval it
 publishes `capture_complete`. If no downstream data arrives during
 `WAIT_MSEC_BEFORE_START`, it publishes `capture_start_timeout` and exits with
 code `10`. Other fatal capture errors are published as `capture_failed` by
@@ -29,7 +29,7 @@ the other's runtime filesystem.
 | `KAFKA_TOPIC` | `test-capture-events` | Capture event topic. |
 | `CAPTURE_ID` | `functional-test` | Bounded capture identity and Kafka record key. |
 | `WAIT_MSEC_BEFORE_START` | `60000` | Maximum wait for the first downstream capture bytes. |
-| `WAIT_MSEC_UNTIL_FINISH` | `15000` | RX quiet interval after capture has started. |
+| `WAIT_MSEC_UNTIL_FINISH` | `15000` | Decoded tap-data quiet interval after capture has started. |
 | `MAX_WAIT_MSEC_UNTIL_FINISH` | `900000` | Capture deadline. |
 | `RETAIN_RAW_TAPS` | `false` | Retain diagnostic protobuf tap files locally. |
 
@@ -47,6 +47,11 @@ can span frames and
 keeping every active stream in RAM would be unbounded. The finalized log is
 published to Kafka and immediately removed. Set `RETAIN_RAW_TAPS=true` only for
 diagnostics or replay experiments.
+
+Traffic activity is the arrival of any non-empty decoded downstream tap data.
+The subscriber updates only an activity timestamp; it does not count bytes or
+poll Envoy's listener-wide RX statistics. A partial JSON trace prevents quiet
+completion until it is completed or the absolute capture deadline expires.
 
 ## Broker outage behavior
 

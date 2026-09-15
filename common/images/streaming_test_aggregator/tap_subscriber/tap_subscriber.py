@@ -94,22 +94,6 @@ def trace_id_and_closed(trace):
     return segment.trace_id, closed
 
 
-def stats_rx_bytes(admin):
-    connection = http.client.HTTPConnection(admin.hostname, admin.port, timeout=2)
-    path = "/stats?filter=%5Etcp%5C.destination%5C.downstream_cx_rx_bytes_total%24"
-    try:
-        connection.request("GET", path)
-        response = connection.getresponse()
-        if response.status != 200:
-            return None
-        for line in response.read().decode().splitlines():
-            if line.startswith("tcp.destination.downstream_cx_rx_bytes_total:"):
-                return int(line.rsplit(":", 1)[1])
-    finally:
-        connection.close()
-    return None
-
-
 def subscribe(args):
     admin = urllib.parse.urlsplit(args.admin_url)
     deadline = time.monotonic() + args.max_wait_msec / 1000
@@ -148,16 +132,16 @@ def subscribe(args):
             time.sleep(1)
 
 
-def append_received_bytes(trace, stream_path):
-    """Decode one protobuf segment and return the downstream RX byte count."""
-    received = 0
+def append_received_data(trace, stream_path):
+    """Append downstream data from one trace and report whether any arrived."""
+    received_data = False
     with stream_path.open("ab") as output:
         for event in events_from_trace(trace):
             chunk = bytes_from_event(event)
             if chunk:
                 output.write(chunk)
-                received += len(chunk)
-    return received
+                received_data = True
+    return received_data
 
 
 def finalize_stream(stream_path, destination):
@@ -310,10 +294,8 @@ def main():
     trace_reader = StreamingJsonTraceReader(response)
     if args.ready_file:
         args.ready_file.touch()
-    admin = urllib.parse.urlsplit(args.admin_url)
     started = time.monotonic()
     last_activity = None
-    last_rx = stats_rx_bytes(admin)
     active_trace_ids = set()
     traces_with_data = set()
     start_timed_out = False
@@ -340,14 +322,14 @@ def main():
                 # JSON-to-protobuf conversion happens while the admin response
                 # is live. Only reconstructed downstream bytes are spooled.
                 stream_path = spool_directory / f"connection_{trace_id}.stream"
-                received_bytes = append_received_bytes(trace, stream_path)
+                received_data = append_received_data(trace, stream_path)
                 if args.retain_raw_taps:
                     raw_path = args.tap_directory / f"connection_{trace_id}.pb"
                     payload = trace.SerializeToString()
                     with raw_path.open("ab") as raw_output:
                         raw_output.write(encode_varint(len(payload)) + payload)
 
-                if received_bytes:
+                if received_data:
                     traces_with_data.add(trace_id)
                     last_activity = time.monotonic()
                 if closed:
@@ -374,10 +356,12 @@ def main():
                         start_timed_out = True
                         break
                     continue
-                current_rx = stats_rx_bytes(admin)
-                if current_rx is not None and current_rx != last_rx:
-                    last_rx = current_rx
-                    last_activity = now
+                # A partial JSON object proves that a tap event is still in
+                # flight even though no complete downstream payload can be
+                # decoded yet. Wait for its remainder or the absolute capture
+                # deadline instead of declaring the stream quiet.
+                if trace_reader.buffer.strip():
+                    continue
                 if now - last_activity >= args.quiet_msec / 1000:
                     break
         else:
