@@ -1,68 +1,142 @@
 #!/bin/bash
 
-# import utilities
 source /package/ssh.sh
 
-# input log directory for gathering and analysing test suite outputs
-echo $HOSTNAME
-LOG_AGGREGATED_PATH=/logs/syslog-ng
-if [ -d ${LOG_AGGREGATED_PATH} ]; then
-    rm -rf ${LOG_AGGREGATED_PATH}
-fi
-mkdir -p ${LOG_AGGREGATED_PATH}
+echo "${HOSTNAME}"
 
-# output directory which confounds analyzis results and errors
-LOG_AGGREGATED_RESULT_PATH=/logs/aggregator/
-if [ -d ${LOG_AGGREGATED_RESULT_PATH} ]; then
-    rm -rf ${LOG_AGGREGATED_RESULT_PATH}
-fi
-mkdir -p ${LOG_AGGREGATED_RESULT_PATH}
+TAP_PATH=/logs/taps
+DECODED_LOG_PATH=/logs/syslog-streams
+LOG_AGGREGATED_RESULT_PATH=/logs/aggregator
+
+for path in "${TAP_PATH}" "${DECODED_LOG_PATH}" "${LOG_AGGREGATED_RESULT_PATH}"; do
+    if [[ -d "${path}" ]]; then
+        rm -rf "${path}"
+    fi
+    mkdir -p "${path}"
+done
+
+# /logs is a runtime volume, so the image-layer permissions from the
+# Dockerfile are hidden when the container starts. The Envoy entrypoint drops
+# privileges to the `envoy` user; grant that user access to the only directory
+# it needs to write while leaving the watcher-owned output directories alone.
+chown envoy:envoy "${TAP_PATH}"
+chmod 0750 "${TAP_PATH}"
 
 echo "Remove all SSH stored keys to prevent 'man-in-the-middle' complaint, as host identities may change in our virtual network"
 rm -f /root/.ssh/known_hosts
 
 echo "Wait until syslog-ng SSH server started"
 wait_for_ssh "root" "${DOWNSTREAM_SYSLOG_HOSTNAME}" "${DOWNSTREAM_SSH_SECRET}"
-execute_ssh_cmd "root" "${DOWNSTREAM_SYSLOG_HOSTNAME}" "${DOWNSTREAM_SSH_SECRET}" "while syslog-ng-ctl healthcheck -c /config/syslog-ng.ctl && [[ $? != 0 ]]; do echo \"waiting for syslog-ng running...\" && sleep 1; done"
+execute_ssh_cmd "root" "${DOWNSTREAM_SYSLOG_HOSTNAME}" "${DOWNSTREAM_SSH_SECRET}" "while syslog-ng-ctl healthcheck -c /config/syslog-ng.ctl && [[ \$? != 0 ]]; do echo \"waiting for syslog-ng running...\" && sleep 1; done"
 
-termination_handler(){
+termination_handler() {
     trap - QUIT TERM EXIT
 
-    RET=`cat ${LOG_AGGREGATED_RESULT_PATH}/result`
-    echo "Test Suites execution result: ${RET}. Full log can be found: "
+    if [[ -n "${tap_watcher_pid:-}" ]] && kill -0 "${tap_watcher_pid}" 2>/dev/null; then
+        kill "${tap_watcher_pid}" 2>/dev/null
+    fi
+    if [[ -n "${envoy_pid:-}" ]] && kill -0 "${envoy_pid}" 2>/dev/null; then
+        kill "${envoy_pid}" 2>/dev/null
+    fi
+
+    if [[ -f "${LOG_AGGREGATED_RESULT_PATH}/result" ]]; then
+        result=$(cat "${LOG_AGGREGATED_RESULT_PATH}/result")
+    else
+        result=255
+        echo "The tap watcher stopped without producing a result" \
+            > "${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
+    fi
+
+    echo "Test Suites execution result: ${result}. Full log can be found:"
     echo "- ${LOG_AGGREGATED_RESULT_PATH}/result_log_stdout"
     echo "- ${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
-    echo "- ${LOG_AGGREGATED_PATH}/tester.log"
-    if [ $RET != 0 ]; then
+    echo "- raw Envoy taps: ${TAP_PATH}"
+    echo "- reconstructed syslog streams: ${DECODED_LOG_PATH}"
+
+    if [[ "${result}" != 0 ]]; then
         echo "================================================================="
-        echo "|                  Captured Log traffic:                                   |"
+        echo "| Reconstructed traffic designated for syslog-ng                 |"
         echo "================================================================="
-        cat ${LOG_AGGREGATED_PATH}/tester.log
+        for log_file in "${DECODED_LOG_PATH}"/*.log; do
+            if [[ -f "${log_file}" ]]; then
+                echo "--- ${log_file}"
+                cat "${log_file}"
+            fi
+        done
         echo "================================================================="
+        echo "| Aggregation/decoding errors                                    |"
         echo "================================================================="
-        echo "|                  ERROR Log:                                   |"
-        echo "================================================================="
-        cat ${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr
+        if [[ -f "${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr" ]]; then
+            cat "${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
+        fi
         echo "================================================================="
     fi
-    exit ${RET}
+    exit "${result}"
 }
 
 echo "Setup signal handlers"
-trap 'termination_handler' QUIT TERM EXIT
+trap termination_handler QUIT TERM EXIT
 
-# capture traffic from syslog-ng port | compel line ending \r\n | turn off stdoutput bufferization | decode from hex and redirect into files for analyzis
-tshark -f "tcp port ${UPSTREAM_AGGREGATOR_TCP_PORT}" -i any -l -T fields -e tcp.payload | xargs -I{} echo "{}0d0a" | stdbuf -i0 -o0 -e0  xxd -r -p - > ${LOG_AGGREGATED_PATH}/tester.log  &
-/package/log_watcher_service.sh ${LOG_AGGREGATED_PATH} ${WAIT_MSEC_UNTIL_FINISH} ${LOG_AGGREGATED_RESULT_PATH} &
-
-# bootstrap envoy.yaml
+# Bootstrap the port/address placeholders before starting Envoy.
+sed -i "s/ENVOY_ADMIN_PORT/${ENVOY_ADMIN_PORT}/" /etc/envoy/envoy.yaml
+sed -i "s/MAX_BUFFERED_RX_BYTES/${MAX_BUFFERED_RX_BYTES}/" /etc/envoy/envoy.yaml
 sed -i "s/UPSTREAM_AGGREGATOR_TCP_PORT/${UPSTREAM_AGGREGATOR_TCP_PORT}/" /etc/envoy/envoy.yaml
 sed -i "s/DOWNSTREAM_SYSLOG_TCP_PORT/${DOWNSTREAM_SYSLOG_TCP_PORT}/" /etc/envoy/envoy.yaml
 sed -i "s/DOWNSTREAM_SYSLOG_HOSTNAME/${DOWNSTREAM_SYSLOG_HOSTNAME}/" /etc/envoy/envoy.yaml
 
-# Substitute the new entry point (docker inspect was used here to determined the entry [ENTRYPOINT + CMD])
-/docker-entrypoint.sh envoy -c /etc/envoy/envoy.yaml
+# The watcher is ready before Envoy accepts its first connection. It resets its
+# inactivity timer from Envoy's downstream RX-byte counter and decodes a
+# connection only on CLOSE_WRITE.
+/package/tap_watcher_service.sh \
+    "${TAP_PATH}" \
+    "${DECODED_LOG_PATH}" \
+    "${WAIT_MSEC_UNTIL_FINISH}" \
+    "${LOG_AGGREGATED_RESULT_PATH}" \
+    "${MAX_WAIT_MSEC_UNTIL_FINISH:-900000}" \
+    "http://127.0.0.1:${ENVOY_ADMIN_PORT}" &
+tap_watcher_pid=$!
 
-RET=`cat ${LOG_AGGREGATED_PATH}/result`
-echo "Test aggregator result: ${RET}.Full log can be found: ${LOG_AGGREGATED_PATH}/result_log"
-exit ${RET}
+watcher_start_second=$SECONDS
+while [[ ! -f "${LOG_AGGREGATED_RESULT_PATH}/watcher_ready" ]]; do
+    if ! kill -0 "${tap_watcher_pid}" 2>/dev/null || (( SECONDS - watcher_start_second >= 10 )); then
+        echo "The Envoy tap file watcher did not become ready" \
+            > "${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
+        : > "${LOG_AGGREGATED_RESULT_PATH}/result_log_stdout"
+        echo 255 > "${LOG_AGGREGATED_RESULT_PATH}/result"
+        exit 255
+    fi
+    sleep 1
+done
+
+/docker-entrypoint.sh envoy -c /etc/envoy/envoy.yaml &
+envoy_pid=$!
+
+capture_stop_request="${LOG_AGGREGATED_RESULT_PATH}/capture_stop_requested"
+envoy_stop_sent=0
+
+while kill -0 "${tap_watcher_pid}" 2>/dev/null; do
+    if [[ -f "${capture_stop_request}" ]]; then
+        if (( envoy_stop_sent == 0 )) && kill -0 "${envoy_pid}" 2>/dev/null; then
+            kill "${envoy_pid}" 2>/dev/null
+            envoy_stop_sent=1
+        fi
+    elif ! kill -0 "${envoy_pid}" 2>/dev/null; then
+        echo "Envoy exited before log aggregation completed" \
+            > "${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
+        : > "${LOG_AGGREGATED_RESULT_PATH}/result_log_stdout"
+        echo 255 > "${LOG_AGGREGATED_RESULT_PATH}/result"
+        kill "${tap_watcher_pid}" 2>/dev/null
+        break
+    fi
+    sleep 1
+done
+
+wait "${tap_watcher_pid}" 2>/dev/null
+result=$(cat "${LOG_AGGREGATED_RESULT_PATH}/result")
+
+if kill -0 "${envoy_pid}" 2>/dev/null; then
+    kill "${envoy_pid}" 2>/dev/null
+fi
+wait "${envoy_pid}" 2>/dev/null
+
+exit "${result}"

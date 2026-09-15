@@ -1,5 +1,7 @@
 FROM envoyproxy/envoy:dev-5451efd9b8f8a444431197050e45ba974ed4e9d8
-RUN apt-get update && apt-get install -y openssh-client sshpass tshark xxd python3 python3-pyinotify dos2unix
+RUN apt-get update && apt-get install -y openssh-client sshpass python3 python3-pip python3-pyinotify curl inotify-tools dos2unix
+RUN python3 -m pip install --no-cache-dir --target=/opt/test-aggregator-python xds-protos==1.83.1
+ENV PYTHONPATH=/opt/test-aggregator-python
 
 COPY common/images/test_aggregator_image/envoy.yaml /etc/envoy/envoy.yaml
 RUN chmod go+r /etc/envoy/envoy.yaml
@@ -19,13 +21,21 @@ RUN dos2unix /etc/bootstrap.sh
 
 COPY common/images/test_aggregator_image/log_aggregator.py /package/log_aggregator.py
 COPY common/images/test_aggregator_image/log_watcher_service.sh /package/log_watcher_service.sh
+COPY common/images/test_aggregator_image/tap_watcher_service.sh /package/tap_watcher_service.sh
+COPY common/images/test_aggregator_image/decode_envoy_tap.py /package/decode_envoy_tap.py
 COPY common/shell_utils/ssh.sh /package/ssh.sh
 
-RUN dos2unix /package/*
+RUN dos2unix /package/* && chmod +x /package/*.sh
 
 
 ARG WAIT_MSEC_UNTIL_FINISH=15000
 ENV WAIT_MSEC_UNTIL_FINISH=$WAIT_MSEC_UNTIL_FINISH
+
+ARG ENVOY_ADMIN_PORT=9901
+ENV ENVOY_ADMIN_PORT=${ENVOY_ADMIN_PORT}
+
+ARG MAX_BUFFERED_RX_BYTES=16777216
+ENV MAX_BUFFERED_RX_BYTES=${MAX_BUFFERED_RX_BYTES}
 
 ARG UPSTREAM_SYSLOG_TCP_PORT=13601
 ENV UPSTREAM_SYSLOG_TCP_PORT=${UPSTREAM_SYSLOG_TCP_PORT}
@@ -33,7 +43,7 @@ ENV UPSTREAM_SYSLOG_TCP_PORT=${UPSTREAM_SYSLOG_TCP_PORT}
 ARG DOWNSTREAM_SYSLOG_TCP_PORT=6601
 ENV DOWNSTREAM_SYSLOG_TCP_PORT=${DOWNSTREAM_SYSLOG_TCP_PORT}
 
-ARG DOWNSTREAM_SYSLOG_HOSTNAME=api.pmccabe_collector.syslog-ng
+ARG DOWNSTREAM_SYSLOG_HOSTNAME=syslog-ng
 ENV DOWNSTREAM_SYSLOG_HOSTNAME=${DOWNSTREAM_SYSLOG_HOSTNAME}
 
 ARG DOWNSTREAM_SSH_SECRET=syslog-ng

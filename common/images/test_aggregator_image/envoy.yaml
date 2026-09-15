@@ -1,3 +1,10 @@
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: ENVOY_ADMIN_PORT
+
 static_resources:
   listeners:
     - name: test_aggregator
@@ -6,7 +13,29 @@ static_resources:
           address: 0.0.0.0
           port_value: UPSTREAM_AGGREGATOR_TCP_PORT
       filter_chains:
-        - filters:
+        - transport_socket:
+            # Tap the downstream side so every Docker syslog connection gets
+            # its own trace file. The explicit receive limit prevents larger
+            # syslog reads from being marked truncated while output is streamed.
+            name: envoy.transport_sockets.tap
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tap.v3.Tap
+              common_config:
+                static_config:
+                  match:
+                    any_match: true
+                  output_config:
+                    streaming: true
+                    max_buffered_rx_bytes: MAX_BUFFERED_RX_BYTES
+                    sinks:
+                      - format: PROTO_BINARY_LENGTH_DELIMITED
+                        file_per_tap:
+                          path_prefix: /logs/taps/connection
+              transport_socket:
+                name: envoy.transport_sockets.raw_buffer
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+          filters:
             - name: envoy.filters.network.tcp_proxy
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy

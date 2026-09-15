@@ -12,7 +12,7 @@ execute_ssh_cmd() {
     # $2 - host
     # $3 - pwd
     # $4 - cmd
-    sshpass -p "${3}" ssh -o StrictHostKeyChecking=no ${1}@${2} '${4}'
+    sshpass -p "${3}" ssh -o StrictHostKeyChecking=no "${1}@${2}" "${4}"
 }
 
 scp_copy_file() {
