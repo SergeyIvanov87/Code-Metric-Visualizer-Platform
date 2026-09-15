@@ -3,10 +3,9 @@ from pathlib import Path
 LOGS = Path("/logs")
 
 
-def test_subscriber_persisted_per_connection_taps():
-    taps = list((LOGS / "taps").glob("connection_*.pb"))
-    assert len(taps) >= 3
-    assert all(path.stat().st_size for path in taps)
+def test_subscriber_does_not_persist_raw_taps_by_default():
+    assert not list((LOGS / "taps").glob("connection_*.pb"))
+    assert not (LOGS / "syslog-streams" / ".spool").exists()
 
 
 def test_subscriber_reconstructed_each_tester_stream():

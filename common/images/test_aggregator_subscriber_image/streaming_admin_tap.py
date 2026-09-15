@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-"""Subscribe to Envoy's streaming admin tap and persist per-connection traces."""
+"""Decode Envoy streaming-admin tap segments as they arrive."""
 
 import argparse
 import http.client
 import json
-import subprocess
 import time
 import urllib.parse
 from pathlib import Path
 
 from envoy.data.tap.v3 import wrapper_pb2
+
+from decode_envoy_tap import (
+    bytes_from_event,
+    events_from_trace,
+    frame_syslog_stream,
+    producer_output_path,
+)
 
 
 def encode_varint(value):
@@ -98,6 +104,29 @@ def subscribe(args):
             time.sleep(1)
 
 
+def append_received_bytes(trace, stream_path):
+    """Decode one protobuf segment and append only downstream RX bytes."""
+    with stream_path.open("ab") as output:
+        for event in events_from_trace(trace):
+            chunk = bytes_from_event(event)
+            if chunk:
+                output.write(chunk)
+
+
+def finalize_stream(stream_path, destination):
+    """Frame a reconstructed connection stream and atomically publish it."""
+    stream = stream_path.read_bytes() if stream_path.exists() else b""
+    records = frame_syslog_stream(stream)
+    destination = producer_output_path(destination, records)
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    with temporary.open("wb") as output:
+        for record in records:
+            output.write(record + b"\n")
+    temporary.replace(destination)
+    stream_path.unlink(missing_ok=True)
+    return destination
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--admin-url", required=True)
@@ -107,10 +136,13 @@ def main():
     parser.add_argument("--quiet-msec", type=int, required=True)
     parser.add_argument("--max-wait-msec", type=int, required=True)
     parser.add_argument("--max-buffered-rx-bytes", type=int, default=16777216)
+    parser.add_argument("--retain-raw-taps", action="store_true")
     parser.add_argument("--ready-file", type=Path)
     args = parser.parse_args()
     args.tap_directory.mkdir(parents=True, exist_ok=True)
     args.decoded_directory.mkdir(parents=True, exist_ok=True)
+    spool_directory = args.decoded_directory / ".spool"
+    spool_directory.mkdir()
 
     connection, response = subscribe(args)
     if args.ready_file:
@@ -118,8 +150,7 @@ def main():
     admin = urllib.parse.urlsplit(args.admin_url)
     started = last_activity = time.monotonic()
     last_rx = stats_rx_bytes(admin)
-    files = {}
-    completed = []
+    active_trace_ids = set()
     try:
         while time.monotonic() - started < args.max_wait_msec / 1000:
             try:
@@ -132,17 +163,22 @@ def main():
                 trace = wrapper_pb2.TraceWrapper()
                 trace.ParseFromString(payload)
                 trace_id, closed = trace_id_and_closed(trace)
-                path = args.tap_directory / f"connection_{trace_id}.pb"
-                if trace_id not in files:
-                    files[trace_id] = path.open("ab")
-                output = files[trace_id]
-                output.write(encode_varint(length) + payload)
-                output.flush()
+                active_trace_ids.add(trace_id)
+
+                # Protobuf decoding happens here, while the admin response is
+                # live. Only reconstructed downstream bytes are spooled.
+                stream_path = spool_directory / f"connection_{trace_id}.stream"
+                append_received_bytes(trace, stream_path)
+                if args.retain_raw_taps:
+                    raw_path = args.tap_directory / f"connection_{trace_id}.pb"
+                    with raw_path.open("ab") as raw_output:
+                        raw_output.write(encode_varint(length) + payload)
+
                 last_activity = time.monotonic()
                 if closed:
-                    output.close()
-                    del files[trace_id]
-                    completed.append(path)
+                    destination = args.decoded_directory / f"connection_{trace_id}.log"
+                    finalize_stream(stream_path, destination)
+                    active_trace_ids.remove(trace_id)
             except TimeoutError:
                 current_rx = stats_rx_bytes(admin)
                 if current_rx is not None and current_rx != last_rx:
@@ -154,22 +190,14 @@ def main():
             raise TimeoutError("timed out waiting for tapped traffic to become quiet")
     finally:
         connection.close()
-        for output in files.values():
-            output.close()
 
-    # A streamed response can be deliberately closed after the quiet period;
-    # complete protobuf segments already persisted are valid decoder input.
-    completed.extend(
-        path for trace_id, path in
-        ((int(path.stem.rsplit("_", 1)[1]), path) for path in args.tap_directory.glob("connection_*.pb"))
-        if trace_id in files
-    )
-    for path in sorted(set(completed)):
-        destination = args.decoded_directory / f"{path.stem}.log"
-        subprocess.run(
-            ["python3", "/package/decode_envoy_tap.py", str(path), str(destination), "--name-by-producer"],
-            check=True,
-        )
+    # Docker logging connections commonly stay open. At the bounded-batch
+    # quiet boundary, publish every complete protobuf segment received so far.
+    for trace_id in sorted(active_trace_ids):
+        stream_path = spool_directory / f"connection_{trace_id}.stream"
+        destination = args.decoded_directory / f"connection_{trace_id}.log"
+        finalize_stream(stream_path, destination)
+    spool_directory.rmdir()
 
 
 if __name__ == "__main__":

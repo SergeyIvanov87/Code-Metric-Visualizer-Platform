@@ -14,6 +14,7 @@ RUN chmod +x /etc/bootstrap.sh /package/*.sh /package/*.py
 ENV WAIT_MSEC_UNTIL_FINISH=15000 \
     MAX_WAIT_MSEC_UNTIL_FINISH=900000 \
     MAX_BUFFERED_RX_BYTES=16777216 \
+    RETAIN_RAW_TAPS=false \
     ENVOY_ADMIN_HOST=envoy \
     ENVOY_ADMIN_PORT=9901 \
     ENVOY_TAP_CONFIG_ID=test_aggregator

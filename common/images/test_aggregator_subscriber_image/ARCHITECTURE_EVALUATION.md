@@ -83,11 +83,13 @@ unterminated suffix until a close event or a defined drain deadline.
 
 ### 4. Resource limits moved; they did not disappear
 
-Envoy no longer retains tap files, but the subscriber keeps an open file per
-trace and writes unbounded raw and decoded artifacts. There is no cap on active
-connections, total bytes, file descriptors, disk use, decoder work, or
-retention. `MAX_BUFFERED_RX_BYTES` limits an Envoy capture body, not total run
-storage. Quotas and backpressure are required before army-of-monkeys use.
+Envoy no longer retains tap files, and the subscriber now protobuf-decodes each
+segment immediately instead of duplicating the raw tap by default. It still
+spools reconstructed connection bytes until a safe publication boundary, so
+there is no cap on active connections, total bytes, disk use, decoder work, or
+retention. Optional `RETAIN_RAW_TAPS=true` deliberately adds diagnostic storage.
+`MAX_BUFFERED_RX_BYTES` limits an Envoy capture body, not total run storage.
+Quotas and backpressure are required before army-of-monkeys use.
 
 ### 5. Operational coupling remains
 
