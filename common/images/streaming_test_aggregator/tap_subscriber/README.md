@@ -50,8 +50,9 @@ diagnostics or replay experiments.
 
 Traffic activity is the arrival of any non-empty decoded downstream tap data.
 The subscriber updates only an activity timestamp; it does not count bytes or
-poll Envoy's listener-wide RX statistics. A partial JSON trace prevents quiet
-completion until it is completed or the absolute capture deadline expires.
+poll Envoy's listener-wide RX statistics. A dedicated reader thread continuously
+drains the buffered HTTP response, so socket-readiness checks cannot overlook
+trace objects already held by Python's HTTP buffering layer.
 
 ## Broker outage behavior
 

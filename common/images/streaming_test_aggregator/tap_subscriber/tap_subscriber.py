@@ -7,8 +7,9 @@ import codecs
 from collections import deque
 import http.client
 import json
-import select
+import queue
 import sys
+import threading
 import time
 import urllib.parse
 from pathlib import Path
@@ -78,6 +79,39 @@ class StreamingJsonTraceReader:
             if self.buffer.strip():
                 raise ValueError("Envoy returned a truncated tap JSON object")
             return None
+
+
+class TapStreamPump:
+    """Drain the buffered HTTP response continuously on a reader thread."""
+
+    END = object()
+
+    def __init__(self, reader):
+        self.reader = reader
+        self.items = queue.Queue()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+
+    def start(self):
+        self.thread.start()
+
+    def _run(self):
+        try:
+            while True:
+                trace = self.reader.read()
+                if trace is None:
+                    self.items.put(self.END)
+                    return
+                self.items.put(trace)
+        except BaseException as error:
+            self.items.put(error)
+
+    def get(self, timeout):
+        item = self.items.get(timeout=timeout)
+        if item is self.END:
+            return None
+        if isinstance(item, BaseException):
+            raise item
+        return item
 
 
 def trace_id_and_closed(trace):
@@ -292,6 +326,8 @@ def main():
         producer, args.kafka_topic, args.capture_id
     )
     trace_reader = StreamingJsonTraceReader(response)
+    trace_pump = TapStreamPump(trace_reader)
+    trace_pump.start()
     if args.ready_file:
         args.ready_file.touch()
     started = time.monotonic()
@@ -305,15 +341,10 @@ def main():
                 # Retry application-buffered events first on every capture
                 # iteration, but never block reading Envoy on Kafka recovery.
                 publisher.drain_available()
-                # One socket read may contain several adjacent JSON objects.
-                # Drain those objects before waiting for more network data;
-                # otherwise the quiet timer can end the capture while complete
-                # trace events are still buffered in this process.
-                trace = trace_reader.pop_buffered()
-                if trace is None:
-                    if not select.select([connection.sock], [], [], 1)[0]:
-                        raise TimeoutError
-                    trace = trace_reader.read()
+                try:
+                    trace = trace_pump.get(timeout=1)
+                except queue.Empty as error:
+                    raise TimeoutError from error
                 if trace is None:
                     raise RuntimeError("Envoy closed the streaming admin tap")
                 trace_id, closed = trace_id_and_closed(trace)
@@ -355,12 +386,6 @@ def main():
                     ):
                         start_timed_out = True
                         break
-                    continue
-                # A partial JSON object proves that a tap event is still in
-                # flight even though no complete downstream payload can be
-                # decoded yet. Wait for its remainder or the absolute capture
-                # deadline instead of declaring the stream quiet.
-                if trace_reader.buffer.strip():
                     continue
                 if now - last_activity >= args.quiet_msec / 1000:
                     break

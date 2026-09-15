@@ -53,6 +53,19 @@ def test_rejects_truncated_streaming_admin_json():
         reader.read()
 
 
+def test_stream_pump_drains_http_reader_without_socket_readiness_checks():
+    trace = tap.wrapper_pb2.TraceWrapper()
+    trace.socket_streamed_trace_segment.trace_id = 9
+    trace.socket_streamed_trace_segment.event.closed.SetInParent()
+    response = io.BytesIO(json_format.MessageToJson(trace).encode())
+    pump = tap.TapStreamPump(tap.StreamingJsonTraceReader(response))
+
+    pump.start()
+
+    assert tap.trace_id_and_closed(pump.get(timeout=1)) == (9, True)
+    assert pump.get(timeout=1) is None
+
+
 def test_trace_id_and_closed_for_streamed_event():
     trace = tap.wrapper_pb2.TraceWrapper()
     segment = trace.socket_streamed_trace_segment
