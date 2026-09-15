@@ -1,0 +1,41 @@
+include:
+  - ../../../../common/images/test_pseudo_fs/compose.yaml
+
+services:
+  docs-dispatcher-file-storage-permissions:
+    image: alpine:3.20.6
+    user: root
+    command: >
+      sh -ec "
+        mkdir -p /mnt/file_storage;
+        chmod -R 0777 /mnt/file_storage;
+        touch /tmp/ready;
+        exec tail -f /dev/null
+      "
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 1s
+      timeout: 1s
+      retries: 10
+    volumes:
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/mnt/file_storage
+
+  docs-dispatcher-functional-tester:
+    build:
+      context: ../../../../
+      dockerfile: ai_agents_framework/docs_dispatcher/tests/functional/Dockerfile
+      additional_contexts:
+        test_pseudo_fs: "service:test_pseudo_fs"
+    environment:
+      - EXIT_ONCE_DONE=true
+    volumes:
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/mnt/file_storage
+    depends_on:
+      docs-dispatcher:
+        condition: service_started
+      test_pseudo_fs:
+        condition: service_started
+
+volumes:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:

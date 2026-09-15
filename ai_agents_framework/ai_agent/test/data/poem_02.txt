@@ -1,0 +1,8 @@
+Orchard Clock
+
+Apples hold sunlight under each leaf,
+A field mouse pauses beside a wheat sheaf.
+Branches keep time when the warm winds pass,
+And noon leaves gold on the orchard grass.
+
+This original synthetic poem is functional-test fixture 02.
