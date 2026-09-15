@@ -3,8 +3,9 @@
 This image is a pure capture adapter and Kafka producer. It does not analyze
 pytest output and is not the test aggregator.
 
-It posts an `any_match` configuration to Envoy's `/tap` admin endpoint, decodes
-length-delimited `TraceWrapper` protobuf messages as they arrive, groups
+It posts an `any_match` configuration to Envoy's `/tap` admin endpoint, parses
+the adjacent `JSON_BODY_AS_BYTES` trace objects as they arrive, converts them
+to `TraceWrapper` messages, groups
 transport reads by connection, reconstructs syslog records, and publishes
 `connection_log` events to Kafka. After the bounded-batch RX quiet interval it
 publishes `capture_complete`. If no downstream data arrives during
@@ -37,9 +38,12 @@ See [the event contract](EVENT_SCHEMA.md) and the subsystem
 
 ## Streaming and temporary files
 
-Raw protobuf tap files are not required. Each frame is decoded directly from
-the HTTP response. Reconstructed connection bytes are temporarily spooled
-under `/logs/subscriber/streams/.spool` because TCP records can span frames and
+Raw protobuf tap files are not required. Each JSON object is decoded directly
+from the HTTP response. When retention is enabled, the subscriber serializes
+normalized length-delimited protobuf files after parsing; these files are not
+byte-for-byte copies of the admin response. Reconstructed connection bytes are
+temporarily spooled under `/logs/subscriber/streams/.spool` because TCP records
+can span frames and
 keeping every active stream in RAM would be unbounded. The finalized log is
 published to Kafka and immediately removed. Set `RETAIN_RAW_TAPS=true` only for
 diagnostics or replay experiments.

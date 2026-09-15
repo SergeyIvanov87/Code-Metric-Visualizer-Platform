@@ -50,8 +50,7 @@ services:
       - ./syslog-ng.conf:/etc/syslog-ng/syslog-ng.conf:ro
 
   envoy:
-    # Use a released native Envoy build. The previous development snapshot
-    # exited with SIGSEGV (139) while initializing this admin-tap fixture.
+    # Use a released native Envoy build for a reproducible admin-tap fixture.
     image: envoyproxy/envoy:v1.39.1
     volumes:
       - ./envoy.yaml:/etc/envoy/envoy.yaml:ro

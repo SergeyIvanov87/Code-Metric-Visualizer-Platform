@@ -3,8 +3,10 @@
 
 import argparse
 import base64
+import codecs
 import http.client
 import json
+import select
 import sys
 import time
 import urllib.parse
@@ -12,6 +14,7 @@ from pathlib import Path
 
 from confluent_kafka import Producer
 from envoy.data.tap.v3 import wrapper_pb2
+from google.protobuf import json_format
 
 from decode_envoy_tap import (
     bytes_from_event,
@@ -30,16 +33,44 @@ def encode_varint(value):
     return bytes(encoded)
 
 
-def read_varint(response):
-    value = 0
-    for shift in range(0, 35, 7):
-        byte = response.read(1)
-        if not byte:
+class StreamingJsonTraceReader:
+    """Parse adjacent JSON objects from an Envoy streaming-admin response."""
+
+    def __init__(self, response):
+        self.response = response
+        self.buffer = ""
+        self.decoder = json.JSONDecoder()
+        self.utf8_decoder = codecs.getincrementaldecoder("utf-8")()
+
+    def read(self):
+        while True:
+            self.buffer = self.buffer.lstrip()
+            if self.buffer:
+                try:
+                    value, end = self.decoder.raw_decode(self.buffer)
+                except json.JSONDecodeError:
+                    pass
+                else:
+                    self.buffer = self.buffer[end:]
+                    trace = wrapper_pb2.TraceWrapper()
+                    # Envoy may add event metadata before the bundled xDS
+                    # Python descriptors are updated (for example seq_num).
+                    # Unknown metadata is safe to ignore: capture uses only
+                    # trace identity, event kind, and body bytes.
+                    json_format.ParseDict(value, trace, ignore_unknown_fields=True)
+                    return trace
+
+            # read1 returns currently available response data instead of waiting
+            # for a full buffer, which is essential for a never-ending stream.
+            chunk = self.response.read1(65536)
+            if chunk:
+                self.buffer += self.utf8_decoder.decode(chunk)
+                continue
+
+            self.buffer += self.utf8_decoder.decode(b"", final=True)
+            if self.buffer.strip():
+                raise ValueError("Envoy returned a truncated tap JSON object")
             return None
-        value |= (byte[0] & 0x7F) << shift
-        if byte[0] < 0x80:
-            return value
-    raise ValueError("invalid protobuf length prefix from Envoy")
 
 
 def trace_id_and_closed(trace):
@@ -86,7 +117,7 @@ def subscribe(args):
                         "streaming": True,
                         "maxBufferedRxBytes": args.max_buffered_rx_bytes,
                         "sinks": [{
-                            "format": "PROTO_BINARY_LENGTH_DELIMITED",
+                            "format": "JSON_BODY_AS_BYTES",
                             "streamingAdmin": {}
                         }]
                     }
@@ -96,7 +127,10 @@ def subscribe(args):
             connection.request("POST", path, body, {"Content-Type": "application/json"})
             response = connection.getresponse()
             if response.status == 200:
-                connection.sock.settimeout(1)
+                # Keep the buffered HTTP reader in blocking mode. A timeout in
+                # socket.makefile() can poison subsequent reads; select drives
+                # the one-second inactivity checks without touching the reader.
+                connection.sock.settimeout(None)
                 return connection, response
             message = response.read().decode(errors="replace")
             connection.close()
@@ -229,6 +263,7 @@ def main():
     })
     wait_for_broker(producer, args.kafka_startup_timeout_seconds)
     connection, response = subscribe(args)
+    trace_reader = StreamingJsonTraceReader(response)
     if args.ready_file:
         args.ready_file.touch()
     admin = urllib.parse.urlsplit(args.admin_url)
@@ -241,25 +276,23 @@ def main():
     try:
         while time.monotonic() - started < args.max_wait_msec / 1000:
             try:
-                length = read_varint(response)
-                if length is None:
+                if not select.select([connection.sock], [], [], 1)[0]:
+                    raise TimeoutError
+                trace = trace_reader.read()
+                if trace is None:
                     raise RuntimeError("Envoy closed the streaming admin tap")
-                payload = response.read(length)
-                if len(payload) != length:
-                    raise RuntimeError("Envoy returned a truncated tap protobuf")
-                trace = wrapper_pb2.TraceWrapper()
-                trace.ParseFromString(payload)
                 trace_id, closed = trace_id_and_closed(trace)
                 active_trace_ids.add(trace_id)
 
-                # Protobuf decoding happens here, while the admin response is
-                # live. Only reconstructed downstream bytes are spooled.
+                # JSON-to-protobuf conversion happens while the admin response
+                # is live. Only reconstructed downstream bytes are spooled.
                 stream_path = spool_directory / f"connection_{trace_id}.stream"
                 received_bytes = append_received_bytes(trace, stream_path)
                 if args.retain_raw_taps:
                     raw_path = args.tap_directory / f"connection_{trace_id}.pb"
+                    payload = trace.SerializeToString()
                     with raw_path.open("ab") as raw_output:
-                        raw_output.write(encode_varint(length) + payload)
+                        raw_output.write(encode_varint(len(payload)) + payload)
 
                 if received_bytes:
                     traces_with_data.add(trace_id)

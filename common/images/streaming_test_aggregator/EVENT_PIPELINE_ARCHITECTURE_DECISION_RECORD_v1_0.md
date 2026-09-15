@@ -83,7 +83,8 @@ configuration contention.
 The subscriber is a capture adapter and event producer. It is responsible for:
 
 - maintaining the private admin tap request;
-- parsing length-delimited `TraceWrapper` protobuf frames;
+- parsing Envoy's adjacent `JSON_BODY_AS_BYTES` streaming-admin objects and
+  converting them to `TraceWrapper` messages;
 - rejecting malformed or truncated capture data;
 - grouping downstream reads by connection identity;
 - reconstructing complete syslog records without interpreting their pytest

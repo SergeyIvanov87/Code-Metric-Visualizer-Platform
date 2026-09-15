@@ -1,8 +1,11 @@
 import importlib.util
+import io
+import json
 import sys
 from pathlib import Path
 
 import pytest
+from google.protobuf import json_format
 
 pytest.importorskip("envoy.data.tap.v3.wrapper_pb2")
 MODULE_PATH = Path(__file__).with_name("tap_subscriber.py")
@@ -17,6 +20,35 @@ def test_encode_varint_boundaries():
     assert tap.encode_varint(127) == b"\x7f"
     assert tap.encode_varint(128) == bytes([0x80, 0x01])
     assert tap.encode_varint(0xFFFFFFFF) == bytes([0xff, 0xff, 0xff, 0xff, 0x0f])
+
+
+def test_reads_adjacent_streaming_admin_json_traces():
+    first = tap.wrapper_pb2.TraceWrapper()
+    first.socket_streamed_trace_segment.trace_id = 7
+    first.socket_streamed_trace_segment.event.closed.SetInParent()
+    second = tap.wrapper_pb2.TraceWrapper()
+    second.socket_streamed_trace_segment.trace_id = 8
+    second.socket_streamed_trace_segment.event.closed.SetInParent()
+    first_json = json.loads(json_format.MessageToJson(first))
+    first_json["socketStreamedTraceSegment"]["event"]["seqNum"] = "0"
+    response = io.BytesIO(
+        (
+            json.dumps(first_json)
+            + json_format.MessageToJson(second)
+        ).encode()
+    )
+    reader = tap.StreamingJsonTraceReader(response)
+
+    assert tap.trace_id_and_closed(reader.read()) == (7, True)
+    assert tap.trace_id_and_closed(reader.read()) == (8, True)
+    assert reader.read() is None
+
+
+def test_rejects_truncated_streaming_admin_json():
+    reader = tap.StreamingJsonTraceReader(io.BytesIO(b'{"socketStreamedTraceSegment":'))
+
+    with pytest.raises(ValueError, match="truncated tap JSON"):
+        reader.read()
 
 
 def test_trace_id_and_closed_for_streamed_event():
