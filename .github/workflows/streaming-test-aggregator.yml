@@ -20,25 +20,54 @@ jobs:
       run: |
         set -euo pipefail
         compose_file="common/images/streaming_test_aggregator/tests/functional/compose-functional.test.yaml"
+        diagnostics="${RUNNER_TEMP}/streaming-test-aggregator-diagnostics"
 
         cleanup() {
           status=$?
+          mkdir -p "${diagnostics}"
+          docker compose -f "${compose_file}" cp \
+            log_event_aggregator:/logs/aggregator/. \
+            "${diagnostics}/aggregator" 2>/dev/null || true
+          docker compose -f "${compose_file}" cp \
+            log_event_aggregator:/logs/syslog-streams/. \
+            "${diagnostics}/syslog-streams" 2>/dev/null || true
           docker compose -f "${compose_file}" ps --all || true
-          docker compose -f "${compose_file}" logs --no-color || true
+          docker compose -f "${compose_file}" logs --no-color --tail 200 \
+            log_event_aggregator tap_subscriber envoy || true
           docker compose -f "${compose_file}" down --volumes --remove-orphans || true
           exit "${status}"
         }
         trap cleanup EXIT
 
-        docker compose -f "${compose_file}" up --build --detach --remove-orphans
-        functional_tests_id=$(docker compose -f "${compose_file}" ps --all --quiet functional-tests)
-        if [[ -z "${functional_tests_id}" ]]; then
-          echo "The functional-tests container was not created" >&2
+        docker compose -f "${compose_file}" build
+        docker compose -f "${compose_file}" up --detach --remove-orphans \
+          kafka syslog-ng envoy envoy-ready log_event_aggregator tap_subscriber \
+          passed-tester skipped-tester mixed-tester
+
+        aggregator_id=$(docker compose -f "${compose_file}" ps --all --quiet log_event_aggregator)
+        if [[ -z "${aggregator_id}" ]]; then
+          echo "The log_event_aggregator container was not created" >&2
           exit 1
         fi
 
-        functional_tests_exit_code=$(docker wait "${functional_tests_id}")
-        if [[ "${functional_tests_exit_code}" != "0" ]]; then
-          echo "Functional tests exited with ${functional_tests_exit_code}" >&2
-          exit "${functional_tests_exit_code}"
+        aggregator_exit_code=$(docker wait "${aggregator_id}")
+        if [[ "${aggregator_exit_code}" != "0" ]]; then
+          echo "::error::log_event_aggregator exited with ${aggregator_exit_code}"
+          echo "::group::log_event_aggregator diagnostics"
+          docker compose -f "${compose_file}" logs --no-color log_event_aggregator || true
+          docker compose -f "${compose_file}" run --rm --no-deps \
+            --entrypoint sh functional-tests -c \
+            'for file in /logs/aggregator/*; do echo "===== ${file} ====="; cat "${file}"; done' || true
+          echo "::endgroup::"
+          exit "${aggregator_exit_code}"
         fi
+
+        docker compose -f "${compose_file}" run --rm --no-deps functional-tests
+
+    - name: Upload streaming test aggregator diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: streaming-test-aggregator-diagnostics
+        path: ${{ runner.temp }}/streaming-test-aggregator-diagnostics
+        if-no-files-found: warn
