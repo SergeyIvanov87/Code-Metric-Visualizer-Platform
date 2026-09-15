@@ -14,10 +14,18 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      test:
+        - CMD-SHELL
+        - >-
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092
+          --create --if-not-exists --topic test-capture-events --partitions 1
+          --replication-factor 1 >/dev/null 2>&1 &&
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092
+          --describe --topic test-capture-events >/dev/null 2>&1
       interval: 2s
-      timeout: 5s
-      retries: 30
+      timeout: 10s
+      retries: 60
+      start_period: 10s
 
   log_event_aggregator:
     build:
@@ -25,6 +33,7 @@ services:
       dockerfile: common/images/streaming_test_aggregator/log_event_aggregator/Dockerfile
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_STARTUP_TIMEOUT_SECONDS: 120
       KAFKA_TOPIC: test-capture-events
       KAFKA_CONSUMER_GROUP: functional-log_event_aggregator
       CAPTURE_ID: functional-test
@@ -62,6 +71,7 @@ services:
       WAIT_MSEC_BEFORE_START: 15000
       MAX_WAIT_MSEC_UNTIL_FINISH: 60000
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_STARTUP_TIMEOUT_SECONDS: 120
       KAFKA_TOPIC: test-capture-events
       CAPTURE_ID: functional-test
     volumes:

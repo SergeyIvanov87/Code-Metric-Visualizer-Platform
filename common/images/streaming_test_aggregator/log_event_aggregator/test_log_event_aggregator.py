@@ -89,3 +89,29 @@ def test_capture_start_timeout_has_distinguishable_result(tmp_path):
     )
     assert (tmp_path / "result").read_text().strip() == "10"
     assert "no capture data" in (tmp_path / "result_log_stderr").read_text()
+
+
+class EventuallyReadyBroker:
+    def __init__(self, failures):
+        self.failures = failures
+        self.attempts = 0
+
+    def list_topics(self, **_kwargs):
+        self.attempts += 1
+        if self.attempts <= self.failures:
+            raise RuntimeError("broker listener is not ready")
+
+
+def test_waits_for_advertised_broker_listener(monkeypatch):
+    broker = EventuallyReadyBroker(failures=2)
+    monkeypatch.setattr(aggregator.time, "sleep", lambda _seconds: None)
+
+    aggregator.wait_for_broker(broker, timeout_seconds=5)
+
+    assert broker.attempts == 3
+
+
+def test_broker_readiness_timeout_is_actionable():
+    broker = EventuallyReadyBroker(failures=1)
+    with pytest.raises(RuntimeError, match="not ready within 0 seconds"):
+        aggregator.wait_for_broker(broker, timeout_seconds=0)

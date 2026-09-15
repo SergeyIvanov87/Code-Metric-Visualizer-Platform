@@ -70,10 +70,29 @@ def consume_capture(consumer, topic, capture_id, output_directory, timeout_secon
     raise TimeoutError(f"timed out waiting for capture {capture_id!r} to complete")
 
 
+
+def wait_for_broker(client, timeout_seconds):
+    """Wait until broker metadata can be fetched over its advertised listener."""
+    deadline = time.monotonic() + timeout_seconds
+    last_error = None
+    while time.monotonic() < deadline:
+        try:
+            remaining = max(0.1, deadline - time.monotonic())
+            client.list_topics(timeout=min(5, remaining))
+            return
+        except Exception as error:
+            last_error = error
+            print(f"Waiting for event broker: {error}", file=sys.stderr, flush=True)
+            time.sleep(min(1, max(0, deadline - time.monotonic())))
+    raise RuntimeError(
+        f"event broker was not ready within {timeout_seconds} seconds"
+    ) from last_error
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--brokers", required=True)
     parser.add_argument("--topic", required=True)
+    parser.add_argument("--broker-startup-timeout-seconds", type=int, default=120)
     parser.add_argument("--group-id", required=True)
     parser.add_argument("--capture-id", required=True)
     parser.add_argument("--output-directory", type=Path, required=True)
@@ -91,7 +110,7 @@ def main():
         "enable.auto.commit": False,
     })
     try:
-        consumer.list_topics(timeout=10)
+        wait_for_broker(consumer, args.broker_startup_timeout_seconds)
         consumer.subscribe([args.topic])
         if args.ready_file:
             args.ready_file.touch()

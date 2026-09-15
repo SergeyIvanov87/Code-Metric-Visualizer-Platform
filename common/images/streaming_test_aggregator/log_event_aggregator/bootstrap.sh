@@ -7,6 +7,7 @@ mkdir -p "${DECODED_LOG_PATH}" "${RESULT_PATH}"
 python3 /package/log_event_aggregator.py \
   --brokers "${KAFKA_BOOTSTRAP_SERVERS}" \
   --topic "${KAFKA_TOPIC}" \
+  --broker-startup-timeout-seconds "${KAFKA_STARTUP_TIMEOUT_SECONDS:-120}" \
   --group-id "${KAFKA_CONSUMER_GROUP}" \
   --capture-id "${CAPTURE_ID}" \
   --output-directory "${DECODED_LOG_PATH}" \

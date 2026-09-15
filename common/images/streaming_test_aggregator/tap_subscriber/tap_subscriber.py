@@ -178,6 +178,24 @@ def capture_start_expired(started, last_activity, wait_msec, now=None):
     now = time.monotonic() if now is None else now
     return now - started >= wait_msec / 1000
 
+
+def wait_for_broker(client, timeout_seconds):
+    """Wait until broker metadata can be fetched over its advertised listener."""
+    deadline = time.monotonic() + timeout_seconds
+    last_error = None
+    while time.monotonic() < deadline:
+        try:
+            remaining = max(0.1, deadline - time.monotonic())
+            client.list_topics(timeout=min(5, remaining))
+            return
+        except Exception as error:
+            last_error = error
+            print(f"Waiting for event broker: {error}", file=sys.stderr, flush=True)
+            time.sleep(min(1, max(0, deadline - time.monotonic())))
+    raise RuntimeError(
+        f"event broker was not ready within {timeout_seconds} seconds"
+    ) from last_error
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--admin-url", required=True)
@@ -191,6 +209,7 @@ def main():
     parser.add_argument("--retain-raw-taps", action="store_true")
     parser.add_argument("--kafka-brokers", required=True)
     parser.add_argument("--kafka-topic", required=True)
+    parser.add_argument("--kafka-startup-timeout-seconds", type=int, default=120)
     parser.add_argument("--capture-id", required=True)
     parser.add_argument("--ready-file", type=Path)
     args = parser.parse_args()
@@ -208,7 +227,7 @@ def main():
         "enable.idempotence": True,
         "acks": "all",
     })
-    producer.list_topics(timeout=10)
+    wait_for_broker(producer, args.kafka_startup_timeout_seconds)
     connection, response = subscribe(args)
     if args.ready_file:
         args.ready_file.touch()

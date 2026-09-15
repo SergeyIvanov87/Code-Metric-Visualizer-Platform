@@ -36,3 +36,13 @@ docker compose -f "${compose_file}" down --volumes
 The dedicated GitHub Actions workflow uses the same detached orchestration,
 propagates the functional-test container's exit code, and prints all service
 logs before cleanup.
+
+## Broker readiness
+
+The functional broker healthcheck creates and describes `test-capture-events`;
+a TCP listener alone is not considered ready. Both `tap_subscriber` and
+`log_event_aggregator` also retry metadata discovery through the broker's
+advertised listener for `KAFKA_STARTUP_TIMEOUT_SECONDS` (120 seconds by
+default). This protects startup from the interval in which the broker process
+is healthy enough to accept a socket but its controller, metadata, or topic is
+not yet usable.

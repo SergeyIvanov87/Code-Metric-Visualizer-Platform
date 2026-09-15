@@ -24,6 +24,7 @@ the other's runtime filesystem.
 | `ENVOY_ADMIN_PORT` | `9901` | Envoy admin port. |
 | `ENVOY_TAP_CONFIG_ID` | `test_aggregator` | ID configured in Envoy's tap transport socket. |
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:9092` | Kafka bootstrap brokers. |
+| `KAFKA_STARTUP_TIMEOUT_SECONDS` | `120` | Wait for usable broker metadata. |
 | `KAFKA_TOPIC` | `test-capture-events` | Capture event topic. |
 | `CAPTURE_ID` | `functional-test` | Bounded capture identity and Kafka record key. |
 | `WAIT_MSEC_BEFORE_START` | `60000` | Maximum wait for the first downstream capture bytes. |

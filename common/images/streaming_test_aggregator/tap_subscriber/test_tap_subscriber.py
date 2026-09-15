@@ -120,3 +120,23 @@ def test_start_wait_applies_only_before_first_capture_data():
     assert not tap.capture_start_expired(10.0, None, 60000, now=69.999)
     assert tap.capture_start_expired(10.0, None, 60000, now=70.0)
     assert not tap.capture_start_expired(10.0, 20.0, 60000, now=1000.0)
+
+
+class EventuallyReadyProducer:
+    def __init__(self, failures):
+        self.failures = failures
+        self.attempts = 0
+
+    def list_topics(self, **_kwargs):
+        self.attempts += 1
+        if self.attempts <= self.failures:
+            raise RuntimeError("broker listener is not ready")
+
+
+def test_subscriber_retries_broker_metadata(monkeypatch):
+    producer = EventuallyReadyProducer(failures=2)
+    monkeypatch.setattr(tap.time, "sleep", lambda _seconds: None)
+
+    tap.wait_for_broker(producer, timeout_seconds=5)
+
+    assert producer.attempts == 3
