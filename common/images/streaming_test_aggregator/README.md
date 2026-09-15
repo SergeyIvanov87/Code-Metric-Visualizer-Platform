@@ -46,3 +46,20 @@ advertised listener for `KAFKA_STARTUP_TIMEOUT_SECONDS` (120 seconds by
 default). This protects startup from the interval in which the broker process
 is healthy enough to accept a socket but its controller, metadata, or topic is
 not yet usable.
+
+## Functional fixture readiness
+
+The functional topology distinguishes process startup from service readiness.
+Its broker healthcheck creates and describes the capture topic, and an
+`envoy-ready` probe must receive HTTP 200 from Envoy's `/ready` admin endpoint
+before `tap_subscriber` starts. The fixture pins a released Envoy image rather
+than a development snapshot so a proxy crash cannot be misdiagnosed as an
+event-broker startup failure.
+
+Messages such as `Coordinator load in progress` from an idempotent producer are
+normally transient during single-node broker initialization. In contrast,
+Envoy exit status `139`, connection refusal on the published syslog port, and
+subsequent failure to resolve/reach the `envoy` service indicate that the proxy
+capture path failed before any event could be produced. The aggregator then
+exits only because it never receives a terminal capture event before its safety
+deadline.
