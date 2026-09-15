@@ -1,5 +1,9 @@
 # Architecture evaluation: Streaming Admin Tap subscriber
 
+> Historical evaluation of the bounded combined prototype. The implementation
+> has since been split into a pure Kafka-producing tap subscriber and
+> `test_aggregator_kafka_image`; see `EVENT_PIPELINE_EVALUATION.md`.
+
 ## Decision
 
 **Adopt this image as an experimental, bounded-batch alternative; do not replace

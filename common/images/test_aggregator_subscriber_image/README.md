@@ -1,60 +1,53 @@
-# Test aggregator subscriber image
+# Envoy tap subscriber image
 
-> **Status: experimental bounded-batch alternative.** This decomposition makes
-> Envoy thinner, but it is not yet a session-aware replacement for the canonical
-> aggregator. See [the architecture evaluation](ARCHITECTURE_EVALUATION.md)
-> and the [durable event-pipeline evaluation](EVENT_PIPELINE_EVALUATION.md).
+This image is a pure capture adapter and Kafka producer. It does not analyze
+pytest output and is not the test aggregator.
 
-This image keeps traffic proxying and test-result analysis in separate
-containers. Envoy owns the TCP listener and forwards Docker syslog traffic to
-syslog-ng. The subscriber posts an `any_match` tap configuration to Envoy's
-`/tap` admin endpoint and decodes its length-delimited protobuf response as it
-arrives. Only reconstructed downstream bytes are temporarily spooled per
-connection; raw protobuf taps are not written unless `RETAIN_RAW_TAPS=true` is
-selected for diagnostics.
+It posts an `any_match` configuration to Envoy's `/tap` admin endpoint, decodes
+length-delimited `TraceWrapper` protobuf messages as they arrive, groups
+transport reads by connection, reconstructs syslog records, and publishes
+`connection_log` events to Kafka. After the bounded-batch RX quiet interval it
+publishes `capture_complete`. Fatal capture errors are published as
+`capture_failed` by bootstrap.
 
-Once the downstream RX-byte counter has remained unchanged for
-`WAIT_MSEC_UNTIL_FINISH`, the subscriber closes the admin stream, atomically
-publishes reconstructed records into `/logs/syslog-streams`, and runs the same
-pytest summary aggregation algorithm as `test_aggregator_image`. Results are written
-to `/logs/aggregator`.
+The standalone analyzer is `common/images/test_aggregator_kafka_image`. Kafka
+is the only data-plane contract between the two services; neither service reads
+the other's runtime filesystem.
 
-Envoy must configure the tapped transport socket with an admin configuration
-whose `config_id` equals `ENVOY_TAP_CONFIG_ID`. Its admin listener must be
-reachable from the subscriber container. See
-`tests/functional/envoy.yaml` for a minimal configuration.
+## Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ENVOY_ADMIN_HOST` | `envoy` | Envoy admin host on a private network. |
+| `ENVOY_ADMIN_PORT` | `9901` | Envoy admin port. |
+| `ENVOY_TAP_CONFIG_ID` | `test_aggregator` | ID configured in Envoy's tap transport socket. |
+| `KAFKA_BOOTSTRAP_SERVERS` | `kafka:9092` | Kafka bootstrap brokers. |
+| `KAFKA_TOPIC` | `test-capture-events` | Capture event topic. |
+| `CAPTURE_ID` | `functional-test` | Bounded capture identity and Kafka record key. |
+| `WAIT_MSEC_UNTIL_FINISH` | `15000` | Global RX quiet interval for compatibility mode. |
+| `MAX_WAIT_MSEC_UNTIL_FINISH` | `900000` | Capture deadline. |
+| `RETAIN_RAW_TAPS` | `false` | Retain diagnostic protobuf tap files locally. |
+
+See [the Kafka event contract](KAFKA_EVENT_SCHEMA.md), the
+[architecture evaluation](ARCHITECTURE_EVALUATION.md), and the
+[event-pipeline evaluation](EVENT_PIPELINE_EVALUATION.md).
+
+## Streaming and temporary files
+
+Raw protobuf tap files are not required. Each frame is decoded directly from
+the HTTP response. Reconstructed connection bytes are temporarily spooled
+under `/logs/subscriber/streams/.spool` because TCP records can span frames and
+keeping every active stream in RAM would be unbounded. The finalized log is
+published to Kafka and immediately removed. Set `RETAIN_RAW_TAPS=true` only for
+diagnostics or replay experiments.
 
 ## Functional test
-
-From this directory, run:
 
 ```sh
 docker compose -f tests/functional/compose-functional.test.yaml up \
   --build --abort-on-container-exit --exit-code-from functional-tests
 ```
 
-The fixture uses the native Envoy image, a standalone syslog-ng destination,
-and three small producers using Docker's syslog logging driver. The pytest
-container checks that raw taps are omitted by default, verifies reconstructed
-producer streams, and validates the final passed/skipped statistics.
-
-## Streaming versus files
-
-Writing the received protobuf stream to tap files is **not required** for
-decoding. The subscriber parses every complete `TraceWrapper` frame directly
-from the HTTP response, groups it by `trace_id`, and immediately extracts its
-downstream read bytes. By default `/logs/taps` therefore remains empty.
-
-Some state is still necessary because a TCP/syslog record can span several tap
-segments and Docker logging connections can remain open after pytest exits.
-The implementation uses per-connection files under the temporary
-`/logs/syslog-streams/.spool` directory rather than keeping unbounded byte
-arrays in RAM. At a connection-close or bounded-batch quiet boundary, it frames
-those bytes into records, atomically publishes the `.log` file, and removes the
-spool. This is streaming transport decoding with disk-backed connection
-assembly—not a store-all-taps-then-decode pipeline.
-
-Set `RETAIN_RAW_TAPS=true` only when exact protobuf evidence is needed for
-diagnostics or replay. That option recreates length-delimited files under
-`/logs/taps` while continuing to decode on receipt, and carries an intentional
-storage cost.
+The fixture starts a single-node Kafka KRaft broker, native Envoy, syslog-ng,
+three Docker syslog producers, this tap subscriber, the standalone Kafka test
+aggregator, and a pytest assertion container.

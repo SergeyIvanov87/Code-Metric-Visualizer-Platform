@@ -60,3 +60,36 @@ def test_finalizes_reconstructed_stream_atomically(tmp_path):
     assert output.name == "example-tester__connection_7.log"
     assert output.read_bytes().endswith(b"collected 1 item\n")
     assert not spool.exists()
+
+
+class FakeProducer:
+    def __init__(self):
+        self.records = []
+        self.polls = []
+
+    def produce(self, topic, **kwargs):
+        self.records.append((topic, kwargs))
+
+    def poll(self, timeout):
+        self.polls.append(timeout)
+
+
+def test_publishes_versioned_capture_keyed_event():
+    producer = FakeProducer()
+
+    tap.publish_event(
+        producer,
+        "capture-events",
+        "capture-42",
+        {"type": "capture_complete"},
+    )
+
+    topic, record = producer.records[0]
+    value = tap.json.loads(record["value"])
+    assert topic == "capture-events"
+    assert record["key"] == b"capture-42"
+    assert value == {
+        "schema_version": 1,
+        "capture_id": "capture-42",
+        "type": "capture_complete",
+    }

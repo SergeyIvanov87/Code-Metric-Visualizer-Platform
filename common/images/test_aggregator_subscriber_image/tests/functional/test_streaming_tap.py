@@ -4,8 +4,8 @@ LOGS = Path("/logs")
 
 
 def test_subscriber_does_not_persist_raw_taps_by_default():
-    assert not list((LOGS / "taps").glob("connection_*.pb"))
-    assert not (LOGS / "syslog-streams" / ".spool").exists()
+    assert not list((LOGS / "subscriber" / "taps").glob("connection_*.pb"))
+    assert not (LOGS / "subscriber" / "streams" / ".spool").exists()
 
 
 def test_subscriber_reconstructed_each_tester_stream():

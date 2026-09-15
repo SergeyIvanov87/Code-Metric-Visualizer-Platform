@@ -263,6 +263,22 @@ It still does not solve, without additional protocol work:
 - resource quotas and retention;
 - correctness across duplicate or reordered cross-partition events.
 
+## Implemented bounded-batch slice
+
+The repository now implements the first vertical slice of this split:
+
+- `test_aggregator_subscriber_image` contains Envoy capture, transport decoding,
+  and an idempotent Kafka producer, but no pytest analyzer;
+- `test_aggregator_kafka_image` contains a Kafka consumer and an independent
+  copy of the pytest analyzer;
+- the version-1 bounded contract publishes `connection_log` records followed by
+  `capture_complete`, or a terminal `capture_failed` infrastructure event;
+- the functional topology includes a single-node Kafka broker.
+
+This slice intentionally retains global quiet and one `CAPTURE_ID` per analyzer
+run for compatibility. It is not yet the session-aware, per-segment,
+recoverable implementation described above.
+
 ## Recommended rollout
 
 1. Extract `streaming_admin_tap.py` into a `tap-subscriber` image and remove

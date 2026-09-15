@@ -2,12 +2,14 @@
 """Decode Envoy streaming-admin tap segments as they arrive."""
 
 import argparse
+import base64
 import http.client
 import json
 import time
 import urllib.parse
 from pathlib import Path
 
+from confluent_kafka import Producer
 from envoy.data.tap.v3 import wrapper_pb2
 
 from decode_envoy_tap import (
@@ -127,6 +129,36 @@ def finalize_stream(stream_path, destination):
     return destination
 
 
+
+DELIVERY_ERRORS = []
+
+
+def delivery_report(error, _message):
+    if error is not None:
+        DELIVERY_ERRORS.append(str(error))
+
+
+def publish_event(producer, topic, capture_id, event):
+    event["schema_version"] = 1
+    event["capture_id"] = capture_id
+    producer.produce(
+        topic,
+        key=capture_id.encode(),
+        value=json.dumps(event, separators=(",", ":")).encode(),
+        on_delivery=delivery_report,
+    )
+    producer.poll(0)
+
+
+def publish_connection(producer, topic, capture_id, trace_id, path):
+    publish_event(producer, topic, capture_id, {
+        "type": "connection_log",
+        "trace_id": trace_id,
+        "filename": path.name,
+        "payload_base64": base64.b64encode(path.read_bytes()).decode("ascii"),
+    })
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--admin-url", required=True)
@@ -137,6 +169,9 @@ def main():
     parser.add_argument("--max-wait-msec", type=int, required=True)
     parser.add_argument("--max-buffered-rx-bytes", type=int, default=16777216)
     parser.add_argument("--retain-raw-taps", action="store_true")
+    parser.add_argument("--kafka-brokers", required=True)
+    parser.add_argument("--kafka-topic", required=True)
+    parser.add_argument("--capture-id", required=True)
     parser.add_argument("--ready-file", type=Path)
     args = parser.parse_args()
     args.tap_directory.mkdir(parents=True, exist_ok=True)
@@ -144,6 +179,12 @@ def main():
     spool_directory = args.decoded_directory / ".spool"
     spool_directory.mkdir()
 
+    producer = Producer({
+        "bootstrap.servers": args.kafka_brokers,
+        "enable.idempotence": True,
+        "acks": "all",
+    })
+    producer.list_topics(timeout=10)
     connection, response = subscribe(args)
     if args.ready_file:
         args.ready_file.touch()
@@ -177,7 +218,11 @@ def main():
                 last_activity = time.monotonic()
                 if closed:
                     destination = args.decoded_directory / f"connection_{trace_id}.log"
-                    finalize_stream(stream_path, destination)
+                    published_path = finalize_stream(stream_path, destination)
+                    publish_connection(
+                        producer, args.kafka_topic, args.capture_id, trace_id, published_path
+                    )
+                    published_path.unlink()
                     active_trace_ids.remove(trace_id)
             except TimeoutError:
                 current_rx = stats_rx_bytes(admin)
@@ -196,8 +241,17 @@ def main():
     for trace_id in sorted(active_trace_ids):
         stream_path = spool_directory / f"connection_{trace_id}.stream"
         destination = args.decoded_directory / f"connection_{trace_id}.log"
-        finalize_stream(stream_path, destination)
+        published_path = finalize_stream(stream_path, destination)
+        publish_connection(
+            producer, args.kafka_topic, args.capture_id, trace_id, published_path
+        )
+        published_path.unlink()
     spool_directory.rmdir()
+    publish_event(producer, args.kafka_topic, args.capture_id, {"type": "capture_complete"})
+    remaining = producer.flush(30)
+    if remaining or DELIVERY_ERRORS:
+        details = "; ".join(DELIVERY_ERRORS) or "delivery timeout"
+        raise RuntimeError(f"Kafka event delivery failed: {details}")
 
 
 if __name__ == "__main__":
