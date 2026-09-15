@@ -25,7 +25,7 @@ the other's runtime filesystem.
 | `ENVOY_ADMIN_PORT` | `9901` | Envoy admin port. |
 | `ENVOY_TAP_CONFIG_ID` | `test_aggregator` | ID configured in Envoy's tap transport socket. |
 | `KAFKA_BOOTSTRAP_SERVERS` | `kafka:9092` | Kafka bootstrap brokers. |
-| `KAFKA_STARTUP_TIMEOUT_SECONDS` | `120` | Wait for usable broker metadata. |
+| `KAFKA_DELIVERY_TIMEOUT_SECONDS` | `120` | Final drain deadline after capture ends or fails. |
 | `KAFKA_TOPIC` | `test-capture-events` | Capture event topic. |
 | `CAPTURE_ID` | `functional-test` | Bounded capture identity and Kafka record key. |
 | `WAIT_MSEC_BEFORE_START` | `60000` | Maximum wait for the first downstream capture bytes. |
@@ -47,3 +47,15 @@ can span frames and
 keeping every active stream in RAM would be unbounded. The finalized log is
 published to Kafka and immediately removed. Set `RETAIN_RAW_TAPS=true` only for
 diagnostics or replay experiments.
+
+## Broker outage behavior
+
+Kafka readiness does not gate the Envoy subscription. Events that cannot enter
+librdkafka's queue remain in an ordered application buffer while Envoy capture
+continues. At the start of every capture iteration, the subscriber first moves
+previously buffered events into Kafka and then handles the next tap object.
+Librdkafka is configured not to expire accepted events during retriable broker
+or network outages. On every exit path, including capture timeout and normal
+completion, the subscriber drains both buffers for
+`KAFKA_DELIVERY_TIMEOUT_SECONDS`. If Kafka does not recover by that deadline,
+the subscriber fails instead of publishing a misleading `capture_complete`.

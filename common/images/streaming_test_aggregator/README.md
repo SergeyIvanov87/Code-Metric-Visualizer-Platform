@@ -40,12 +40,12 @@ logs before cleanup.
 ## Broker readiness
 
 The functional broker healthcheck creates and describes `test-capture-events`;
-a TCP listener alone is not considered ready. Both `tap_subscriber` and
-`log_event_aggregator` also retry metadata discovery through the broker's
-advertised listener for `KAFKA_STARTUP_TIMEOUT_SECONDS` (120 seconds by
-default). This protects startup from the interval in which the broker process
-is healthy enough to accept a socket but its controller, metadata, or topic is
-not yet usable.
+a TCP listener alone is not considered ready. The `log_event_aggregator`
+retries metadata discovery through the advertised listener. The
+`tap_subscriber` deliberately does not wait for broker readiness: it attaches
+to Envoy immediately and buffers ordered events until Kafka becomes available.
+This prevents broker startup or a temporary network partition from creating a
+gap in tap capture.
 
 ## Functional fixture readiness
 

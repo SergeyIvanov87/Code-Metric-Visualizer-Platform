@@ -4,6 +4,7 @@
 import argparse
 import base64
 import codecs
+from collections import deque
 import http.client
 import json
 import select
@@ -175,42 +176,91 @@ def finalize_stream(stream_path, destination):
 
 
 CAPTURE_START_TIMEOUT_EXIT_CODE = 10
-DELIVERY_ERRORS = []
 
 
-def delivery_report(error, _message):
-    if error is not None:
-        DELIVERY_ERRORS.append(str(error))
+class BufferedEventPublisher:
+    """Preserve event order while Kafka or its network is unavailable."""
+
+    def __init__(self, producer, topic, capture_id):
+        self.producer = producer
+        self.topic = topic
+        self.key = capture_id.encode()
+        self.capture_id = capture_id
+        self.pending = deque()
+        self.delivery_failures = deque()
+
+    def _delivery_report(self, record):
+        def callback(error, _message):
+            if error is not None:
+                self.delivery_failures.append((record, str(error)))
+
+        return callback
+
+    def publish(self, event):
+        event = dict(event)
+        event["schema_version"] = 1
+        event["capture_id"] = self.capture_id
+        self.pending.append(json.dumps(event, separators=(",", ":")).encode())
+        self.drain_available()
+
+    def drain_available(self):
+        """Move buffered records to librdkafka without blocking tap reads."""
+        self.producer.poll(0)
+        while self.delivery_failures:
+            record, error = self.delivery_failures.pop()
+            print(f"Retrying Kafka event after delivery failure: {error}", file=sys.stderr)
+            self.pending.appendleft(record)
+
+        while self.pending:
+            record = self.pending[0]
+            try:
+                self.producer.produce(
+                    self.topic,
+                    key=self.key,
+                    value=record,
+                    on_delivery=self._delivery_report(record),
+                )
+            except BufferError:
+                # librdkafka's local queue is full. Keep this record in the
+                # application queue and resume consuming Envoy immediately.
+                self.producer.poll(0)
+                return False
+            self.pending.popleft()
+            self.producer.poll(0)
+        return True
+
+    def drain_all(self, timeout_seconds):
+        """Drain application and librdkafka buffers before termination."""
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            self.drain_available()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            if self.pending:
+                self.producer.poll(min(0.1, remaining))
+                continue
+            undelivered = self.producer.flush(min(0.5, remaining))
+            self.producer.poll(0)
+            if not undelivered and not self.delivery_failures:
+                return
+
+        raise RuntimeError(
+            "Kafka event delivery did not recover within "
+            f"{timeout_seconds} seconds; {len(self.pending)} application-buffered "
+            "events remain"
+        )
 
 
-def publish_event(producer, topic, capture_id, event):
-    event["schema_version"] = 1
-    event["capture_id"] = capture_id
-    producer.produce(
-        topic,
-        key=capture_id.encode(),
-        value=json.dumps(event, separators=(",", ":")).encode(),
-        on_delivery=delivery_report,
+def publish_connection(publisher, trace_id, path):
+    publisher.publish(
+        {
+            "type": "connection_log",
+            "trace_id": trace_id,
+            "filename": path.name,
+            "payload_base64": base64.b64encode(path.read_bytes()).decode("ascii"),
+        }
     )
-    producer.poll(0)
-
-
-def flush_events(producer):
-    remaining = producer.flush(30)
-    if remaining or DELIVERY_ERRORS:
-        details = "; ".join(DELIVERY_ERRORS) or "delivery timeout"
-        raise RuntimeError(f"Kafka event delivery failed: {details}")
-
-
-def publish_connection(producer, topic, capture_id, trace_id, path):
-    publish_event(producer, topic, capture_id, {
-        "type": "connection_log",
-        "trace_id": trace_id,
-        "filename": path.name,
-        "payload_base64": base64.b64encode(path.read_bytes()).decode("ascii"),
-    })
-
-
 
 def capture_start_expired(started, last_activity, wait_msec, now=None):
     if last_activity is not None:
@@ -218,23 +268,6 @@ def capture_start_expired(started, last_activity, wait_msec, now=None):
     now = time.monotonic() if now is None else now
     return now - started >= wait_msec / 1000
 
-
-def wait_for_broker(client, timeout_seconds):
-    """Wait until broker metadata can be fetched over its advertised listener."""
-    deadline = time.monotonic() + timeout_seconds
-    last_error = None
-    while time.monotonic() < deadline:
-        try:
-            remaining = max(0.1, deadline - time.monotonic())
-            client.list_topics(timeout=min(5, remaining))
-            return
-        except Exception as error:
-            last_error = error
-            print(f"Waiting for event broker: {error}", file=sys.stderr, flush=True)
-            time.sleep(min(1, max(0, deadline - time.monotonic())))
-    raise RuntimeError(
-        f"event broker was not ready within {timeout_seconds} seconds"
-    ) from last_error
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -249,7 +282,7 @@ def main():
     parser.add_argument("--retain-raw-taps", action="store_true")
     parser.add_argument("--kafka-brokers", required=True)
     parser.add_argument("--kafka-topic", required=True)
-    parser.add_argument("--kafka-startup-timeout-seconds", type=int, default=120)
+    parser.add_argument("--kafka-delivery-timeout-seconds", type=int, default=120)
     parser.add_argument("--capture-id", required=True)
     parser.add_argument("--ready-file", type=Path)
     args = parser.parse_args()
@@ -266,9 +299,14 @@ def main():
         "bootstrap.servers": args.kafka_brokers,
         "enable.idempotence": True,
         "acks": "all",
+        # Retriable broker/network failures must not expire accepted events.
+        # drain_all supplies the bounded process-level shutdown deadline.
+        "message.timeout.ms": 0,
     })
-    wait_for_broker(producer, args.kafka_startup_timeout_seconds)
     connection, response = subscribe(args)
+    publisher = BufferedEventPublisher(
+        producer, args.kafka_topic, args.capture_id
+    )
     trace_reader = StreamingJsonTraceReader(response)
     if args.ready_file:
         args.ready_file.touch()
@@ -282,6 +320,9 @@ def main():
     try:
         while time.monotonic() - started < args.max_wait_msec / 1000:
             try:
+                # Retry application-buffered events first on every capture
+                # iteration, but never block reading Envoy on Kafka recovery.
+                publisher.drain_available()
                 # One socket read may contain several adjacent JSON objects.
                 # Drain those objects before waiting for more network data;
                 # otherwise the quiet timer can end the capture while complete
@@ -313,13 +354,7 @@ def main():
                     if trace_id in traces_with_data:
                         destination = args.decoded_directory / f"connection_{trace_id}.log"
                         published_path = finalize_stream(stream_path, destination)
-                        publish_connection(
-                            producer,
-                            args.kafka_topic,
-                            args.capture_id,
-                            trace_id,
-                            published_path,
-                        )
+                        publish_connection(publisher, trace_id, published_path)
                         published_path.unlink()
                         traces_with_data.remove(trace_id)
                     else:
@@ -347,6 +382,11 @@ def main():
                     break
         else:
             raise TimeoutError("timed out waiting for tapped traffic to become quiet")
+    except BaseException:
+        # Preserve every event accepted before a capture-side failure. This is
+        # also the max-capture-timeout path.
+        publisher.drain_all(args.kafka_delivery_timeout_seconds)
+        raise
     finally:
         connection.close()
 
@@ -354,12 +394,12 @@ def main():
         for stream_path in spool_directory.glob("*.stream"):
             stream_path.unlink()
         spool_directory.rmdir()
-        publish_event(producer, args.kafka_topic, args.capture_id, {
+        publisher.publish({
             "type": "capture_start_timeout",
             "wait_msec": args.wait_before_start_msec,
             "exit_code": CAPTURE_START_TIMEOUT_EXIT_CODE,
         })
-        flush_events(producer)
+        publisher.drain_all(args.kafka_delivery_timeout_seconds)
         return CAPTURE_START_TIMEOUT_EXIT_CODE
 
     # Docker logging connections commonly stay open. At the bounded-batch
@@ -368,13 +408,11 @@ def main():
         stream_path = spool_directory / f"connection_{trace_id}.stream"
         destination = args.decoded_directory / f"connection_{trace_id}.log"
         published_path = finalize_stream(stream_path, destination)
-        publish_connection(
-            producer, args.kafka_topic, args.capture_id, trace_id, published_path
-        )
+        publish_connection(publisher, trace_id, published_path)
         published_path.unlink()
     spool_directory.rmdir()
-    publish_event(producer, args.kafka_topic, args.capture_id, {"type": "capture_complete"})
-    flush_events(producer)
+    publisher.publish({"type": "capture_complete"})
+    publisher.drain_all(args.kafka_delivery_timeout_seconds)
     return 0
 
 

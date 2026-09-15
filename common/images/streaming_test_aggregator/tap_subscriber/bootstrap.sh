@@ -24,7 +24,7 @@ python3 /package/tap_subscriber.py \
   --ready-file "${RESULT_PATH}/subscriber_ready" \
   --kafka-brokers "${KAFKA_BOOTSTRAP_SERVERS}" \
   --kafka-topic "${KAFKA_TOPIC}" \
-  --kafka-startup-timeout-seconds "${KAFKA_STARTUP_TIMEOUT_SECONDS:-120}" \
+  --kafka-delivery-timeout-seconds "${KAFKA_DELIVERY_TIMEOUT_SECONDS:-120}" \
   --capture-id "${CAPTURE_ID}" \
   "${subscriber_options[@]}" \
   > "${RESULT_PATH}/subscriber_stdout" \

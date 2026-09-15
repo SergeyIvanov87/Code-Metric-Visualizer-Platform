@@ -238,6 +238,17 @@ It cannot recover tap segments emitted while the subscriber is disconnected or
 read data lost before publication. The Envoy-to-subscriber edge therefore
 remains an explicit capture boundary.
 
+The bounded implementation subscribes to Envoy without waiting for Kafka. It
+uses librdkafka's ordered, non-expiring producer queue during retriable broker
+and network outages and adds an application queue when that local producer
+queue is full. It retries the application queue before processing each next tap
+object and drains both queues on normal completion, initialization timeout, and
+capture failure. The final drain has a configured deadline and fails closed if
+Kafka does not recover. This protects a live process from transient outages;
+it does not survive subscriber/container loss. The target architecture must
+replace the application memory queue with the local write-ahead log described
+below.
+
 Each deployment must choose a capture-gap policy:
 
 1. **Fail closed:** any unaccounted tap interruption makes affected runs

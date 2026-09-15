@@ -108,16 +108,17 @@ class FakeProducer:
     def poll(self, timeout):
         self.polls.append(timeout)
 
+    def flush(self, _timeout):
+        return 0
+
 
 def test_publishes_versioned_capture_keyed_event():
     producer = FakeProducer()
-
-    tap.publish_event(
-        producer,
-        "capture-events",
-        "capture-42",
-        {"type": "capture_complete"},
+    publisher = tap.BufferedEventPublisher(
+        producer, "capture-events", "capture-42"
     )
+
+    publisher.publish({"type": "capture_complete"})
 
     topic, record = producer.records[0]
     value = tap.json.loads(record["value"])
@@ -132,16 +133,16 @@ def test_publishes_versioned_capture_keyed_event():
 
 def test_publishes_distinct_capture_start_timeout_event():
     producer = FakeProducer()
+    publisher = tap.BufferedEventPublisher(
+        producer, "capture-events", "capture-42"
+    )
 
-    tap.publish_event(
-        producer,
-        "capture-events",
-        "capture-42",
+    publisher.publish(
         {
             "type": "capture_start_timeout",
             "wait_msec": 60000,
             "exit_code": tap.CAPTURE_START_TIMEOUT_EXIT_CODE,
-        },
+        }
     )
 
     value = tap.json.loads(producer.records[0][1]["value"])
@@ -156,21 +157,41 @@ def test_start_wait_applies_only_before_first_capture_data():
     assert not tap.capture_start_expired(10.0, 20.0, 60000, now=1000.0)
 
 
-class EventuallyReadyProducer:
+class RecoveringProducer(FakeProducer):
     def __init__(self, failures):
+        super().__init__()
         self.failures = failures
-        self.attempts = 0
 
-    def list_topics(self, **_kwargs):
-        self.attempts += 1
-        if self.attempts <= self.failures:
-            raise RuntimeError("broker listener is not ready")
+    def produce(self, topic, **kwargs):
+        if self.failures:
+            self.failures -= 1
+            raise BufferError("Kafka queue is full while broker is down")
+        super().produce(topic, **kwargs)
 
 
-def test_subscriber_retries_broker_metadata(monkeypatch):
-    producer = EventuallyReadyProducer(failures=2)
-    monkeypatch.setattr(tap.time, "sleep", lambda _seconds: None)
+def test_buffers_during_kafka_outage_and_replays_in_order():
+    producer = RecoveringProducer(failures=2)
+    publisher = tap.BufferedEventPublisher(producer, "events", "capture-1")
 
-    tap.wait_for_broker(producer, timeout_seconds=5)
+    publisher.publish({"type": "connection_log", "trace_id": 1})
+    publisher.publish({"type": "connection_log", "trace_id": 2})
+    assert len(publisher.pending) == 2
+    assert producer.records == []
 
-    assert producer.attempts == 3
+    assert publisher.drain_available()
+    events = [tap.json.loads(record[1]["value"]) for record in producer.records]
+    assert [event["trace_id"] for event in events] == [1, 2]
+    assert not publisher.pending
+
+
+def test_final_drain_retries_application_buffer():
+    producer = RecoveringProducer(failures=1)
+    publisher = tap.BufferedEventPublisher(producer, "events", "capture-1")
+    publisher.publish({"type": "capture_complete"})
+    assert len(publisher.pending) == 1
+
+    publisher.drain_all(timeout_seconds=1)
+
+    assert not publisher.pending
+    event = tap.json.loads(producer.records[0][1]["value"])
+    assert event["type"] == "capture_complete"

@@ -86,7 +86,7 @@ services:
       WAIT_MSEC_BEFORE_START: 15000
       MAX_WAIT_MSEC_UNTIL_FINISH: 60000
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      KAFKA_STARTUP_TIMEOUT_SECONDS: 120
+      KAFKA_DELIVERY_TIMEOUT_SECONDS: 120
       KAFKA_TOPIC: test-capture-events
       CAPTURE_ID: functional-test
     volumes:
