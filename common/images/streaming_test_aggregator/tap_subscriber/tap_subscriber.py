@@ -8,6 +8,7 @@ from collections import deque
 import http.client
 import json
 import queue
+import socket
 import sys
 import threading
 import time
@@ -112,6 +113,19 @@ class TapStreamPump:
         if isinstance(item, BaseException):
             raise item
         return item
+
+    def stop(self, connection, response, timeout=5):
+        """Interrupt the blocking HTTP read and wait for the reader to exit."""
+        sock = connection.sock
+        if sock is not None:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+        response.close()
+        self.thread.join(timeout)
+        if self.thread.is_alive():
+            raise RuntimeError("Envoy tap reader thread did not stop")
 
 
 def trace_id_and_closed(trace):
@@ -397,6 +411,7 @@ def main():
         publisher.drain_all(args.kafka_delivery_timeout_seconds)
         raise
     finally:
+        trace_pump.stop(connection, response)
         connection.close()
 
     if start_timed_out:

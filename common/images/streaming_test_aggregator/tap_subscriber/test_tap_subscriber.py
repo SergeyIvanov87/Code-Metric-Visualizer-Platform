@@ -2,6 +2,8 @@ import importlib.util
 import io
 import json
 import sys
+import threading
+import types
 from pathlib import Path
 
 import pytest
@@ -64,6 +66,31 @@ def test_stream_pump_drains_http_reader_without_socket_readiness_checks():
 
     assert tap.trace_id_and_closed(pump.get(timeout=1)) == (9, True)
     assert pump.get(timeout=1) is None
+
+
+def test_stream_pump_shutdown_unblocks_and_joins_reader_thread():
+    released = threading.Event()
+
+    class BlockingResponse:
+        def read1(self, _size):
+            released.wait(1)
+            return b""
+
+        def close(self):
+            pass
+
+    class InterruptingSocket:
+        def shutdown(self, _how):
+            released.set()
+
+    response = BlockingResponse()
+    connection = types.SimpleNamespace(sock=InterruptingSocket())
+    pump = tap.TapStreamPump(tap.StreamingJsonTraceReader(response))
+    pump.start()
+
+    pump.stop(connection, response)
+
+    assert not pump.thread.is_alive()
 
 
 def test_trace_id_and_closed_for_streamed_event():

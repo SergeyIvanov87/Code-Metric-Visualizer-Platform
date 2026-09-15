@@ -52,7 +52,9 @@ Traffic activity is the arrival of any non-empty decoded downstream tap data.
 The subscriber updates only an activity timestamp; it does not count bytes or
 poll Envoy's listener-wide RX statistics. A dedicated reader thread continuously
 drains the buffered HTTP response, so socket-readiness checks cannot overlook
-trace objects already held by Python's HTTP buffering layer.
+trace objects already held by Python's HTTP buffering layer. On every exit
+path, shutdown interrupts the blocking socket read and joins the reader before
+Python interpreter teardown; no daemon reader is left using buffered I/O.
 
 ## Broker outage behavior
 
