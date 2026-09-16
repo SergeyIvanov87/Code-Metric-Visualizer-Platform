@@ -18,9 +18,10 @@ implementation, allowing the transport to evolve without renaming the images.
 
 ## Documentation and functional tests
 
-The architecture and simian-army evolution plan are recorded in
+The one-shot architecture, including the permanent Envoy and on-demand
+execution lifecycle, is recorded in
 [`EVENT_PIPELINE_ARCHITECTURE_DECISION_RECORD_v1_0.md`](EVENT_PIPELINE_ARCHITECTURE_DECISION_RECORD_v1_0.md).
-A bounded-batch compatibility verdict and migration prerequisites are in
+A legacy-substitution verdict and configuration prerequisites are in
 [`LEGACY_SUBSTITUTION_ASSESSMENT.md`](LEGACY_SUBSTITUTION_ASSESSMENT.md).
 The complete subsystem test topology lives in `tests/functional` rather than
 inside either component. Run it from this directory with:

@@ -10,10 +10,11 @@ All events use `CAPTURE_ID` as the Kafka key and contain `schema_version`,
 - `capture_failed`: terminal infrastructure failure with a bounded `error`
   diagnostic.
 
-Using one key keeps a bounded capture ordered in one partition. Event IDs and
-per-segment publishing remain future work for the session-aware architecture;
-the current contract transports the existing bounded-batch behavior without
-putting pytest interpretation in the tap subscriber.
+Using one key keeps the one-shot capture ordered in one partition. Stable event
+IDs and per-segment publishing remain possible hardening work for restart-safe
+delivery within an execution; they do not imply a multi-run service. The
+current contract transports the finite execution without putting pytest
+interpretation in the tap subscriber.
 
 ## Initialization timeout
 
