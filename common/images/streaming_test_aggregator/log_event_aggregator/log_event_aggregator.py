@@ -194,7 +194,14 @@ def consume_capture(
             filename = safe_name(event["filename"])
             trace_id = event.get("trace_id")
             key = (trace_id, filename)
-            state = chunks.pop(key, {"next": 0})
+            state = chunks.pop(
+                key,
+                {
+                    "next": 0,
+                    "buffer": bytearray(),
+                    "temporary": output_directory / f".{filename}.{trace_id}.tmp",
+                },
+            )
             if event.get("chunk_count") != state["next"]:
                 raise ValueError(f"incomplete chunk sequence for {filename!r}")
             buffered_chunk_bytes -= flush_chunk_buffer(state)

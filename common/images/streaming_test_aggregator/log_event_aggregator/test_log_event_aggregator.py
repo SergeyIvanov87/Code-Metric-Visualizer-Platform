@@ -208,6 +208,25 @@ def test_reassembles_chunked_connection_log(tmp_path):
     assert (tmp_path / "sample.log").read_bytes() == b"first second"
 
 
+def test_materializes_empty_log_for_zero_chunk_connection(tmp_path):
+    consumer = Consumer([
+        event(
+            "connection_log_complete",
+            trace_id=1,
+            filename="health-check.log",
+            chunk_count=0,
+        ),
+        event("capture_complete"),
+    ])
+
+    received, _terminal = aggregator.consume_capture(
+        consumer, "events", "capture-1", tmp_path, 1
+    )
+
+    assert received == 1
+    assert (tmp_path / "health-check.log").read_bytes() == b""
+
+
 def test_batches_chunks_before_spooling(tmp_path, monkeypatch):
     writes = []
     original_flush = aggregator.flush_chunk_buffer
