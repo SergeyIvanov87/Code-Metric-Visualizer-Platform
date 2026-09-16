@@ -46,17 +46,78 @@ def report_analysis_result(result_directory):
     return int((result_directory / "result").read_text().strip())
 
 
-def consume_capture(consumer, topic, capture_id, output_directory, timeout_seconds):
+def retry_delay(attempt, backoff_seconds):
+    """Apply a bounded linear backoff between broker retries."""
+    time.sleep(backoff_seconds * attempt)
+
+
+def poll_with_retry(consumer, max_retries, backoff_seconds):
+    """Poll until Kafka responds normally or the retry budget is exhausted."""
+    failures = 0
+    while True:
+        try:
+            message = consumer.poll(1.0)
+        except Exception as error:
+            kafka_error = error
+        else:
+            if message is None or not message.error():
+                return message
+            if message.error().code() == KafkaError._PARTITION_EOF:
+                return None
+            kafka_error = message.error()
+
+        failures += 1
+        if failures > max_retries:
+            failure = RuntimeError(
+                f"Kafka poll failed after {max_retries} retries: {kafka_error}"
+            )
+            if isinstance(kafka_error, Exception):
+                raise failure from kafka_error
+            raise failure
+        print(
+            f"Kafka poll failed ({failures}/{max_retries}); retrying: {kafka_error}",
+            file=sys.stderr,
+            flush=True,
+        )
+        retry_delay(failures, backoff_seconds)
+
+
+def commit_with_retry(consumer, message, max_retries, backoff_seconds):
+    """Commit a terminal event despite a temporary broker/network outage."""
+    failures = 0
+    while True:
+        try:
+            consumer.commit(message=message, asynchronous=False)
+            return
+        except Exception as error:
+            failures += 1
+            if failures > max_retries:
+                raise RuntimeError(
+                    f"Kafka commit failed after {max_retries} retries: {error}"
+                ) from error
+            print(
+                f"Kafka commit failed ({failures}/{max_retries}); retrying: {error}",
+                file=sys.stderr,
+                flush=True,
+            )
+            retry_delay(failures, backoff_seconds)
+
+
+def consume_capture(
+    consumer,
+    topic,
+    capture_id,
+    output_directory,
+    timeout_seconds,
+    max_retries=10,
+    retry_backoff_seconds=1.0,
+):
     deadline = time.monotonic() + timeout_seconds
     received = 0
     while time.monotonic() < deadline:
-        message = consumer.poll(1.0)
+        message = poll_with_retry(consumer, max_retries, retry_backoff_seconds)
         if message is None:
             continue
-        if message.error():
-            if message.error().code() == KafkaError._PARTITION_EOF:
-                continue
-            raise RuntimeError(str(message.error()))
         event = json.loads(message.value())
         if event.get("schema_version") != 1:
             raise ValueError("unsupported Kafka capture event schema_version")
@@ -71,10 +132,14 @@ def consume_capture(consumer, topic, capture_id, output_directory, timeout_secon
             temporary.replace(output_directory / filename)
             received += 1
         elif event_type == "capture_complete":
-            consumer.commit(message=message, asynchronous=False)
+            commit_with_retry(
+                consumer, message, max_retries, retry_backoff_seconds
+            )
             return received
         elif event_type == "capture_start_timeout":
-            consumer.commit(message=message, asynchronous=False)
+            commit_with_retry(
+                consumer, message, max_retries, retry_backoff_seconds
+            )
             wait_msec = event.get("wait_msec", "unknown")
             raise CaptureStartTimeout(
                 f"no capture data arrived during the {wait_msec} ms initialization interval"
@@ -114,8 +179,14 @@ def main():
     parser.add_argument("--output-directory", type=Path, required=True)
     parser.add_argument("--result-directory", type=Path, required=True)
     parser.add_argument("--timeout-seconds", type=int, default=900)
+    parser.add_argument("--consumer-max-retries", type=int, default=10)
+    parser.add_argument("--consumer-retry-backoff-seconds", type=float, default=1.0)
     parser.add_argument("--ready-file", type=Path)
     args = parser.parse_args()
+    if args.consumer_max_retries < 0:
+        parser.error("--consumer-max-retries must not be negative")
+    if args.consumer_retry_backoff_seconds < 0:
+        parser.error("--consumer-retry-backoff-seconds must not be negative")
     args.output_directory.mkdir(parents=True, exist_ok=True)
     args.result_directory.mkdir(parents=True, exist_ok=True)
 
@@ -137,6 +208,8 @@ def main():
                 args.capture_id,
                 args.output_directory,
                 args.timeout_seconds,
+                args.consumer_max_retries,
+                args.consumer_retry_backoff_seconds,
             )
         except CaptureStartTimeout as error:
             write_terminal_result(

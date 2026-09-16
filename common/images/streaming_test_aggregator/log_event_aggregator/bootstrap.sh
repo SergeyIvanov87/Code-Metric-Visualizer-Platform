@@ -13,4 +13,6 @@ python3 /package/log_event_aggregator.py \
   --output-directory "${DECODED_LOG_PATH}" \
   --result-directory "${RESULT_PATH}" \
   --timeout-seconds "${MAX_WAIT_SECONDS:-900}" \
+  --consumer-max-retries "${KAFKA_CONSUMER_MAX_RETRIES:-10}" \
+  --consumer-retry-backoff-seconds "${KAFKA_CONSUMER_RETRY_BACKOFF_SECONDS:-1}" \
   --ready-file "${RESULT_PATH}/consumer_ready"

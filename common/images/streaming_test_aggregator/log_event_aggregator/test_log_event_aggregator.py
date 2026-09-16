@@ -18,11 +18,12 @@ spec.loader.exec_module(aggregator)
 
 
 class Message:
-    def __init__(self, event):
-        self._value = json.dumps(event).encode()
+    def __init__(self, event=None, broker_error=None):
+        self._value = json.dumps(event).encode() if event is not None else None
+        self._error = broker_error
 
     def error(self):
-        return None
+        return self._error
 
     def value(self):
         return self._value
@@ -42,6 +43,18 @@ class Consumer:
 
 def event(event_type, **values):
     return Message({"schema_version": 1, "type": event_type, "capture_id": "capture-1", **values})
+
+
+class BrokerError:
+    def __init__(self, message, code=-195):
+        self.message = message
+        self._code = code
+
+    def code(self):
+        return self._code
+
+    def __str__(self):
+        return self.message
 
 
 def test_consumes_logs_until_capture_complete(tmp_path):
@@ -89,6 +102,68 @@ def test_capture_start_timeout_has_distinguishable_result(tmp_path):
     )
     assert (tmp_path / "result").read_text().strip() == "10"
     assert "no capture data" in (tmp_path / "result_log_stderr").read_text()
+
+
+def test_retries_poll_errors_and_preserves_capture_flow(tmp_path, monkeypatch):
+    sleeps = []
+    consumer = Consumer([
+        Message(broker_error=BrokerError("broker transport failed")),
+        Message(broker_error=BrokerError("all brokers are down")),
+        event("capture_complete"),
+    ])
+    monkeypatch.setattr(aggregator.time, "sleep", sleeps.append)
+
+    received = aggregator.consume_capture(
+        consumer,
+        "events",
+        "capture-1",
+        tmp_path,
+        1,
+        max_retries=2,
+        retry_backoff_seconds=0.25,
+    )
+
+    assert received == 0
+    assert consumer.committed
+    assert sleeps == [0.25, 0.5]
+
+
+def test_poll_fails_only_after_configured_retry_budget(tmp_path, monkeypatch):
+    consumer = Consumer([
+        Message(broker_error=BrokerError("down-1")),
+        Message(broker_error=BrokerError("down-2")),
+        Message(broker_error=BrokerError("down-3")),
+    ])
+    monkeypatch.setattr(aggregator.time, "sleep", lambda _seconds: None)
+
+    with pytest.raises(RuntimeError, match="after 2 retries: down-3"):
+        aggregator.consume_capture(
+            consumer,
+            "events",
+            "capture-1",
+            tmp_path,
+            1,
+            max_retries=2,
+            retry_backoff_seconds=0,
+        )
+
+
+def test_retries_terminal_offset_commit(monkeypatch):
+    class RecoveringCommitConsumer:
+        def __init__(self):
+            self.attempts = 0
+
+        def commit(self, **_kwargs):
+            self.attempts += 1
+            if self.attempts < 3:
+                raise RuntimeError("coordinator unavailable")
+
+    consumer = RecoveringCommitConsumer()
+    monkeypatch.setattr(aggregator.time, "sleep", lambda _seconds: None)
+
+    aggregator.commit_with_retry(consumer, object(), 2, 0)
+
+    assert consumer.attempts == 3
 
 
 def test_reports_analyzer_artifacts_to_container_logs(tmp_path, capsys):

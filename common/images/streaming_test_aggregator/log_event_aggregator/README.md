@@ -14,6 +14,13 @@ partition so `capture_complete` follows its connection logs.
 
 Broker metadata readiness is retried for `KAFKA_STARTUP_TIMEOUT_SECONDS`; container startup does not rely solely on the broker container health status.
 
+While consuming, broker/network errors returned by `poll()` and exceptions from
+synchronous terminal-offset commits are recoverable. The service retries them
+up to `KAFKA_CONSUMER_MAX_RETRIES` (default `10`) with a linear backoff based on
+`KAFKA_CONSUMER_RETRY_BACKOFF_SECONDS` (default `1`). A successfully received
+record starts with a fresh retry budget. Exhaustion is an infrastructure error;
+malformed capture events and explicit `capture_failed` events are not retried.
+
 The image uses Python 3.12. `pyinotify` still imports the standard-library
 `asyncore` module removed in Python 3.12, so the image installs the maintained
 `pyasyncore` compatibility package explicitly. Its Docker build also imports
