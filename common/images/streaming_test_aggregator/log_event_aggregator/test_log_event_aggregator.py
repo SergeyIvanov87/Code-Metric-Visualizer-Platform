@@ -208,6 +208,43 @@ def test_reassembles_chunked_connection_log(tmp_path):
     assert (tmp_path / "sample.log").read_bytes() == b"first second"
 
 
+def test_batches_chunks_before_spooling(tmp_path, monkeypatch):
+    writes = []
+    original_flush = aggregator.flush_chunk_buffer
+
+    def recording_flush(state):
+        if state["buffer"]:
+            writes.append(bytes(state["buffer"]))
+        return original_flush(state)
+
+    monkeypatch.setattr(aggregator, "flush_chunk_buffer", recording_flush)
+    consumer = Consumer([
+        event(
+            "connection_log_chunk",
+            trace_id=1,
+            filename="sample.log",
+            chunk_index=index,
+            payload_base64=base64.b64encode(payload).decode(),
+        )
+        for index, payload in enumerate((b"aa", b"bb", b"cc"))
+    ] + [
+        event(
+            "connection_log_complete",
+            trace_id=1,
+            filename="sample.log",
+            chunk_count=3,
+        ),
+        event("capture_complete"),
+    ])
+
+    aggregator.consume_capture(
+        consumer, "events", "capture-1", tmp_path, 1, chunk_buffer_bytes=5
+    )
+
+    assert writes == [b"aabbcc"]
+    assert (tmp_path / "sample.log").read_bytes() == b"aabbcc"
+
+
 def test_does_not_mix_same_named_chunk_streams_from_different_traces(tmp_path):
     consumer = Consumer([
         event(

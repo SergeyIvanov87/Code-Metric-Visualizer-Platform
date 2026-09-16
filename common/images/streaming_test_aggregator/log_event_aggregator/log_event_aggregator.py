@@ -15,6 +15,7 @@ from confluent_kafka import Consumer, KafkaError
 
 SAFE_NAME = re.compile(r"[^A-Za-z0-9_.-]+")
 CAPTURE_START_TIMEOUT_EXIT_CODE = 10
+DEFAULT_CHUNK_BUFFER_BYTES = 4 * 1024 * 1024
 
 
 class CaptureStartTimeout(RuntimeError):
@@ -53,6 +54,17 @@ def sync_result_artifacts(result_directory):
         os.fsync(directory_fd)
     finally:
         os.close(directory_fd)
+
+
+def flush_chunk_buffer(state):
+    """Write one assembly buffer as a single sequential spool operation."""
+    if not state["buffer"]:
+        return 0
+    size = len(state["buffer"])
+    with state["temporary"].open("ab") as output:
+        output.write(state["buffer"])
+    state["buffer"].clear()
+    return size
 
 
 def report_analysis_result(result_directory):
@@ -125,10 +137,12 @@ def consume_capture(
     output_directory,
     timeout_seconds,
     retry_backoff_seconds=1.0,
+    chunk_buffer_bytes=DEFAULT_CHUNK_BUFFER_BYTES,
 ):
     deadline = time.monotonic() + timeout_seconds
     received = 0
     chunks = {}
+    buffered_chunk_bytes = 0
     while time.monotonic() < deadline:
         message = poll_until_deadline(consumer, deadline, retry_backoff_seconds)
         if message is None:
@@ -157,16 +171,24 @@ def consume_capture(
             trace_id = event.get("trace_id")
             key = (trace_id, filename)
             chunk_index = event.get("chunk_index")
-            state = chunks.setdefault(key, {"next": 0})
+            state = chunks.setdefault(
+                key,
+                {
+                    "next": 0,
+                    "buffer": bytearray(),
+                    "temporary": output_directory / f".{filename}.{trace_id}.tmp",
+                },
+            )
             if chunk_index != state["next"]:
                 raise ValueError(
                     f"out-of-order chunk for {filename!r}: expected "
                     f"{state['next']}, got {chunk_index!r}"
                 )
             payload = base64.b64decode(event["payload_base64"], validate=True)
-            temporary = output_directory / f".{filename}.{trace_id}.tmp"
-            with temporary.open("ab") as output:
-                output.write(payload)
+            state["buffer"].extend(payload)
+            buffered_chunk_bytes += len(payload)
+            if buffered_chunk_bytes >= chunk_buffer_bytes:
+                buffered_chunk_bytes -= flush_chunk_buffer(state)
             state["next"] += 1
         elif event_type == "connection_log_complete":
             filename = safe_name(event["filename"])
@@ -175,7 +197,8 @@ def consume_capture(
             state = chunks.pop(key, {"next": 0})
             if event.get("chunk_count") != state["next"]:
                 raise ValueError(f"incomplete chunk sequence for {filename!r}")
-            temporary = output_directory / f".{filename}.{trace_id}.tmp"
+            buffered_chunk_bytes -= flush_chunk_buffer(state)
+            temporary = state["temporary"]
             if not temporary.exists():
                 temporary.touch()
             temporary.replace(output_directory / filename)
@@ -226,10 +249,15 @@ def main():
     parser.add_argument("--result-directory", type=Path, required=True)
     parser.add_argument("--timeout-seconds", type=int, default=900)
     parser.add_argument("--consumer-retry-backoff-seconds", type=float, default=1.0)
+    parser.add_argument(
+        "--chunk-buffer-bytes", type=int, default=DEFAULT_CHUNK_BUFFER_BYTES
+    )
     parser.add_argument("--ready-file", type=Path)
     args = parser.parse_args()
     if args.consumer_retry_backoff_seconds < 0:
         parser.error("--consumer-retry-backoff-seconds must not be negative")
+    if args.chunk_buffer_bytes < 1:
+        parser.error("--chunk-buffer-bytes must be positive")
     args.output_directory.mkdir(parents=True, exist_ok=True)
     args.result_directory.mkdir(parents=True, exist_ok=True)
 
@@ -252,6 +280,7 @@ def main():
                 args.output_directory,
                 args.timeout_seconds,
                 args.consumer_retry_backoff_seconds,
+                args.chunk_buffer_bytes,
             )
         except CaptureStartTimeout as error:
             write_terminal_result(
