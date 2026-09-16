@@ -68,6 +68,12 @@ def test_stream_pump_drains_http_reader_without_socket_readiness_checks():
     assert pump.get(timeout=1) is None
 
 
+def test_stream_pump_uses_bounded_queue():
+    pump = tap.TapStreamPump(object(), capacity=3)
+
+    assert pump.items.maxsize == 3
+
+
 def test_stream_pump_shutdown_unblocks_and_joins_reader_thread():
     released = threading.Event()
 
@@ -198,6 +204,28 @@ def test_publishes_distinct_capture_start_timeout_event():
     assert value["type"] == "capture_start_timeout"
     assert value["wait_msec"] == 60000
     assert value["exit_code"] == 10
+
+
+def test_publishes_connection_as_bounded_ordered_chunks(tmp_path):
+    path = tmp_path / "connection.log"
+    path.write_bytes(b"abcdefghij")
+    producer = FakeProducer()
+    publisher = tap.BufferedEventPublisher(producer, "events", "capture-1")
+
+    tap.publish_connection(publisher, 7, path, chunk_bytes=4)
+
+    events = [tap.json.loads(record[1]["value"]) for record in producer.records]
+    assert [item["type"] for item in events] == [
+        "connection_log_chunk",
+        "connection_log_chunk",
+        "connection_log_chunk",
+        "connection_log_complete",
+    ]
+    assert [item["chunk_index"] for item in events[:-1]] == [0, 1, 2]
+    assert [tap.base64.b64decode(item["payload_base64"]) for item in events[:-1]] == [
+        b"abcd", b"efgh", b"ij"
+    ]
+    assert events[-1]["chunk_count"] == 3
 
 
 def test_start_wait_applies_only_before_first_capture_data():

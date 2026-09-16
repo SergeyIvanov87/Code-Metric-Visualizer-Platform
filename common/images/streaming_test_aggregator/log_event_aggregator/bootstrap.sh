@@ -14,4 +14,5 @@ python3 /package/log_event_aggregator.py \
   --result-directory "${RESULT_PATH}" \
   --timeout-seconds "${MAX_WAIT_SECONDS:-900}" \
   --consumer-retry-backoff-seconds "${KAFKA_CONSUMER_RETRY_BACKOFF_SECONDS:-1}" \
+  --chunk-buffer-bytes "${KAFKA_CHUNK_BUFFER_BYTES:-4194304}" \
   --ready-file "${RESULT_PATH}/consumer_ready"
