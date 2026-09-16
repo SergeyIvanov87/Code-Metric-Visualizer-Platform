@@ -4,6 +4,7 @@
 import argparse
 import base64
 import json
+import os
 import re
 import subprocess
 import sys
@@ -27,9 +28,31 @@ def safe_name(value):
 
 
 def write_terminal_result(result_directory, exit_code, message):
-    (result_directory / "result_log_stdout").write_text("")
-    (result_directory / "result_log_stderr").write_text(f"{message}\n")
-    (result_directory / "result").write_text(f"{exit_code}\n")
+    artifacts = {
+        "result_log_stdout": "",
+        "result_log_stderr": f"{message}\n",
+        "result": f"{exit_code}\n",
+    }
+    for name, contents in artifacts.items():
+        temporary = result_directory / f".{name}.tmp"
+        with temporary.open("w") as output:
+            output.write(contents)
+            output.flush()
+            os.fsync(output.fileno())
+        temporary.replace(result_directory / name)
+    sync_result_artifacts(result_directory)
+
+
+def sync_result_artifacts(result_directory):
+    """Flush analyzer artifacts and their directory before committing Kafka."""
+    for name in ("result_log_stdout", "result_log_stderr", "result"):
+        with (result_directory / name).open("rb") as artifact:
+            os.fsync(artifact.fileno())
+    directory_fd = os.open(result_directory, os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
 
 
 def report_analysis_result(result_directory):
@@ -131,24 +154,28 @@ def consume_capture(
             received += 1
         elif event_type == "connection_log_chunk":
             filename = safe_name(event["filename"])
+            trace_id = event.get("trace_id")
+            key = (trace_id, filename)
             chunk_index = event.get("chunk_index")
-            state = chunks.setdefault(filename, {"next": 0})
+            state = chunks.setdefault(key, {"next": 0})
             if chunk_index != state["next"]:
                 raise ValueError(
                     f"out-of-order chunk for {filename!r}: expected "
                     f"{state['next']}, got {chunk_index!r}"
                 )
             payload = base64.b64decode(event["payload_base64"], validate=True)
-            temporary = output_directory / f".{filename}.tmp"
+            temporary = output_directory / f".{filename}.{trace_id}.tmp"
             with temporary.open("ab") as output:
                 output.write(payload)
             state["next"] += 1
         elif event_type == "connection_log_complete":
             filename = safe_name(event["filename"])
-            state = chunks.pop(filename, {"next": 0})
+            trace_id = event.get("trace_id")
+            key = (trace_id, filename)
+            state = chunks.pop(key, {"next": 0})
             if event.get("chunk_count") != state["next"]:
                 raise ValueError(f"incomplete chunk sequence for {filename!r}")
-            temporary = output_directory / f".{filename}.tmp"
+            temporary = output_directory / f".{filename}.{trace_id}.tmp"
             if not temporary.exists():
                 temporary.touch()
             temporary.replace(output_directory / filename)
@@ -249,6 +276,7 @@ def main():
             check=False,
         )
         result = report_analysis_result(args.result_directory)
+        sync_result_artifacts(args.result_directory)
         commit_until_deadline(
             consumer,
             terminal_message,

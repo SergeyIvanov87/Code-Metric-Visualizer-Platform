@@ -105,6 +105,17 @@ def test_capture_start_timeout_has_distinguishable_result(tmp_path):
     assert "no capture data" in (tmp_path / "result_log_stderr").read_text()
 
 
+def test_syncs_all_result_artifacts_and_directory(tmp_path, monkeypatch):
+    for name in ("result_log_stdout", "result_log_stderr", "result"):
+        (tmp_path / name).write_text("complete")
+    synced = []
+    monkeypatch.setattr(aggregator.os, "fsync", synced.append)
+
+    aggregator.sync_result_artifacts(tmp_path)
+
+    assert len(synced) == 4
+
+
 def test_retries_poll_errors_and_preserves_capture_flow(tmp_path, monkeypatch):
     sleeps = []
     consumer = Consumer([
@@ -195,6 +206,22 @@ def test_reassembles_chunked_connection_log(tmp_path):
 
     assert received == 1
     assert (tmp_path / "sample.log").read_bytes() == b"first second"
+
+
+def test_does_not_mix_same_named_chunk_streams_from_different_traces(tmp_path):
+    consumer = Consumer([
+        event(
+            "connection_log_chunk", trace_id=1, filename="sample.log",
+            chunk_index=0, payload_base64=base64.b64encode(b"one").decode(),
+        ),
+        event(
+            "connection_log_complete", trace_id=2, filename="sample.log",
+            chunk_count=1,
+        ),
+    ])
+
+    with pytest.raises(ValueError, match="incomplete chunk sequence"):
+        aggregator.consume_capture(consumer, "events", "capture-1", tmp_path, 1)
 
 
 def test_retries_terminal_offset_commit(monkeypatch):
