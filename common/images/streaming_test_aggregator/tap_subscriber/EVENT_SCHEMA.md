@@ -3,8 +3,14 @@
 All events use `CAPTURE_ID` as the Kafka key and contain `schema_version`,
 `capture_id`, and `type`.
 
-- `connection_log`: includes `trace_id`, sanitized `filename`, and
-  `payload_base64` containing reconstructed newline-delimited syslog records.
+- `connection_log_chunk`: includes `trace_id`, sanitized `filename`, a
+  zero-based `chunk_index`, and `payload_base64`. Chunks are at most 512 KiB
+  before base64 encoding so each event remains below Kafka's default record
+  limit.
+- `connection_log_complete`: includes `trace_id`, `filename`, and the expected
+  `chunk_count`; consumers publish the reconstructed file only after receiving
+  this marker. Consumers also accept the original whole-file `connection_log`
+  event during rolling upgrades.
 - `capture_complete`: terminal marker produced only after all connection logs
   have been acknowledged during producer flush.
 - `capture_failed`: terminal infrastructure failure with a bounded `error`

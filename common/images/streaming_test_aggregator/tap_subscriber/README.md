@@ -7,7 +7,8 @@ It posts an `any_match` configuration to Envoy's `/tap` admin endpoint, parses
 the adjacent `JSON_BODY_AS_BYTES` trace objects as they arrive, converts them
 to `TraceWrapper` messages, groups
 transport reads by connection, reconstructs syslog records, and publishes
-`connection_log` events to Kafka. After the bounded-batch tap quiet interval it
+bounded `connection_log_chunk` events followed by `connection_log_complete` to
+Kafka. After the bounded-batch tap quiet interval it
 publishes `capture_complete`. If no downstream data arrives during
 `WAIT_MSEC_BEFORE_START`, it publishes `capture_start_timeout` and exits with
 code `10`. Other fatal capture errors are published as `capture_failed` by

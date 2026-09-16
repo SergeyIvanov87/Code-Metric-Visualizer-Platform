@@ -4,6 +4,7 @@
 import argparse
 import base64
 import json
+import os
 import re
 import subprocess
 import sys
@@ -14,10 +15,13 @@ from confluent_kafka import Consumer, KafkaError
 
 SAFE_NAME = re.compile(r"[^A-Za-z0-9_.-]+")
 CAPTURE_START_TIMEOUT_EXIT_CODE = 10
+DEFAULT_CHUNK_BUFFER_BYTES = 4 * 1024 * 1024
 
 
 class CaptureStartTimeout(RuntimeError):
-    pass
+    def __init__(self, message, terminal_message):
+        super().__init__(message)
+        self.terminal_message = terminal_message
 
 
 def safe_name(value):
@@ -25,9 +29,42 @@ def safe_name(value):
 
 
 def write_terminal_result(result_directory, exit_code, message):
-    (result_directory / "result_log_stdout").write_text("")
-    (result_directory / "result_log_stderr").write_text(f"{message}\n")
-    (result_directory / "result").write_text(f"{exit_code}\n")
+    artifacts = {
+        "result_log_stdout": "",
+        "result_log_stderr": f"{message}\n",
+        "result": f"{exit_code}\n",
+    }
+    for name, contents in artifacts.items():
+        temporary = result_directory / f".{name}.tmp"
+        with temporary.open("w") as output:
+            output.write(contents)
+            output.flush()
+            os.fsync(output.fileno())
+        temporary.replace(result_directory / name)
+    sync_result_artifacts(result_directory)
+
+
+def sync_result_artifacts(result_directory):
+    """Flush analyzer artifacts and their directory before committing Kafka."""
+    for name in ("result_log_stdout", "result_log_stderr", "result"):
+        with (result_directory / name).open("rb") as artifact:
+            os.fsync(artifact.fileno())
+    directory_fd = os.open(result_directory, os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def flush_chunk_buffer(state):
+    """Write one assembly buffer as a single sequential spool operation."""
+    if not state["buffer"]:
+        return 0
+    size = len(state["buffer"])
+    with state["temporary"].open("ab") as output:
+        output.write(state["buffer"])
+    state["buffer"].clear()
+    return size
 
 
 def report_analysis_result(result_directory):
@@ -100,9 +137,12 @@ def consume_capture(
     output_directory,
     timeout_seconds,
     retry_backoff_seconds=1.0,
+    chunk_buffer_bytes=DEFAULT_CHUNK_BUFFER_BYTES,
 ):
     deadline = time.monotonic() + timeout_seconds
     received = 0
+    chunks = {}
+    buffered_chunk_bytes = 0
     while time.monotonic() < deadline:
         message = poll_until_deadline(consumer, deadline, retry_backoff_seconds)
         if message is None:
@@ -118,20 +158,60 @@ def consume_capture(
             continue
         event_type = event.get("type")
         if event_type == "connection_log":
+            # Retain compatibility with captures produced during a rolling
+            # deployment of the chunked event schema.
             filename = safe_name(event["filename"])
             payload = base64.b64decode(event["payload_base64"], validate=True)
             temporary = output_directory / f".{filename}.tmp"
             temporary.write_bytes(payload)
             temporary.replace(output_directory / filename)
             received += 1
+        elif event_type == "connection_log_chunk":
+            filename = safe_name(event["filename"])
+            trace_id = event.get("trace_id")
+            key = (trace_id, filename)
+            chunk_index = event.get("chunk_index")
+            state = chunks.setdefault(
+                key,
+                {
+                    "next": 0,
+                    "buffer": bytearray(),
+                    "temporary": output_directory / f".{filename}.{trace_id}.tmp",
+                },
+            )
+            if chunk_index != state["next"]:
+                raise ValueError(
+                    f"out-of-order chunk for {filename!r}: expected "
+                    f"{state['next']}, got {chunk_index!r}"
+                )
+            payload = base64.b64decode(event["payload_base64"], validate=True)
+            state["buffer"].extend(payload)
+            buffered_chunk_bytes += len(payload)
+            if buffered_chunk_bytes >= chunk_buffer_bytes:
+                buffered_chunk_bytes -= flush_chunk_buffer(state)
+            state["next"] += 1
+        elif event_type == "connection_log_complete":
+            filename = safe_name(event["filename"])
+            trace_id = event.get("trace_id")
+            key = (trace_id, filename)
+            state = chunks.pop(key, {"next": 0})
+            if event.get("chunk_count") != state["next"]:
+                raise ValueError(f"incomplete chunk sequence for {filename!r}")
+            buffered_chunk_bytes -= flush_chunk_buffer(state)
+            temporary = state["temporary"]
+            if not temporary.exists():
+                temporary.touch()
+            temporary.replace(output_directory / filename)
+            received += 1
         elif event_type == "capture_complete":
-            commit_until_deadline(consumer, message, deadline, retry_backoff_seconds)
-            return received
+            if chunks:
+                raise ValueError("capture completed with unfinished connection logs")
+            return received, message
         elif event_type == "capture_start_timeout":
-            commit_until_deadline(consumer, message, deadline, retry_backoff_seconds)
             wait_msec = event.get("wait_msec", "unknown")
             raise CaptureStartTimeout(
-                f"no capture data arrived during the {wait_msec} ms initialization interval"
+                f"no capture data arrived during the {wait_msec} ms initialization interval",
+                message,
             )
         elif event_type == "capture_failed":
             raise RuntimeError(event.get("error", "tap subscriber reported failure"))
@@ -169,10 +249,15 @@ def main():
     parser.add_argument("--result-directory", type=Path, required=True)
     parser.add_argument("--timeout-seconds", type=int, default=900)
     parser.add_argument("--consumer-retry-backoff-seconds", type=float, default=1.0)
+    parser.add_argument(
+        "--chunk-buffer-bytes", type=int, default=DEFAULT_CHUNK_BUFFER_BYTES
+    )
     parser.add_argument("--ready-file", type=Path)
     args = parser.parse_args()
     if args.consumer_retry_backoff_seconds < 0:
         parser.error("--consumer-retry-backoff-seconds must not be negative")
+    if args.chunk_buffer_bytes < 1:
+        parser.error("--chunk-buffer-bytes must be positive")
     args.output_directory.mkdir(parents=True, exist_ok=True)
     args.result_directory.mkdir(parents=True, exist_ok=True)
 
@@ -188,34 +273,48 @@ def main():
         if args.ready_file:
             args.ready_file.touch()
         try:
-            received = consume_capture(
+            received, terminal_message = consume_capture(
                 consumer,
                 args.topic,
                 args.capture_id,
                 args.output_directory,
                 args.timeout_seconds,
                 args.consumer_retry_backoff_seconds,
+                args.chunk_buffer_bytes,
             )
         except CaptureStartTimeout as error:
             write_terminal_result(
                 args.result_directory, CAPTURE_START_TIMEOUT_EXIT_CODE, error
             )
+            commit_until_deadline(
+                consumer,
+                error.terminal_message,
+                time.monotonic() + args.timeout_seconds,
+                args.consumer_retry_backoff_seconds,
+            )
             return CAPTURE_START_TIMEOUT_EXIT_CODE
+        if received == 0:
+            raise RuntimeError("capture completed without any connection logs")
+        subprocess.run(
+            [
+                "/package/log_watcher_service.sh",
+                str(args.output_directory),
+                "1",
+                str(args.result_directory),
+            ],
+            check=False,
+        )
+        result = report_analysis_result(args.result_directory)
+        sync_result_artifacts(args.result_directory)
+        commit_until_deadline(
+            consumer,
+            terminal_message,
+            time.monotonic() + args.timeout_seconds,
+            args.consumer_retry_backoff_seconds,
+        )
+        return result
     finally:
         consumer.close()
-
-    if received == 0:
-        raise RuntimeError("capture completed without any connection logs")
-    subprocess.run(
-        [
-            "/package/log_watcher_service.sh",
-            str(args.output_directory),
-            "1",
-            str(args.result_directory),
-        ],
-        check=False,
-    )
-    return report_analysis_result(args.result_directory)
 
 
 if __name__ == "__main__":
