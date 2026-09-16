@@ -1,0 +1,133 @@
+services:
+  kafka:
+    image: apache/kafka:4.1.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092
+          --create --if-not-exists --topic test-capture-events --partitions 1
+          --replication-factor 1 >/dev/null 2>&1 &&
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092
+          --describe --topic test-capture-events >/dev/null 2>&1
+      interval: 2s
+      timeout: 10s
+      retries: 60
+      start_period: 10s
+
+  log_event_aggregator:
+    build:
+      context: ../../../../..
+      dockerfile: common/images/streaming_test_aggregator/log_event_aggregator/Dockerfile
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_STARTUP_TIMEOUT_SECONDS: 120
+      KAFKA_CONSUMER_RETRY_BACKOFF_SECONDS: 1
+      KAFKA_TOPIC: test-capture-events
+      KAFKA_CONSUMER_GROUP: functional-log_event_aggregator
+      CAPTURE_ID: functional-test
+      MAX_WAIT_SECONDS: 180
+    volumes:
+      - streaming-test-aggregator-logs:/logs
+    depends_on:
+      kafka: { condition: service_healthy }
+
+  syslog-ng:
+    image: balabit/syslog-ng:4.8.3
+    command: ["-F", "-f", "/etc/syslog-ng/syslog-ng.conf"]
+    volumes:
+      - ./syslog-ng.conf:/etc/syslog-ng/syslog-ng.conf:ro
+
+  envoy:
+    # Use a released native Envoy build for a reproducible admin-tap fixture.
+    image: envoyproxy/envoy:v1.39.1
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "14601:14601"
+    depends_on:
+      - syslog-ng
+
+  envoy-ready:
+    image: curlimages/curl:8.16.0
+    command:
+      - --fail
+      - --silent
+      - --show-error
+      - --retry
+      - "60"
+      - --retry-all-errors
+      - --retry-delay
+      - "1"
+      - http://envoy:9901/ready
+    depends_on:
+      envoy: { condition: service_started }
+
+  tap_subscriber:
+    build:
+      context: ../../../../..
+      dockerfile: common/images/streaming_test_aggregator/tap_subscriber/Dockerfile
+    environment:
+      ENVOY_ADMIN_HOST: envoy
+      ENVOY_ADMIN_PORT: 9901
+      ENVOY_TAP_CONFIG_ID: test_aggregator
+      WAIT_MSEC_UNTIL_FINISH: 5000
+      WAIT_MSEC_BEFORE_START: 15000
+      MAX_WAIT_MSEC_UNTIL_FINISH: 60000
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_DELIVERY_TIMEOUT_SECONDS: 120
+      KAFKA_TOPIC: test-capture-events
+      CAPTURE_ID: functional-test
+    volumes:
+      - streaming-test-aggregator-logs:/logs
+    depends_on:
+      envoy-ready: { condition: service_completed_successfully }
+      kafka: { condition: service_healthy }
+      log_event_aggregator: { condition: service_healthy }
+
+  passed-tester:
+    image: alpine:3.20
+    command: ["sh", "-c", "printf 'collected 2 items\\n================ 2 passed in 0.02s ================\\n'; sleep infinity"]
+    depends_on:
+      tap_subscriber: { condition: service_healthy }
+    logging: &tester-logging
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:14601", tag: "{{.Name}}" }
+
+  skipped-tester:
+    image: alpine:3.20
+    command: ["sh", "-c", "printf 'collected 2 items\\n================ 1 passed in 0.02s ================\\n================ 1 skipped in 0.01s ================\\n'; sleep infinity"]
+    depends_on:
+      tap_subscriber: { condition: service_healthy }
+    logging: *tester-logging
+
+  mixed-tester:
+    image: alpine:3.20
+    command: ["sh", "-c", "printf 'collected 2 items\\n================ 2 passed in 0.02s ================\\n'; sleep infinity"]
+    depends_on:
+      tap_subscriber: { condition: service_healthy }
+    logging: *tester-logging
+
+  functional-tests:
+    build:
+      context: ../../../../..
+      dockerfile: common/images/streaming_test_aggregator/tests/functional/Dockerfile
+    volumes:
+      - streaming-test-aggregator-logs:/logs:ro
+    depends_on:
+      log_event_aggregator: { condition: service_completed_successfully }
+
+volumes:
+  streaming-test-aggregator-logs:
