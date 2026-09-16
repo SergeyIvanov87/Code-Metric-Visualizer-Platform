@@ -17,7 +17,9 @@ CAPTURE_START_TIMEOUT_EXIT_CODE = 10
 
 
 class CaptureStartTimeout(RuntimeError):
-    pass
+    def __init__(self, message, terminal_message):
+        super().__init__(message)
+        self.terminal_message = terminal_message
 
 
 def safe_name(value):
@@ -103,6 +105,7 @@ def consume_capture(
 ):
     deadline = time.monotonic() + timeout_seconds
     received = 0
+    chunks = {}
     while time.monotonic() < deadline:
         message = poll_until_deadline(consumer, deadline, retry_backoff_seconds)
         if message is None:
@@ -118,20 +121,47 @@ def consume_capture(
             continue
         event_type = event.get("type")
         if event_type == "connection_log":
+            # Retain compatibility with captures produced during a rolling
+            # deployment of the chunked event schema.
             filename = safe_name(event["filename"])
             payload = base64.b64decode(event["payload_base64"], validate=True)
             temporary = output_directory / f".{filename}.tmp"
             temporary.write_bytes(payload)
             temporary.replace(output_directory / filename)
             received += 1
+        elif event_type == "connection_log_chunk":
+            filename = safe_name(event["filename"])
+            chunk_index = event.get("chunk_index")
+            state = chunks.setdefault(filename, {"next": 0})
+            if chunk_index != state["next"]:
+                raise ValueError(
+                    f"out-of-order chunk for {filename!r}: expected "
+                    f"{state['next']}, got {chunk_index!r}"
+                )
+            payload = base64.b64decode(event["payload_base64"], validate=True)
+            temporary = output_directory / f".{filename}.tmp"
+            with temporary.open("ab") as output:
+                output.write(payload)
+            state["next"] += 1
+        elif event_type == "connection_log_complete":
+            filename = safe_name(event["filename"])
+            state = chunks.pop(filename, {"next": 0})
+            if event.get("chunk_count") != state["next"]:
+                raise ValueError(f"incomplete chunk sequence for {filename!r}")
+            temporary = output_directory / f".{filename}.tmp"
+            if not temporary.exists():
+                temporary.touch()
+            temporary.replace(output_directory / filename)
+            received += 1
         elif event_type == "capture_complete":
-            commit_until_deadline(consumer, message, deadline, retry_backoff_seconds)
-            return received
+            if chunks:
+                raise ValueError("capture completed with unfinished connection logs")
+            return received, message
         elif event_type == "capture_start_timeout":
-            commit_until_deadline(consumer, message, deadline, retry_backoff_seconds)
             wait_msec = event.get("wait_msec", "unknown")
             raise CaptureStartTimeout(
-                f"no capture data arrived during the {wait_msec} ms initialization interval"
+                f"no capture data arrived during the {wait_msec} ms initialization interval",
+                message,
             )
         elif event_type == "capture_failed":
             raise RuntimeError(event.get("error", "tap subscriber reported failure"))
@@ -188,7 +218,7 @@ def main():
         if args.ready_file:
             args.ready_file.touch()
         try:
-            received = consume_capture(
+            received, terminal_message = consume_capture(
                 consumer,
                 args.topic,
                 args.capture_id,
@@ -200,22 +230,34 @@ def main():
             write_terminal_result(
                 args.result_directory, CAPTURE_START_TIMEOUT_EXIT_CODE, error
             )
+            commit_until_deadline(
+                consumer,
+                error.terminal_message,
+                time.monotonic() + args.timeout_seconds,
+                args.consumer_retry_backoff_seconds,
+            )
             return CAPTURE_START_TIMEOUT_EXIT_CODE
+        if received == 0:
+            raise RuntimeError("capture completed without any connection logs")
+        subprocess.run(
+            [
+                "/package/log_watcher_service.sh",
+                str(args.output_directory),
+                "1",
+                str(args.result_directory),
+            ],
+            check=False,
+        )
+        result = report_analysis_result(args.result_directory)
+        commit_until_deadline(
+            consumer,
+            terminal_message,
+            time.monotonic() + args.timeout_seconds,
+            args.consumer_retry_backoff_seconds,
+        )
+        return result
     finally:
         consumer.close()
-
-    if received == 0:
-        raise RuntimeError("capture completed without any connection logs")
-    subprocess.run(
-        [
-            "/package/log_watcher_service.sh",
-            str(args.output_directory),
-            "1",
-            str(args.result_directory),
-        ],
-        check=False,
-    )
-    return report_analysis_result(args.result_directory)
 
 
 if __name__ == "__main__":

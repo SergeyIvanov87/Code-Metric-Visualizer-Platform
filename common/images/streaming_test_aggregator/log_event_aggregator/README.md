@@ -1,6 +1,6 @@
 # Log event aggregator image
 
-This service is the test analyzer. It consumes `connection_log` records for one
+This service is the test analyzer. It reconstructs chunked connection-log records for one
 `CAPTURE_ID` from Kafka until it receives `capture_complete`, writes the decoded
 connection logs into `/logs/syslog-streams`, and runs its own copy of the
 canonical pytest summary analyzer. A `capture_failed` event is treated as an
@@ -15,7 +15,8 @@ partition so `capture_complete` follows its connection logs.
 Broker metadata readiness is retried for `KAFKA_STARTUP_TIMEOUT_SECONDS`; container startup does not rely solely on the broker container health status.
 
 While consuming, broker/network errors returned by `poll()` and exceptions from
-synchronous terminal-offset commits are recoverable. The service retries them
+synchronous terminal-offset commits are recoverable. Terminal offsets are not
+committed until analyzer result artifacts have been written durably, and the service retries them
 until the `MAX_WAIT_SECONDS` activity deadline, pausing for
 `KAFKA_CONSUMER_RETRY_BACKOFF_SECONDS` (default `1`) between attempts. Every
 successfully consumed message recalculates that deadline, so the timeout

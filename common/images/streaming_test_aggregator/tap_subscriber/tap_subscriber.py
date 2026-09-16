@@ -26,6 +26,8 @@ from decode_envoy_tap import (
     producer_output_path,
 )
 
+KAFKA_CHUNK_BYTES = 512 * 1024
+TAP_QUEUE_CAPACITY = 64
 
 def encode_varint(value):
     encoded = bytearray()
@@ -87,9 +89,10 @@ class TapStreamPump:
 
     END = object()
 
-    def __init__(self, reader):
+    def __init__(self, reader, capacity=TAP_QUEUE_CAPACITY):
         self.reader = reader
-        self.items = queue.Queue()
+        self.items = queue.Queue(maxsize=capacity)
+        self.stopping = threading.Event()
         self.thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self):
@@ -100,11 +103,22 @@ class TapStreamPump:
             while True:
                 trace = self.reader.read()
                 if trace is None:
-                    self.items.put(self.END)
+                    self._put(self.END)
                     return
-                self.items.put(trace)
+                if not self._put(trace):
+                    return
         except BaseException as error:
-            self.items.put(error)
+            self._put(error)
+
+    def _put(self, item):
+        """Apply bounded backpressure while still allowing prompt shutdown."""
+        while not self.stopping.is_set():
+            try:
+                self.items.put(item, timeout=0.1)
+                return True
+            except queue.Full:
+                pass
+        return False
 
     def get(self, timeout):
         item = self.items.get(timeout=timeout)
@@ -116,6 +130,7 @@ class TapStreamPump:
 
     def stop(self, connection, response, timeout=5):
         """Interrupt the blocking HTTP read and wait for the reader to exit."""
+        self.stopping.set()
         sock = connection.sock
         if sock is not None:
             try:
@@ -284,13 +299,27 @@ class BufferedEventPublisher:
         )
 
 
-def publish_connection(publisher, trace_id, path):
+def publish_connection(publisher, trace_id, path, chunk_bytes=KAFKA_CHUNK_BYTES):
+    """Publish a log in records safely below Kafka's default message limit."""
+    chunk_count = 0
+    with path.open("rb") as source:
+        while chunk := source.read(chunk_bytes):
+            publisher.publish(
+                {
+                    "type": "connection_log_chunk",
+                    "trace_id": trace_id,
+                    "filename": path.name,
+                    "chunk_index": chunk_count,
+                    "payload_base64": base64.b64encode(chunk).decode("ascii"),
+                }
+            )
+            chunk_count += 1
     publisher.publish(
         {
-            "type": "connection_log",
+            "type": "connection_log_complete",
             "trace_id": trace_id,
             "filename": path.name,
-            "payload_base64": base64.b64encode(path.read_bytes()).decode("ascii"),
+            "chunk_count": chunk_count,
         }
     )
 

@@ -68,12 +68,13 @@ def test_consumes_logs_until_capture_complete(tmp_path):
         event("capture_complete"),
     ])
 
-    received = aggregator.consume_capture(
+    received, terminal = aggregator.consume_capture(
         consumer, "events", "capture-1", tmp_path, 1
     )
 
     assert received == 1
-    assert consumer.committed
+    assert terminal.value() == event("capture_complete").value()
+    assert not consumer.committed
     assert (tmp_path / "sample-tester__connection_1.log").read_bytes() == payload
 
 
@@ -93,7 +94,7 @@ def test_capture_start_timeout_has_distinguishable_result(tmp_path):
     ])
     with pytest.raises(aggregator.CaptureStartTimeout, match="60000 ms"):
         aggregator.consume_capture(consumer, "events", "capture-1", tmp_path, 1)
-    assert consumer.committed
+    assert not consumer.committed
 
     aggregator.write_terminal_result(
         tmp_path,
@@ -113,7 +114,7 @@ def test_retries_poll_errors_and_preserves_capture_flow(tmp_path, monkeypatch):
     ])
     monkeypatch.setattr(aggregator.time, "sleep", sleeps.append)
 
-    received = aggregator.consume_capture(
+    received, _terminal = aggregator.consume_capture(
         consumer,
         "events",
         "capture-1",
@@ -123,7 +124,7 @@ def test_retries_poll_errors_and_preserves_capture_flow(tmp_path, monkeypatch):
     )
 
     assert received == 0
-    assert consumer.committed
+    assert not consumer.committed
     assert sleeps == [0.25, 0.25]
 
 
@@ -163,10 +164,37 @@ def test_successful_message_recalculates_activity_deadline(tmp_path, monkeypatch
     ])
     monkeypatch.setattr(aggregator.time, "monotonic", lambda: clock.now)
 
-    assert aggregator.consume_capture(
+    received, _terminal = aggregator.consume_capture(
         consumer, "events", "capture-1", tmp_path, 1, retry_backoff_seconds=0
-    ) == 0
+    )
+    assert received == 0
     assert clock.now == 1.5
+
+
+def test_reassembles_chunked_connection_log(tmp_path):
+    consumer = Consumer([
+        event(
+            "connection_log_chunk",
+            filename="sample.log",
+            chunk_index=0,
+            payload_base64=base64.b64encode(b"first ").decode(),
+        ),
+        event(
+            "connection_log_chunk",
+            filename="sample.log",
+            chunk_index=1,
+            payload_base64=base64.b64encode(b"second").decode(),
+        ),
+        event("connection_log_complete", filename="sample.log", chunk_count=2),
+        event("capture_complete"),
+    ])
+
+    received, _terminal = aggregator.consume_capture(
+        consumer, "events", "capture-1", tmp_path, 1
+    )
+
+    assert received == 1
+    assert (tmp_path / "sample.log").read_bytes() == b"first second"
 
 
 def test_retries_terminal_offset_commit(monkeypatch):
