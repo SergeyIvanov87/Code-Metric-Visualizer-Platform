@@ -154,9 +154,25 @@ if (( decode_status != 0 )); then
 else
     # Preserve every decoded connection, then publish one ordered file per
     # producer for the test-result aggregator.
-    python3 /package/aggregate_connection_logs.py \
-        "${connection_backup_path}" "${decoded_path}"
-    /package/log_watcher_service.sh "${decoded_path}" 1 "${result_path}"
+    aggregation_error_file="${result_path}/connection_aggregation_stderr"
+    if python3 /package/aggregate_connection_logs.py \
+        "${connection_backup_path}" "${decoded_path}" \
+        2> "${aggregation_error_file}"; then
+        rm -f "${aggregation_error_file}"
+        /package/log_watcher_service.sh "${decoded_path}" 1 "${result_path}"
+    else
+        aggregation_error=$(cat "${aggregation_error_file}")
+        # Discard any producer files published before the failure. Besides
+        # making partial output unmistakable, this can recover enough volume
+        # space to persist the infrastructure-failure result.
+        rm -f "${decoded_path}"/* "${aggregation_error_file}"
+        {
+            echo "Per-producer connection log aggregation failed"
+            printf '%s\n' "${aggregation_error}"
+        } > "${result_path}/result_log_stderr"
+        : > "${result_path}/result_log_stdout"
+        echo 255 > "${result_path}/result"
+    fi
 fi
 
 kill -s SIGTERM "$(pidof envoy)" 2>/dev/null

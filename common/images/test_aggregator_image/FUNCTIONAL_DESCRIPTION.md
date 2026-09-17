@@ -187,6 +187,12 @@ the per-connection backup directory. Although
 the parser mode is named `pcap`, at this stage it reads reconstructed syslog
 text and removes the leading `<PRI>` field.
 
+If creation of any solid producer file fails, result analysis is skipped and
+the watcher reports infrastructure status `255`. This prevents an incomplete
+set of producer files from yielding a false passing test result. Any partially
+published solid files are removed, the per-connection backups remain intact,
+and the underlying aggregation error is retained in `result_log_stderr`.
+
 The aggregator selects records whose syslog producer contains `tester` and
 groups them by producer/container name. It recognizes pytest records shaped
 like:
