@@ -67,6 +67,13 @@ Kafka, and only then does the subscriber exit. SIGKILL and SIGSTOP cannot be
 caught. When the variable is empty or unset, no watchdog is started and the
 subscriber has no lifetime limit.
 
+After requesting graceful shutdown, the bootstrap waits at most the sum of
+`WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC`,
+`WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC`, and
+`KAFKA_DELIVERY_TIMEOUT_SECONDS`. It then sends SIGKILL so a stuck subscriber
+cannot hold container shutdown indefinitely. If all three values are zero or
+empty, the bootstrap still uses a one-millisecond, non-zero escalation period.
+
 ## Broker outage behavior
 
 Kafka readiness does not gate the Envoy subscription. Events that cannot enter
