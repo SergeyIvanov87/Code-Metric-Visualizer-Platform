@@ -1,0 +1,25 @@
+services:
+  tap_subscriber:
+    build:
+      context: ../../../../
+      dockerfile: common/images/streaming_test_aggregator/tap_subscriber/Dockerfile
+    env_file:
+      - ./.env
+    environment:
+      ENVOY_ADMIN_HOST: ${ENVOY_ADMIN_HOST:-envoy}
+      ENVOY_ADMIN_PORT: ${ENVOY_ADMIN_PORT:-9901}
+      ENVOY_TAP_CONFIG_ID: ${ENVOY_TAP_CONFIG_ID:-test_aggregator}
+      WAIT_MSEC_UNTIL_FINISH: ${WAIT_MSEC_UNTIL_FINISH:-15000}
+      WAIT_MSEC_BEFORE_START: ${WAIT_MSEC_BEFORE_START:-60000}
+      MAX_WAIT_MSEC_UNTIL_FINISH: ${MAX_WAIT_MSEC_UNTIL_FINISH:-900000}
+      MAX_BUFFERED_RX_BYTES: ${MAX_BUFFERED_RX_BYTES:-16777216}
+      RETAIN_RAW_TAPS: ${RETAIN_RAW_TAPS:-false}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      KAFKA_DELIVERY_TIMEOUT_SECONDS: ${KAFKA_DELIVERY_TIMEOUT_SECONDS:-120}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-test-capture-events}
+      CAPTURE_ID: ${CAPTURE_ID:-functional-test}
+    volumes:
+      - tap_subscriber_logs:/logs
+
+volumes:
+  tap_subscriber_logs:
