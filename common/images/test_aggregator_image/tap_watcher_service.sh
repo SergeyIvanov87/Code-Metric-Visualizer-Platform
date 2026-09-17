@@ -9,13 +9,14 @@ quiet_msec=$3
 result_path=$4
 max_wait_msec=${5:-900000}
 envoy_admin_url=${6:-http://127.0.0.1:9901}
+connection_backup_path=${7:-${decoded_path}/connections}
 
 quiet_seconds=$(( (quiet_msec + 999) / 1000 ))
 max_wait_seconds=$(( (max_wait_msec + 999) / 1000 ))
 (( quiet_seconds < 1 )) && quiet_seconds=1
 (( max_wait_seconds < quiet_seconds )) && max_wait_seconds=$quiet_seconds
 
-mkdir -p "${tap_path}" "${decoded_path}" "${result_path}"
+mkdir -p "${tap_path}" "${decoded_path}" "${connection_backup_path}" "${result_path}"
 
 declare -A active_files
 declare -a workers
@@ -65,7 +66,7 @@ while true; do
             *CLOSE_WRITE*)
                 unset 'active_files['"${event_path}"']'
                 base_name=$(basename "${event_path}")
-                output_file="${decoded_path}/${base_name%.*}.log"
+                output_file="${connection_backup_path}/${base_name%.*}.log"
                 error_file="${result_path}/${base_name}.decode_stderr"
                 python3 /package/decode_envoy_tap.py "${event_path}" "${output_file}" \
                     --name-by-producer \
@@ -151,9 +152,27 @@ if (( decode_status != 0 )); then
     : > "${result_path}/result_log_stdout"
     echo 255 > "${result_path}/result"
 else
-    # All decoded files are now immutable. A 1 ms watcher timeout makes the
-    # existing aggregator immediately scan and aggregate them by container tag.
-    /package/log_watcher_service.sh "${decoded_path}" 1 "${result_path}"
+    # Preserve every decoded connection, then publish one ordered file per
+    # producer for the test-result aggregator.
+    aggregation_error_file="${result_path}/connection_aggregation_stderr"
+    if python3 /package/aggregate_connection_logs.py \
+        "${connection_backup_path}" "${decoded_path}" \
+        2> "${aggregation_error_file}"; then
+        rm -f "${aggregation_error_file}"
+        /package/log_watcher_service.sh "${decoded_path}" 1 "${result_path}"
+    else
+        aggregation_error=$(cat "${aggregation_error_file}")
+        # Discard any producer files published before the failure. Besides
+        # making partial output unmistakable, this can recover enough volume
+        # space to persist the infrastructure-failure result.
+        rm -f "${decoded_path}"/* "${aggregation_error_file}"
+        {
+            echo "Per-producer connection log aggregation failed"
+            printf '%s\n' "${aggregation_error}"
+        } > "${result_path}/result_log_stderr"
+        : > "${result_path}/result_log_stdout"
+        echo 255 > "${result_path}/result"
+    fi
 fi
 
 kill -s SIGTERM "$(pidof envoy)" 2>/dev/null

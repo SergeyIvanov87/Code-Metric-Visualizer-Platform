@@ -180,6 +180,10 @@ def producer_output_path(output_file, records):
         match = SYSLOG_HEADER.match(record)
         if match is None:
             continue
+        # Docker's syslog tag is configured as {{.Name}}, so it is the actual
+        # container producer identity. Do not use Envoy's remote address here:
+        # traffic reaching a published port can be source-NATed to the same
+        # Docker bridge gateway address for every sending container.
         producer = re.sub(
             rb"[^A-Za-z0-9_.-]+",
             b"_",
@@ -191,7 +195,7 @@ def producer_output_path(output_file, records):
     if len(producers) > 1:
         names = ", ".join(name.decode("ascii") for name in producers)
         raise ValueError(
-            "one Envoy connection contains records from multiple syslog producers: "
+            "one Envoy connection contains records from multiple producers: "
             f"{names}"
         )
     if not producers:
@@ -208,7 +212,7 @@ def main():
     parser.add_argument(
         "--name-by-producer",
         action="store_true",
-        help="prefix the output filename with the syslog producer tag",
+        help="prefix the output filename with the Docker syslog producer tag",
     )
     args = parser.parse_args()
 

@@ -37,6 +37,7 @@ flowchart LR
 | `envoy.yaml` | Defines the TCP listener, downstream tap transport socket, and TCP proxy to syslog-ng. |
 | `tap_watcher_service.sh` | Tracks tap-file creation and closure, polls Envoy's downstream RX-byte counter for global inactivity, starts per-file decoders, and invokes aggregation. |
 | `decode_envoy_tap.py` | Parses one completed length-delimited Envoy protobuf tap with `xds-protos`, reassembles downstream TCP bytes, frames syslog records, and writes one reconstructed connection log. |
+| `aggregate_connection_logs.py` | Orders immutable connection logs by Envoy connection ID and concatenates them into one log per producer. |
 | `log_watcher_service.sh` | Runs the existing Python statistics aggregator and stores its exit status. |
 | `log_aggregator.py` | Selects tester records, groups them by container tag, parses pytest summaries, validates totals, and determines success or failure. |
 
@@ -143,18 +144,35 @@ The decoder:
 7. Ignores the RFC5424 octet-counted connection created by the container health
    check when it contains no tester data.
 8. Verifies that a connection contains at most one syslog producer.
-9. Sanitizes the producer tag and atomically publishes the reconstructed log.
+9. Identifies the producer by Docker's syslog tag, configured as `{{.Name}}`,
+   then sanitizes the identity and atomically publishes the reconstructed log.
+   The RFC3164 hostname and Envoy remote IP are deliberately not grouping keys:
+   multiple containers can share a host, and Docker port publishing can
+   source-NAT all of them to the same bridge-gateway IP.
 
-Raw files keep their Envoy names. Decoded files include the Docker syslog tag
-configured by `tag: "{{.Name}}"` and the connection ID:
+Raw files keep their Envoy names. Per-connection backups include the producer
+identity and connection ID:
 
 ```text
 /logs/taps/connection_18.pb
-/logs/syslog-streams/code-metric-platform-rrd-functional-tester-1__connection_18.log
+/logs/syslog-connections/code-metric-platform-rrd-functional-tester-1__connection_18.log
 ```
 
 If no recognizable syslog record exists, such as for the health-check
-connection, the decoded file keeps its generic connection name and is empty.
+connection, the backup keeps its generic connection name and is empty.
+
+After all decoder workers finish, `aggregate_connection_logs.py` groups the
+backups by producer, sorts each group by numeric Envoy connection ID, and
+concatenates each connection byte-for-byte. It atomically publishes solid
+producer files such as:
+
+```text
+/logs/syslog-streams/code-metric-platform-rrd-functional-tester-1.log
+```
+
+The backup directory remains untouched for diagnostics. Consequently,
+records retain their order within each connection and connections retain their
+Envoy creation order.
 
 ## Test-result aggregation
 
@@ -164,9 +182,16 @@ Decoder errors are preserved as
 `/logs/aggregator/connection_<id>.pb.decode_stderr`.
 
 When all traces decode successfully, `log_watcher_service.sh` runs
-`log_aggregator.py` against the immutable reconstructed directory. Although
+`log_aggregator.py` against the immutable solid producer-file directory, not
+the per-connection backup directory. Although
 the parser mode is named `pcap`, at this stage it reads reconstructed syslog
 text and removes the leading `<PRI>` field.
+
+If creation of any solid producer file fails, result analysis is skipped and
+the watcher reports infrastructure status `255`. This prevents an incomplete
+set of producer files from yielding a false passing test result. Any partially
+published solid files are removed, the per-connection backups remain intact,
+and the underlying aggregation error is retained in `result_log_stderr`.
 
 The aggregator selects records whose syslog producer contains `tester` and
 groups them by producer/container name. It recognizes pytest records shaped
