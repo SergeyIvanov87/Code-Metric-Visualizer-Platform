@@ -1,0 +1,56 @@
+name: Upload test aggregator diagnostics
+description: Export Envoy TAP files from the Compose volume and upload them for offline analysis
+
+inputs:
+  compose-file:
+    description: Compose file that defines the test_aggregator service
+    required: true
+  artifact-name:
+    description: Name of the GitHub Actions artifact
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Export test aggregator volume
+      shell: bash
+      env:
+        COMPOSE_FILE: ${{ inputs.compose-file }}
+        DESTINATION: ${{ runner.temp }}/test-aggregator-artifacts
+      run: |
+        set -u
+        rm -rf "${DESTINATION}"
+        mkdir -p "${DESTINATION}"
+
+        {
+          echo "run_id=${GITHUB_RUN_ID}"
+          echo "run_attempt=${GITHUB_RUN_ATTEMPT}"
+          echo "job=${GITHUB_JOB}"
+          echo "sha=${GITHUB_SHA}"
+          echo "compose_file=${COMPOSE_FILE}"
+        } > "${DESTINATION}/github-run.txt"
+
+        container_id=$(docker compose -f "${COMPOSE_FILE}" ps -aq test_aggregator 2>/dev/null | head -n 1)
+        if [[ -z "${container_id}" ]]; then
+          echo "The test_aggregator container was not created; no /logs volume could be exported." \
+            > "${DESTINATION}/EXPORT_ERROR.txt"
+          exit 0
+        fi
+
+        docker inspect "${container_id}" > "${DESTINATION}/container-inspect.json"
+        docker compose -f "${COMPOSE_FILE}" config > "${DESTINATION}/compose-config.yaml"
+        if ! docker cp "${container_id}:/logs/." "${DESTINATION}/"; then
+          echo "docker cp failed while exporting /logs from ${container_id}." \
+            > "${DESTINATION}/EXPORT_ERROR.txt"
+        fi
+        chmod -R a+rX "${DESTINATION}"
+
+    - name: Upload test aggregator diagnostics
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ runner.temp }}/test-aggregator-artifacts
+        if-no-files-found: error
+        compression-level: 0
+        retention-days: 14
+

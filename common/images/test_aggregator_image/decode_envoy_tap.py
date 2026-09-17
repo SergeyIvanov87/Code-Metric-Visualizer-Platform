@@ -22,7 +22,7 @@ SYSLOG_HEADER = re.compile(
 )
 
 
-DEFAULT_MAX_BUFFERED_RX_BYTES = "16777216"
+DEFAULT_MAX_BUFFERED_RX_BYTES = "4294967295"
 
 
 def truncation_error(subject):
@@ -94,12 +94,6 @@ def decode_body(body):
     return b""
 
 
-def bytes_from_event(event):
-    if event.WhichOneof("event_selector") != "read":
-        return b""
-    return decode_body(event.read.data)
-
-
 def events_from_trace(trace):
     trace_type = trace.WhichOneof("trace")
     if trace_type == "socket_buffered_trace":
@@ -124,10 +118,34 @@ def events_from_trace(trace):
 
 
 def extract_downstream_bytes(trace_data):
-    chunks = []
+    events = []
+    streamed_trace_id = None
+    streamed_closed = False
     for trace in iter_trace_wrappers(trace_data):
+        trace_type = trace.WhichOneof("trace")
+        if trace_type == "socket_streamed_trace_segment":
+            segment = trace.socket_streamed_trace_segment
+            if streamed_trace_id is None:
+                streamed_trace_id = segment.trace_id
+            elif segment.trace_id != streamed_trace_id:
+                raise ValueError(
+                    "one tap file contains multiple streamed trace IDs: "
+                    f"{streamed_trace_id} and {segment.trace_id}"
+                )
         for event in events_from_trace(trace):
-            chunk = bytes_from_event(event)
+            events.append(event)
+            if event.WhichOneof("event_selector") == "closed":
+                streamed_closed = True
+
+    if streamed_trace_id is not None and not streamed_closed:
+        raise ValueError(
+            f"streamed Envoy trace {streamed_trace_id} has no connection-close event"
+        )
+
+    chunks = []
+    for event in events:
+        if event.WhichOneof("event_selector") == "read":
+            chunk = decode_body(event.read.data)
             if chunk:
                 chunks.append(chunk)
     return b"".join(chunks)
