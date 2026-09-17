@@ -1,0 +1,15 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "PUT",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/attach_doc_chunk/v1",
+    "Params": {
+        "-doc_id": "",
+        "-metadata": "\"\"",
+        "doc_data": ""
+    },
+    "Description": {
+        "header": "Insert a chunk of a document into persistent storage",
+        "body": "The chunk will be attached to an existing document described by unique 'doc_id', which was returned previously by the API `put_doc`. The parameter `data` contains encoded bytes which encoding schema must be determined by the parameter `metadata`. If nothing is set, the type of `data` is considered as a string-type. If the insertion is successful, the API call returns unique id of the inserted chunk",
+        "footer": ""
+    }
+}

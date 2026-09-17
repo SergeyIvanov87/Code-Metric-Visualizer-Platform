@@ -1,0 +1,22 @@
+services:
+  ai_agent:
+    build:
+      context: ../..
+      dockerfile: ai_agents_framework/ai_agent/Dockerfile.dev
+    environment:
+      VECTORDB_HOST: rag-db
+      VECTORDB_PORT: 8000
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - api.pmccabe_collector.project.ai-agents-framework.ai-agent.src:/package
+      - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:/assets/models
+
+volumes:
+  api.pmccabe_collector.restapi.org:
+  api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:
+  api.pmccabe_collector.project.ai-agents-framework.ai-agent.src:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./sources
