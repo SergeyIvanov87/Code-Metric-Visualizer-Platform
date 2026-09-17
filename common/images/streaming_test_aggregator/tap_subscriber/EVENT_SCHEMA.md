@@ -24,8 +24,10 @@ interpretation in the tap subscriber.
 
 ## Initialization timeout
 
-`capture_start_timeout` is emitted when no downstream capture bytes arrive
-within `WAIT_MSEC_BEFORE_START`. It contains `wait_msec` and `exit_code: 10`.
+`capture_start_timeout` is emitted when no tap record arrives within
+`WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC`. It contains `wait_msec` and
+`exit_code: 10`. An empty value or zero waits forever, so this event is not
+emitted unless capture is given a finite first-record deadline.
 This terminal event is distinct from `capture_failed`: the tap and broker were
 reachable, but the expected test traffic never started during the configured
 admission interval. Consumers must treat it as an infrastructure/orchestration

@@ -8,6 +8,7 @@ from collections import deque
 import http.client
 import json
 import queue
+import signal
 import socket
 import sys
 import threading
@@ -28,6 +29,36 @@ from decode_envoy_tap import (
 
 KAFKA_CHUNK_BYTES = 512 * 1024
 TAP_QUEUE_CAPACITY = 64
+POLL_INTERVAL_SECONDS = 1
+
+
+class ShutdownRequested(RuntimeError):
+    """Raised when shutdown is requested before the tap subscription is ready."""
+
+
+def optional_wait_msec(value):
+    """Parse a wait interval; an empty value or zero means no deadline."""
+    if value == "":
+        return 0
+    try:
+        wait_msec = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(
+            "must be empty or a non-negative integer"
+        ) from error
+    if wait_msec < 0:
+        raise argparse.ArgumentTypeError("must be empty or a non-negative integer")
+    return wait_msec
+
+
+def next_wait(wait_msec, waiting_since, now=None):
+    """Return the next bounded poll duration and whether a deadline expired."""
+    if wait_msec == 0:
+        return POLL_INTERVAL_SECONDS, False
+    now = time.monotonic() if now is None else now
+    remaining = wait_msec / 1000 - (now - waiting_since)
+    return min(POLL_INTERVAL_SECONDS, max(0, remaining)), remaining <= 0
+
 
 def encode_varint(value):
     encoded = bytearray()
@@ -157,10 +188,11 @@ def trace_id_and_closed(trace):
     return segment.trace_id, closed
 
 
-def subscribe(args):
+def subscribe(args, shutdown_requested):
     admin = urllib.parse.urlsplit(args.admin_url)
-    deadline = time.monotonic() + args.max_wait_msec / 1000
     while True:
+        if shutdown_requested.is_set():
+            raise ShutdownRequested
         try:
             connection = http.client.HTTPConnection(admin.hostname, admin.port, timeout=2)
             body = json.dumps({
@@ -190,9 +222,8 @@ def subscribe(args):
             connection.close()
             raise RuntimeError(f"Envoy /tap returned HTTP {response.status}: {message}")
         except (OSError, RuntimeError):
-            if time.monotonic() >= deadline:
-                raise
-            time.sleep(1)
+            if shutdown_requested.wait(1):
+                raise ShutdownRequested
 
 
 def append_received_data(trace, stream_path):
@@ -323,22 +354,22 @@ def publish_connection(publisher, trace_id, path, chunk_bytes=KAFKA_CHUNK_BYTES)
         }
     )
 
-def capture_start_expired(started, last_activity, wait_msec, now=None):
-    if last_activity is not None:
-        return False
-    now = time.monotonic() if now is None else now
-    return now - started >= wait_msec / 1000
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--admin-url", required=True)
     parser.add_argument("--config-id", required=True)
     parser.add_argument("--tap-directory", type=Path, required=True)
     parser.add_argument("--decoded-directory", type=Path, required=True)
-    parser.add_argument("--quiet-msec", type=int, required=True)
-    parser.add_argument("--wait-before-start-msec", type=int, required=True)
-    parser.add_argument("--max-wait-msec", type=int, required=True)
+    parser.add_argument(
+        "--wait-for-next-tap-before-finish-msec",
+        type=optional_wait_msec,
+        required=True,
+    )
+    parser.add_argument(
+        "--wait-for-first-tap-before-finish-msec",
+        type=optional_wait_msec,
+        required=True,
+    )
     parser.add_argument("--max-buffered-rx-bytes", type=int, default=16777216)
     parser.add_argument("--retain-raw-taps", action="store_true")
     parser.add_argument("--kafka-brokers", required=True)
@@ -347,10 +378,6 @@ def main():
     parser.add_argument("--capture-id", required=True)
     parser.add_argument("--ready-file", type=Path)
     args = parser.parse_args()
-    if args.wait_before_start_msec < 1:
-        parser.error("--wait-before-start-msec must be positive")
-    if args.max_wait_msec < args.wait_before_start_msec:
-        parser.error("--max-wait-msec must not be shorter than --wait-before-start-msec")
     args.tap_directory.mkdir(parents=True, exist_ok=True)
     args.decoded_directory.mkdir(parents=True, exist_ok=True)
     spool_directory = args.decoded_directory / ".spool"
@@ -364,84 +391,123 @@ def main():
         # drain_all supplies the bounded process-level shutdown deadline.
         "message.timeout.ms": 0,
     })
-    connection, response = subscribe(args)
     publisher = BufferedEventPublisher(
         producer, args.kafka_topic, args.capture_id
     )
+    shutdown_requested = threading.Event()
+
+    def request_shutdown(_signum, _frame):
+        shutdown_requested.set()
+
+    signal.signal(signal.SIGHUP, request_shutdown)
+    signal.signal(signal.SIGINT, request_shutdown)
+    signal.signal(signal.SIGQUIT, request_shutdown)
+    signal.signal(signal.SIGTERM, request_shutdown)
+    try:
+        connection, response = subscribe(args, shutdown_requested)
+    except ShutdownRequested:
+        publisher.publish({"type": "capture_complete"})
+        publisher.drain_all(args.kafka_delivery_timeout_seconds)
+        return 0
     trace_reader = StreamingJsonTraceReader(response)
     trace_pump = TapStreamPump(trace_reader)
     trace_pump.start()
     if args.ready_file:
         args.ready_file.touch()
-    started = time.monotonic()
-    last_activity = None
     active_trace_ids = set()
     traces_with_data = set()
-    start_timed_out = False
-    try:
-        while time.monotonic() - started < args.max_wait_msec / 1000:
+    capture_failed = False
+
+    def capture_trace(trace):
+        trace_id, closed = trace_id_and_closed(trace)
+        active_trace_ids.add(trace_id)
+        stream_path = spool_directory / f"connection_{trace_id}.stream"
+        received_data = append_received_data(trace, stream_path)
+        if args.retain_raw_taps:
+            raw_path = args.tap_directory / f"connection_{trace_id}.pb"
+            payload = trace.SerializeToString()
+            with raw_path.open("ab") as raw_output:
+                raw_output.write(encode_varint(len(payload)) + payload)
+
+        if received_data:
+            traces_with_data.add(trace_id)
+        if closed:
+            if trace_id in traces_with_data:
+                destination = args.decoded_directory / f"connection_{trace_id}.log"
+                published_path = finalize_stream(stream_path, destination)
+                publish_connection(publisher, trace_id, published_path)
+                published_path.unlink()
+                traces_with_data.remove(trace_id)
+            else:
+                stream_path.unlink(missing_ok=True)
+            active_trace_ids.remove(trace_id)
+
+    def next_trace(timeout):
+        publisher.drain_available()
+        trace = trace_pump.get(timeout=timeout)
+        if trace is None:
+            raise RuntimeError("Envoy closed the streaming admin tap")
+        capture_trace(trace)
+
+    def wait_for_first_trace():
+        waiting_since = time.monotonic()
+        start_timed_out = False
+        while not (shutdown_requested.is_set() or start_timed_out):
+            timeout, start_timed_out = next_wait(
+                args.wait_for_first_tap_before_finish_msec, waiting_since
+            )
+            if start_timed_out:
+                continue
             try:
-                # Retry application-buffered events first on every capture
-                # iteration, but never block reading Envoy on Kafka recovery.
-                publisher.drain_available()
-                try:
-                    trace = trace_pump.get(timeout=1)
-                except queue.Empty as error:
-                    raise TimeoutError from error
-                if trace is None:
-                    raise RuntimeError("Envoy closed the streaming admin tap")
-                trace_id, closed = trace_id_and_closed(trace)
-                active_trace_ids.add(trace_id)
+                next_trace(timeout)
+                return False
+            except queue.Empty:
+                pass
+        return start_timed_out
 
-                # JSON-to-protobuf conversion happens while the admin response
-                # is live. Only reconstructed downstream bytes are spooled.
-                stream_path = spool_directory / f"connection_{trace_id}.stream"
-                received_data = append_received_data(trace, stream_path)
-                if args.retain_raw_taps:
-                    raw_path = args.tap_directory / f"connection_{trace_id}.pb"
-                    payload = trace.SerializeToString()
-                    with raw_path.open("ab") as raw_output:
-                        raw_output.write(encode_varint(len(payload)) + payload)
+    def wait_for_next_trace():
+        waiting_since = time.monotonic()
+        while not shutdown_requested.is_set():
+            timeout, wait_finished = next_wait(
+                args.wait_for_next_tap_before_finish_msec, waiting_since
+            )
+            if wait_finished:
+                return
+            try:
+                next_trace(timeout)
+                waiting_since = time.monotonic()
+            except queue.Empty:
+                pass
 
-                if received_data:
-                    traces_with_data.add(trace_id)
-                    last_activity = time.monotonic()
-                if closed:
-                    if trace_id in traces_with_data:
-                        destination = args.decoded_directory / f"connection_{trace_id}.log"
-                        published_path = finalize_stream(stream_path, destination)
-                        publish_connection(publisher, trace_id, published_path)
-                        published_path.unlink()
-                        traces_with_data.remove(trace_id)
-                    else:
-                        stream_path.unlink(missing_ok=True)
-                    active_trace_ids.remove(trace_id)
-                if capture_start_expired(
-                    started, last_activity, args.wait_before_start_msec
-                ):
-                    start_timed_out = True
-                    break
-            except TimeoutError:
-                now = time.monotonic()
-                if last_activity is None:
-                    if capture_start_expired(
-                        started, last_activity, args.wait_before_start_msec, now
-                    ):
-                        start_timed_out = True
-                        break
-                    continue
-                if now - last_activity >= args.quiet_msec / 1000:
-                    break
-        else:
-            raise TimeoutError("timed out waiting for tapped traffic to become quiet")
+    def capture_until_finished():
+        start_timed_out = wait_for_first_trace()
+        if start_timed_out or shutdown_requested.is_set():
+            return start_timed_out
+        wait_for_next_trace()
+        return False
+
+    try:
+        start_timed_out = capture_until_finished()
     except BaseException:
-        # Preserve every event accepted before a capture-side failure. This is
-        # also the max-capture-timeout path.
+        capture_failed = True
+        # Preserve every event accepted before a capture-side failure.
         publisher.drain_all(args.kafka_delivery_timeout_seconds)
         raise
     finally:
         trace_pump.stop(connection, response)
         connection.close()
+        if shutdown_requested.is_set() and not capture_failed:
+            # The reader may already have decoded records before SIGTERM was
+            # observed by the main loop. Include that bounded queue in the
+            # capture before finalizing its partial streams.
+            while True:
+                try:
+                    trace = trace_pump.get(timeout=0)
+                except queue.Empty:
+                    break
+                if trace is None:
+                    break
+                capture_trace(trace)
 
     if start_timed_out:
         for stream_path in spool_directory.glob("*.stream"):
@@ -449,7 +515,7 @@ def main():
         spool_directory.rmdir()
         publisher.publish({
             "type": "capture_start_timeout",
-            "wait_msec": args.wait_before_start_msec,
+            "wait_msec": args.wait_for_first_tap_before_finish_msec,
             "exit_code": CAPTURE_START_TIMEOUT_EXIT_CODE,
         })
         publisher.drain_all(args.kafka_delivery_timeout_seconds)
