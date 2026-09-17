@@ -9,10 +9,10 @@ to `TraceWrapper` messages, groups
 transport reads by connection, reconstructs syslog records, and publishes
 bounded `connection_log_chunk` events followed by `connection_log_complete` to
 Kafka. After the bounded-batch tap quiet interval it
-publishes `capture_complete`. If no downstream data arrives during
-`WAIT_MSEC_BEFORE_START`, it publishes `capture_start_timeout` and exits with
-code `10`. Other fatal capture errors are published as `capture_failed` by
-bootstrap.
+publishes `capture_complete`. If no tap record arrives during
+`WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC`, it publishes `capture_start_timeout`
+and exits with code `10`. Other fatal capture errors are published as
+`capture_failed` by bootstrap.
 
 The standalone analyzer is `../log_event_aggregator`. Kafka
 is the only data-plane contract between the two services; neither service reads
@@ -29,9 +29,9 @@ the other's runtime filesystem.
 | `KAFKA_DELIVERY_TIMEOUT_SECONDS` | `120` | Final drain deadline after capture ends or fails. |
 | `KAFKA_TOPIC` | `test-capture-events` | Capture event topic. |
 | `CAPTURE_ID` | `functional-test` | Bounded capture identity and Kafka record key. |
-| `WAIT_MSEC_BEFORE_START` | `60000` | Maximum wait for the first downstream capture bytes. |
-| `WAIT_MSEC_UNTIL_FINISH` | `15000` | Decoded tap-data quiet interval after capture has started. |
-| `MAX_WAIT_MSEC_UNTIL_FINISH` | `900000` | Capture deadline. |
+| `WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC` | `60000` | Maximum wait for the first tap record; empty or `0` waits forever. |
+| `WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC` | `15000` | Tap-record quiet interval after capture has started; empty or `0` waits forever. |
+| `MAX_WAIT_MSEC_UNTIL_FINISH` | unset | Optional container lifetime. A shell watchdog sends SIGTERM; it is not part of the Python capture algorithm. |
 | `RETAIN_RAW_TAPS` | `false` | Retain diagnostic protobuf tap files locally. |
 
 See [the event contract](EVENT_SCHEMA.md) and the subsystem
@@ -49,13 +49,23 @@ keeping every active stream in RAM would be unbounded. The finalized log is
 published to Kafka and immediately removed. Set `RETAIN_RAW_TAPS=true` only for
 diagnostics or replay experiments.
 
-Traffic activity is the arrival of any non-empty decoded downstream tap data.
-The subscriber updates only an activity timestamp; it does not count bytes or
-poll Envoy's listener-wide RX statistics. A dedicated reader thread continuously
-drains the buffered HTTP response, so socket-readiness checks cannot overlook
-trace objects already held by Python's HTTP buffering layer. On every exit
-path, shutdown interrupts the blocking socket read and joins the reader before
+The subscriber first waits `WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC` for any tap
+record. Once a record arrives, a separate loop waits
+`WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC` for each next record, restarting that
+quiet interval on every arrival. It does not count bytes or poll Envoy's
+listener-wide RX statistics. A dedicated reader thread continuously drains the
+buffered HTTP response, so socket-readiness checks cannot overlook trace
+objects already held by Python's HTTP buffering layer. On every exit path,
+shutdown interrupts the blocking socket read and joins the reader before
 Python interpreter teardown; no daemon reader is left using buffered I/O.
+
+`MAX_WAIT_MSEC_UNTIL_FINISH` is enforced outside Python by the lifecycle
+watchdog. When configured, the watchdog sends SIGTERM after that container
+lifetime. External SIGHUP, SIGINT, SIGQUIT, and SIGTERM follow the same path:
+capture stops, partial streams are finalized, all queued events are drained to
+Kafka, and only then does the subscriber exit. SIGKILL and SIGSTOP cannot be
+caught. When the variable is empty or unset, no watchdog is started and the
+subscriber has no lifetime limit.
 
 ## Broker outage behavior
 
