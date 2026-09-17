@@ -23,6 +23,7 @@ COPY common/images/test_aggregator_image/log_aggregator.py /package/log_aggregat
 COPY common/images/test_aggregator_image/log_watcher_service.sh /package/log_watcher_service.sh
 COPY common/images/test_aggregator_image/tap_watcher_service.sh /package/tap_watcher_service.sh
 COPY common/images/test_aggregator_image/decode_envoy_tap.py /package/decode_envoy_tap.py
+COPY common/images/test_aggregator_image/aggregate_connection_logs.py /package/aggregate_connection_logs.py
 COPY common/shell_utils/ssh.sh /package/ssh.sh
 
 RUN dos2unix /package/* && chmod +x /package/*.sh

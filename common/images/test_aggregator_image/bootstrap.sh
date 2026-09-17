@@ -6,9 +6,10 @@ echo "${HOSTNAME}"
 
 TAP_PATH=/logs/taps
 DECODED_LOG_PATH=/logs/syslog-streams
+CONNECTION_LOG_BACKUP_PATH=/logs/syslog-connections
 LOG_AGGREGATED_RESULT_PATH=/logs/aggregator
 
-for path in "${TAP_PATH}" "${DECODED_LOG_PATH}" "${LOG_AGGREGATED_RESULT_PATH}"; do
+for path in "${TAP_PATH}" "${DECODED_LOG_PATH}" "${CONNECTION_LOG_BACKUP_PATH}" "${LOG_AGGREGATED_RESULT_PATH}"; do
     if [[ -d "${path}" ]]; then
         rm -rf "${path}"
     fi
@@ -52,6 +53,7 @@ termination_handler() {
     echo "- ${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
     echo "- raw Envoy taps: ${TAP_PATH}"
     echo "- reconstructed syslog streams: ${DECODED_LOG_PATH}"
+    echo "- per-connection syslog backups: ${CONNECTION_LOG_BACKUP_PATH}"
 
     if [[ "${result}" != 0 ]]; then
         echo "================================================================="
@@ -93,7 +95,8 @@ sed -i "s/DOWNSTREAM_SYSLOG_HOSTNAME/${DOWNSTREAM_SYSLOG_HOSTNAME}/" /etc/envoy/
     "${WAIT_MSEC_UNTIL_FINISH}" \
     "${LOG_AGGREGATED_RESULT_PATH}" \
     "${MAX_WAIT_MSEC_UNTIL_FINISH:-900000}" \
-    "http://127.0.0.1:${ENVOY_ADMIN_PORT}" &
+    "http://127.0.0.1:${ENVOY_ADMIN_PORT}" \
+    "${CONNECTION_LOG_BACKUP_PATH}" &
 tap_watcher_pid=$!
 
 watcher_start_second=$SECONDS

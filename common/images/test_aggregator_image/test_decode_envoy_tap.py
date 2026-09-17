@@ -37,6 +37,15 @@ def streamed_close_message():
     return streamed_event_message(event)
 
 
+def streamed_connection_message(source_ip, *, trace_id=1):
+    trace = wrapper_pb2.TraceWrapper()
+    segment = trace.socket_streamed_trace_segment
+    segment.trace_id = trace_id
+    segment.connection.remote_address.socket_address.address = source_ip
+    payload = trace.SerializeToString()
+    return encode_varint32(len(payload)) + payload
+
+
 def run_decoder(
     tmp_path,
     chunks,
@@ -151,6 +160,48 @@ def test_decoder_names_output_from_docker_syslog_tag(tmp_path):
     assert result.returncode == 0, result.stderr
     assert not output_file.exists()
     assert renamed_output.read_bytes() == first + b"\n" + second + b"\n"
+
+
+def test_decoder_prefers_hostname_for_producer_identity(tmp_path):
+    record = b"<30>Sep 14 11:13:13 readable-host service-tester[7]: passed"
+    result, output_file = run_decoder(
+        tmp_path,
+        [record],
+        name_by_producer=True,
+    )
+
+    renamed_output = tmp_path / "readable-host__connection_1.log"
+    assert result.returncode == 0, result.stderr
+    assert not output_file.exists()
+    assert renamed_output.read_bytes() == record + b"\n"
+
+
+def test_decoder_falls_back_to_remote_ip_without_hostname(tmp_path):
+    record = b"<30>Sep 14 11:13:13 service-tester[7]: passed"
+    tap_file = tmp_path / "connection_1.pb"
+    output_file = tmp_path / "connection_1.log"
+    tap_file.write_bytes(
+        streamed_connection_message("10.42.0.17")
+        + streamed_read_message(record)
+        + streamed_close_message()
+    )
+
+    script = Path(__file__).with_name("decode_envoy_tap.py")
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            str(tap_file),
+            str(output_file),
+            "--name-by-producer",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    renamed_output = tmp_path / "10.42.0.17__connection_1.log"
+    assert result.returncode == 0, result.stderr
+    assert renamed_output.read_bytes() == record + b"\n"
 
 
 def test_decoder_ignores_non_tester_health_check_connection(tmp_path):
