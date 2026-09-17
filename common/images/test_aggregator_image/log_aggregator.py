@@ -84,7 +84,6 @@ class LogParser:
             print(f"not a valid logger record: {raw_record}\nError {e}\n")
 
     def collect_statistic(self):
-        test_amount_regex = re.compile(r"^collected (\d+) item[s]?$")
         test_summary_regex = re.compile(r"^=+\s+(?P<summary>.*?)\s+in\s+.*=+$")
         test_outcome_regex = re.compile(
             r"(?:^|,\s+)(\d+)\s+(passed|failed|skipped)(?=,|\s+in\s+|$)"
@@ -93,17 +92,19 @@ class LogParser:
         if len(self.records) == 0:
             return stat
         for r in self.records:
-            amount_found = test_amount_regex.match(r.data)
-            if amount_found:
-                stat.total += int(amount_found.group(1))
-                continue
-
             summary_found = test_summary_regex.match(r.data)
             if summary_found:
                 for count, outcome in test_outcome_regex.findall(
                     summary_found.group("summary")
                 ):
-                    setattr(stat, outcome, getattr(stat, outcome) + int(count))
+                    count = int(count)
+                    # A tester may invoke pytest more than once. Collection
+                    # lines are session-local and may be absent from the
+                    # reconstructed stream, so completed terminal summaries
+                    # are the single source of truth for both totals and
+                    # outcomes.
+                    stat.total += count
+                    setattr(stat, outcome, getattr(stat, outcome) + count)
 
         if stat.failed != 0:
             stat.error_log = "\n".join([f.data for f in self.records])

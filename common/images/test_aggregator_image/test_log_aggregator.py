@@ -98,3 +98,42 @@ def test_pytest_summary_counts_every_combination_of_supported_outcomes(tmp_path)
         assert 'Statistic of "tester" is inconsistent' not in result.stderr
         should_succeed = "passed" in outcomes and "failed" not in outcomes
         assert (result.returncode == 0) == should_succeed
+
+
+def test_multiple_pytest_sessions_use_completed_summaries_for_totals(tmp_path):
+    result = run_aggregator(
+        tmp_path,
+        (
+            "<27>Sep 13 19:43:49 tester[1]: collected 2 items\n"
+            "<27>Sep 13 19:43:50 tester[1]: ===== 2 passed in 8.00s =====\n"
+            # A collection record may be lost when a fragmented TCP/syslog
+            # stream is reconstructed; its completed summary is sufficient.
+            "<27>Sep 13 19:47:54 tester[1]: ===== 3 passed in 244.06s (0:04:04) =====\n"
+        ).encode(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        'Statistic of "tester" - total: 5, failed: 0, passed: 5, skipped: 0'
+        in result.stdout
+    )
+    assert "All tests PASSED: (5/5)" in result.stdout
+
+
+def test_collection_lines_from_incomplete_sessions_do_not_mix_counters(tmp_path):
+    result = run_aggregator(
+        tmp_path,
+        (
+            "<27>Sep 13 19:43:49 tester[1]: collected 5 items\n"
+            "<27>Sep 13 19:43:50 tester[1]: ===== 1 skipped in 0.11s =====\n"
+            "<27>Sep 13 19:43:51 tester[1]: collected 4 items\n"
+            "<27>Sep 13 19:49:00 tester[1]: ===== 2 passed in 377.16s (0:06:17) =====\n"
+        ).encode(),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        'Statistic of "tester" - total: 3, failed: 0, passed: 2, skipped: 1'
+        in result.stdout
+    )
+    assert 'Statistic of "tester" is inconsistent' not in result.stderr
