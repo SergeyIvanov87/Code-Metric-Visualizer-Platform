@@ -118,6 +118,12 @@ jobs:
       run: rm -rf ${GITHUB_WORKSPACE}/log && mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
     - name: All together functional tests
       run: EXIT_STATUS=0 && docker compose -f compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
+    - name: Preserve test aggregator diagnostics
+      if: ${{ always() }}
+      uses: ./.github/actions/upload-test-aggregator-artifacts
+      with:
+        compose-file: compose-functional.test.yaml
+        artifact-name: ${{ github.job }}-envoy-taps-${{ github.run_attempt }}
 
   analysis_use-case:
 
@@ -166,6 +172,12 @@ jobs:
       run: PROJECT_PATH=${GITHUB_WORKSPACE}/MRUVocabulary docker compose -f compose-analysis.yaml stop -t 30
     - name: Check filesystem API artefacts attempt 2
       run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
+    - name: Preserve test aggregator diagnostics
+      if: ${{ always() }}
+      uses: ./.github/actions/upload-test-aggregator-artifacts
+      with:
+        compose-file: compose-analysis.integrational-test.yaml
+        artifact-name: ${{ github.job }}-envoy-taps-${{ github.run_attempt }}
 
   analysis_use-case_http_decoupled:
 
@@ -228,6 +240,12 @@ jobs:
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic.yaml stop -t 30
     - name: Check filesystem API artefacts
       run: ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && cat ${GITHUB_WORKSPACE}/log/messages && exit -1; fi
+    - name: Preserve test aggregator diagnostics
+      if: ${{ always() }}
+      uses: ./.github/actions/upload-test-aggregator-artifacts
+      with:
+        compose-file: compose-analysis.integrational-test.yaml
+        artifact-name: ${{ github.job }}-envoy-taps-${{ github.run_attempt }}
 
   analytic_use-case_http_decoupled:
 
@@ -254,3 +272,9 @@ jobs:
       run: EXIT_STATUS=0 && sleep 30 && docker compose -f compose-analytic-http-api-integrational-test.yaml up --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
     - name: Stop Analytic UC attempt
       run: PROJECT_URL=https://github.com/SergeyIvanov87/MRUVocabulary.git PROJECT_BRANCH=main docker compose -f compose-analytic-http-api.yaml stop
+    - name: Preserve test aggregator diagnostics
+      if: ${{ always() }}
+      uses: ./.github/actions/upload-test-aggregator-artifacts
+      with:
+        compose-file: compose-analytic-http-api-integrational-test.yaml
+        artifact-name: ${{ github.job }}-envoy-taps-${{ github.run_attempt }}

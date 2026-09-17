@@ -15,8 +15,8 @@ static_resources:
       filter_chains:
         - transport_socket:
             # Tap the downstream side so every Docker syslog connection gets
-            # its own trace file. The explicit receive limit prevents larger
-            # syslog reads from being marked truncated while output is streamed.
+            # its own trace file. Stream every read event immediately and only
+            # decode traces that contain Envoy's connection-close event.
             name: envoy.transport_sockets.tap
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.transport_sockets.tap.v3.Tap

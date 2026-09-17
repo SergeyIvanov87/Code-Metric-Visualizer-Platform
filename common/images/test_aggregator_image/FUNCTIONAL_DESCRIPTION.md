@@ -71,11 +71,13 @@ watcher on `ENVOY_ADMIN_PORT`; it is not published outside the container.
 The downstream tap transport socket uses:
 
 - `any_match: true` to capture every connection;
-- streamed `PROTO_BINARY_LENGTH_DELIMITED` output;
+- streamed `PROTO_BINARY_LENGTH_DELIMITED` output, with every socket event
+  submitted as its own segment by the pinned Envoy build;
 - one file per connection under
   `/logs/taps/connection_<envoy-connection-id>.pb`;
-- a configurable receive-buffer limit controlled by `MAX_BUFFERED_RX_BYTES`,
-  defaulting to 16 MiB (`16777216` bytes).
+- a configurable per-read capture limit controlled by `MAX_BUFFERED_RX_BYTES`,
+  defaulting to the protobuf `uint32` maximum (`4294967295`) so a streamed read
+  cannot be shortened by the TAP limit.
 
 The raw connection ID is retained for correlation with Envoy diagnostics and
 to prevent collisions when one container reconnects.
@@ -122,8 +124,9 @@ The decoder:
    `xds-protos`.
 2. Extracts only downstream socket `read` events. These are bytes sent by the
    logging container to the aggregator.
-3. Concatenates binary `as_bytes` bodies in trace order, reconstructing the TCP
-   byte stream.
+3. Validates that streamed files contain a single trace ID and a connection-close
+   event, then concatenates read bodies in emitted order to reconstruct the TCP
+   byte stream. Buffered traces remain supported for existing diagnostics.
 4. Rejects a body marked `truncated`; incomplete evidence must not be used to
    calculate test totals. The error reports the effective
    `max_buffered_rx_bytes` value and recommends increasing
@@ -202,6 +205,35 @@ When all checks pass, stdout contains `All tests PASSED: (passed/total)`.
 | `/logs/aggregator/result_log_stderr` | Skips, failed/inconsistent statistics, watcher failures, or decoder failures. |
 | `/logs/aggregator/result` | Numeric process result written by the watcher. |
 
+## GitHub Actions artifacts
+
+Jobs that run `test_aggregator` execute the local
+`.github/actions/upload-test-aggregator-artifacts` action with `always()`, so
+diagnostics are retained for successful and failed jobs. The artifact is named
+`<job-name>-envoy-taps-<run-attempt>` and is available from the workflow run's
+**Artifacts** section for 14 days.
+
+It can also be downloaded with the GitHub CLI:
+
+```bash
+gh run download <run-id> \
+  --name <job-name>-envoy-taps-<run-attempt> \
+  --dir test-aggregator-artifacts
+```
+
+The action copies the stopped or running aggregator container's complete
+`/logs` volume. An extracted artifact therefore contains the original protobuf
+files under `taps/`, reconstructed records under `syslog-streams/`, aggregation
+results under `aggregator/`, the resolved Compose configuration, container
+inspection data, and GitHub run metadata. Raw traces can be decoded after
+installing the image's pinned `xds-protos` version:
+
+```bash
+python3 common/images/test_aggregator_image/decode_envoy_tap.py \
+  test-aggregator-artifacts/taps/connection_<id>.pb \
+  connection_<id>.log --name-by-producer
+```
+
 Success is `0`. Python's `-1` failure result appears to the shell and Docker
 as `255`; watcher and decoding infrastructure failures also use `255`.
 
@@ -219,7 +251,7 @@ automatically on success, test failure, or infrastructure failure.
 | `WAIT_MSEC_UNTIL_FINISH` | `15000` | Required interval with no downstream bytes before capture shutdown. |
 | `MAX_WAIT_MSEC_UNTIL_FINISH` | `900000` | Hard limit for the capture phase. |
 | `ENVOY_ADMIN_PORT` | `9901` | Loopback-only Envoy admin port used to read the downstream RX-byte counter. |
-| `MAX_BUFFERED_RX_BYTES` | `16777216` | Maximum downstream tap bytes buffered by Envoy; 16 MiB by default. |
+| `MAX_BUFFERED_RX_BYTES` | `4294967295` | Per-read streamed TAP capture limit; defaults to the protobuf `uint32` maximum to prevent limit-based truncation. |
 | `UPSTREAM_AGGREGATOR_TCP_PORT` | `13601` | Envoy listener port receiving Docker syslog traffic. |
 | `HOST_UPSTREAM_AGGREGATOR_TCP_PORT` | `13601` | Host-published TCP port. |
 | `DOWNSTREAM_SYSLOG_HOSTNAME` | `syslog-ng` | Compose-network DNS name of the downstream syslog service. |
@@ -241,6 +273,8 @@ automatically on success, test failure, or infrastructure failure.
   and all tap fields are parsed by the generated bindings from `xds-protos`.
 - A trace marked truncated is treated as an infrastructure error rather than
   producing potentially incorrect statistics.
-- `MAX_BUFFERED_RX_BYTES` is finite. A larger pre-match buffered stream can be
-  marked truncated and will fail decoding with the effective limit and
-  remediation included in the error.
+- Operators can lower `MAX_BUFFERED_RX_BYTES`, but a read larger than the
+  configured value is marked truncated and fails decoding. The default is the
+  largest value accepted by Envoy's `UInt32Value`; resource exhaustion, disk
+  errors, or premature process termination remain possible and are not TAP
+  truncation.

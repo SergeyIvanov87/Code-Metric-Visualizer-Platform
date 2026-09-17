@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from envoy.data.tap.v3 import wrapper_pb2
+from envoy.data.tap.v3 import transport_pb2, wrapper_pb2
 
 
 def encode_varint32(value):
@@ -15,14 +15,26 @@ def encode_varint32(value):
     return bytes(encoded)
 
 
-def streamed_read_message(chunk, *, truncated=False):
+def streamed_event_message(event, *, trace_id=1):
     trace = wrapper_pb2.TraceWrapper()
     segment = trace.socket_streamed_trace_segment
-    segment.trace_id = 1
-    segment.event.read.data.as_bytes = chunk
-    segment.event.read.data.truncated = truncated
+    segment.trace_id = trace_id
+    segment.event.CopyFrom(event)
     payload = trace.SerializeToString()
     return encode_varint32(len(payload)) + payload
+
+
+def streamed_read_message(chunk, *, truncated=False):
+    event = transport_pb2.SocketEvent()
+    event.read.data.as_bytes = chunk
+    event.read.data.truncated = truncated
+    return streamed_event_message(event)
+
+
+def streamed_close_message():
+    event = transport_pb2.SocketEvent()
+    event.closed.SetInParent()
+    return streamed_event_message(event)
 
 
 def run_decoder(
@@ -31,13 +43,19 @@ def run_decoder(
     *,
     name_by_producer=False,
     truncated=False,
-    max_buffered_rx_bytes="16777216",
+    max_buffered_rx_bytes="4294967295",
 ):
     tap_file = tmp_path / "connection_1.pb"
     output_file = tmp_path / "connection_1.log"
     tap_file.write_bytes(
         b"".join(
-            streamed_read_message(chunk, truncated=truncated) for chunk in chunks
+            [
+                *(
+                    streamed_read_message(chunk, truncated=truncated)
+                    for chunk in chunks
+                ),
+                streamed_close_message(),
+            ]
         )
     )
 
@@ -76,6 +94,48 @@ def test_decoder_reassembles_chunks_before_framing_syslog(tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert output_file.read_bytes() == first + b"\n" + second + b"\n"
+
+
+def test_decoder_accepts_complete_streamed_connection(tmp_path):
+    first = b"<30>Sep 14 11:13:13 host service-tester[7]: collected 2 items"
+    second = (
+        b"<30>Sep 14 11:13:14 host service-tester[7]: "
+        b"================ 2 passed in 0.01s ================"
+    )
+    tap_file = tmp_path / "connection_1.pb"
+    output_file = tmp_path / "connection_1.log"
+    tap_file.write_bytes(
+        streamed_read_message(first[:17])
+        + streamed_read_message(first[17:] + second)
+        + streamed_close_message()
+    )
+
+    script = Path(__file__).with_name("decode_envoy_tap.py")
+    result = subprocess.run(
+        [sys.executable, str(script), str(tap_file), str(output_file)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert output_file.read_bytes() == first + b"\n" + second + b"\n"
+
+
+def test_decoder_rejects_incomplete_streamed_connection(tmp_path):
+    tap_file = tmp_path / "connection_1.pb"
+    output_file = tmp_path / "connection_1.log"
+    tap_file.write_bytes(streamed_read_message(b"tester output"))
+
+    script = Path(__file__).with_name("decode_envoy_tap.py")
+    result = subprocess.run(
+        [sys.executable, str(script), str(tap_file), str(output_file)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "has no connection-close event" in result.stderr
+    assert not output_file.exists()
 
 
 def test_decoder_names_output_from_docker_syslog_tag(tmp_path):
