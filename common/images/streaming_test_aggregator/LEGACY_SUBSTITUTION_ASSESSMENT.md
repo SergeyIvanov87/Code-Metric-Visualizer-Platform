@@ -39,9 +39,11 @@ exit describe one launch.
 2. Key every execution event by that `CAPTURE_ID`.
 3. Start broker and aggregator, establish the tap subscription, then launch
    testers.
-4. Configure `WAIT_MSEC_BEFORE_START` for the longest intended startup delay.
-5. Configure `WAIT_MSEC_UNTIL_FINISH` beyond the longest legitimate log gap,
-   and the aggregator deadline beyond the subscriber's capture/drain window.
+4. Configure `WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC` for the longest intended
+   startup delay.
+5. Configure `WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC` beyond the longest
+   legitimate log gap, and the aggregator deadline beyond the subscriber's
+   capture/drain window.
 6. Treat `log_event_aggregator` as the authoritative exit-status service.
 7. Collect `/logs/aggregator` before teardown.
 8. Keep the permanent Envoy admin interface private.

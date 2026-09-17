@@ -93,10 +93,11 @@ The subscriber parses Streaming Admin Tap data, reconstructs syslog streams,
 publishes ordered `connection_log` and terminal events, buffers temporary
 broker failures, and exits after the capture completes or fails.
 
-`WAIT_MSEC_BEFORE_START` bounds the wait for the first decoded log data.
-`WAIT_MSEC_UNTIL_FINISH` starts only after capture activity and defines the
-quiet boundary for the finite launch. Decoded tap delivery—not Envoy's
-listener-wide RX counter—is the activity signal.
+`WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC` bounds the wait for the first tap
+record. `WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC` starts only after that record
+and defines the quiet boundary for the finite launch. Tap-record delivery—not
+Envoy's listener-wide RX counter—is the activity signal. An empty value or
+zero disables the corresponding deadline.
 
 Quiet time is a pragmatic execution boundary, not proof that permanent Envoy
 closed every connection. The controller must configure it longer than the

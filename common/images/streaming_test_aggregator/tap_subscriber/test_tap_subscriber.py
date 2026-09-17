@@ -24,6 +24,25 @@ def test_encode_varint_boundaries():
     assert tap.encode_varint(0xFFFFFFFF) == bytes([0xff, 0xff, 0xff, 0xff, 0x0f])
 
 
+@pytest.mark.parametrize("value", ["", "0"])
+def test_empty_and_zero_wait_intervals_have_no_deadline(value):
+    wait_msec = tap.optional_wait_msec(value)
+
+    assert tap.next_wait(wait_msec, waiting_since=10, now=1000) == (1, False)
+
+
+def test_wait_interval_reports_remaining_time_and_expiry():
+    assert tap.next_wait(1500, waiting_since=10, now=10.25) == (1, False)
+    assert tap.next_wait(1500, waiting_since=10, now=11.25) == (0.25, False)
+    assert tap.next_wait(1500, waiting_since=10, now=11.5) == (0, True)
+
+
+@pytest.mark.parametrize("value", ["-1", "not-a-number"])
+def test_wait_interval_rejects_invalid_values(value):
+    with pytest.raises(tap.argparse.ArgumentTypeError):
+        tap.optional_wait_msec(value)
+
+
 def test_reads_adjacent_streaming_admin_json_traces():
     first = tap.wrapper_pb2.TraceWrapper()
     first.socket_streamed_trace_segment.trace_id = 7
@@ -228,10 +247,12 @@ def test_publishes_connection_as_bounded_ordered_chunks(tmp_path):
     assert events[-1]["chunk_count"] == 3
 
 
-def test_start_wait_applies_only_before_first_capture_data():
-    assert not tap.capture_start_expired(10.0, None, 60000, now=69.999)
-    assert tap.capture_start_expired(10.0, None, 60000, now=70.0)
-    assert not tap.capture_start_expired(10.0, 20.0, 60000, now=1000.0)
+def test_subscription_stops_before_connecting_when_shutdown_is_requested():
+    shutdown_requested = threading.Event()
+    shutdown_requested.set()
+
+    with pytest.raises(tap.ShutdownRequested):
+        tap.subscribe(types.SimpleNamespace(admin_url="http://envoy:9901"), shutdown_requested)
 
 
 class RecoveringProducer(FakeProducer):
