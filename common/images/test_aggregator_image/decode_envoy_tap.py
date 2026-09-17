@@ -117,33 +117,11 @@ def events_from_trace(trace):
     raise ValueError(f"unsupported Envoy tap trace type: {trace_type}")
 
 
-def connection_source_ip(trace):
-    """Return the remote socket IP recorded by Envoy, when present."""
-    trace_type = trace.WhichOneof("trace")
-    if trace_type == "socket_buffered_trace":
-        connection = trace.socket_buffered_trace.connection
-    elif trace_type == "socket_streamed_trace_segment":
-        connection = trace.socket_streamed_trace_segment.connection
-    else:
-        return None
-
-    if not connection.HasField("remote_address"):
-        return None
-    address = connection.remote_address
-    if address.WhichOneof("address") != "socket_address":
-        return None
-    return address.socket_address.address or None
-
-
-def extract_connection(trace_data):
+def extract_downstream_bytes(trace_data):
     events = []
     streamed_trace_id = None
     streamed_closed = False
-    source_ips = []
     for trace in iter_trace_wrappers(trace_data):
-        source_ip = connection_source_ip(trace)
-        if source_ip and source_ip not in source_ips:
-            source_ips.append(source_ip)
         trace_type = trace.WhichOneof("trace")
         if trace_type == "socket_streamed_trace_segment":
             segment = trace.socket_streamed_trace_segment
@@ -170,12 +148,7 @@ def extract_connection(trace_data):
             chunk = decode_body(event.read.data)
             if chunk:
                 chunks.append(chunk)
-    if len(source_ips) > 1:
-        raise ValueError(
-            "one tap file contains multiple remote addresses: "
-            + ", ".join(source_ips)
-        )
-    return b"".join(chunks), source_ips[0] if source_ips else None
+    return b"".join(chunks)
 
 
 def frame_syslog_stream(stream):
@@ -201,39 +174,35 @@ def frame_syslog_stream(stream):
     ]
 
 
-def producer_output_path(output_file, records, source_ip=None):
-    identities = []
+def producer_output_path(output_file, records):
+    producers = []
     for record in records:
         match = SYSLOG_HEADER.match(record)
         if match is None:
             continue
-        # The RFC3164 hostname identifies the sending container more reliably
-        # than Docker's configurable tag. Envoy's remote socket IP is the
-        # fallback for header variants which omit it.
-        identity = match.group("hostname")
-        if identity is None and source_ip:
-            identity = source_ip.encode("utf-8")
-        if identity is None:
-            identity = match.group("producer")
-        identity = re.sub(
+        # Docker's syslog tag is configured as {{.Name}}, so it is the actual
+        # container producer identity. Do not use Envoy's remote address here:
+        # traffic reaching a published port can be source-NATed to the same
+        # Docker bridge gateway address for every sending container.
+        producer = re.sub(
             rb"[^A-Za-z0-9_.-]+",
             b"_",
-            identity,
+            match.group("producer"),
         ).strip(b"._")
-        if identity and identity not in identities:
-            identities.append(identity)
+        if producer and producer not in producers:
+            producers.append(producer)
 
-    if len(identities) > 1:
-        names = ", ".join(name.decode("ascii") for name in identities)
+    if len(producers) > 1:
+        names = ", ".join(name.decode("ascii") for name in producers)
         raise ValueError(
             "one Envoy connection contains records from multiple producers: "
             f"{names}"
         )
-    if not identities:
+    if not producers:
         return output_file
 
-    identity = identities[0].decode("ascii")
-    return output_file.with_name(f"{identity}__{output_file.name}")
+    producer = producers[0].decode("ascii")
+    return output_file.with_name(f"{producer}__{output_file.name}")
 
 
 def main():
@@ -243,17 +212,17 @@ def main():
     parser.add_argument(
         "--name-by-producer",
         action="store_true",
-        help="prefix the output filename with the producer hostname or IP",
+        help="prefix the output filename with the Docker syslog producer tag",
     )
     args = parser.parse_args()
 
     trace_data = args.tap_file.read_bytes()
-    stream, source_ip = extract_connection(trace_data)
+    stream = extract_downstream_bytes(trace_data)
     records = frame_syslog_stream(stream)
 
     output_file = args.output_file
     if args.name_by_producer:
-        output_file = producer_output_path(output_file, records, source_ip)
+        output_file = producer_output_path(output_file, records)
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
     temporary = output_file.with_suffix(output_file.suffix + ".tmp")

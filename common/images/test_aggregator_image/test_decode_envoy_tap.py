@@ -53,11 +53,13 @@ def run_decoder(
     name_by_producer=False,
     truncated=False,
     max_buffered_rx_bytes="4294967295",
+    source_ip=None,
 ):
     tap_file = tmp_path / "connection_1.pb"
     output_file = tmp_path / "connection_1.log"
     tap_file.write_bytes(
-        b"".join(
+        (streamed_connection_message(source_ip) if source_ip else b"")
+        + b"".join(
             [
                 *(
                     streamed_read_message(chunk, truncated=truncated)
@@ -162,7 +164,7 @@ def test_decoder_names_output_from_docker_syslog_tag(tmp_path):
     assert renamed_output.read_bytes() == first + b"\n" + second + b"\n"
 
 
-def test_decoder_prefers_hostname_for_producer_identity(tmp_path):
+def test_decoder_uses_container_tag_instead_of_shared_hostname(tmp_path):
     record = b"<30>Sep 14 11:13:13 readable-host service-tester[7]: passed"
     result, output_file = run_decoder(
         tmp_path,
@@ -170,38 +172,39 @@ def test_decoder_prefers_hostname_for_producer_identity(tmp_path):
         name_by_producer=True,
     )
 
-    renamed_output = tmp_path / "readable-host__connection_1.log"
+    renamed_output = tmp_path / "service-tester__connection_1.log"
     assert result.returncode == 0, result.stderr
     assert not output_file.exists()
     assert renamed_output.read_bytes() == record + b"\n"
 
 
-def test_decoder_falls_back_to_remote_ip_without_hostname(tmp_path):
-    record = b"<30>Sep 14 11:13:13 service-tester[7]: passed"
-    tap_file = tmp_path / "connection_1.pb"
-    output_file = tmp_path / "connection_1.log"
-    tap_file.write_bytes(
-        streamed_connection_message("10.42.0.17")
-        + streamed_read_message(record)
-        + streamed_close_message()
+def test_decoder_does_not_group_distinct_tags_by_nat_source_ip(tmp_path):
+    shared_ip = "172.18.0.1"
+    first = b"<30>Sep 14 11:13:13 first-tester[7]: passed"
+    second = b"<30>Sep 14 11:13:14 second-tester[8]: passed"
+
+    first_result, _ = run_decoder(
+        tmp_path,
+        [first],
+        name_by_producer=True,
+        source_ip=shared_ip,
+    )
+    second_result, _ = run_decoder(
+        tmp_path,
+        [second],
+        name_by_producer=True,
+        source_ip=shared_ip,
     )
 
-    script = Path(__file__).with_name("decode_envoy_tap.py")
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(script),
-            str(tap_file),
-            str(output_file),
-            "--name-by-producer",
-        ],
-        capture_output=True,
-        text=True,
-    )
-
-    renamed_output = tmp_path / "10.42.0.17__connection_1.log"
-    assert result.returncode == 0, result.stderr
-    assert renamed_output.read_bytes() == record + b"\n"
+    assert first_result.returncode == 0, first_result.stderr
+    assert second_result.returncode == 0, second_result.stderr
+    assert (
+        tmp_path / "first-tester__connection_1.log"
+    ).read_bytes() == first + b"\n"
+    assert (
+        tmp_path / "second-tester__connection_1.log"
+    ).read_bytes() == second + b"\n"
+    assert not (tmp_path / f"{shared_ip}__connection_1.log").exists()
 
 
 def test_decoder_ignores_non_tester_health_check_connection(tmp_path):

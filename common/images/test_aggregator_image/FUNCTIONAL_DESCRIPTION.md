@@ -144,10 +144,11 @@ The decoder:
 7. Ignores the RFC5424 octet-counted connection created by the container health
    check when it contains no tester data.
 8. Verifies that a connection contains at most one syslog producer.
-9. Identifies the producer by the human-readable syslog hostname, falling back
-   to Envoy's remote socket IP when the header has no hostname (and to the tag
-   only for legacy traces that contain neither), then sanitizes the identity
-   and atomically publishes the reconstructed log.
+9. Identifies the producer by Docker's syslog tag, configured as `{{.Name}}`,
+   then sanitizes the identity and atomically publishes the reconstructed log.
+   The RFC3164 hostname and Envoy remote IP are deliberately not grouping keys:
+   multiple containers can share a host, and Docker port publishing can
+   source-NAT all of them to the same bridge-gateway IP.
 
 Raw files keep their Envoy names. Per-connection backups include the producer
 identity and connection ID:
