@@ -84,43 +84,27 @@ class LogParser:
             print(f"not a valid logger record: {raw_record}\nError {e}\n")
 
     def collect_statistic(self):
-        # TODO handle this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        #  ========================= 1 failed, 5 passed in 45.09s =========================
-
-        test_amount_regex = re.compile(r"^collected (\d+) item[s]?$")
-        test_failed_regex = re.compile(r"^=+\s+(\d+)\s+failed\s+in\s+.*=+$")
-        test_failed_passed_regex = re.compile(r"^=+\s+(\d+)\s+failed,\s+(\d+)\s+passed\s+in\s+.*=+$")
-        test_passed_regex = re.compile(r"^=+\s+(\d+)\s+passed\s+in\s+.*=+$")
-        test_skipped_regex = re.compile(r"^=+\s+(\d+)\s+skipped\s+in\s+.*=+$")
+        test_summary_regex = re.compile(r"^=+\s+(?P<summary>.*?)\s+in\s+.*=+$")
+        test_outcome_regex = re.compile(
+            r"(?:^|,\s+)(\d+)\s+(passed|failed|skipped)(?=,|\s+in\s+|$)"
+        )
         stat = TestStatistic()
         if len(self.records) == 0:
             return stat
         for r in self.records:
-            amount_found = test_amount_regex.match(r.data)
-            if amount_found:
-                stat.total += int(amount_found.group(1))
-                continue
-
-            failed_found = test_failed_regex.match(r.data)
-            if failed_found:
-                stat.failed += int(failed_found.group(1))
-                continue
-
-            failed_passed_found = test_failed_passed_regex.match(r.data)
-            if failed_passed_found:
-                stat.failed += int(failed_passed_found.group(1))
-                stat.passed += int(failed_passed_found.group(2))
-                continue
-
-            passed_found = test_passed_regex.match(r.data)
-            if passed_found:
-                stat.passed += int(passed_found.group(1))
-                continue
-
-            skipped_found = test_skipped_regex.match(r.data)
-            if skipped_found:
-                stat.skipped += int(skipped_found.group(1))
-                continue
+            summary_found = test_summary_regex.match(r.data)
+            if summary_found:
+                for count, outcome in test_outcome_regex.findall(
+                    summary_found.group("summary")
+                ):
+                    count = int(count)
+                    # A tester may invoke pytest more than once. Collection
+                    # lines are session-local and may be absent from the
+                    # reconstructed stream, so completed terminal summaries
+                    # are the single source of truth for both totals and
+                    # outcomes.
+                    stat.total += count
+                    setattr(stat, outcome, getattr(stat, outcome) + count)
 
         if stat.failed != 0:
             stat.error_log = "\n".join([f.data for f in self.records])
