@@ -1,0 +1,1683 @@
+# Scoped cumulative diff for common/images/test_aggregator_image only.
+# Base: 20f756f8fd2c8f96f22c6cff1cd610b4716621a2
+# Target: main at 9eb3a0b645f3f7093e5549e3e7096383ab0d56d1 (2026-09-18)
+# Attribution source: closed pull requests carrying the repository label "log stabilization"
+# (the label corresponding to the requested "log stability" work).
+#
+# This is an ordinary cumulative unified diff. The comments before each file name every
+# labeled PR that changed that file between the base and target revisions.
+
+# PR attribution for common/images/test_aggregator_image/.env:
+# - PR #102: Use envoy tap-logs instead of tshatk dumps
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/102
+# - PR #108: Upload test_aggregator artifacts; support streamed Envoy TAP segments and increase MAX_BUFFERED_RX_BYTES
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/108
+diff --git a/common/images/test_aggregator_image/.env b/common/images/test_aggregator_image/.env
+index 863d7b5..868f556 100644
+--- a/common/images/test_aggregator_image/.env
++++ b/common/images/test_aggregator_image/.env
+@@ -1,4 +1,6 @@
+ WAIT_MSEC_UNTIL_FINISH=15000
++MAX_WAIT_MSEC_UNTIL_FINISH=900000
++MAX_BUFFERED_RX_BYTES=4294967295
+ 
+ UPSTREAM_AGGREGATOR_TCP_PORT=13601
+ HOST_UPSTREAM_AGGREGATOR_TCP_PORT=13601
+# PR attribution for common/images/test_aggregator_image/Dockerfile:
+# - PR #102: Use envoy tap-logs instead of tshatk dumps
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/102
+# - PR #108: Upload test_aggregator artifacts; support streamed Envoy TAP segments and increase MAX_BUFFERED_RX_BYTES
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/108
+# - PR #110: Aggregate Envoy tap connections into producer logs
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/110
+diff --git a/common/images/test_aggregator_image/Dockerfile b/common/images/test_aggregator_image/Dockerfile
+index 0c376d4..12981ed 100644
+--- a/common/images/test_aggregator_image/Dockerfile
++++ b/common/images/test_aggregator_image/Dockerfile
+@@ -1,5 +1,7 @@
+ FROM envoyproxy/envoy:dev-5451efd9b8f8a444431197050e45ba974ed4e9d8
+-RUN apt-get update && apt-get install -y openssh-client sshpass tshark xxd python3 python3-pyinotify dos2unix
++RUN apt-get update && apt-get install -y openssh-client sshpass python3 python3-pip python3-pyinotify curl inotify-tools dos2unix
++RUN python3 -m pip install --no-cache-dir --target=/opt/test-aggregator-python xds-protos==1.83.1
++ENV PYTHONPATH=/opt/test-aggregator-python
+ 
+ COPY common/images/test_aggregator_image/envoy.yaml /etc/envoy/envoy.yaml
+ RUN chmod go+r /etc/envoy/envoy.yaml
+@@ -19,21 +21,30 @@ RUN dos2unix /etc/bootstrap.sh
+ 
+ COPY common/images/test_aggregator_image/log_aggregator.py /package/log_aggregator.py
+ COPY common/images/test_aggregator_image/log_watcher_service.sh /package/log_watcher_service.sh
++COPY common/images/test_aggregator_image/tap_watcher_service.sh /package/tap_watcher_service.sh
++COPY common/images/test_aggregator_image/decode_envoy_tap.py /package/decode_envoy_tap.py
++COPY common/images/test_aggregator_image/aggregate_connection_logs.py /package/aggregate_connection_logs.py
+ COPY common/shell_utils/ssh.sh /package/ssh.sh
+ 
+-RUN dos2unix /package/*
++RUN dos2unix /package/* && chmod +x /package/*.sh
+ 
+ 
+ ARG WAIT_MSEC_UNTIL_FINISH=15000
+ ENV WAIT_MSEC_UNTIL_FINISH=$WAIT_MSEC_UNTIL_FINISH
+ 
++ARG ENVOY_ADMIN_PORT=9901
++ENV ENVOY_ADMIN_PORT=${ENVOY_ADMIN_PORT}
++
++ARG MAX_BUFFERED_RX_BYTES=4294967295
++ENV MAX_BUFFERED_RX_BYTES=${MAX_BUFFERED_RX_BYTES}
++
+ ARG UPSTREAM_SYSLOG_TCP_PORT=13601
+ ENV UPSTREAM_SYSLOG_TCP_PORT=${UPSTREAM_SYSLOG_TCP_PORT}
+ 
+ ARG DOWNSTREAM_SYSLOG_TCP_PORT=6601
+ ENV DOWNSTREAM_SYSLOG_TCP_PORT=${DOWNSTREAM_SYSLOG_TCP_PORT}
+ 
+-ARG DOWNSTREAM_SYSLOG_HOSTNAME=api.pmccabe_collector.syslog-ng
++ARG DOWNSTREAM_SYSLOG_HOSTNAME=syslog-ng
+ ENV DOWNSTREAM_SYSLOG_HOSTNAME=${DOWNSTREAM_SYSLOG_HOSTNAME}
+ 
+ ARG DOWNSTREAM_SSH_SECRET=syslog-ng
+# PR attribution for common/images/test_aggregator_image/FUNCTIONAL_DESCRIPTION.md:
+# - PR #102: Use envoy tap-logs instead of tshatk dumps
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/102
+# - PR #108: Upload test_aggregator artifacts; support streamed Envoy TAP segments and increase MAX_BUFFERED_RX_BYTES
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/108
+# - PR #110: Aggregate Envoy tap connections into producer logs
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/110
+diff --git a/common/images/test_aggregator_image/FUNCTIONAL_DESCRIPTION.md b/common/images/test_aggregator_image/FUNCTIONAL_DESCRIPTION.md
+new file mode 100644
+index 0000000..aa35321
+--- /dev/null
++++ b/common/images/test_aggregator_image/FUNCTIONAL_DESCRIPTION.md
+@@ -0,0 +1,305 @@
++# Test Aggregator Functional Description
++
++## Purpose
++
++The test aggregator observes Docker syslog traffic produced by functional-test
++containers, preserves each TCP connection as an Envoy tap trace, reconstructs
++the syslog records for each connection, and calculates pytest totals per test
++container.
++
++The aggregator is an inline TCP proxy. Test traffic is still delivered to
++syslog-ng while Envoy captures a copy for later analysis. The aggregator does
++not mount or read syslog-ng's filesystem.
++
++## Data flow
++
++```mermaid
++flowchart LR
++    T["Test containers<br/>Docker syslog driver"]
++    E["Test aggregator<br/>Envoy TCP listener"]
++    S["syslog-ng<br/>TCP destination"]
++    R["Raw tap files<br/>/logs/taps"]
++    D["Decoded streams<br/>/logs/syslog-streams"]
++    A["pytest statistics<br/>/logs/aggregator"]
++
++    T -->|"TCP syslog"| E
++    E -->|"proxied TCP syslog"| S
++    E -->|"one trace per connection"| R
++    R -->|"decode after close"| D
++    D -->|"aggregate tester records"| A
++```
++
++## Components
++
++| Component | Responsibility |
++| --- | --- |
++| `bootstrap.sh` | Initializes storage, waits for syslog-ng, starts the watcher and Envoy, coordinates capture shutdown, and reports the final result. |
++| `envoy.yaml` | Defines the TCP listener, downstream tap transport socket, and TCP proxy to syslog-ng. |
++| `tap_watcher_service.sh` | Tracks tap-file creation and closure, polls Envoy's downstream RX-byte counter for global inactivity, starts per-file decoders, and invokes aggregation. |
++| `decode_envoy_tap.py` | Parses one completed length-delimited Envoy protobuf tap with `xds-protos`, reassembles downstream TCP bytes, frames syslog records, and writes one reconstructed connection log. |
++| `aggregate_connection_logs.py` | Orders immutable connection logs by Envoy connection ID and concatenates them into one log per producer. |
++| `log_watcher_service.sh` | Runs the existing Python statistics aggregator and stores its exit status. |
++| `log_aggregator.py` | Selects tester records, groups them by container tag, parses pytest summaries, validates totals, and determines success or failure. |
++
++## Startup and readiness
++
++1. `bootstrap.sh` removes data left by an earlier run and creates:
++   `/logs/taps`, `/logs/syslog-streams`, and `/logs/aggregator`.
++2. The runtime volume hides permissions created in the image layer. Bootstrap
++   therefore assigns `/logs/taps` to `envoy:envoy` with mode `0750`.
++   Envoy writes raw traces; the root-owned watcher writes decoded and result
++   files.
++3. Stored SSH host keys are removed because service identities can change in
++   the virtual network.
++4. Bootstrap waits for the syslog-ng SSH endpoint and runs the remote
++   syslog-ng health check.
++5. Admin, listener-port, and downstream-host placeholders in
++   `/etc/envoy/envoy.yaml` are replaced from environment variables.
++6. The tap watcher starts before Envoy. Bootstrap waits up to 10 seconds for
++   `/logs/aggregator/watcher_ready`, which is created only after
++   `inotifywait` has installed its filesystem watch.
++7. Envoy starts and the container health check sends a small TCP logger message
++   through its listener. Test services can use the aggregator's healthy state
++   as a Compose dependency.
++
++## Traffic capture
++
++Envoy listens on `UPSTREAM_AGGREGATOR_TCP_PORT` and proxies every accepted TCP
++connection to `DOWNSTREAM_SYSLOG_HOSTNAME:DOWNSTREAM_SYSLOG_TCP_PORT`.
++A loopback-only admin listener exposes the TCP proxy byte counters to the
++watcher on `ENVOY_ADMIN_PORT`; it is not published outside the container.
++
++The downstream tap transport socket uses:
++
++- `any_match: true` to capture every connection;
++- streamed `PROTO_BINARY_LENGTH_DELIMITED` output, with every socket event
++  submitted as its own segment by the pinned Envoy build;
++- one file per connection under
++  `/logs/taps/connection_<envoy-connection-id>.pb`;
++- a configurable per-read capture limit controlled by `MAX_BUFFERED_RX_BYTES`,
++  defaulting to the protobuf `uint32` maximum (`4294967295`) so a streamed read
++  cannot be shortened by the TAP limit.
++
++The raw connection ID is retained for correlation with Envoy diagnostics and
++to prevent collisions when one container reconnects.
++
++## Deciding when capture is complete
++
++`WAIT_MSEC_UNTIL_FINISH` is a global traffic-inactivity period, not a maximum
++test duration. Once per second, the watcher polls Envoy's monotonic
++`tcp.destination.downstream_cx_rx_bytes_total` counter. Every increase resets
++the inactivity clock. With the default value of `15000`, capture stops only
++after Envoy has received no downstream bytes for 15 seconds.
++
++The byte counter is used instead of tap-file `MODIFY` events because Envoy
++buffers file-per-tap output. A heartbeat can therefore reach Envoy before its
++protobuf representation becomes visible as a filesystem write.
++
++Docker logger TCP connections can remain open after pytest finishes.
++Consequently, the watcher does not require connections to close before the
++inactivity period expires. Instead:
++
++1. The watcher creates
++   `/logs/aggregator/capture_stop_requested`.
++2. Bootstrap recognizes the marker and sends SIGTERM to Envoy.
++3. Envoy stops accepting traffic and closes its tap files.
++4. `CLOSE_WRITE` events allow the watcher to decode only immutable files.
++5. The watcher allows 30 seconds for all active tap files to close.
++
++`MAX_WAIT_MSEC_UNTIL_FINISH`, defaulting to `900000` (15 minutes), is the
++hard safety limit for the complete capture phase. Reaching it produces an
++infrastructure failure.
++
++This design avoids analyzing a partial TCP stream while also supporting
++long-lived Docker logging connections.
++
++## Per-connection decoding and naming
++
++Each `CLOSE_WRITE` event starts an independent
++`decode_envoy_tap.py` process. Decoders may run concurrently.
++
++The decoder:
++
++1. Reads each protobuf varint length prefix and parses the corresponding
++   `envoy.data.tap.v3.TraceWrapper` with the generated classes supplied by
++   `xds-protos`.
++2. Extracts only downstream socket `read` events. These are bytes sent by the
++   logging container to the aggregator.
++3. Validates that streamed files contain a single trace ID and a connection-close
++   event, then concatenates read bodies in emitted order to reconstruct the TCP
++   byte stream. Buffered traces remain supported for existing diagnostics.
++4. Rejects a body marked `truncated`; incomplete evidence must not be used to
++   calculate test totals. The error reports the effective
++   `max_buffered_rx_bytes` value and recommends increasing
++   `MAX_BUFFERED_RX_BYTES` in the Docker Compose configuration.
++5. Finds RFC3164-like Docker syslog headers and splits the reconstructed stream
++   at complete record boundaries.
++6. Supports both formats used by Docker/syslog deployments:
++
++   ```text
++   <PRI>Mon DD HH:MM:SS producer[pid]: message
++   <PRI>Mon DD HH:MM:SS hostname producer[pid]: message
++   ```
++
++7. Ignores the RFC5424 octet-counted connection created by the container health
++   check when it contains no tester data.
++8. Verifies that a connection contains at most one syslog producer.
++9. Identifies the producer by Docker's syslog tag, configured as `{{.Name}}`,
++   then sanitizes the identity and atomically publishes the reconstructed log.
++   The RFC3164 hostname and Envoy remote IP are deliberately not grouping keys:
++   multiple containers can share a host, and Docker port publishing can
++   source-NAT all of them to the same bridge-gateway IP.
++
++Raw files keep their Envoy names. Per-connection backups include the producer
++identity and connection ID:
++
++```text
++/logs/taps/connection_18.pb
++/logs/syslog-connections/code-metric-platform-rrd-functional-tester-1__connection_18.log
++```
++
++If no recognizable syslog record exists, such as for the health-check
++connection, the backup keeps its generic connection name and is empty.
++
++After all decoder workers finish, `aggregate_connection_logs.py` groups the
++backups by producer, sorts each group by numeric Envoy connection ID, and
++concatenates each connection byte-for-byte. It atomically publishes solid
++producer files such as:
++
++```text
++/logs/syslog-streams/code-metric-platform-rrd-functional-tester-1.log
++```
++
++The backup directory remains untouched for diagnostics. Consequently,
++records retain their order within each connection and connections retain their
++Envoy creation order.
++
++## Test-result aggregation
++
++After every decoder exits, the watcher checks their statuses. If any trace
++cannot be decoded, aggregation is skipped and the overall result is failure.
++Decoder errors are preserved as
++`/logs/aggregator/connection_<id>.pb.decode_stderr`.
++
++When all traces decode successfully, `log_watcher_service.sh` runs
++`log_aggregator.py` against the immutable solid producer-file directory, not
++the per-connection backup directory. Although
++the parser mode is named `pcap`, at this stage it reads reconstructed syslog
++text and removes the leading `<PRI>` field.
++
++If creation of any solid producer file fails, result analysis is skipped and
++the watcher reports infrastructure status `255`. This prevents an incomplete
++set of producer files from yielding a false passing test result. Any partially
++published solid files are removed, the per-connection backups remain intact,
++and the underlying aggregation error is retained in `result_log_stderr`.
++
++The aggregator selects records whose syslog producer contains `tester` and
++groups them by producer/container name. It recognizes pytest records shaped
++like:
++
++```text
++collected 4 items
++================ 4 passed in 0.02s ================
++================ 1 skipped in 0.01s ===============
++================ 1 failed, 3 passed in 1.20s =======
++```
++
++For each test container it calculates:
++
++- total collected;
++- passed;
++- skipped;
++- failed.
++
++The aggregate is invalid if:
++
++- any failed count is nonzero;
++- `total != passed + skipped + failed` for any container;
++- no tests were collected or no tests passed.
++
++Skipped tests are reported to stderr but do not by themselves fail the run.
++When all checks pass, stdout contains `All tests PASSED: (passed/total)`.
++
++## Result files and exit behavior
++
++| Path | Content |
++| --- | --- |
++| `/logs/taps/` | Raw streamed length-delimited Envoy protobuf taps, one file per TCP connection. |
++| `/logs/syslog-streams/` | Reconstructed, newline-delimited syslog records, normally named by producer and connection ID. |
++| `/logs/aggregator/result_log_stdout` | Per-container statistics and the success recap. |
++| `/logs/aggregator/result_log_stderr` | Skips, failed/inconsistent statistics, watcher failures, or decoder failures. |
++| `/logs/aggregator/result` | Numeric process result written by the watcher. |
++
++## GitHub Actions artifacts
++
++Jobs that run `test_aggregator` execute the local
++`.github/actions/upload-test-aggregator-artifacts` action with `always()`, so
++diagnostics are retained for successful and failed jobs. The artifact is named
++`<job-name>-envoy-taps-<run-attempt>` and is available from the workflow run's
++**Artifacts** section for 14 days.
++
++It can also be downloaded with the GitHub CLI:
++
++```bash
++gh run download <run-id> \
++  --name <job-name>-envoy-taps-<run-attempt> \
++  --dir test-aggregator-artifacts
++```
++
++The action copies the stopped or running aggregator container's complete
++`/logs` volume. An extracted artifact therefore contains the original protobuf
++files under `taps/`, reconstructed records under `syslog-streams/`, aggregation
++results under `aggregator/`, the resolved Compose configuration, container
++inspection data, and GitHub run metadata. Raw traces can be decoded after
++installing the image's pinned `xds-protos` version:
++
++```bash
++python3 common/images/test_aggregator_image/decode_envoy_tap.py \
++  test-aggregator-artifacts/taps/connection_<id>.pb \
++  connection_<id>.log --name-by-producer
++```
++
++Success is `0`. Python's `-1` failure result appears to the shell and Docker
++as `255`; watcher and decoding infrastructure failures also use `255`.
++
++On failure or termination, bootstrap prints the reconstructed logs and the
++aggregation/decoding errors to container output.
++
++After the watcher has produced a result and Envoy has stopped, bootstrap exits
++with the stored result code. The aggregator container therefore terminates
++automatically on success, test failure, or infrastructure failure.
++
++## Configuration
++
++| Variable | Default | Meaning |
++| --- | ---: | --- |
++| `WAIT_MSEC_UNTIL_FINISH` | `15000` | Required interval with no downstream bytes before capture shutdown. |
++| `MAX_WAIT_MSEC_UNTIL_FINISH` | `900000` | Hard limit for the capture phase. |
++| `ENVOY_ADMIN_PORT` | `9901` | Loopback-only Envoy admin port used to read the downstream RX-byte counter. |
++| `MAX_BUFFERED_RX_BYTES` | `4294967295` | Per-read streamed TAP capture limit; defaults to the protobuf `uint32` maximum to prevent limit-based truncation. |
++| `UPSTREAM_AGGREGATOR_TCP_PORT` | `13601` | Envoy listener port receiving Docker syslog traffic. |
++| `HOST_UPSTREAM_AGGREGATOR_TCP_PORT` | `13601` | Host-published TCP port. |
++| `DOWNSTREAM_SYSLOG_HOSTNAME` | `syslog-ng` | Compose-network DNS name of the downstream syslog service. |
++| `DOWNSTREAM_SYSLOG_TCP_PORT` | `6601` | Downstream syslog-ng TCP port. |
++| `DOWNSTREAM_SSH_SECRET` | `syslog-ng` | Secret used by the bootstrap SSH readiness functions. |
++
++## Functional assumptions and limitations
++
++- All relevant logging traffic must pass through the Envoy listener.
++- The inactivity interval must exceed legitimate gaps in downstream traffic.
++  Long-running tests must send heartbeats more frequently than this interval;
++  otherwise capture can stop before a test finishes.
++- Each Docker logger TCP connection is expected to represent one syslog
++  producer.
++- Test summaries must use one of the pytest formats currently recognized by
++  `log_aggregator.py`. Other combinations or output formats require an
++  additional statistic parser.
++- The protobuf length delimiter is decoded locally; the `TraceWrapper` schema
++  and all tap fields are parsed by the generated bindings from `xds-protos`.
++- A trace marked truncated is treated as an infrastructure error rather than
++  producing potentially incorrect statistics.
++- Operators can lower `MAX_BUFFERED_RX_BYTES`, but a read larger than the
++  configured value is marked truncated and fails decoding. The default is the
++  largest value accepted by Envoy's `UInt32Value`; resource exhaustion, disk
++  errors, or premature process termination remain possible and are not TAP
++  truncation.
+# PR attribution for common/images/test_aggregator_image/aggregate_connection_logs.py:
+# - PR #110: Aggregate Envoy tap connections into producer logs
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/110
+diff --git a/common/images/test_aggregator_image/aggregate_connection_logs.py b/common/images/test_aggregator_image/aggregate_connection_logs.py
+new file mode 100644
+index 0000000..60821ca
+--- /dev/null
++++ b/common/images/test_aggregator_image/aggregate_connection_logs.py
+@@ -0,0 +1,44 @@
++#!/usr/bin/env python3
++
++"""Combine immutable per-connection logs into one ordered log per producer."""
++
++import argparse
++import re
++from collections import defaultdict
++from pathlib import Path
++
++
++CONNECTION_LOG = re.compile(r"^(?P<producer>.+)__connection_(?P<id>\d+)\.log$")
++
++
++def aggregate(connection_directory, output_directory):
++    producers = defaultdict(list)
++    for path in connection_directory.iterdir():
++        if not path.is_file():
++            continue
++        match = CONNECTION_LOG.match(path.name)
++        if match:
++            producers[match.group("producer")].append(
++                (int(match.group("id")), path)
++            )
++
++    output_directory.mkdir(parents=True, exist_ok=True)
++    for producer, connections in producers.items():
++        output_file = output_directory / f"{producer}.log"
++        temporary = output_file.with_suffix(".log.tmp")
++        with temporary.open("wb") as combined:
++            for _, connection in sorted(connections):
++                combined.write(connection.read_bytes())
++        temporary.replace(output_file)
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("connection_directory", type=Path)
++    parser.add_argument("output_directory", type=Path)
++    args = parser.parse_args()
++    aggregate(args.connection_directory, args.output_directory)
++
++
++if __name__ == "__main__":
++    main()
+# PR attribution for common/images/test_aggregator_image/bootstrap.sh:
+# - PR #102: Use envoy tap-logs instead of tshatk dumps
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/102
+# - PR #110: Aggregate Envoy tap connections into producer logs
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/110
+diff --git a/common/images/test_aggregator_image/bootstrap.sh b/common/images/test_aggregator_image/bootstrap.sh
+index 8996745..15efda3 100755
+--- a/common/images/test_aggregator_image/bootstrap.sh
++++ b/common/images/test_aggregator_image/bootstrap.sh
+@@ -1,68 +1,145 @@
+ #!/bin/bash
+ 
+-# import utilities
+ source /package/ssh.sh
+ 
+-# input log directory for gathering and analysing test suite outputs
+-echo $HOSTNAME
+-LOG_AGGREGATED_PATH=/logs/syslog-ng
+-if [ -d ${LOG_AGGREGATED_PATH} ]; then
+-    rm -rf ${LOG_AGGREGATED_PATH}
+-fi
+-mkdir -p ${LOG_AGGREGATED_PATH}
++echo "${HOSTNAME}"
+ 
+-# output directory which confounds analyzis results and errors
+-LOG_AGGREGATED_RESULT_PATH=/logs/aggregator/
+-if [ -d ${LOG_AGGREGATED_RESULT_PATH} ]; then
+-    rm -rf ${LOG_AGGREGATED_RESULT_PATH}
+-fi
+-mkdir -p ${LOG_AGGREGATED_RESULT_PATH}
++TAP_PATH=/logs/taps
++DECODED_LOG_PATH=/logs/syslog-streams
++CONNECTION_LOG_BACKUP_PATH=/logs/syslog-connections
++LOG_AGGREGATED_RESULT_PATH=/logs/aggregator
++
++for path in "${TAP_PATH}" "${DECODED_LOG_PATH}" "${CONNECTION_LOG_BACKUP_PATH}" "${LOG_AGGREGATED_RESULT_PATH}"; do
++    if [[ -d "${path}" ]]; then
++        rm -rf "${path}"
++    fi
++    mkdir -p "${path}"
++done
++
++# /logs is a runtime volume, so the image-layer permissions from the
++# Dockerfile are hidden when the container starts. The Envoy entrypoint drops
++# privileges to the `envoy` user; grant that user access to the only directory
++# it needs to write while leaving the watcher-owned output directories alone.
++chown envoy:envoy "${TAP_PATH}"
++chmod 0750 "${TAP_PATH}"
+ 
+ echo "Remove all SSH stored keys to prevent 'man-in-the-middle' complaint, as host identities may change in our virtual network"
+ rm -f /root/.ssh/known_hosts
+ 
+ echo "Wait until syslog-ng SSH server started"
+ wait_for_ssh "root" "${DOWNSTREAM_SYSLOG_HOSTNAME}" "${DOWNSTREAM_SSH_SECRET}"
+-execute_ssh_cmd "root" "${DOWNSTREAM_SYSLOG_HOSTNAME}" "${DOWNSTREAM_SSH_SECRET}" "while syslog-ng-ctl healthcheck -c /config/syslog-ng.ctl && [[ $? != 0 ]]; do echo \"waiting for syslog-ng running...\" && sleep 1; done"
++execute_ssh_cmd "root" "${DOWNSTREAM_SYSLOG_HOSTNAME}" "${DOWNSTREAM_SSH_SECRET}" "while syslog-ng-ctl healthcheck -c /config/syslog-ng.ctl && [[ \$? != 0 ]]; do echo \"waiting for syslog-ng running...\" && sleep 1; done"
+ 
+-termination_handler(){
++termination_handler() {
+     trap - QUIT TERM EXIT
+ 
+-    RET=`cat ${LOG_AGGREGATED_RESULT_PATH}/result`
+-    echo "Test Suites execution result: ${RET}. Full log can be found: "
++    if [[ -n "${tap_watcher_pid:-}" ]] && kill -0 "${tap_watcher_pid}" 2>/dev/null; then
++        kill "${tap_watcher_pid}" 2>/dev/null
++    fi
++    if [[ -n "${envoy_pid:-}" ]] && kill -0 "${envoy_pid}" 2>/dev/null; then
++        kill "${envoy_pid}" 2>/dev/null
++    fi
++
++    if [[ -f "${LOG_AGGREGATED_RESULT_PATH}/result" ]]; then
++        result=$(cat "${LOG_AGGREGATED_RESULT_PATH}/result")
++    else
++        result=255
++        echo "The tap watcher stopped without producing a result" \
++            > "${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
++    fi
++
++    echo "Test Suites execution result: ${result}. Full log can be found:"
+     echo "- ${LOG_AGGREGATED_RESULT_PATH}/result_log_stdout"
+     echo "- ${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
+-    echo "- ${LOG_AGGREGATED_PATH}/tester.log"
+-    if [ $RET != 0 ]; then
+-        echo "================================================================="
+-        echo "|                  Captured Log traffic:                                   |"
++    echo "- raw Envoy taps: ${TAP_PATH}"
++    echo "- reconstructed syslog streams: ${DECODED_LOG_PATH}"
++    echo "- per-connection syslog backups: ${CONNECTION_LOG_BACKUP_PATH}"
++
++    if [[ "${result}" != 0 ]]; then
+         echo "================================================================="
+-        cat ${LOG_AGGREGATED_PATH}/tester.log
++        echo "| Reconstructed traffic designated for syslog-ng                 |"
+         echo "================================================================="
++        for log_file in "${DECODED_LOG_PATH}"/*.log; do
++            if [[ -f "${log_file}" ]]; then
++                echo "--- ${log_file}"
++                cat "${log_file}"
++            fi
++        done
+         echo "================================================================="
+-        echo "|                  ERROR Log:                                   |"
++        echo "| Aggregation/decoding errors                                    |"
+         echo "================================================================="
+-        cat ${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr
++        if [[ -f "${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr" ]]; then
++            cat "${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
++        fi
+         echo "================================================================="
+     fi
+-    exit ${RET}
++    exit "${result}"
+ }
+ 
+ echo "Setup signal handlers"
+-trap 'termination_handler' QUIT TERM EXIT
+-
+-# capture traffic from syslog-ng port | compel line ending \r\n | turn off stdoutput bufferization | decode from hex and redirect into files for analyzis
+-tshark -f "tcp port ${UPSTREAM_AGGREGATOR_TCP_PORT}" -i any -l -T fields -e tcp.payload | xargs -I{} echo "{}0d0a" | stdbuf -i0 -o0 -e0  xxd -r -p - > ${LOG_AGGREGATED_PATH}/tester.log  &
+-/package/log_watcher_service.sh ${LOG_AGGREGATED_PATH} ${WAIT_MSEC_UNTIL_FINISH} ${LOG_AGGREGATED_RESULT_PATH} &
++trap termination_handler QUIT TERM EXIT
+ 
+-# bootstrap envoy.yaml
++# Bootstrap the port/address placeholders before starting Envoy.
++sed -i "s/ENVOY_ADMIN_PORT/${ENVOY_ADMIN_PORT}/" /etc/envoy/envoy.yaml
++sed -i "s/MAX_BUFFERED_RX_BYTES/${MAX_BUFFERED_RX_BYTES}/" /etc/envoy/envoy.yaml
+ sed -i "s/UPSTREAM_AGGREGATOR_TCP_PORT/${UPSTREAM_AGGREGATOR_TCP_PORT}/" /etc/envoy/envoy.yaml
+ sed -i "s/DOWNSTREAM_SYSLOG_TCP_PORT/${DOWNSTREAM_SYSLOG_TCP_PORT}/" /etc/envoy/envoy.yaml
+ sed -i "s/DOWNSTREAM_SYSLOG_HOSTNAME/${DOWNSTREAM_SYSLOG_HOSTNAME}/" /etc/envoy/envoy.yaml
+ 
+-# Substitute the new entry point (docker inspect was used here to determined the entry [ENTRYPOINT + CMD])
+-/docker-entrypoint.sh envoy -c /etc/envoy/envoy.yaml
++# The watcher is ready before Envoy accepts its first connection. It resets its
++# inactivity timer from Envoy's downstream RX-byte counter and decodes a
++# connection only on CLOSE_WRITE.
++/package/tap_watcher_service.sh \
++    "${TAP_PATH}" \
++    "${DECODED_LOG_PATH}" \
++    "${WAIT_MSEC_UNTIL_FINISH}" \
++    "${LOG_AGGREGATED_RESULT_PATH}" \
++    "${MAX_WAIT_MSEC_UNTIL_FINISH:-900000}" \
++    "http://127.0.0.1:${ENVOY_ADMIN_PORT}" \
++    "${CONNECTION_LOG_BACKUP_PATH}" &
++tap_watcher_pid=$!
++
++watcher_start_second=$SECONDS
++while [[ ! -f "${LOG_AGGREGATED_RESULT_PATH}/watcher_ready" ]]; do
++    if ! kill -0 "${tap_watcher_pid}" 2>/dev/null || (( SECONDS - watcher_start_second >= 10 )); then
++        echo "The Envoy tap file watcher did not become ready" \
++            > "${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
++        : > "${LOG_AGGREGATED_RESULT_PATH}/result_log_stdout"
++        echo 255 > "${LOG_AGGREGATED_RESULT_PATH}/result"
++        exit 255
++    fi
++    sleep 1
++done
++
++/docker-entrypoint.sh envoy -c /etc/envoy/envoy.yaml &
++envoy_pid=$!
++
++capture_stop_request="${LOG_AGGREGATED_RESULT_PATH}/capture_stop_requested"
++envoy_stop_sent=0
++
++while kill -0 "${tap_watcher_pid}" 2>/dev/null; do
++    if [[ -f "${capture_stop_request}" ]]; then
++        if (( envoy_stop_sent == 0 )) && kill -0 "${envoy_pid}" 2>/dev/null; then
++            kill "${envoy_pid}" 2>/dev/null
++            envoy_stop_sent=1
++        fi
++    elif ! kill -0 "${envoy_pid}" 2>/dev/null; then
++        echo "Envoy exited before log aggregation completed" \
++            > "${LOG_AGGREGATED_RESULT_PATH}/result_log_stderr"
++        : > "${LOG_AGGREGATED_RESULT_PATH}/result_log_stdout"
++        echo 255 > "${LOG_AGGREGATED_RESULT_PATH}/result"
++        kill "${tap_watcher_pid}" 2>/dev/null
++        break
++    fi
++    sleep 1
++done
++
++wait "${tap_watcher_pid}" 2>/dev/null
++result=$(cat "${LOG_AGGREGATED_RESULT_PATH}/result")
++
++if kill -0 "${envoy_pid}" 2>/dev/null; then
++    kill "${envoy_pid}" 2>/dev/null
++fi
++wait "${envoy_pid}" 2>/dev/null
+ 
+-RET=`cat ${LOG_AGGREGATED_PATH}/result`
+-echo "Test aggregator result: ${RET}.Full log can be found: ${LOG_AGGREGATED_PATH}/result_log"
+-exit ${RET}
++exit "${result}"
+# PR attribution for common/images/test_aggregator_image/compose.yaml:
+# - PR #102: Use envoy tap-logs instead of tshatk dumps
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/102
+# - PR #108: Upload test_aggregator artifacts; support streamed Envoy TAP segments and increase MAX_BUFFERED_RX_BYTES
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/108
+diff --git a/common/images/test_aggregator_image/compose.yaml b/common/images/test_aggregator_image/compose.yaml
+index 646820e..1c51ccd 100644
+--- a/common/images/test_aggregator_image/compose.yaml
++++ b/common/images/test_aggregator_image/compose.yaml
+@@ -3,9 +3,6 @@ services:
+     build:
+       context: ../../../
+       dockerfile: common/images/test_aggregator_image/Dockerfile
+-    cap_add:
+-      - NET_ADMIN
+-      - NET_RAW
+     env_file:
+       - path: ./.env
+         required: true
+@@ -13,8 +10,14 @@ services:
+         required: true # values from that files used only for container runtime, not for the current compose!!!
+     environment:
+         - WAIT_MSEC_UNTIL_FINISH=${WAIT_MSEC_UNTIL_FINISH}
++        - MAX_WAIT_MSEC_UNTIL_FINISH=${MAX_WAIT_MSEC_UNTIL_FINISH:-900000}
++        - MAX_BUFFERED_RX_BYTES=${MAX_BUFFERED_RX_BYTES:-4294967295}
+         - UPSTREAM_AGGREGATOR_TCP_PORT=${UPSTREAM_AGGREGATOR_TCP_PORT}
+         - HOST_UPSTREAM_AGGREGATOR_TCP_PORT=${HOST_UPSTREAM_AGGREGATOR_TCP_PORT}
++        # Use the Compose service alias for container-to-container DNS. The
++        # DOWNSTREAM_SYSLOG_HOSTNAME value from syslog-ng's .env is its custom
++        # container name and is not a portable DNS name.
++        - DOWNSTREAM_SYSLOG_HOSTNAME=syslog-ng
+     networks:
+       - api.pmccabe_collector.network
+     ports:
+# PR attribution for common/images/test_aggregator_image/decode_envoy_tap.py:
+# - PR #102: Use envoy tap-logs instead of tshatk dumps
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/102
+# - PR #108: Upload test_aggregator artifacts; support streamed Envoy TAP segments and increase MAX_BUFFERED_RX_BYTES
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/108
+# - PR #110: Aggregate Envoy tap connections into producer logs
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/110
+diff --git a/common/images/test_aggregator_image/decode_envoy_tap.py b/common/images/test_aggregator_image/decode_envoy_tap.py
+new file mode 100755
+index 0000000..97c4d7c
+--- /dev/null
++++ b/common/images/test_aggregator_image/decode_envoy_tap.py
+@@ -0,0 +1,237 @@
++#!/usr/bin/env python3
++
++"""Decode one completed Envoy socket-tap trace into syslog records."""
++
++import argparse
++import os
++import re
++from pathlib import Path
++
++from envoy.data.tap.v3 import wrapper_pb2
++from google.protobuf.message import DecodeError
++
++
++# Docker's default Unix syslog formatter emits RFC3164-like records. Its TCP
++# framer adds no delimiter, so record boundaries must be recovered from the
++# next complete header after the connection byte stream has been reconstructed.
++SYSLOG_HEADER = re.compile(
++    rb"<\d{1,3}>[A-Z][a-z]{2} [ 0-9][0-9] "
++    rb"[0-9]{2}:[0-9]{2}:[0-9]{2} "
++    rb"(?:(?P<hostname>[^\s:\[]+) )?"
++    rb"(?P<producer>[^\s:\[]+)(?:\[\d+\])?: ?"
++)
++
++
++DEFAULT_MAX_BUFFERED_RX_BYTES = "4294967295"
++
++
++def truncation_error(subject):
++    configured_limit = os.environ.get(
++        "MAX_BUFFERED_RX_BYTES", DEFAULT_MAX_BUFFERED_RX_BYTES
++    )
++    return ValueError(
++        f"Envoy marked {subject} as truncated. Configured max_buffered_rx_bytes "
++        f"is {configured_limit} bytes. Increase MAX_BUFFERED_RX_BYTES in the "
++        "Docker Compose configuration and retry."
++    )
++
++
++def decode_varint32(data, offset):
++    """Decode one protobuf uint32 length prefix without parsing its message."""
++    value = 0
++    start = offset
++    for shift in range(0, 35, 7):
++        if offset >= len(data):
++            raise ValueError(
++                f"truncated protobuf length prefix at byte offset {start}"
++            )
++        byte = data[offset]
++        offset += 1
++        value |= (byte & 0x7F) << shift
++        if byte < 0x80:
++            if value > 0xFFFFFFFF:
++                raise ValueError(
++                    f"protobuf message length exceeds uint32 at byte offset {start}"
++                )
++            return value, offset
++    raise ValueError(f"invalid protobuf length prefix at byte offset {start}")
++
++
++def iter_trace_wrappers(data):
++    """Yield TraceWrapper messages from Envoy's length-delimited tap format."""
++    offset = 0
++    message_number = 0
++    while offset < len(data):
++        message_number += 1
++        length, payload_offset = decode_varint32(data, offset)
++        end = payload_offset + length
++        if end > len(data):
++            raise ValueError(
++                "truncated protobuf message "
++                f"{message_number}: declared {length} bytes at byte offset {offset}, "
++                f"only {len(data) - payload_offset} remain"
++            )
++
++        trace = wrapper_pb2.TraceWrapper()
++        try:
++            trace.ParseFromString(data[payload_offset:end])
++        except DecodeError as error:
++            raise ValueError(
++                f"invalid Envoy TraceWrapper protobuf message {message_number}"
++            ) from error
++        yield trace
++        offset = end
++
++
++def decode_body(body):
++    if body.truncated:
++        raise truncation_error("a captured body")
++    body_type = body.WhichOneof("body_type")
++    if body_type == "as_bytes":
++        return bytes(body.as_bytes)
++    if body_type == "as_string":
++        return body.as_string.encode("utf-8")
++    return b""
++
++
++def events_from_trace(trace):
++    trace_type = trace.WhichOneof("trace")
++    if trace_type == "socket_buffered_trace":
++        buffered = trace.socket_buffered_trace
++        if buffered.read_truncated:
++            raise truncation_error("the downstream socket trace")
++        yield from buffered.events
++        return
++
++    if trace_type == "socket_streamed_trace_segment":
++        streamed = trace.socket_streamed_trace_segment
++        message_piece = streamed.WhichOneof("message_piece")
++        if message_piece == "event":
++            yield streamed.event
++        elif message_piece == "events":
++            yield from streamed.events.events
++        return
++
++    if trace_type is None:
++        raise ValueError("Envoy TraceWrapper contains no trace")
++    raise ValueError(f"unsupported Envoy tap trace type: {trace_type}")
++
++
++def extract_downstream_bytes(trace_data):
++    events = []
++    streamed_trace_id = None
++    streamed_closed = False
++    for trace in iter_trace_wrappers(trace_data):
++        trace_type = trace.WhichOneof("trace")
++        if trace_type == "socket_streamed_trace_segment":
++            segment = trace.socket_streamed_trace_segment
++            if streamed_trace_id is None:
++                streamed_trace_id = segment.trace_id
++            elif segment.trace_id != streamed_trace_id:
++                raise ValueError(
++                    "one tap file contains multiple streamed trace IDs: "
++                    f"{streamed_trace_id} and {segment.trace_id}"
++                )
++        for event in events_from_trace(trace):
++            events.append(event)
++            if event.WhichOneof("event_selector") == "closed":
++                streamed_closed = True
++
++    if streamed_trace_id is not None and not streamed_closed:
++        raise ValueError(
++            f"streamed Envoy trace {streamed_trace_id} has no connection-close event"
++        )
++
++    chunks = []
++    for event in events:
++        if event.WhichOneof("event_selector") == "read":
++            chunk = decode_body(event.read.data)
++            if chunk:
++                chunks.append(chunk)
++    return b"".join(chunks)
++
++
++def frame_syslog_stream(stream):
++    starts = [match.start() for match in SYSLOG_HEADER.finditer(stream)]
++    if not starts:
++        # The listener health check also passes through Envoy and uses RFC5424
++        # octet-counting. It is intentionally irrelevant to pytest aggregation.
++        # A tester stream without a recognizable header, however, must fail
++        # loudly rather than disappear from the result.
++        if b"tester" in stream.lower():
++            raise ValueError(
++                "captured tester data contains no recognizable Docker syslog header"
++            )
++        return []
++    prefix = stream[: starts[0]].strip(b"\x00\r\n \t")
++    if prefix and b"tester" in prefix.lower():
++        raise ValueError("unframed bytes precede the first recognizable syslog record")
++
++    starts.append(len(stream))
++    return [
++        stream[start:end].rstrip(b"\r\n")
++        for start, end in zip(starts, starts[1:])
++    ]
++
++
++def producer_output_path(output_file, records):
++    producers = []
++    for record in records:
++        match = SYSLOG_HEADER.match(record)
++        if match is None:
++            continue
++        # Docker's syslog tag is configured as {{.Name}}, so it is the actual
++        # container producer identity. Do not use Envoy's remote address here:
++        # traffic reaching a published port can be source-NATed to the same
++        # Docker bridge gateway address for every sending container.
++        producer = re.sub(
++            rb"[^A-Za-z0-9_.-]+",
++            b"_",
++            match.group("producer"),
++        ).strip(b"._")
++        if producer and producer not in producers:
++            producers.append(producer)
++
++    if len(producers) > 1:
++        names = ", ".join(name.decode("ascii") for name in producers)
++        raise ValueError(
++            "one Envoy connection contains records from multiple producers: "
++            f"{names}"
++        )
++    if not producers:
++        return output_file
++
++    producer = producers[0].decode("ascii")
++    return output_file.with_name(f"{producer}__{output_file.name}")
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("tap_file", type=Path)
++    parser.add_argument("output_file", type=Path)
++    parser.add_argument(
++        "--name-by-producer",
++        action="store_true",
++        help="prefix the output filename with the Docker syslog producer tag",
++    )
++    args = parser.parse_args()
++
++    trace_data = args.tap_file.read_bytes()
++    stream = extract_downstream_bytes(trace_data)
++    records = frame_syslog_stream(stream)
++
++    output_file = args.output_file
++    if args.name_by_producer:
++        output_file = producer_output_path(output_file, records)
++
++    output_file.parent.mkdir(parents=True, exist_ok=True)
++    temporary = output_file.with_suffix(output_file.suffix + ".tmp")
++    with temporary.open("wb") as output:
++        for record in records:
++            output.write(record)
++            output.write(b"\n")
++    temporary.replace(output_file)
++
++
++if __name__ == "__main__":
++    main()
+# PR attribution for common/images/test_aggregator_image/envoy.yaml:
+# - PR #102: Use envoy tap-logs instead of tshatk dumps
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/102
+# - PR #108: Upload test_aggregator artifacts; support streamed Envoy TAP segments and increase MAX_BUFFERED_RX_BYTES
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/108
+diff --git a/common/images/test_aggregator_image/envoy.yaml b/common/images/test_aggregator_image/envoy.yaml
+index 71742e0..792fe81 100644
+--- a/common/images/test_aggregator_image/envoy.yaml
++++ b/common/images/test_aggregator_image/envoy.yaml
+@@ -1,3 +1,10 @@
++admin:
++  access_log_path: /dev/null
++  address:
++    socket_address:
++      address: 127.0.0.1
++      port_value: ENVOY_ADMIN_PORT
++
+ static_resources:
+   listeners:
+     - name: test_aggregator
+@@ -6,7 +13,29 @@ static_resources:
+           address: 0.0.0.0
+           port_value: UPSTREAM_AGGREGATOR_TCP_PORT
+       filter_chains:
+-        - filters:
++        - transport_socket:
++            # Tap the downstream side so every Docker syslog connection gets
++            # its own trace file. Stream every read event immediately and only
++            # decode traces that contain Envoy's connection-close event.
++            name: envoy.transport_sockets.tap
++            typed_config:
++              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tap.v3.Tap
++              common_config:
++                static_config:
++                  match:
++                    any_match: true
++                  output_config:
++                    streaming: true
++                    max_buffered_rx_bytes: MAX_BUFFERED_RX_BYTES
++                    sinks:
++                      - format: PROTO_BINARY_LENGTH_DELIMITED
++                        file_per_tap:
++                          path_prefix: /logs/taps/connection
++              transport_socket:
++                name: envoy.transport_sockets.raw_buffer
++                typed_config:
++                  "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
++          filters:
+             - name: envoy.filters.network.tcp_proxy
+               typed_config:
+                 "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+# PR attribution for common/images/test_aggregator_image/log_aggregator.py:
+# - PR #109: Parse pytest summary lines generically and add tests for permutations and malformed UTF-8 & Increase SYSLOG-NG connection capacity
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/109
+diff --git a/common/images/test_aggregator_image/log_aggregator.py b/common/images/test_aggregator_image/log_aggregator.py
+index 3807746..c395bae 100755
+--- a/common/images/test_aggregator_image/log_aggregator.py
++++ b/common/images/test_aggregator_image/log_aggregator.py
+@@ -84,43 +84,27 @@ class LogParser:
+             print(f"not a valid logger record: {raw_record}\nError {e}\n")
+ 
+     def collect_statistic(self):
+-        # TODO handle this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+-        #  ========================= 1 failed, 5 passed in 45.09s =========================
+-
+-        test_amount_regex = re.compile(r"^collected (\d+) item[s]?$")
+-        test_failed_regex = re.compile(r"^=+\s+(\d+)\s+failed\s+in\s+.*=+$")
+-        test_failed_passed_regex = re.compile(r"^=+\s+(\d+)\s+failed,\s+(\d+)\s+passed\s+in\s+.*=+$")
+-        test_passed_regex = re.compile(r"^=+\s+(\d+)\s+passed\s+in\s+.*=+$")
+-        test_skipped_regex = re.compile(r"^=+\s+(\d+)\s+skipped\s+in\s+.*=+$")
++        test_summary_regex = re.compile(r"^=+\s+(?P<summary>.*?)\s+in\s+.*=+$")
++        test_outcome_regex = re.compile(
++            r"(?:^|,\s+)(\d+)\s+(passed|failed|skipped)(?=,|\s+in\s+|$)"
++        )
+         stat = TestStatistic()
+         if len(self.records) == 0:
+             return stat
+         for r in self.records:
+-            amount_found = test_amount_regex.match(r.data)
+-            if amount_found:
+-                stat.total += int(amount_found.group(1))
+-                continue
+-
+-            failed_found = test_failed_regex.match(r.data)
+-            if failed_found:
+-                stat.failed += int(failed_found.group(1))
+-                continue
+-
+-            failed_passed_found = test_failed_passed_regex.match(r.data)
+-            if failed_passed_found:
+-                stat.failed += int(failed_passed_found.group(1))
+-                stat.passed += int(failed_passed_found.group(2))
+-                continue
+-
+-            passed_found = test_passed_regex.match(r.data)
+-            if passed_found:
+-                stat.passed += int(passed_found.group(1))
+-                continue
+-
+-            skipped_found = test_skipped_regex.match(r.data)
+-            if skipped_found:
+-                stat.skipped += int(skipped_found.group(1))
+-                continue
++            summary_found = test_summary_regex.match(r.data)
++            if summary_found:
++                for count, outcome in test_outcome_regex.findall(
++                    summary_found.group("summary")
++                ):
++                    count = int(count)
++                    # A tester may invoke pytest more than once. Collection
++                    # lines are session-local and may be absent from the
++                    # reconstructed stream, so completed terminal summaries
++                    # are the single source of truth for both totals and
++                    # outcomes.
++                    stat.total += count
++                    setattr(stat, outcome, getattr(stat, outcome) + count)
+ 
+         if stat.failed != 0:
+             stat.error_log = "\n".join([f.data for f in self.records])
+# PR attribution for common/images/test_aggregator_image/log_watcher_service.sh:
+# - PR #102: Use envoy tap-logs instead of tshatk dumps
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/102
+diff --git a/common/images/test_aggregator_image/log_watcher_service.sh b/common/images/test_aggregator_image/log_watcher_service.sh
+index f57facb..b6a79ce 100755
+--- a/common/images/test_aggregator_image/log_watcher_service.sh
++++ b/common/images/test_aggregator_image/log_watcher_service.sh
+@@ -1,6 +1,10 @@
+ #!/bin/bash
+ 
+-python3 /package/log_aggregator.py ${1} "^.*\\s.*\\s(.*tester.*)\\[\\d+\\]:.*$" -t=${2} -f pcap > ${3}/result_log_stdout 2> ${3}/result_log_stderr
+-echo $? > ${3}/result
+-kill -s SIGTERM ${PPID}
+-kill -s SIGTERM `pidof envoy`
++log_path=$1
++timeout_msec=$2
++result_path=$3
++
++python3 /package/log_aggregator.py "${log_path}" "^.*\\s.*\\s(.*tester.*)\\[\\d+\\]:.*$" -t="${timeout_msec}" -f pcap \
++    > "${result_path}/result_log_stdout" \
++    2> "${result_path}/result_log_stderr"
++echo $? > "${result_path}/result"
+# PR attribution for common/images/test_aggregator_image/tap_watcher_service.sh:
+# - PR #102: Use envoy tap-logs instead of tshatk dumps
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/102
+# - PR #110: Aggregate Envoy tap connections into producer logs
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/110
+diff --git a/common/images/test_aggregator_image/tap_watcher_service.sh b/common/images/test_aggregator_image/tap_watcher_service.sh
+new file mode 100755
+index 0000000..b8fd35d
+--- /dev/null
++++ b/common/images/test_aggregator_image/tap_watcher_service.sh
+@@ -0,0 +1,179 @@
++#!/bin/bash
++
++# Observe Envoy's per-connection tap files. Envoy's downstream byte counter
++# keeps the service alive; a trace is decoded only after Envoy closes it.
++
++tap_path=$1
++decoded_path=$2
++quiet_msec=$3
++result_path=$4
++max_wait_msec=${5:-900000}
++envoy_admin_url=${6:-http://127.0.0.1:9901}
++connection_backup_path=${7:-${decoded_path}/connections}
++
++quiet_seconds=$(( (quiet_msec + 999) / 1000 ))
++max_wait_seconds=$(( (max_wait_msec + 999) / 1000 ))
++(( quiet_seconds < 1 )) && quiet_seconds=1
++(( max_wait_seconds < quiet_seconds )) && max_wait_seconds=$quiet_seconds
++
++mkdir -p "${tap_path}" "${decoded_path}" "${connection_backup_path}" "${result_path}"
++
++declare -A active_files
++declare -a workers
++start_second=$SECONDS
++last_activity_second=$SECONDS
++last_stats_poll_second=-1
++last_rx_bytes=
++stats_ready=0
++capture_stop_requested=0
++capture_stop_second=0
++shutdown_grace_seconds=30
++
++coproc TAP_EVENTS {
++    inotifywait --monitor \
++        --event create --event close_write \
++        --format '%e|%w%f' "${tap_path}" 2>&1
++}
++event_fd=${TAP_EVENTS[0]}
++inotify_pid=$TAP_EVENTS_PID
++
++# inotifywait announces this only after the kernel watch has been installed.
++# Bootstrap waits for the marker so Envoy cannot win a startup race.
++watch_established=0
++while IFS= read -r monitor_status <&${event_fd}; do
++    if [[ "${monitor_status}" == "Watches established." ]]; then
++        watch_established=1
++        break
++    fi
++done
++if (( watch_established == 0 )); then
++    echo "inotifywait exited before establishing the tap directory watch" \
++        > "${result_path}/result_log_stderr"
++    echo 255 > "${result_path}/result"
++    exit 255
++fi
++: > "${result_path}/watcher_ready"
++
++
++while true; do
++    if IFS='|' read -r -t 1 event_name event_path <&${event_fd}; then
++        case "${event_name}" in
++            *CREATE*)
++                active_files["${event_path}"]=1
++                ;;
++        esac
++        case "${event_name}" in
++            *CLOSE_WRITE*)
++                unset 'active_files['"${event_path}"']'
++                base_name=$(basename "${event_path}")
++                output_file="${connection_backup_path}/${base_name%.*}.log"
++                error_file="${result_path}/${base_name}.decode_stderr"
++                python3 /package/decode_envoy_tap.py "${event_path}" "${output_file}" \
++                    --name-by-producer \
++                    > /dev/null 2> "${error_file}" &
++                workers+=("$!")
++                ;;
++        esac
++    fi
++
++    if (( SECONDS - start_second >= max_wait_seconds )); then
++        echo "Timed out waiting for Envoy tap connections to close" \
++            > "${result_path}/result_log_stderr"
++        echo 255 > "${result_path}/result"
++        kill "${inotify_pid}" 2>/dev/null
++        kill -s SIGTERM "$(pidof envoy)" 2>/dev/null
++        exit 255
++    fi
++
++    # File-per-tap output is buffered by Envoy, so inotify MODIFY events are
++    # not a reliable indication of live traffic. Poll the TCP proxy's
++    # monotonic downstream byte counter instead.
++    if (( SECONDS != last_stats_poll_second )); then
++        last_stats_poll_second=$SECONDS
++        current_rx_bytes=$(
++            curl --silent --fail --max-time 1 --get \
++                --data-urlencode 'filter=^tcp\.destination\.downstream_cx_rx_bytes_total$' \
++                "${envoy_admin_url}/stats" 2>/dev/null |
++                awk -F': ' \
++                    '$1 == "tcp.destination.downstream_cx_rx_bytes_total" { print $2; exit }'
++        )
++        if [[ "${current_rx_bytes}" =~ ^[0-9]+$ ]]; then
++            if (( stats_ready == 0 )); then
++                stats_ready=1
++                last_rx_bytes=$current_rx_bytes
++                last_activity_second=$SECONDS
++            elif [[ "${current_rx_bytes}" != "${last_rx_bytes}" ]]; then
++                last_rx_bytes=$current_rx_bytes
++                last_activity_second=$SECONDS
++            fi
++        fi
++    fi
++
++    if (( capture_stop_requested != 0 )); then
++        if (( ${#active_files[@]} == 0 )); then
++            break
++        fi
++        if (( SECONDS - capture_stop_second >= shutdown_grace_seconds )); then
++            echo "Envoy did not close all tap files after capture stopped" \
++                > "${result_path}/result_log_stderr"
++            echo 255 > "${result_path}/result"
++            kill "${inotify_pid}" 2>/dev/null
++            exit 255
++        fi
++    elif (( stats_ready != 0 && SECONDS - last_activity_second >= quiet_seconds )); then
++        # Persistent Docker logger connections keep tap files open after tests
++        # finish. Ask bootstrap to stop Envoy after the global traffic-quiet
++        # period; its shutdown closes every trace before decoding starts.
++        : > "${result_path}/capture_stop_requested"
++        capture_stop_requested=1
++        capture_stop_second=$SECONDS
++    fi
++done
++
++kill "${inotify_pid}" 2>/dev/null
++wait "${inotify_pid}" 2>/dev/null
++rm -f "${result_path}/watcher_ready"
++
++decode_status=0
++for worker in "${workers[@]}"; do
++    wait "${worker}" || decode_status=1
++done
++
++if (( decode_status != 0 )); then
++    {
++        echo "One or more Envoy tap traces could not be decoded"
++        for error_file in "${result_path}"/*.decode_stderr; do
++            if [[ -s "${error_file}" ]]; then
++                echo "${error_file}:"
++                cat "${error_file}"
++            fi
++        done
++    } > "${result_path}/result_log_stderr"
++    : > "${result_path}/result_log_stdout"
++    echo 255 > "${result_path}/result"
++else
++    # Preserve every decoded connection, then publish one ordered file per
++    # producer for the test-result aggregator.
++    aggregation_error_file="${result_path}/connection_aggregation_stderr"
++    if python3 /package/aggregate_connection_logs.py \
++        "${connection_backup_path}" "${decoded_path}" \
++        2> "${aggregation_error_file}"; then
++        rm -f "${aggregation_error_file}"
++        /package/log_watcher_service.sh "${decoded_path}" 1 "${result_path}"
++    else
++        aggregation_error=$(cat "${aggregation_error_file}")
++        # Discard any producer files published before the failure. Besides
++        # making partial output unmistakable, this can recover enough volume
++        # space to persist the infrastructure-failure result.
++        rm -f "${decoded_path}"/* "${aggregation_error_file}"
++        {
++            echo "Per-producer connection log aggregation failed"
++            printf '%s\n' "${aggregation_error}"
++        } > "${result_path}/result_log_stderr"
++        : > "${result_path}/result_log_stdout"
++        echo 255 > "${result_path}/result"
++    fi
++fi
++
++kill -s SIGTERM "$(pidof envoy)" 2>/dev/null
++exit "$(cat "${result_path}/result")"
+# PR attribution for common/images/test_aggregator_image/test_aggregate_connection_logs.py:
+# - PR #110: Aggregate Envoy tap connections into producer logs
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/110
+diff --git a/common/images/test_aggregator_image/test_aggregate_connection_logs.py b/common/images/test_aggregator_image/test_aggregate_connection_logs.py
+new file mode 100644
+index 0000000..fc2981c
+--- /dev/null
++++ b/common/images/test_aggregator_image/test_aggregate_connection_logs.py
+@@ -0,0 +1,30 @@
++from pathlib import Path
++import subprocess
++import sys
++
++
++def test_connections_are_combined_by_producer_in_connection_order(tmp_path):
++    connections = tmp_path / "connections"
++    combined = tmp_path / "combined"
++    connections.mkdir()
++    (connections / "host-a__connection_116.log").write_bytes(b"third\n")
++    (connections / "host-b__connection_8.log").write_bytes(b"other\n")
++    (connections / "host-a__connection_9.log").write_bytes(b"first\nsecond\n")
++    (connections / "connection_1.log").write_bytes(b"")
++
++    script = Path(__file__).with_name("aggregate_connection_logs.py")
++    result = subprocess.run(
++        [sys.executable, str(script), str(connections), str(combined)],
++        capture_output=True,
++        text=True,
++    )
++
++    assert result.returncode == 0, result.stderr
++    assert (combined / "host-a.log").read_bytes() == b"first\nsecond\nthird\n"
++    assert (combined / "host-b.log").read_bytes() == b"other\n"
++    assert sorted(path.name for path in connections.iterdir()) == [
++        "connection_1.log",
++        "host-a__connection_116.log",
++        "host-a__connection_9.log",
++        "host-b__connection_8.log",
++    ]
+# PR attribution for common/images/test_aggregator_image/test_decode_envoy_tap.py:
+# - PR #102: Use envoy tap-logs instead of tshatk dumps
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/102
+# - PR #108: Upload test_aggregator artifacts; support streamed Envoy TAP segments and increase MAX_BUFFERED_RX_BYTES
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/108
+# - PR #110: Aggregate Envoy tap connections into producer logs
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/110
+diff --git a/common/images/test_aggregator_image/test_decode_envoy_tap.py b/common/images/test_aggregator_image/test_decode_envoy_tap.py
+new file mode 100644
+index 0000000..1d3005f
+--- /dev/null
++++ b/common/images/test_aggregator_image/test_decode_envoy_tap.py
+@@ -0,0 +1,240 @@
++import os
++from pathlib import Path
++import subprocess
++import sys
++
++from envoy.data.tap.v3 import transport_pb2, wrapper_pb2
++
++
++def encode_varint32(value):
++    encoded = bytearray()
++    while value > 0x7F:
++        encoded.append((value & 0x7F) | 0x80)
++        value >>= 7
++    encoded.append(value)
++    return bytes(encoded)
++
++
++def streamed_event_message(event, *, trace_id=1):
++    trace = wrapper_pb2.TraceWrapper()
++    segment = trace.socket_streamed_trace_segment
++    segment.trace_id = trace_id
++    segment.event.CopyFrom(event)
++    payload = trace.SerializeToString()
++    return encode_varint32(len(payload)) + payload
++
++
++def streamed_read_message(chunk, *, truncated=False):
++    event = transport_pb2.SocketEvent()
++    event.read.data.as_bytes = chunk
++    event.read.data.truncated = truncated
++    return streamed_event_message(event)
++
++
++def streamed_close_message():
++    event = transport_pb2.SocketEvent()
++    event.closed.SetInParent()
++    return streamed_event_message(event)
++
++
++def streamed_connection_message(source_ip, *, trace_id=1):
++    trace = wrapper_pb2.TraceWrapper()
++    segment = trace.socket_streamed_trace_segment
++    segment.trace_id = trace_id
++    segment.connection.remote_address.socket_address.address = source_ip
++    payload = trace.SerializeToString()
++    return encode_varint32(len(payload)) + payload
++
++
++def run_decoder(
++    tmp_path,
++    chunks,
++    *,
++    name_by_producer=False,
++    truncated=False,
++    max_buffered_rx_bytes="4294967295",
++    source_ip=None,
++):
++    tap_file = tmp_path / "connection_1.pb"
++    output_file = tmp_path / "connection_1.log"
++    tap_file.write_bytes(
++        (streamed_connection_message(source_ip) if source_ip else b"")
++        + b"".join(
++            [
++                *(
++                    streamed_read_message(chunk, truncated=truncated)
++                    for chunk in chunks
++                ),
++                streamed_close_message(),
++            ]
++        )
++    )
++
++    script = Path(__file__).with_name("decode_envoy_tap.py")
++    command = [sys.executable, str(script), str(tap_file), str(output_file)]
++    if name_by_producer:
++        command.append("--name-by-producer")
++
++    environment = os.environ.copy()
++    environment["MAX_BUFFERED_RX_BYTES"] = max_buffered_rx_bytes
++    result = subprocess.run(
++        command,
++        capture_output=True,
++        text=True,
++        env=environment,
++    )
++    return result, output_file
++
++
++def test_decoder_reassembles_chunks_before_framing_syslog(tmp_path):
++    first = (
++        b"<30>Sep 14 11:13:13 host service-tester[7]: collected 2 items"
++    )
++    second = (
++        b"<30>Sep 14 11:13:14 host service-tester[7]: "
++        b"================ 2 passed in 0.01s ================"
++    )
++    joined = first + second
++
++    # Split one header across reads and coalesce the end of one record with the
++    # start of the next. These are both legal outcomes for a TCP byte stream.
++    result, output_file = run_decoder(
++        tmp_path,
++        [joined[:3], joined[3:71], joined[71:]],
++    )
++
++    assert result.returncode == 0, result.stderr
++    assert output_file.read_bytes() == first + b"\n" + second + b"\n"
++
++
++def test_decoder_accepts_complete_streamed_connection(tmp_path):
++    first = b"<30>Sep 14 11:13:13 host service-tester[7]: collected 2 items"
++    second = (
++        b"<30>Sep 14 11:13:14 host service-tester[7]: "
++        b"================ 2 passed in 0.01s ================"
++    )
++    tap_file = tmp_path / "connection_1.pb"
++    output_file = tmp_path / "connection_1.log"
++    tap_file.write_bytes(
++        streamed_read_message(first[:17])
++        + streamed_read_message(first[17:] + second)
++        + streamed_close_message()
++    )
++
++    script = Path(__file__).with_name("decode_envoy_tap.py")
++    result = subprocess.run(
++        [sys.executable, str(script), str(tap_file), str(output_file)],
++        capture_output=True,
++        text=True,
++    )
++
++    assert result.returncode == 0, result.stderr
++    assert output_file.read_bytes() == first + b"\n" + second + b"\n"
++
++
++def test_decoder_rejects_incomplete_streamed_connection(tmp_path):
++    tap_file = tmp_path / "connection_1.pb"
++    output_file = tmp_path / "connection_1.log"
++    tap_file.write_bytes(streamed_read_message(b"tester output"))
++
++    script = Path(__file__).with_name("decode_envoy_tap.py")
++    result = subprocess.run(
++        [sys.executable, str(script), str(tap_file), str(output_file)],
++        capture_output=True,
++        text=True,
++    )
++
++    assert result.returncode != 0
++    assert "has no connection-close event" in result.stderr
++    assert not output_file.exists()
++
++
++def test_decoder_names_output_from_docker_syslog_tag(tmp_path):
++    first = b"<30>Sep 14 11:13:13 rrd-service[7]: Runlevel change"
++    second = b"<30>Sep 14 11:13:14 rrd-service[7]: WARNING cleanup"
++    result, output_file = run_decoder(
++        tmp_path,
++        [first + second],
++        name_by_producer=True,
++    )
++
++    renamed_output = tmp_path / "rrd-service__connection_1.log"
++    assert result.returncode == 0, result.stderr
++    assert not output_file.exists()
++    assert renamed_output.read_bytes() == first + b"\n" + second + b"\n"
++
++
++def test_decoder_uses_container_tag_instead_of_shared_hostname(tmp_path):
++    record = b"<30>Sep 14 11:13:13 readable-host service-tester[7]: passed"
++    result, output_file = run_decoder(
++        tmp_path,
++        [record],
++        name_by_producer=True,
++    )
++
++    renamed_output = tmp_path / "service-tester__connection_1.log"
++    assert result.returncode == 0, result.stderr
++    assert not output_file.exists()
++    assert renamed_output.read_bytes() == record + b"\n"
++
++
++def test_decoder_does_not_group_distinct_tags_by_nat_source_ip(tmp_path):
++    shared_ip = "172.18.0.1"
++    first = b"<30>Sep 14 11:13:13 first-tester[7]: passed"
++    second = b"<30>Sep 14 11:13:14 second-tester[8]: passed"
++
++    first_result, _ = run_decoder(
++        tmp_path,
++        [first],
++        name_by_producer=True,
++        source_ip=shared_ip,
++    )
++    second_result, _ = run_decoder(
++        tmp_path,
++        [second],
++        name_by_producer=True,
++        source_ip=shared_ip,
++    )
++
++    assert first_result.returncode == 0, first_result.stderr
++    assert second_result.returncode == 0, second_result.stderr
++    assert (
++        tmp_path / "first-tester__connection_1.log"
++    ).read_bytes() == first + b"\n"
++    assert (
++        tmp_path / "second-tester__connection_1.log"
++    ).read_bytes() == second + b"\n"
++    assert not (tmp_path / f"{shared_ip}__connection_1.log").exists()
++
++
++def test_decoder_ignores_non_tester_health_check_connection(tmp_path):
++    result, output_file = run_decoder(
++        tmp_path,
++        [b"75 <13>1 2026-09-14T11:13:13Z host root - - - Hello"],
++    )
++
++    assert result.returncode == 0, result.stderr
++    assert output_file.read_bytes() == b""
++
++
++def test_decoder_rejects_unrecognizable_tester_stream(tmp_path):
++    result, output_file = run_decoder(tmp_path, [b"broken service-tester output"])
++
++    assert result.returncode != 0
++    assert "tester data contains no recognizable" in result.stderr
++    assert not output_file.exists()
++
++
++def test_decoder_rejects_truncated_tap_body(tmp_path):
++    result, output_file = run_decoder(
++        tmp_path,
++        [b"<30>Sep 14 11:13:13 service-tester[7]: incomplete"],
++        truncated=True,
++        max_buffered_rx_bytes="33554432",
++    )
++
++    assert result.returncode != 0
++    assert "captured body as truncated" in result.stderr
++    assert "max_buffered_rx_bytes is 33554432 bytes" in result.stderr
++    assert "Increase MAX_BUFFERED_RX_BYTES in the Docker Compose" in result.stderr
++    assert not output_file.exists()
+# PR attribution for common/images/test_aggregator_image/test_log_aggregator.py:
+# - PR #109: Parse pytest summary lines generically and add tests for permutations and malformed UTF-8 & Increase SYSLOG-NG connection capacity
+#   https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/pull/109
+diff --git a/common/images/test_aggregator_image/test_log_aggregator.py b/common/images/test_aggregator_image/test_log_aggregator.py
+index c99a8e7..6b01391 100644
+--- a/common/images/test_aggregator_image/test_log_aggregator.py
++++ b/common/images/test_aggregator_image/test_log_aggregator.py
+@@ -2,9 +2,10 @@ import os
+ from pathlib import Path
+ import subprocess
+ import sys
++from itertools import permutations
+ 
+ 
+-def test_malformed_utf8_log_record_does_not_crash_aggregator(tmp_path):
++def run_aggregator(tmp_path, log_records):
+     stub_dir = tmp_path / "stubs"
+     stub_dir.mkdir()
+     (stub_dir / "pyinotify.py").write_text(
+@@ -23,16 +24,12 @@ class Notifier:
+ 
+     logs_dir = tmp_path / "logs"
+     logs_dir.mkdir()
+-    (logs_dir / "tester.log").write_bytes(
+-        b"<27>Sep 13 19:43:49 tester[1]: collected 1 item\n"
+-        b"<27>Sep 13 19:43:49 tester[1]: Loading weights: \xe2\n"
+-        b"<27>Sep 13 19:43:50 tester[1]: ========== 1 passed in 0.01s ==========\n"
+-    )
++    (logs_dir / "tester.log").write_bytes(log_records)
+ 
+     script = Path(__file__).with_name("log_aggregator.py")
+     environment = os.environ.copy()
+     environment["PYTHONPATH"] = str(stub_dir)
+-    result = subprocess.run(
++    return subprocess.run(
+         [
+             sys.executable,
+             str(script),
+@@ -47,6 +44,96 @@ class Notifier:
+         timeout=5,
+     )
+ 
++
++def test_malformed_utf8_log_record_does_not_crash_aggregator(tmp_path):
++    result = run_aggregator(
++        tmp_path,
++        b"<27>Sep 13 19:43:49 tester[1]: collected 1 item\n"
++        b"<27>Sep 13 19:43:49 tester[1]: Loading weights: \xe2\n"
++        b"<27>Sep 13 19:43:50 tester[1]: ========== 1 passed in 0.01s ==========\n",
++    )
++
+     assert result.returncode == 0, result.stderr
+     assert "All tests PASSED: (1/1)" in result.stdout
+     assert "UnicodeDecodeError" not in result.stderr
++
++
++def test_pytest_summary_counts_every_combination_of_supported_outcomes(tmp_path):
++    outcome_counts = {"passed": 2, "failed": 1, "skipped": 3}
++    combinations = [
++        order
++        for length in range(1, len(outcome_counts) + 1)
++        for order in permutations(outcome_counts, length)
++    ]
++
++    for case_number, outcomes in enumerate(combinations):
++        case_path = tmp_path / str(case_number)
++        case_path.mkdir()
++        total = sum(outcome_counts[outcome] for outcome in outcomes)
++        summary = ", ".join(
++            f"{outcome_counts[outcome]} {outcome}" for outcome in outcomes
++        )
++        # Warnings may follow any combination of test outcomes, but are not
++        # tests and must therefore not affect the total.
++        summary += ", 4 warnings"
++        result = run_aggregator(
++            case_path,
++            (
++                f"<27>Sep 13 19:43:49 tester[1]: collected {total} items\n"
++                f"<27>Sep 13 19:43:50 tester[1]: "
++                f"========== {summary} in 0.01s ==========\n"
++            ).encode(),
++        )
++
++        expected = {
++            outcome: outcome_counts[outcome] if outcome in outcomes else 0
++            for outcome in outcome_counts
++        }
++        statistic = (
++            f'Statistic of "tester" - total: {total}, '
++            f'failed: {expected["failed"]}, passed: {expected["passed"]}, '
++            f'skipped: {expected["skipped"]}'
++        )
++        assert statistic in result.stdout
++        assert 'Statistic of "tester" is inconsistent' not in result.stderr
++        should_succeed = "passed" in outcomes and "failed" not in outcomes
++        assert (result.returncode == 0) == should_succeed
++
++
++def test_multiple_pytest_sessions_use_completed_summaries_for_totals(tmp_path):
++    result = run_aggregator(
++        tmp_path,
++        (
++            "<27>Sep 13 19:43:49 tester[1]: collected 2 items\n"
++            "<27>Sep 13 19:43:50 tester[1]: ===== 2 passed in 8.00s =====\n"
++            # A collection record may be lost when a fragmented TCP/syslog
++            # stream is reconstructed; its completed summary is sufficient.
++            "<27>Sep 13 19:47:54 tester[1]: ===== 3 passed in 244.06s (0:04:04) =====\n"
++        ).encode(),
++    )
++
++    assert result.returncode == 0, result.stderr
++    assert (
++        'Statistic of "tester" - total: 5, failed: 0, passed: 5, skipped: 0'
++        in result.stdout
++    )
++    assert "All tests PASSED: (5/5)" in result.stdout
++
++
++def test_collection_lines_from_incomplete_sessions_do_not_mix_counters(tmp_path):
++    result = run_aggregator(
++        tmp_path,
++        (
++            "<27>Sep 13 19:43:49 tester[1]: collected 5 items\n"
++            "<27>Sep 13 19:43:50 tester[1]: ===== 1 skipped in 0.11s =====\n"
++            "<27>Sep 13 19:43:51 tester[1]: collected 4 items\n"
++            "<27>Sep 13 19:49:00 tester[1]: ===== 2 passed in 377.16s (0:06:17) =====\n"
++        ).encode(),
++    )
++
++    assert result.returncode == 0, result.stderr
++    assert (
++        'Statistic of "tester" - total: 3, failed: 0, passed: 2, skipped: 1'
++        in result.stdout
++    )
++    assert 'Statistic of "tester" is inconsistent' not in result.stderr
