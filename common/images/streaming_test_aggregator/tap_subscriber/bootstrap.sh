@@ -3,9 +3,10 @@ set -u
 
 TAP_PATH=/logs/subscriber/taps
 DECODED_LOG_PATH=/logs/subscriber/streams
+AGGREGATED_CONNECTIONS_LOG_PATH=/logs/subscriber/aggregated_connection
 RESULT_PATH=/logs/subscriber/status
-rm -rf "${TAP_PATH}" "${DECODED_LOG_PATH}" "${RESULT_PATH}"
-mkdir -p "${TAP_PATH}" "${DECODED_LOG_PATH}" "${RESULT_PATH}"
+rm -rf "${TAP_PATH}" "${DECODED_LOG_PATH}" "${RESULT_PATH}" "${AGGREGATED_CONNECTIONS_LOG_PATH}"
+mkdir -p "${TAP_PATH}" "${DECODED_LOG_PATH}" "${RESULT_PATH}" "${AGGREGATED_CONNECTIONS_LOG_PATH}"
 
 subscriber_options=()
 if [[ "${RETAIN_RAW_TAPS:-false}" == "true" ]]; then
@@ -90,6 +91,26 @@ if kill -0 "${subscriber_pid}" 2>/dev/null; then
   wait "${subscriber_pid}"
   subscriber_result=$?
 fi
+
+aggregation_error_file="${RESULT_PATH}/connection_aggregation_stderr"
+if python3 /package/aggregate_connection_logs.py \
+    "${DECODED_LOG_PATH}" "${AGGREGATED_CONNECTIONS_LOG_PATH}" \
+    2> "${aggregation_error_file}"; then
+    rm -f "${aggregation_error_file}"
+else
+    aggregation_error=$(cat "${aggregation_error_file}")
+    # Discard any producer files published before the failure. Besides
+    # making partial output unmistakable, this can recover enough volume
+    # space to persist the infrastructure-failure result.
+    rm -f "${AGGREGATED_CONNECTIONS_LOG_PATH}"/* "${aggregation_error_file}"
+    {
+        echo "Per-producer connection log aggregation failed"
+        printf '%s\n' "${aggregation_error}"
+    } >> "${RESULT_PATH}/subscriber_stdout"
+    : >> "${RESULT_PATH}/subscriber_stderr"
+    echo 255 > "${result_path}/result"
+fi
+
 trap - HUP INT QUIT TERM
 for watchdog_pid in "${lifecycle_watchdog_pid}" "${shutdown_watchdog_pid}"; do
   if [[ -n "${watchdog_pid}" ]]; then

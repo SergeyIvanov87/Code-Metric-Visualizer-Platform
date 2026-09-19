@@ -1,0 +1,59 @@
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      # envoy-ready runs in a separate container, so the admin listener must
+      # accept connections on the Compose network rather than loopback only.
+      address: 0.0.0.0
+      port_value: ENVOY_ADMIN_PORT
+
+static_resources:
+  listeners:
+    - name: test_aggregator
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: UPSTREAM_AGGREGATOR_TCP_PORT
+      filter_chains:
+        - transport_socket:
+            # Tap the downstream side so every Docker syslog connection gets
+            # its own trace file. Stream every read event immediately and only
+            # decode traces that contain Envoy's connection-close event.
+            name: envoy.transport_sockets.tap
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tap.v3.Tap
+              common_config:
+                static_config:
+                  match:
+                    any_match: true
+                  output_config:
+                    streaming: true
+                    max_buffered_rx_bytes: MAX_BUFFERED_RX_BYTES
+                    sinks:
+                      - format: PROTO_BINARY_LENGTH_DELIMITED
+                        file_per_tap:
+                          path_prefix: /logs/taps/connection
+              transport_socket:
+                name: envoy.transport_sockets.raw_buffer
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+          filters:
+            - name: envoy.filters.network.tcp_proxy
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+                stat_prefix: destination
+                cluster: cluster_0
+  clusters:
+    - name: cluster_0
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: DOWNSTREAM_SYSLOG_HOSTNAME
+                      port_value: DOWNSTREAM_SYSLOG_TCP_PORT

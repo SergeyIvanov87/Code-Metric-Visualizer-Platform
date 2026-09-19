@@ -1,0 +1,73 @@
+services:
+  envoy:
+    extends:
+      file: log_proxy/compose.yaml
+      service: envoy
+    environment:
+        # Use the Compose service alias for container-to-container DNS. The
+        # DOWNSTREAM_SYSLOG_HOSTNAME value from syslog-ng's .env is its custom
+        # container name and is not a portable DNS name.
+        - DOWNSTREAM_SYSLOG_HOSTNAME=api.pmccabe_collector.syslog-ng.streaming
+    depends_on:
+      - syslog-ng-streaming
+    networks:
+      - api.pmccabe_collector.network
+
+  envoy-ready:
+    extends:
+      file: log_proxy/compose.yaml
+      service: envoy-ready
+    environment:
+        - ENVOY_ADMIN_PORT=9901
+        # Use the Compose service alias for container-to-container DNS. The
+        # DOWNSTREAM_SYSLOG_HOSTNAME value from syslog-ng's .env is its custom
+        # container name and is not a portable DNS name.
+        - DOWNSTREAM_SYSLOG_HOSTNAME=api.pmccabe_collector.syslog-ng.streaming
+    command:
+      - --fail
+      - --silent
+      - --show-error
+      - --retry
+      - "60"
+      - --retry-all-errors
+      - --retry-delay
+      - "1"
+      - http://envoy:${ENVOY_ADMIN_PORT:-9901}/ready
+    depends_on:
+      envoy: { condition: service_started }
+    networks:
+      - api.pmccabe_collector.network
+
+  syslog-ng-streaming:
+    extends:
+      file: syslog-ng_image/compose.yaml
+      service: syslog-ng
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ= # timezone
+      - DOWNSTREAM_SYSLOG_HOSTNAME=api.pmccabe_collector.syslog-ng.streaming
+      - DOWNSTREAM_SYSLOG_UDP_PORT=5514
+      - DOWNSTREAM_SYSLOG_TCP_PORT=6601
+    container_name: api.pmccabe_collector.syslog-ng.streaming
+    hostname: api.pmccabe_collector.syslog-ng.streaming
+    volumes:
+      - api.pmccabe_collector.logger.org:/var/log
+    ports:
+      - "514:${DOWNSTREAM_SYSLOG_UDP_PORT:-5514}/udp"
+      - "601:${DOWNSTREAM_SYSLOG_TCP_PORT:-6601}/tcp"
+    restart: unless-stopped
+    networks:
+      - api.pmccabe_collector.network
+    logging:
+      driver: "json-file"
+
+volumes:
+  api.pmccabe_collector.logger.org:
+    name: api.pmccabe_collector.logger.org
+    external: true
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
