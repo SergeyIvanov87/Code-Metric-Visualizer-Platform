@@ -12,6 +12,7 @@ services:
       - syslog-ng-streaming
     networks:
       - api.pmccabe_collector.network
+      - envoy.admin.channel.network
 
   envoy-ready:
     extends:
@@ -71,3 +72,5 @@ networks:
   api.pmccabe_collector.network:
     name: api.pmccabe_collector.network
     external: true
+  envoy.admin.channel.network:
+    name: envoy.admin.channel.network

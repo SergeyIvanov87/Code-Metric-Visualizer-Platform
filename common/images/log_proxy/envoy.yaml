@@ -23,16 +23,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.transport_sockets.tap.v3.Tap
               common_config:
-                static_config:
-                  match:
-                    any_match: true
-                  output_config:
-                    streaming: true
-                    max_buffered_rx_bytes: MAX_BUFFERED_RX_BYTES
-                    sinks:
-                      - format: PROTO_BINARY_LENGTH_DELIMITED
-                        file_per_tap:
-                          path_prefix: /logs/taps/connection
+                admin_config: { config_id: test_aggregator }
               transport_socket:
                 name: envoy.transport_sockets.raw_buffer
                 typed_config:

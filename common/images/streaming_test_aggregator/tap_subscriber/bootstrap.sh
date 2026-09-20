@@ -93,6 +93,7 @@ if kill -0 "${subscriber_pid}" 2>/dev/null; then
 fi
 
 aggregation_error_file="${RESULT_PATH}/connection_aggregation_stderr"
+aggregation_result_file="${RESULT_PATH}/connection_aggregation_result"
 if python3 /package/aggregate_connection_logs.py \
     "${DECODED_LOG_PATH}" "${AGGREGATED_CONNECTIONS_LOG_PATH}" \
     2> "${aggregation_error_file}"; then
@@ -108,7 +109,7 @@ else
         printf '%s\n' "${aggregation_error}"
     } >> "${RESULT_PATH}/subscriber_stdout"
     : >> "${RESULT_PATH}/subscriber_stderr"
-    echo 255 > "${result_path}/result"
+    echo 255 > "${aggregation_result_file}"
 fi
 
 trap - HUP INT QUIT TERM
