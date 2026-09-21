@@ -170,9 +170,23 @@ jobs:
     - name: Create empty standalone volumes
       run: mkdir -p ${GITHUB_WORKSPACE}/api && chmod 777 ${GITHUB_WORKSPACE}/api && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/api -o o=bind api && docker volume create project
     - name: Run Broker Docker
-      run: docker run -d --name service-broker -v "api:/api" -v "project:/mnt" -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service-broker:$DATE
+      run: docker run -d --name service-broker -v "api:/api" -v "project:/mnt" -e SKIP_API_DEPS_CHECK=true -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service-broker:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
+    - name: Wait for Broker Docker to become ready
+      run: |
+        for attempt in $(seq 1 30); do
+          if docker logs service-broker 2>&1 | grep -q "The service is ready"; then
+            exit 0
+          fi
+          if ! docker inspect --format='{{.State.Running}}' service-broker | grep -q true; then
+            docker logs service-broker
+            exit 1
+          fi
+          sleep 1
+        done
+        docker logs service-broker
+        exit 1
     - name: Stop Standalone Container
       run: docker stop service-broker
     - name: Check filesystem API artefacts
@@ -182,7 +196,7 @@ jobs:
       run: |
         docker rm -f service-broker 2>/dev/null || true
         docker volume rm api project
-        rm -rf ${GITHUB_WORKSPACE}/api
+        sudo rm -rf ${GITHUB_WORKSPACE}/api
 
   build:
 
