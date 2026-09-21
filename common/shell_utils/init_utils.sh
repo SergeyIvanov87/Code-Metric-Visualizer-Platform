@@ -4,6 +4,39 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 source ${SCRIPT_DIR}/color_codes.sh
 
+terminate_and_wait() {
+    local pid=${1}
+    local process_name=${2:-process}
+    local timeout_sec=${3:-10}
+
+    if [[ ! ${pid} =~ ^[0-9]+$ ]] || [ "${pid}" -le 1 ]; then
+        echo -e "${BRed}Refusing to signal invalid ${process_name} PID: ${pid}${Color_Off}" >&2
+        return 1
+    fi
+
+    if ! kill -s 0 "${pid}" 2>/dev/null; then
+        # Reap an already exited child when possible.
+        wait "${pid}" 2>/dev/null || true
+        return 0
+    fi
+
+    kill -s SIGTERM "${pid}" 2>/dev/null || true
+    (
+        sleep "${timeout_sec}"
+        if kill -s 0 "${pid}" 2>/dev/null; then
+            echo -e "${BRed}${process_name} PID ${pid} did not stop in ${timeout_sec}s; sending SIGKILL${Color_Off}" >&2
+            kill -s SIGKILL "${pid}" 2>/dev/null || true
+        fi
+    ) &
+    local watchdog_pid=$!
+
+    # wait both blocks until shutdown completes and reaps the child, so a zombie
+    # cannot make an unbounded `kill -0` polling loop look alive forever.
+    wait "${pid}" 2>/dev/null || true
+    kill -s SIGTERM "${watchdog_pid}" 2>/dev/null || true
+    wait "${watchdog_pid}" 2>/dev/null || true
+}
+
 gracefull_shutdown() {
     echo -e "${BBlue}Starting gracefull shutdown routine${Color_Off}"
     local -n service_watch_pids_to_stop=${1}
@@ -14,23 +47,13 @@ gracefull_shutdown() {
     for server_script_path in "${!service_watch_pids_to_stop[@]}"
     do
         echo -e "${BRed}Kill ${server_script_path}${Color_Off} by PID: ${Red}${service_watch_pids_to_stop[$server_script_path]}${Color_Off}"
-        pkill -KILL -e -P ${service_watch_pids_to_stop[$server_script_path]}
-        kill -9 ${service_watch_pids_to_stop[$server_script_path]}
+        pkill -KILL -e -P ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
+        kill -9 ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
+        wait ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
         ps -ef
     done
     echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Clear pipes, killing PID: ${Red}${API_MANAGEMENT_PID}${BRed}****${Color_Off}"
-    kill -s SIGTERM ${api_management_pid}
-    while true
-    do
-        kill -s 0 ${api_management_pid} > /dev/null 2>&1
-        RESULT=$?
-        if [ $RESULT == 0 ]; then
-            echo -e "`date +%H:%M:%S:%3N`    ${Blue}***API_MANAGEMENT_PID: ${API_MANAGEMENT_PID} still exist****${Color_Off}"
-            sleep 1
-            continue
-        fi
-        break
-    done
+    terminate_and_wait "${api_management_pid}" "API manager"
     echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Done****${Color_Off}"
 }
 
@@ -43,8 +66,9 @@ gracefull_shutdown_bunch() {
         for server_script_path in "${!service_watch_pids_to_stop[@]}"
         do
             echo -e "${BRed}Kill ${server_script_path}${Color_Off} by PID: ${Red}${service_watch_pids_to_stop[$server_script_path]}${Color_Off}"
-            pkill -KILL -e -P ${service_watch_pids_to_stop[$server_script_path]}
-            kill -9 ${service_watch_pids_to_stop[$server_script_path]}
+            pkill -KILL -e -P ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
+            kill -9 ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
+            wait ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
             ps -ef
         done
         echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Shutdown servers --- DONE***${Color_Off}"
@@ -54,18 +78,7 @@ gracefull_shutdown_bunch() {
         do
             service_pid=${api_management_pids[${service_name}]}
             echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Clear pipes, killing PID: ${Red}${service_pid}${BRed} of ${Red}${service_name}${BRed}****${Color_Off}"
-            kill -s SIGTERM ${service_pid}
-            while true
-            do
-                kill -s 0 ${service_pid}
-                RESULT=$?
-                if [ $RESULT == 0 ]; then
-                    echo -e "`date +%H:%M:%S:%3N`    ${Blue}***service_pid: ${service_pid} still exist****${Color_Off}"
-                    sleep 1
-                    continue
-                fi
-                break
-            done
+            terminate_and_wait "${service_pid}" "API manager for ${service_name}"
         done
         echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Clear pipes --- Done****${Color_Off}"
     fi
