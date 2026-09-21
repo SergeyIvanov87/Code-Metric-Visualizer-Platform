@@ -20,6 +20,106 @@ jobs:
     - name: Execute unit tests
       run: docker compose -f common/images/unit_test/compose.yaml up --exit-code-from unit_tests
 
+  build_and_test_cyclomatic_complexity:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: TODO Remove this phase build test_pseudo_fs
+      run: docker build -f common/images/test_pseudo_fs/Dockerfile -t test_pseudo_fs:latest .
+    - name: Build the CC Docker image
+      run: docker build -f cyclomatic_complexity/Dockerfile --tag cc-visualizer:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test the CC Docker image
+      run: docker compose -f cyclomatic_complexity/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from cc-functional-tester
+
+  build_and_test_rrd_analytic:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: TODO Remove this phase build test_pseudo_fs
+      run: docker build -f common/images/test_pseudo_fs/Dockerfile -t test_pseudo_fs:latest .
+    - name: Build the RRD Docker image
+      run: docker build -f rrd_analytic/Dockerfile --tag rrd-analytic:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test the RRD Docker image
+      run: docker compose -f rrd_analytic/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rrd-functional-tester
+
+  build_and_test_rest_api:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: TODO Remove this phase build test_pseudo_fs
+      run: docker build -f common/images/test_pseudo_fs/Dockerfile -t test_pseudo_fs:latest .
+    - name: Build the REST API Docker image
+      run: docker build -f rest_api/Dockerfile --tag rest-api:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test the REST API Docker image
+      run: docker compose -f rest_api/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
+
+  build_and_test_http_fs_api_proxy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: TODO Remove this phase build test_pseudo_fs
+      run: docker build -f common/images/test_pseudo_fs/Dockerfile -t test_pseudo_fs:latest .
+    - name: Build the HTTP_FS API PROXY Docker image
+      run: docker build -f fs_api_proxy/http_proxy/Dockerfile --tag fs_api_proxy_http:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test the HTTP_FS API PROXY Docker image
+      run: docker compose -f fs_api_proxy/http_proxy/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from fs-api-http-proxy-functional-tester-service-a
+
+  build_and_test_service_broker:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: TODO Remove this phase build test_pseudo_fs
+      run: docker build -f common/images/test_pseudo_fs/Dockerfile -t test_pseudo_fs:latest .
+    - name: Build the Service Broker Docker image
+      run: docker build -f service_broker/Dockerfile -t service-broker:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test the Service Broker Docker image
+      run: docker compose -f service_broker/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from service-broker-functional-tester
+
   build:
 
     runs-on: ubuntu-latest
