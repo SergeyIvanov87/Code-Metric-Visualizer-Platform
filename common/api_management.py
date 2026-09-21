@@ -4,16 +4,17 @@
 import argparse
 import os
 import signal
+
+SHUTDOWN_SIGNALS = {signal.SIGINT, signal.SIGTERM}
+# A container can be stopped while this module or its local dependencies are
+# still loading. Defer termination until the cleanup handler is ready.
+signal.pthread_sigmask(signal.SIG_BLOCK, SHUTDOWN_SIGNALS)
+
 import shutil
-import stat
 import sys
-
-
 
 from renew_pseudo_fs_pipes import remove_api_fs_pipes_node
 from api_schema_utils import deserialize_api_request_from_schema_file
-import subprocess
-from subprocess import check_output
 
 
 parser = argparse.ArgumentParser(
@@ -45,64 +46,56 @@ for schema_file in schema_files:
         continue
     valid_queries_dict[req_name] = request_data
 
+shutdown_started = False
 
 def unblock_pipes_signal_handler(sig, frame):
     global valid_queries_dict
     global args
-    print(f'Signal catched: {sig}')
+    global shutdown_started
+
+    if shutdown_started:
+        return
+    shutdown_started = True
+
+    print(f'Signal caught: {sig}', flush=True)
     deleted_pipes = []
-    print(f"unblock server pipes")
-    for req_name,query in valid_queries_dict.items():
-        req_type = query["Method"]
-        req_api = query["Query"]
-        deleted_pipes.extend(remove_api_fs_pipes_node(args.mount_point, "server", req_api, req_type))
+    cleanup_errors = []
+    for communication_type in ("server", "client"):
+        print(f"unblock {communication_type} pipes", flush=True)
+        for req_name, query in valid_queries_dict.items():
+            try:
+                deleted_pipes.extend(
+                    remove_api_fs_pipes_node(
+                        args.mount_point,
+                        communication_type,
+                        query["Query"],
+                        query["Method"],
+                    )
+                )
+            except Exception as error:
+                cleanup_errors.append((req_name, communication_type, error))
+                print(
+                    f"Failed to clean {communication_type} pipes for {req_name}: {error}",
+                    file=sys.stderr,
+                    flush=True,
+                )
 
-    print(f"unblock client pipes")
-    for req_name,query in valid_queries_dict.items():
-        req_type = query["Method"]
-        req_api = query["Query"]
-        deleted_pipes.extend(remove_api_fs_pipes_node(args. mount_point, "client", req_api, req_type))
-
-
-    exec_node_directories = { os.path.dirname(p) for p in deleted_pipes }
+    exec_node_directories = {os.path.dirname(path) for path in deleted_pipes}
     for d in exec_node_directories:
-        shutil.rmtree(d, ignore_errors=True)
+        try:
+            shutil.rmtree(d)
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            cleanup_errors.append((d, "directory", error))
+            print(f"Failed to remove API directory {d}: {error}", file=sys.stderr, flush=True)
 
-    print(f"{deleted_pipes.extend(exec_node_directories)}")
-    sys.exit(0)
+    removed_paths = deleted_pipes + sorted(exec_node_directories)
+    print(f"Removed API paths: {removed_paths}", flush=True)
+    raise SystemExit(1 if cleanup_errors else 0)
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, unblock_pipes_signal_handler)
     signal.signal(signal.SIGTERM, unblock_pipes_signal_handler)
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, SHUTDOWN_SIGNALS)
     signal.pause()
-
-'''
-def get_pids(name):
-    return map(int,check_output(["pidof",name]).split())
-
-def kill_server(pid, server_name):
-    server_shutdown_script = 'bash -c "pkill -KILL -e -P ' + str(pid) + ' && kill -KILL ' + str(pid) + '"'
-    print(f"execute shutdown script: {server_shutdown_script}")
-    proc=subprocess.Popen(server_shutdown_script, shell=True)
-
-    try:
-        proc.wait(5)
-    except Exception:
-        print(f"Error killing: {server_name}. Skip it")
-        proc.kill()
-    else:
-        print(f"Finished: {server_name}")
-
---> procedure (doesn't work, why?)
-    for name,query in valid_queries_dict.items():
-        print(f"Send signal to pids of {name}_listener.sh", file=sys.stdout, flush=True)
-        pids = list(get_pids(f"{name}_listener.sh"))
-        for p in pids:
-            kill_server(p, f"{name}_listener.sh")
-
-    for name,query in valid_queries_dict.items():
-        print(f"Send signal to pids of {name}_server.sh", file=sys.stdout, flush=True)
-        pids = list(get_pids(f"{name}_server.sh"))
-        for p in pids:
-            kill_server(p, f"{name}_server.sh")
-'''

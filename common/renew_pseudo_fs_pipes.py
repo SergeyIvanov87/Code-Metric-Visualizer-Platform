@@ -57,10 +57,11 @@ def unblock_result_pipe_reader(pipe_filepath, print_log = True):
         proc=subprocess.Popen(unlocking_script, shell=True)
         try:
             proc.wait(0.5)
-        except Exception:
+        except subprocess.TimeoutExpired:
             if print_log:
                 print(f"No one was listening to: {pipe_filepath}. Skip it", file=sys.stdout, flush=True)
             proc.kill()
+            proc.wait()
         else:
             unblocked_readers_count += 1
             if print_log:
@@ -89,10 +90,11 @@ def unblock_result_pipe_writer(pipe_filepath, print_log = True):
         proc=subprocess.Popen(unlocking_script, shell=True)
         try:
             proc.wait(0.5)
-        except Exception:
+        except subprocess.TimeoutExpired:
             if print_log:
                 print(f"No one was writing to: {pipe_filepath}. Skip it", file=sys.stdout, flush=True)
             proc.kill()
+            proc.wait()
         else:
             unblocked_writers_count += 1
             if print_log:
@@ -144,7 +146,7 @@ def remove_api_fs_pipes_node(api_root_path, communication_type, req, rtype):
     # If we don't wait, then we won't unblock clients & servers
     print(f"Waiting for finishing of child processes: {children}", file=sys.stdout, flush=True)
     for c in children:
-        os.waitpid(0, 0)
+        os.waitpid(c, 0)
 
     print(f"Child processes have finished: {children}", file=sys.stdout, flush=True)
     for p in pipes_to_unblock:

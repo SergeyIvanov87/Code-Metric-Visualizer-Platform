@@ -39,8 +39,8 @@ termination_handler(){
    exit 0
 }
 
-echo "Setup signal handlers"
 trap 'termination_handler' SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
+echo "Signal handlers are ready"
 
 echo "DEBUG CMD:"
 echo "cp ../rest_api_server/rest_api_server/cgi_template.py ../rest_api_server/rest_api_server/cgi.py && ../build_api_cgi.py ../restored_API /api api.pmccabe_collector.restapi.org >> ../rest_api_server/rest_api_server/cgi.py"

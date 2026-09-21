@@ -20,6 +20,226 @@ jobs:
     - name: Execute unit tests
       run: docker compose -f common/images/unit_test/compose.yaml up --exit-code-from unit_tests
 
+  build_and_test_cyclomatic_complexity:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: TODO Remove this phase build test_pseudo_fs
+      run: docker build -f common/images/test_pseudo_fs/Dockerfile -t test_pseudo_fs:latest .
+    - name: Build the CC Docker image
+      run: docker build -f cyclomatic_complexity/Dockerfile --tag cc-visualizer:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test the CC Docker image
+      run: docker compose -f cyclomatic_complexity/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from cc-functional-tester
+    - name: Create empty standalone volumes
+      run: mkdir -p ${GITHUB_WORKSPACE}/api && chmod 777 ${GITHUB_WORKSPACE}/api && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/api -o o=bind api && docker volume create project
+    - name: Run CC Docker
+      run: docker run -d --name cc-visualizer -v "api:/api" -v "project:/mnt" cc-visualizer:$DATE
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Wait for CC Docker to become ready
+      run: |
+        for attempt in $(seq 1 60); do
+          if docker logs cc-visualizer 2>&1 | grep -q "The service is ready"; then
+            exit 0
+          fi
+          if ! docker inspect --format='{{.State.Running}}' cc-visualizer | grep -q true; then
+            docker logs cc-visualizer
+            exit 1
+          fi
+          sleep 1
+        done
+        docker logs cc-visualizer
+        exit 1
+    - name: Stop Standalone Container
+      run: docker stop cc-visualizer
+    - name: Check filesystem API artefacts
+      run: ARTEFACTS=`find api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
+    - name: Purge standalone volumes
+      if: ${{ always() }}
+      run: |
+        docker rm -f cc-visualizer 2>/dev/null || true
+        docker volume rm api project
+        rm -rf ${GITHUB_WORKSPACE}/api
+
+  build_and_test_rrd_analytic:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: TODO Remove this phase build test_pseudo_fs
+      run: docker build -f common/images/test_pseudo_fs/Dockerfile -t test_pseudo_fs:latest .
+    - name: Build the RRD Docker image
+      run: docker build -f rrd_analytic/Dockerfile --tag rrd-analytic:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test the RRD Docker image
+      run: docker compose -f rrd_analytic/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rrd-functional-tester
+    - name: Create empty standalone volumes
+      run: mkdir -p ${GITHUB_WORKSPACE}/api ${GITHUB_WORKSPACE}/rrd_data && chmod 777 ${GITHUB_WORKSPACE}/api ${GITHUB_WORKSPACE}/rrd_data && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/api -o o=bind api && docker volume create project && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/rrd_data -o o=bind rrd_data
+    - name: Run RRD Docker
+      run: docker run -d --name rrd-analytic -v "api:/api" -v "project:/mnt" -v "rrd_data:/rrd_data" -e SKIP_API_DEPS_CHECK=true rrd-analytic:$DATE
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Wait for RRD Docker to become ready
+      run: |
+        for attempt in $(seq 1 60); do
+          if docker logs rrd-analytic 2>&1 | grep -q "The service is ready"; then
+            exit 0
+          fi
+          if ! docker inspect --format='{{.State.Running}}' rrd-analytic | grep -q true; then
+            docker logs rrd-analytic
+            exit 1
+          fi
+          sleep 1
+        done
+        docker logs rrd-analytic
+        exit 1
+    - name: Stop Standalone Container
+      run: docker stop rrd-analytic
+    - name: Check filesystem API artefacts
+      run: ARTEFACTS=`find api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
+    - name: Purge standalone volumes
+      if: ${{ always() }}
+      run: |
+        docker rm -f rrd-analytic 2>/dev/null || true
+        docker volume rm api project rrd_data
+        rm -rf ${GITHUB_WORKSPACE}/api ${GITHUB_WORKSPACE}/rrd_data
+
+  build_and_test_rest_api:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: TODO Remove this phase build test_pseudo_fs
+      run: docker build -f common/images/test_pseudo_fs/Dockerfile -t test_pseudo_fs:latest .
+    - name: Build the REST API Docker image
+      run: docker build -f rest_api/Dockerfile --tag rest-api:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test the REST API Docker image
+      run: docker compose -f rest_api/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
+    - name: Create empty standalone volumes
+      run: mkdir -p ${GITHUB_WORKSPACE}/api && chmod 777 ${GITHUB_WORKSPACE}/api && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/api -o o=bind api && docker volume create project
+    - name: Run REST Docker
+      run: docker run -d --name rest-api -v "api:/api" -v "project:/mnt" -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 -p 5000:5000 rest-api:$DATE
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Wait for REST Docker to initialize
+      run: |
+        for attempt in $(seq 1 30); do
+          if docker logs rest-api 2>&1 | grep -q "Signal handlers are ready"; then
+            exit 0
+          fi
+          if ! docker inspect --format='{{.State.Running}}' rest-api | grep -q true; then
+            docker logs rest-api
+            exit 1
+          fi
+          sleep 1
+        done
+        docker logs rest-api
+        exit 1
+    - name: Stop Standalone Container
+      run: docker stop rest-api
+    - name: Check filesystem API artefacts
+      run: ARTEFACTS=`find api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
+    - name: Purge standalone volumes
+      if: ${{ always() }}
+      run: |
+        docker rm -f rest-api 2>/dev/null || true
+        docker volume rm api project
+        rm -rf ${GITHUB_WORKSPACE}/api
+
+  build_and_test_http_fs_api_proxy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: TODO Remove this phase build test_pseudo_fs
+      run: docker build -f common/images/test_pseudo_fs/Dockerfile -t test_pseudo_fs:latest .
+    - name: Build the HTTP_FS API PROXY Docker image
+      run: docker build -f fs_api_proxy/http_proxy/Dockerfile --tag fs_api_proxy_http:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test the HTTP_FS API PROXY Docker image
+      run: docker compose -f fs_api_proxy/http_proxy/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from fs-api-http-proxy-functional-tester-service-a
+
+  build_and_test_service_broker:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: TODO Remove this phase build test_pseudo_fs
+      run: docker build -f common/images/test_pseudo_fs/Dockerfile -t test_pseudo_fs:latest .
+    - name: Build the Service Broker Docker image
+      run: docker build -f service_broker/Dockerfile -t service-broker:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Test the Service Broker Docker image
+      run: docker compose -f service_broker/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from service-broker-functional-tester
+    - name: Create empty standalone volumes
+      run: mkdir -p ${GITHUB_WORKSPACE}/api && chmod 777 ${GITHUB_WORKSPACE}/api && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/api -o o=bind api && docker volume create project
+    - name: Run Broker Docker
+      run: docker run -d --name service-broker -v "api:/api" -v "project:/mnt" -e SKIP_API_DEPS_CHECK=true -e CRON_REPO_UPDATE_SCHEDULE="0 0 * * *" service-broker:$DATE
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Wait for Broker Docker to become ready
+      run: |
+        for attempt in $(seq 1 30); do
+          if docker logs service-broker 2>&1 | grep -q "The service is ready"; then
+            exit 0
+          fi
+          if ! docker inspect --format='{{.State.Running}}' service-broker | grep -q true; then
+            docker logs service-broker
+            exit 1
+          fi
+          sleep 1
+        done
+        docker logs service-broker
+        exit 1
+    - name: Stop Standalone Container
+      run: docker stop service-broker
+    - name: Check filesystem API artefacts
+      run: ARTEFACTS=`find api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"` && if [ "${ARTEFACTS}" != "" ]; then echo "${ARTEFACTS}" && exit -1; fi
+    - name: Purge standalone volumes
+      if: ${{ always() }}
+      run: |
+        docker rm -f service-broker 2>/dev/null || true
+        docker volume rm api project
+        sudo rm -rf ${GITHUB_WORKSPACE}/api
+
   build:
 
     runs-on: ubuntu-latest
