@@ -45,6 +45,20 @@ jobs:
       run: docker run -d --name cc-visualizer -v "api:/api" -v "project:/mnt" cc-visualizer:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
+    - name: Wait for CC Docker to become ready
+      run: |
+        for attempt in $(seq 1 60); do
+          if docker logs cc-visualizer 2>&1 | grep -q "The service is ready"; then
+            exit 0
+          fi
+          if ! docker inspect --format='{{.State.Running}}' cc-visualizer | grep -q true; then
+            docker logs cc-visualizer
+            exit 1
+          fi
+          sleep 1
+        done
+        docker logs cc-visualizer
+        exit 1
     - name: Stop Standalone Container
       run: docker stop cc-visualizer
     - name: Check filesystem API artefacts
@@ -78,9 +92,23 @@ jobs:
     - name: Create empty standalone volumes
       run: mkdir -p ${GITHUB_WORKSPACE}/api ${GITHUB_WORKSPACE}/rrd_data && chmod 777 ${GITHUB_WORKSPACE}/api ${GITHUB_WORKSPACE}/rrd_data && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/api -o o=bind api && docker volume create project && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/rrd_data -o o=bind rrd_data
     - name: Run RRD Docker
-      run: docker run -d --name rrd-analytic -v "api:/api" -v "project:/mnt" -v "rrd_data:/rrd_data" rrd-analytic:$DATE
+      run: docker run -d --name rrd-analytic -v "api:/api" -v "project:/mnt" -v "rrd_data:/rrd_data" -e SKIP_API_DEPS_CHECK=true rrd-analytic:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
+    - name: Wait for RRD Docker to become ready
+      run: |
+        for attempt in $(seq 1 60); do
+          if docker logs rrd-analytic 2>&1 | grep -q "The service is ready"; then
+            exit 0
+          fi
+          if ! docker inspect --format='{{.State.Running}}' rrd-analytic | grep -q true; then
+            docker logs rrd-analytic
+            exit 1
+          fi
+          sleep 1
+        done
+        docker logs rrd-analytic
+        exit 1
     - name: Stop Standalone Container
       run: docker stop rrd-analytic
     - name: Check filesystem API artefacts
@@ -117,6 +145,20 @@ jobs:
       run: docker run -d --name rest-api -v "api:/api" -v "project:/mnt" -e FLASK_RUN_PORT=5000 -e FLASK_RUN_HOST=0.0.0.0 -p 5000:5000 rest-api:$DATE
       env:
         DATE: ${{ steps.date.outputs.date }}
+    - name: Wait for REST Docker to initialize
+      run: |
+        for attempt in $(seq 1 30); do
+          if docker logs rest-api 2>&1 | grep -q "Signal handlers are ready"; then
+            exit 0
+          fi
+          if ! docker inspect --format='{{.State.Running}}' rest-api | grep -q true; then
+            docker logs rest-api
+            exit 1
+          fi
+          sleep 1
+        done
+        docker logs rest-api
+        exit 1
     - name: Stop Standalone Container
       run: docker stop rest-api
     - name: Check filesystem API artefacts
