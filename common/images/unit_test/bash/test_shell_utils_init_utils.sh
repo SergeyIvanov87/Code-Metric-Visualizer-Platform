@@ -4,7 +4,53 @@ test_suite_filename=${0}
 
 source /tests/shell_utils/init_utils.sh
 
+assert_process_running() {
+    local message=${1}
+    local pid=${2}
+
+    kill -s 0 "${pid}" 2>/dev/null
+    local status=$?
+    assertEquals "${message}" 0 "${status}"
+}
+
+assert_process_stopped() {
+    local message=${1}
+    local pid=${2}
+
+    kill -s 0 "${pid}" 2>/dev/null
+    local status=$?
+    assertNotEquals "${message}" 0 "${status}"
+}
+
 ################################################################################
+test_terminate_and_wait_reaps_process_after_sigterm() {
+    sleep infinity &
+    local pid=$!
+
+    assert_process_running "process must be running before shutdown" "${pid}"
+    terminate_and_wait "${pid}" "cooperative test process" 2
+    assert_process_stopped "process must be reaped after SIGTERM" "${pid}"
+}
+
+test_terminate_and_wait_kills_process_after_timeout() {
+    local ready_file="/tmp/terminate_and_wait_ready_$$"
+    rm -f "${ready_file}"
+    (
+        trap '' TERM
+        : > "${ready_file}"
+        exec sleep infinity
+    ) &
+    local pid=$!
+
+    while [ ! -f "${ready_file}" ]; do
+        sleep 0.01
+    done
+    assert_process_running "process must be running before forced shutdown" "${pid}"
+    terminate_and_wait "${pid}" "uncooperative test process" 1
+    assert_process_stopped "process must be reaped after SIGKILL" "${pid}"
+    rm -f "${ready_file}"
+}
+
 test_gracefull_shutdown() {
     declare -A SERVICE_WATCH_PIDS_TO_STOP
 
@@ -20,15 +66,15 @@ test_gracefull_shutdown() {
     (tail -f /dev/null) &
     API_MANAGEMENT_PID=$!
 
-    assertEquals "process_name_0 must have 1 instance" `ps -ef | grep ${SERVICE_WATCH_PIDS_TO_STOP[${process_name_0}]} | grep -v grep | wc -l` 1
-    assertEquals "process_name_1 must have 1 instance" `ps -ef | grep ${SERVICE_WATCH_PIDS_TO_STOP[${process_name_1}]} | grep -v grep | wc -l` 1
-    assertEquals "API_MANAGEMENT_PID must have 1 instance" `ps -ef | grep ${API_MANAGEMENT_PID} | grep -v grep | wc -l` 1
+    assert_process_running "process_name_0 must have 1 instance" "${SERVICE_WATCH_PIDS_TO_STOP[${process_name_0}]}"
+    assert_process_running "process_name_1 must have 1 instance" "${SERVICE_WATCH_PIDS_TO_STOP[${process_name_1}]}"
+    assert_process_running "API_MANAGEMENT_PID must have 1 instance" "${API_MANAGEMENT_PID}"
 
     gracefull_shutdown SERVICE_WATCH_PIDS_TO_STOP ${API_MANAGEMENT_PID}
 
-    assertEquals `ps -ef | grep ${SERVICE_WATCH_PIDS_TO_STOP[${process_name_0}]} | grep -v grep | wc -l` 0
-    assertEquals `ps -ef | grep ${SERVICE_WATCH_PIDS_TO_STOP[${process_name_1}]} | grep -v grep | wc -l` 0
-    assertEquals `ps -ef | grep ${API_MANAGEMENT_PID} | grep -v grep | wc -l` 0
+    assert_process_stopped "process_name_0 must stop" "${SERVICE_WATCH_PIDS_TO_STOP[${process_name_0}]}"
+    assert_process_stopped "process_name_1 must stop" "${SERVICE_WATCH_PIDS_TO_STOP[${process_name_1}]}"
+    assert_process_stopped "API_MANAGEMENT_PID must stop" "${API_MANAGEMENT_PID}"
 }
 
 
@@ -53,17 +99,17 @@ test_gracefull_shutdown_bunch() {
     eval $process_management_name_1
     API_MANAGEMENT_PID[${process_management_name_1}]=$!
 
-    assertEquals "process_name_0 must have 1 instance" `ps -ef | grep ${SERVICE_WATCH_PIDS_TO_STOP[${process_name_0}]} | grep -v grep | wc -l` 1
-    assertEquals "process_name_1 must have 1 instance" `ps -ef | grep ${SERVICE_WATCH_PIDS_TO_STOP[${process_name_1}]} | grep -v grep | wc -l` 1
-    assertEquals "API_MANAGEMENT_PID must have 1 instance of process_management_name_0" `ps -ef | grep ${API_MANAGEMENT_PID[${process_management_name_0}]} | grep -v grep | wc -l` 1
-    assertEquals "API_MANAGEMENT_PID must have 1 instance of process_management_name_1" `ps -ef | grep ${API_MANAGEMENT_PID[${process_management_name_1}]} | grep -v grep | wc -l` 1
+    assert_process_running "process_name_0 must have 1 instance" "${SERVICE_WATCH_PIDS_TO_STOP[${process_name_0}]}"
+    assert_process_running "process_name_1 must have 1 instance" "${SERVICE_WATCH_PIDS_TO_STOP[${process_name_1}]}"
+    assert_process_running "API_MANAGEMENT_PID must have 1 instance of process_management_name_0" "${API_MANAGEMENT_PID[${process_management_name_0}]}"
+    assert_process_running "API_MANAGEMENT_PID must have 1 instance of process_management_name_1" "${API_MANAGEMENT_PID[${process_management_name_1}]}"
 
     gracefull_shutdown_bunch SERVICE_WATCH_PIDS_TO_STOP API_MANAGEMENT_PID
 
-    assertEquals `ps -ef | grep ${SERVICE_WATCH_PIDS_TO_STOP[${process_name_0}]} | grep -v grep | wc -l` 0
-    assertEquals `ps -ef | grep ${SERVICE_WATCH_PIDS_TO_STOP[${process_name_1}]} | grep -v grep | wc -l` 0
-    assertEquals `ps -ef | grep ${API_MANAGEMENT_PID[${process_management_name_0}]} | grep -v grep | wc -l` 0
-    assertEquals `ps -ef | grep ${API_MANAGEMENT_PID[${process_management_name_1}]} | grep -v grep | wc -l` 0
+    assert_process_stopped "process_name_0 must stop" "${SERVICE_WATCH_PIDS_TO_STOP[${process_name_0}]}"
+    assert_process_stopped "process_name_1 must stop" "${SERVICE_WATCH_PIDS_TO_STOP[${process_name_1}]}"
+    assert_process_stopped "API_MANAGEMENT_PID process_management_name_0 must stop" "${API_MANAGEMENT_PID[${process_management_name_0}]}"
+    assert_process_stopped "API_MANAGEMENT_PID process_management_name_1 must stop" "${API_MANAGEMENT_PID[${process_management_name_1}]}"
 }
 
 ################################################################################
