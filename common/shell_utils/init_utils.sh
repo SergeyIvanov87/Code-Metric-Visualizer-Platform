@@ -21,20 +21,36 @@ terminate_and_wait() {
     fi
 
     kill -s SIGTERM "${pid}" 2>/dev/null || true
-    (
-        sleep "${timeout_sec}"
-        if kill -s 0 "${pid}" 2>/dev/null; then
+    local deadline=$((SECONDS + timeout_sec))
+    local process_state=""
+    local stat_line=""
+
+    while kill -s 0 "${pid}" 2>/dev/null; do
+        # A zombie still answers kill -0, but is ready for its parent to reap.
+        # Read /proc with shell builtins so shutdown does not create additional
+        # asynchronous jobs while Bash is updating its child-process table.
+        if [ -r "/proc/${pid}/stat" ]; then
+            IFS= read -r stat_line < "/proc/${pid}/stat" 2>/dev/null || break
+            process_state=${stat_line##*) }
+            process_state=${process_state%% *}
+            if [ "${process_state}" = "Z" ] || [ "${process_state}" = "X" ]; then
+                break
+            fi
+        else
+            break
+        fi
+
+        if [ "${SECONDS}" -ge "${deadline}" ]; then
             echo -e "${BRed}${process_name} PID ${pid} did not stop in ${timeout_sec}s; sending SIGKILL${Color_Off}" >&2
             kill -s SIGKILL "${pid}" 2>/dev/null || true
+            break
         fi
-    ) &
-    local watchdog_pid=$!
+        sleep 0.1
+    done
 
-    # wait both blocks until shutdown completes and reaps the child, so a zombie
-    # cannot make an unbounded `kill -0` polling loop look alive forever.
+    # Reap a direct child. For externally-owned processes wait returns
+    # immediately; disappearance/zombie detection above still bounds shutdown.
     wait "${pid}" 2>/dev/null || true
-    kill -s SIGTERM "${watchdog_pid}" 2>/dev/null || true
-    wait "${watchdog_pid}" 2>/dev/null || true
 }
 
 gracefull_shutdown() {
@@ -43,14 +59,12 @@ gracefull_shutdown() {
     local api_management_pid=${2}
 
     echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Shutdown servers***${Color_Off}"
-    ps -ef
     for server_script_path in "${!service_watch_pids_to_stop[@]}"
     do
         echo -e "${BRed}Kill ${server_script_path}${Color_Off} by PID: ${Red}${service_watch_pids_to_stop[$server_script_path]}${Color_Off}"
         pkill -KILL -e -P ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
         kill -9 ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
         wait ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
-        ps -ef
     done
     echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Clear pipes, killing PID: ${Red}${API_MANAGEMENT_PID}${BRed}****${Color_Off}"
     terminate_and_wait "${api_management_pid}" "API manager"
@@ -62,14 +76,12 @@ gracefull_shutdown_bunch() {
     local -n api_management_pids=${2}
     if [ ${#service_watch_pids_to_stop[@]} -ne 0 ] ; then
         echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Shutdown servers***${Color_Off}"
-        ps -ef
         for server_script_path in "${!service_watch_pids_to_stop[@]}"
         do
             echo -e "${BRed}Kill ${server_script_path}${Color_Off} by PID: ${Red}${service_watch_pids_to_stop[$server_script_path]}${Color_Off}"
             pkill -KILL -e -P ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
             kill -9 ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
             wait ${service_watch_pids_to_stop[$server_script_path]} 2>/dev/null || true
-            ps -ef
         done
         echo -e "`date +%H:%M:%S:%3N`    ${BRed}***Shutdown servers --- DONE***${Color_Off}"
     fi
