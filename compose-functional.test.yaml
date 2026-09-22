@@ -149,10 +149,10 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  ai_aent_rag_functional_tester:
+  ai_agent_rag_functional_tester:
     extends:
       file: ai_agents_framework/ai_agent/test/compose-functional.prod.yaml
-      service: ai_aent_rag_functional_tester
+      service: ai_agent_rag_functional_tester
     environment:
       EXIT_ONCE_DONE: "false"
     volumes:

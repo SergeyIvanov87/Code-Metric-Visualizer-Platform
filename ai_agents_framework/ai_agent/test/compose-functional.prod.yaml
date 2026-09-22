@@ -52,7 +52,7 @@ services:
     volumes:
       - ai_agent_document_storage:/mnt/file_storage
 
-  ai_aent_rag_functional_tester:
+  ai_agent_rag_functional_tester:
     build:
       context: ../../..
       dockerfile: ai_agents_framework/ai_agent/test/Dockerfile
