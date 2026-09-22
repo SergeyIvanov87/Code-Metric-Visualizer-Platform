@@ -1,7 +1,7 @@
 services:
   syslog-ng:
     build:
-      context: ../../../
+      context: ../../..
       dockerfile: common/images/syslog-ng_image/Dockerfile
     env_file:
       - path: ./.env
@@ -10,16 +10,16 @@ services:
       - PUID=0
       - PGID=0
       - TZ= # timezone
-      - DOWNSTREAM_SYSLOG_HOSTNAME=${DOWNSTREAM_SYSLOG_HOSTNAME}
-      - DOWNSTREAM_SYSLOG_UDP_PORT=${DOWNSTREAM_SYSLOG_UDP_PORT}
-      - DOWNSTREAM_SYSLOG_TCP_PORT=${DOWNSTREAM_SYSLOG_TCP_PORT}
-    container_name: ${DOWNSTREAM_SYSLOG_HOSTNAME}
-    hostname: ${DOWNSTREAM_SYSLOG_HOSTNAME}
+      - DOWNSTREAM_SYSLOG_HOSTNAME=${DOWNSTREAM_SYSLOG_HOSTNAME:-api.pmccabe_collector.syslog-ng}
+      - DOWNSTREAM_SYSLOG_UDP_PORT=${DOWNSTREAM_SYSLOG_UDP_PORT:-5514}
+      - DOWNSTREAM_SYSLOG_TCP_PORT=${DOWNSTREAM_SYSLOG_TCP_PORT:-6601}
+    container_name: ${DOWNSTREAM_SYSLOG_HOSTNAME:-api.pmccabe_collector.syslog-ng}
+    hostname: ${DOWNSTREAM_SYSLOG_HOSTNAME:-api.pmccabe_collector.syslog-ng}
     volumes:
       - api.pmccabe_collector.logger.org:/var/log
     ports:
-      - ${HOST_UPSTREAM_SYSLOG_UDP_PORT}:${DOWNSTREAM_SYSLOG_UDP_PORT}/udp
-      - ${HOST_UPSTREAM_SYSLOG_TCP_PORT}:${DOWNSTREAM_SYSLOG_TCP_PORT}/tcp
+      - "${HOST_UPSTREAM_SYSLOG_UDP_PORT:-514}:${DOWNSTREAM_SYSLOG_UDP_PORT:-5514}/udp"
+      - "${HOST_UPSTREAM_SYSLOG_TCP_PORT:-601}:${DOWNSTREAM_SYSLOG_TCP_PORT:-6601}/tcp"
     restart: unless-stopped
     networks:
       - api.pmccabe_collector.network

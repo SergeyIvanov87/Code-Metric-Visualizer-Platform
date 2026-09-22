@@ -336,6 +336,8 @@ jobs:
       run: docker network create -d bridge api.pmccabe_collector.network
     - name: Prepare shared volume for SYSLOG-NG
       run: rm -rf ${GITHUB_WORKSPACE}/log && mkdir -p ${GITHUB_WORKSPACE}/log && chmod 777 ${GITHUB_WORKSPACE}/log && docker volume create -d local -o type=none -o device=${GITHUB_WORKSPACE}/log -o o=bind api.pmccabe_collector.logger.org
+    - name: Validate functional test Compose configuration
+      run: docker compose -f compose-functional.test.yaml config --quiet
     - name: All together functional tests
       run: EXIT_STATUS=0 && docker compose -f compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from test_aggregator || EXIT_STATUS=$? && if [ $EXIT_STATUS != 0 ]; then cat ${GITHUB_WORKSPACE}/log/messages && exit ${EXIT_STATUS}; fi
     - name: Preserve test aggregator diagnostics

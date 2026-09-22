@@ -1,0 +1,38 @@
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9901 }
+static_resources:
+  listeners:
+    - name: test_aggregator
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 14601 }
+      filter_chains:
+        - transport_socket:
+            name: envoy.transport_sockets.tap
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tap.v3.Tap
+              common_config:
+                admin_config: { config_id: test_aggregator }
+              transport_socket:
+                name: envoy.transport_sockets.raw_buffer
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+          filters:
+            - name: envoy.filters.network.tcp_proxy
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+                stat_prefix: destination
+                cluster: syslog
+  clusters:
+    - name: syslog
+      connect_timeout: 5s
+      type: LOGICAL_DNS
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: syslog
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: syslog-ng, port_value: 601 }
