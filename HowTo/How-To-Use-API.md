@@ -1,5 +1,9 @@
 # Few words about using the pseudo-filesystem API
 
+> **Async file-transfer proposal:** the compatibility and lifecycle review for
+> issue 115 is documented in
+> [Issue 115 async file API design review](../Architecture_Design_Decisions/Async-File-API-Design%23115/Review.md).
+
 
 ## CLI Transaction Semantic
 
