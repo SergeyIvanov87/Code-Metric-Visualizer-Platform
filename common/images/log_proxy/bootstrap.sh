@@ -9,7 +9,7 @@ rm -f /root/.ssh/known_hosts
 
 echo "Wait until syslog-ng SSH server started"
 wait_for_ssh "root" "${DOWNSTREAM_SYSLOG_HOSTNAME}" "${DOWNSTREAM_SSH_SECRET}"
-execute_ssh_cmd "root" "${DOWNSTREAM_SYSLOG_HOSTNAME}" "${DOWNSTREAM_SSH_SECRET}" "while syslog-ng-ctl healthcheck -c /config/syslog-ng.ctl && [[ \$? != 0 ]]; do echo \"waiting for syslog-ng running...\" && sleep 1; done"
+execute_ssh_cmd "root" "${DOWNSTREAM_SYSLOG_HOSTNAME}" "${DOWNSTREAM_SSH_SECRET}" "until syslog-ng-ctl healthcheck -c /config/syslog-ng.ctl; do echo \"waiting for syslog-ng running...\" && sleep 1; done"
 
 # Bootstrap the port/address placeholders before starting Envoy.
 sed -i "s/ENVOY_ADMIN_PORT/${ENVOY_ADMIN_PORT}/" /etc/envoy/envoy.yaml
