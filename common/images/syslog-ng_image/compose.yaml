@@ -1,10 +1,10 @@
 services:
   syslog-ng:
     build:
-      context: ../../../
+      context: ../..
       dockerfile: common/images/syslog-ng_image/Dockerfile
     env_file:
-      - path: ./.env
+      - path: ./syslog-ng_image/.env
         required: true
     environment:
       - PUID=0
