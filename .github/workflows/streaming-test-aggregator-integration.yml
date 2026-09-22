@@ -50,6 +50,10 @@ jobs:
         }
         trap cleanup EXIT
 
+        docker compose -f "${compose_logger_subsystem_file}" config --quiet
+        docker compose -f "${compose_logger_test_aggregator_subsystem_file}" config --quiet
+        docker compose -f "${compose_tests_file}" config --quiet
+
         docker compose -f "${compose_logger_subsystem_file}" build
         docker compose -f "${compose_logger_subsystem_file}" up --detach --remove-orphans \
           syslog-ng-streaming envoy envoy-ready
