@@ -86,7 +86,7 @@ class LogParser:
     def collect_statistic(self):
         test_summary_regex = re.compile(r"^=+\s+(?P<summary>.*?)\s+in\s+.*=+$")
         test_outcome_regex = re.compile(
-            r"(?:^|,\s+)(\d+)\s+(passed|failed|skipped)(?=,|\s+in\s+|$)"
+            r"(?:^|,\s+)(\d+)\s+(passed|failed|skipped|errors?)(?=,|$)"
         )
         stat = TestStatistic()
         if len(self.records) == 0:
@@ -104,7 +104,10 @@ class LogParser:
                     # are the single source of truth for both totals and
                     # outcomes.
                     stat.total += count
-                    setattr(stat, outcome, getattr(stat, outcome) + count)
+                    if outcome.startswith("error"):
+                        stat.failed += count
+                    else:
+                        setattr(stat, outcome, getattr(stat, outcome) + count)
 
         if stat.failed != 0:
             stat.error_log = "\n".join([f.data for f in self.records])
