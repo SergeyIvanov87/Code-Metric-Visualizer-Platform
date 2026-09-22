@@ -436,7 +436,6 @@ def main():
                 destination = args.decoded_directory / f"connection_{trace_id}.log"
                 published_path = finalize_stream(stream_path, destination)
                 publish_connection(publisher, trace_id, published_path)
-                published_path.unlink()
                 traces_with_data.remove(trace_id)
             else:
                 stream_path.unlink(missing_ok=True)
@@ -528,7 +527,6 @@ def main():
         destination = args.decoded_directory / f"connection_{trace_id}.log"
         published_path = finalize_stream(stream_path, destination)
         publish_connection(publisher, trace_id, published_path)
-        published_path.unlink()
     spool_directory.rmdir()
     publisher.publish({"type": "capture_complete"})
     publisher.drain_all(args.kafka_delivery_timeout_seconds)

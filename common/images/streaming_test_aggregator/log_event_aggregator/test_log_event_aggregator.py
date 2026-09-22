@@ -1,6 +1,8 @@
 import base64
 import importlib.util
 import json
+import os
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -43,6 +45,50 @@ class Consumer:
 
 def event(event_type, **values):
     return Message({"schema_version": 1, "type": event_type, "capture_id": "capture-1", **values})
+
+
+def test_pytest_error_summary_fails_aggregation(tmp_path):
+    stub_dir = tmp_path / "stubs"
+    stub_dir.mkdir()
+    (stub_dir / "pyinotify.py").write_text(
+        """\
+IN_DELETE = IN_CREATE = IN_MODIFY = 1
+class ProcessEvent: pass
+class WatchManager:
+    def add_watch(self, *args, **kwargs): return {}
+class Notifier:
+    def __init__(self, *args, **kwargs): pass
+    def process_events(self): pass
+    def check_events(self): return False
+    def read_events(self): pass
+"""
+    )
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    (logs_dir / "tester.log").write_text(
+        "<27>Sep 21 19:43:49 sample-tester[1]: "
+        "========== 1 passed, 1 error in 0.02s ==========\n"
+    )
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(stub_dir)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).with_name("log_aggregator.py")),
+            str(logs_dir),
+            r"^.*\s.*\s(.*tester.*)\[\d+\]:.*$",
+            "-t=20",
+            "-f=pcap",
+        ],
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=5,
+    )
+
+    assert result.returncode != 0
+    assert "FAILED tests in sample-tester: 1/2" in result.stderr
 
 
 class BrokerError:

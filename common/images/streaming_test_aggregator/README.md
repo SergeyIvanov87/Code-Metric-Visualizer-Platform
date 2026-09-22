@@ -38,6 +38,118 @@ The dedicated GitHub Actions workflow uses the same detached orchestration,
 propagates the functional-test container's exit code, and prints all service
 logs before cleanup.
 
+## Permanent proxy and on-demand executions
+
+`common/images/compose-logger-subsystem.yaml` owns the permanent Envoy and
+syslog-ng services. Start that project once and leave it running:
+
+```sh
+docker compose \
+  -p logger-subsystem \
+  -f common/images/compose-logger-subsystem.yaml \
+  up --build --detach
+```
+
+The on-demand execution has two Compose entry points:
+
+- `compose-test-aggregator-subsystem.yaml` contains the capture infrastructure:
+  `proxy-ready`, Kafka, `log_event_aggregator`, and `tap_subscriber`.
+- `compose-functional-tests-test-aggregator-subsystem.yaml` includes the
+  capture file and adds the test producers plus the final `functional-tests`
+  validation container. Compose `include` requires Docker Compose 2.20 or
+  newer.
+
+If `TEST_EXECUTION_ID` is unset, both files use `functional-test` for the
+project suffix, capture ID, and consumer-group suffix. That predefined value is
+suitable for a clean manual launch. Before reusing it, tear the previous
+project down with `--volumes` so stale Kafka state cannot be consumed. For
+repeated or controller-managed executions, export one unique ID and retain it
+until result collection and teardown are complete:
+
+```sh
+export TEST_EXECUTION_ID="run-$(date -u +%Y%m%d%H%M%S)-$$"
+tests_file=common/images/compose-functional-tests-test-aggregator-subsystem.yaml
+```
+
+### Start the complete execution at once
+
+Because the functional-test file includes the capture file, this single command
+starts Kafka, the proxy readiness probe, subscriber, aggregator, test producers,
+and final validation container:
+
+```sh
+docker compose \
+  -f "${tests_file}" \
+  up --build --detach
+```
+
+Use this mode when the test producers may start as soon as the tap subscription
+is healthy.
+
+### Stage capture before starting tests
+
+Use two commands only when capture must be established before the test scope is
+introduced. Both commands must retain the same `TEST_EXECUTION_ID`; otherwise
+they address different Compose projects.
+
+```sh
+capture_file=common/images/compose-test-aggregator-subsystem.yaml
+
+# Phase 1: establish the Envoy tap subscription and wait until capture is ready.
+docker compose \
+  -f "${capture_file}" \
+  up --build --detach --wait --wait-timeout 120
+
+# Phase 2: reconcile the existing capture services and add the finite test scope.
+docker compose \
+  -f "${tests_file}" \
+  up --build --detach
+```
+
+The phase-2 command does not create duplicate capture services. The matching
+project name and service names cause Compose to reuse the running Kafka,
+subscriber, and aggregator when their configuration is unchanged. The
+`proxy-ready` one-shot probe may run again.
+
+Start phase 2 before `WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC` expires.
+
+### Collect the result and clean up
+
+The following applies to either launch mode. The aggregator is authoritative
+for capture or analysis failures. When it succeeds, `functional-tests`
+provides the final validation exit code.
+
+```sh
+aggregator_id=$(docker compose \
+  -f "${tests_file}" \
+  ps --all --quiet log_event_aggregator)
+execution_result=$(docker wait "${aggregator_id}")
+
+if [ "${execution_result}" -eq 0 ]; then
+  functional_tests_id=$(docker compose \
+    -f "${tests_file}" \
+    ps --all --quiet functional-tests)
+  execution_result=$(docker wait "${functional_tests_id}")
+fi
+
+# Export result artifacts and diagnostics before cleanup when needed.
+docker compose -f "${tests_file}" logs --no-color
+docker compose \
+  -f "${tests_file}" \
+  down --volumes --remove-orphans
+
+unset TEST_EXECUTION_ID
+exit "${execution_result}"
+```
+
+The capture file derives the project name, `CAPTURE_ID`, and Kafka consumer
+group from the same resolved ID. The functional-test file repeats the project
+name and includes the capture model, so its `up`, `ps`, `logs`, and `down`
+commands operate on the same execution.
+
+Do not run overlapping executions against the same permanent Envoy tap config;
+`test_aggregator` supports one active admin-tap subscriber at a time.
+
 ## Broker readiness
 
 The functional broker healthcheck creates and describes `test-capture-events`;

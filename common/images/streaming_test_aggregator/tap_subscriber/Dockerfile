@@ -13,22 +13,32 @@ COPY common/images/streaming_test_aggregator/tap_subscriber/lifecycle_watchdog.s
 COPY common/images/streaming_test_aggregator/tap_subscriber/tap_subscriber.py /package/tap_subscriber.py
 COPY common/images/streaming_test_aggregator/tap_subscriber/publish_capture_failure.py /package/publish_capture_failure.py
 COPY common/images/streaming_test_aggregator/tap_subscriber/decode_envoy_tap.py /package/decode_envoy_tap.py
+COPY common/images/streaming_test_aggregator/tap_subscriber/aggregate_connection_logs.py /package/aggregate_connection_logs.py
 RUN chmod +x \
     /etc/bootstrap.sh \
     /package/lifecycle_watchdog.sh \
     /package/tap_subscriber.py \
     /package/publish_capture_failure.py \
-    /package/decode_envoy_tap.py
+    /package/decode_envoy_tap.py \
+    /package/aggregate_connection_logs.py
 
-ENV WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC=15000 \
-    WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC=60000 \
-    MAX_BUFFERED_RX_BYTES=16777216 \
+ARG ENVOY_ADMIN_HOST=envoy
+ARG ENVOY_ADMIN_PORT=9901
+ARG MAX_BUFFERED_RX_BYTES=4294967295
+ARG WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC=15000
+ARG WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC=60000
+ARG KAFKA_DELIVERY_TIMEOUT_SECONDS=120
+ARG KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+
+ENV WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC=${WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC} \
+    WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC=${WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC} \
+    MAX_BUFFERED_RX_BYTES=${MAX_BUFFERED_RX_BYTES} \
     RETAIN_RAW_TAPS=false \
-    ENVOY_ADMIN_HOST=envoy \
-    ENVOY_ADMIN_PORT=9901 \
+    ENVOY_ADMIN_HOST=${ENVOY_ADMIN_HOST} \
+    ENVOY_ADMIN_PORT=${ENVOY_ADMIN_PORT} \
     ENVOY_TAP_CONFIG_ID=test_aggregator \
-    KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-    KAFKA_DELIVERY_TIMEOUT_SECONDS=120 \
+    KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS} \
+    KAFKA_DELIVERY_TIMEOUT_SECONDS=${KAFKA_DELIVERY_TIMEOUT_SECONDS} \
     KAFKA_TOPIC=test-capture-events \
     CAPTURE_ID=functional-test
 

@@ -1,0 +1,47 @@
+# Extend the already-running capture project with the functional test scope.
+# TEST_EXECUTION_ID must have the same value used to start the capture stack.
+name: test-aggregator-${TEST_EXECUTION_ID:-functional-test}
+
+include:
+  - compose-test-aggregator-subsystem.yaml
+
+services:
+  passed-tester:
+    image: alpine:3.20
+    command: ["sh", "-c", "printf 'collected 2 items\\n================ 2 passed in 0.02s ================\\n'; sleep infinity"]
+    depends_on:
+      tap_subscriber: { condition: service_healthy }
+    logging: &tester-logging
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
+    networks:
+      - api.pmccabe_collector.network
+
+  skipped-tester:
+    image: alpine:3.20
+    command: ["sh", "-c", "printf 'collected 2 items\\n================ 1 passed in 0.02s ================\\n================ 1 skipped in 0.01s ================\\n'; sleep infinity"]
+    depends_on:
+      tap_subscriber: { condition: service_healthy }
+    logging: *tester-logging
+    networks:
+      - api.pmccabe_collector.network
+
+  mixed-tester:
+    image: alpine:3.20
+    command: ["sh", "-c", "printf 'collected 2 items\\n================ 2 passed in 0.02s ================\\n'; sleep infinity"]
+    depends_on:
+      tap_subscriber: { condition: service_healthy }
+    logging: *tester-logging
+    networks:
+      - api.pmccabe_collector.network
+
+  functional-tests:
+    build:
+      context: ../..
+      dockerfile: common/images/streaming_test_aggregator/tests/functional/Dockerfile
+    volumes:
+      - streaming-test-aggregator-logs:/logs:ro
+    depends_on:
+      log_event_aggregator: { condition: service_completed_successfully }
+    networks:
+      - api.pmccabe_collector.network
