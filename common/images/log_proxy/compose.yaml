@@ -1,10 +1,10 @@
 services:
   envoy:
     build:
-      context: ../../../
+      context: ../..
       dockerfile: common/images/log_proxy/Dockerfile
     env_file:
-      - path: ./.env
+      - path: ./log_proxy/.env
         required: true
     environment:
         - ENVOY_ADMIN_PORT=${ENVOY_ADMIN_PORT:-9901}
@@ -28,7 +28,7 @@ services:
   envoy-ready:
     image: curlimages/curl:8.16.0
     env_file:
-      - path: ./.env
+      - path: ./log_proxy/.env
         required: true
     environment:
         - ENVOY_ADMIN_PORT=${ENVOY_ADMIN_PORT:-9901}
