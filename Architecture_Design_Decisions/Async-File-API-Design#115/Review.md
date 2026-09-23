@@ -129,6 +129,118 @@ The async listener forwards that output to the final-result FIFO. The phrase
 `File uploaded successfully` in the issue is only an example of one successful
 executor outcome; it is not a fixed transport-level response.
 
+## Alternative proposal: executor-level async processor
+
+The alternative proposal removes the reserved async path prefix. A query that
+supports deferred file input declares an ordinary schema parameter named
+`AsyncWaitQueryTimeoutSec` (for example, with a default of `5`). The existing
+pseudo-filesystem generator creates the parameter file and the existing
+executor machinery applies persistent values and per-request overrides just as
+it does for other parameters.
+
+The query's `api_generator.py` then makes its generated executor invoke a common
+utility along these lines:
+
+```text
+${WORK_DIR}/async_query_processor_file_uploader.py \
+  "${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/<microservice>/<query>" \
+  "<path-to-query-processing-executable>" \
+  "${OVERRIDEN_CMD_ARGS[@]}"
+```
+
+The common utility owns allocation, FIFO lifecycle, timeout and signal handling,
+and child-process supervision. The final processing executable is supplied by
+the individual microservice and owns its business logic and result.
+
+### Assessment against the established decisions
+
+| Established decision or mitigation | Coverage by this proposal | Assessment |
+| --- | --- | --- |
+| Async behavior must not silently replace a legacy contract | Conditional | Removing the prefix is safe only when this is a new query, or when its existing contract is intentionally async. Adding the timeout parameter to an existing synchronous query and wrapping its executor changes that query's result into an allocation handshake. |
+| Use existing schema/generator parameter handling | Strong | `AsyncWaitQueryTimeoutSec` fits the current parameter-file and override model, so `build_api_pseudo_fs.py`, `build_api_services.py`, and the common argument-processing path need no async-specific branch. Query schemas and each participating `api_generator.py` still change. |
+| Stream client-side file bytes | Strong | The generic processor can expose an input FIFO while the client continues to use `cat file > FIFO`. The processing-executable contract must say whether it receives a staged pathname, an open descriptor, or standard input. |
+| Keep API artifacts server-owned | Strong | The common processor runs under the service identity and creates nodes in the existing server-owned query directory. Existing container user/group policy can continue to deny clients directory mutation while granting FIFO access. |
+| Validate before allocating or forking work | Strong, if enforced | The generated executor already receives resolved arguments. The common processor can validate `AsyncWaitQueryTimeoutSec`, `SESSION_ID`, executable path, and optional size/digest metadata before creating FIFOs or starting its supervised processing child. |
+| Gate handshake publication on listener readiness | Strong, if the utility is an allocator | The utility can create/open the ephemeral FIFO, establish its reader, create the final-result FIFO, and only then print the input FIFO name as the generated executor's result. Printing before initialization would preserve the original race. |
+| Keep business results owned by the per-query executor | Strong | The microservice-specific executable remains responsible for processing and output. The common processor should transport its stdout/result and preserve its defined failure status rather than inventing a universal success message. |
+| Reuse `api_management.py` shutdown cleanup | Partial | Directory cleanup remains compatible if the async artifacts stay inside the schema-defined query directory. The generic processor must also terminate and reap its processing child when signalled; removing FIFO pathnames alone does not stop processes holding them open. |
+
+### Important interaction with the current generated server
+
+The current CLI server invokes a query executor synchronously, captures its
+stdout, and then publishes that captured value to `result..._<SESSION_ID>`.
+Consequently, the common utility cannot remain in the foreground for the whole
+upload and execution lifecycle: doing so would keep the main per-query listener
+busy and prevent the allocation FIFO name from reaching the client.
+
+The common utility needs two roles:
+
+1. A short-lived **allocator** validates the request, establishes the endpoints
+   and supervised background process, writes only the ephemeral input FIFO name
+   to stdout, and exits.
+2. A detached **supervisor** waits for input, runs the microservice-specific
+   executable, publishes its result, enforces timeouts, and cleans up.
+
+The supervisor must close or redirect every inherited stdout/stderr and pipe
+descriptor used by the generated server's command substitution. Merely forking
+without closing those descriptors can keep command substitution waiting for EOF
+and make the supposedly short allocation request block.
+
+This division lets the unmodified generated server use its normal
+`result..._<SESSION_ID>` path as the allocation handshake. It is the key
+condition behind the proposal's claim that the common `build_api_*` scripts do
+not require changes.
+
+### Parameter and invocation contract
+
+`AsyncWaitQueryTimeoutSec` should remain an ordinary validated query parameter,
+but its meaning must be narrow: it is the maximum wait for upload acceptance,
+not a switch between synchronous and asynchronous behavior. Whether a query is
+async is determined by its generated executor invoking the common processor.
+This avoids treating a timeout value as a hidden boolean protocol selector.
+
+The example array expansion also needs an explicit contract. Passing
+`"${OVERRIDEN_CMD_ARGS[@]}"` from a generated shell script normally supplies one
+argument per array element; serializing it into one quoted string changes
+boundaries for spaces and binary-looking values. Prefer a real argv vector and
+put the executable path after `--` so values cannot be interpreted as options:
+
+```text
+async_query_processor_file_uploader.py \
+  --api-directory "${api_directory}" \
+  --processor "${processor_path}" \
+  -- "${OVERRIDEN_CMD_ARGS[@]}"
+```
+
+The common processor should invoke the per-query executable without a shell and
+pass the validated argument vector unchanged. File bytes do not belong in this
+argument vector; they travel through the ephemeral FIFO.
+
+### Implementation-language estimate
+
+Python is sufficient for an initial common processor: FIFO creation,
+non-blocking descriptors, selectors, monotonic deadlines, signal handling, and
+child supervision are available through the standard library. Rust or C++ may
+offer stronger static guarantees or lower overhead, but also add a compilation
+and multi-container distribution step. Language choice does not solve the
+protocol races by itself. Measure process count, upload throughput, memory, and
+cleanup latency before treating a native rewrite as an optimization requirement.
+
+### Overall estimate
+
+This proposal is viable and has a smaller generator-level change surface than a
+new async path kind. It addresses most established decisions by concentrating
+the async lifecycle in one common processor and keeping business logic in each
+microservice. Its coverage is strongest if async uploads are exposed as new,
+explicitly async query schemas. Reusing an existing synchronous query path is a
+contract migration, not a transparent parameter addition.
+
+Before implementation, prototype the allocator/supervisor descriptor handoff.
+That experiment should prove that the initial generated listener receives EOF,
+publishes the FIFO name immediately, remains able to accept another allocation,
+and that `api_management.py` plus service signals leave no supervisor or
+processing child behind.
+
 ## Remaining challenges and limitations
 
 ### 1. Unlinking a FIFO is not cancellation
