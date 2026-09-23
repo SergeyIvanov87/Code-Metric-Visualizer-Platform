@@ -164,3 +164,14 @@ def test_running_container_filesystem_api():
     result = json.loads(result_fifo.read_text())
     assert result["error_code"] == "0"
     assert Path("/uploads/functional.bin").read_bytes() == payload
+
+    # Leave a deferred request active when the tester exits. Docker Compose then
+    # stops the uploader, and the workflow's artifact check verifies shutdown
+    # removed both FIFOs from this unique request directory.
+    shutdown_session = f"shutdown-cleanup-{os.getpid()}"
+    (api_node / "exec").write_text(
+        f"SESSION_ID={shutdown_session} WaitInitialQueryTimeoutSec=60"
+    )
+    shutdown_handshake = wait_for_fifo(api_node / f"result.json_{shutdown_session}")
+    shutdown_input = wait_for_fifo(Path(shutdown_handshake.read_text().strip()))
+    wait_for_fifo(shutdown_input.parent / "async_result")

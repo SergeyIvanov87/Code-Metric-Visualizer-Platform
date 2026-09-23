@@ -22,7 +22,7 @@ jobs:
       run: |
         mkdir -p "${GITHUB_WORKSPACE}/api"
         docker compose -f utility/file-uploader/compose-functional.test.yaml cp file-uploader:/api/. "${GITHUB_WORKSPACE}/api/"
-        ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\)"`
+        ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\|deferred-[^/]*/\(input\|async_result\)\)"`
         if [ "${ARTEFACTS}" != "" ]; then
           echo "${ARTEFACTS}"
           exit -1
