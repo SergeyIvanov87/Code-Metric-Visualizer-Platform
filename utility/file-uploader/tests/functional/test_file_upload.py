@@ -141,6 +141,8 @@ def test_running_container_filesystem_api():
         "WaitResultConsumptionTimeoutSec=5"
     )
     input_fifo = Path((api_node / f"result.json_{session}").read_text().strip())
+    assert input_fifo.parent.parent == api_node
+    assert input_fifo.parent.is_dir()
     payload = b"functional upload\x00\n"
     input_fifo.write_bytes(payload)
     result = json.loads((input_fifo.parent / "async_result").read_text())

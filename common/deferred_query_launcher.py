@@ -88,7 +88,14 @@ def main(argv=None):
         session_lock.mkdir(mode=0o700)
     except FileExistsError:
         parser.error(f"SESSION_ID is already active: {transport['session_id']}")
-    request_directory = Path(tempfile.mkdtemp(prefix=f"deferred-{session_token}-", dir=api_directory))
+    request_directory = Path(tempfile.mkdtemp(
+        prefix=f"deferred-{session_token}-", dir=api_directory
+    ))
+    # mkdtemp creates the directory atomically. Verify its location before any
+    # FIFO path can be published; this also makes a bad/missing API mount fail
+    # synchronously instead of looking like a disappearing deferred request.
+    if request_directory.parent != api_directory or not request_directory.is_dir():
+        raise RuntimeError(f"failed to create request directory below {api_directory}")
     input_path = request_directory / "input"
     os.mkfifo(input_path, 0o620)
     read_fd, write_fd = os.pipe()
