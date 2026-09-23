@@ -1,7 +1,7 @@
 {
     "Content-Type": "application/json",
     "Method": "POST",
-    "Query": "+/file_upload",
+    "Query": "+/streaming_file_upload",
     "Params": {
         "metadata": "{}",
         "preferred_filename": "\"\"",

@@ -3,7 +3,7 @@
 import api_fs_exec_utils
 
 
-def make_file_upload_script(script, desired_file_ext=""):
+def make_streaming_file_upload_script(script, desired_file_ext=""):
     extension = "." + desired_file_ext if desired_file_ext else ""
     body = (
         *api_fs_exec_utils.generate_exec_header(), "",
@@ -13,10 +13,10 @@ def make_file_upload_script(script, desired_file_ext=""):
         # API_NODE contains parameter files; deferred request artifacts belong in
         # the method directory beside exec/result so clients can discover them.
         'exec "${OPT_DIR}/deferred_query_launcher.py" --api-directory "${API_NODE}/POST" '
-        '--processor "${WORK_DIR}/file_upload_processor.py" -- "${OVERRIDEN_CMD_ARGS[@]}"',
+        '--processor "${WORK_DIR}/streaming_file_upload_processor.py" -- "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
 
 def get():
-    return {"file_upload": make_file_upload_script}, {}
+    return {"streaming_file_upload": make_streaming_file_upload_script}, {}

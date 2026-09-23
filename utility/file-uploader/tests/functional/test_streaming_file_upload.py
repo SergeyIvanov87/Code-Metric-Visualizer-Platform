@@ -11,14 +11,14 @@ import time
 if Path("/opt/deferred_query_launcher.py").exists():
     LAUNCHER = Path("/opt/deferred_query_launcher.py")
     EXECUTOR = Path("/opt/deferred_query_executor.py")
-    PROCESSOR = Path("/package/file_upload_processor.py")
-    SCHEMA = Path("/package/API/file_upload.json")
+    PROCESSOR = Path("/package/streaming_file_upload_processor.py")
+    SCHEMA = Path("/package/API/streaming_file_upload.json")
 else:
     ROOT = Path(__file__).parents[4]
     LAUNCHER = ROOT / "common/deferred_query_launcher.py"
     EXECUTOR = ROOT / "common/deferred_query_executor.py"
-    PROCESSOR = ROOT / "utility/file-uploader/file_upload_processor.py"
-    SCHEMA = ROOT / "utility/file-uploader/API/file_upload.json"
+    PROCESSOR = ROOT / "utility/file-uploader/streaming_file_upload_processor.py"
+    SCHEMA = ROOT / "utility/file-uploader/API/streaming_file_upload.json"
 
 
 def arguments(destination, session="test", initial="1", preferred="binary.dat"):
@@ -100,7 +100,7 @@ def test_deferred_upload_validation_timeout_binary_data_and_cleanup():
 
 def test_schema_uses_relative_query_and_declares_upload_parameters():
     schema = json.loads(SCHEMA.read_text())
-    assert schema["Query"] == "+/file_upload"
+    assert schema["Query"] == "+/streaming_file_upload"
     assert {
         "metadata", "preferred_filename", "destination",
         "WaitInitialQueryTimeoutSec", "WaitQueryUpdateTimeoutSec",
@@ -140,7 +140,7 @@ def test_check_arguments_text_is_valid_as_a_preferred_filename():
 
 def test_running_container_filesystem_api():
     """Exercise the generated service when this test runs under Compose."""
-    api_node = Path("/api/api.pmccabe_collector.restapi.org/file-uploader/file_upload/POST")
+    api_node = Path("/api/api.pmccabe_collector.restapi.org/file-uploader/streaming_file_upload/POST")
     if not Path("/api").is_dir():
         return
     deadline = time.monotonic() + 30

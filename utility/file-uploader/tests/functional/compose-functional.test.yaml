@@ -4,7 +4,7 @@ services:
       context: ../../../..
       dockerfile: utility/file-uploader/tests/functional/Dockerfile
       additional_contexts:
-        file_uploader: "service:file-uploader"
+        streaming_file_uploader: "service:file-uploader"
     depends_on:
       - file-uploader
     volumes:
