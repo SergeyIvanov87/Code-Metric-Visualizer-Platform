@@ -1,0 +1,12 @@
+services:
+  file-uploader:
+    build:
+      context: ../..
+      dockerfile: utility/file-uploader/Dockerfile
+    volumes:
+      - file-uploader-api:/api
+      - file-uploads:/uploads
+
+volumes:
+  file-uploader-api:
+  file-uploads:

@@ -1,0 +1,19 @@
+{
+    "Content-Type": "application/json",
+    "Method": "POST",
+    "Query": "+/file_upload",
+    "Params": {
+        "metadata": "\"\"",
+        "preferred_filename": "\"\"",
+        "destination": "/uploads",
+        "WaitInitialQueryTimeoutSec": "5",
+        "WaitQueryUpdateTimeoutSec": "5",
+        "WaitResultConsumptionTimeoutSec": "5",
+        "SESSION_ID": "default"
+    },
+    "Description": {
+        "header": "Allocates an ephemeral FIFO and uploads a file into this container.",
+        "body": "Write the request arguments to exec, read the returned input FIFO path, stream the file to that FIFO, and read async_result in the same request directory. metadata may be empty or a JSON object. destination is an existing container directory. preferred_filename may be empty to generate an uploaded.<UTC timestamp> name automatically.",
+        "footer": "The three timeout parameters bound initial upload silence, silence between upload chunks, and final result retention."
+    }
+}

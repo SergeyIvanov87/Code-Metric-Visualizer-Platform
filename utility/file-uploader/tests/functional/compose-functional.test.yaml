@@ -1,0 +1,12 @@
+services:
+  file-uploader-functional-tester:
+    build:
+      context: ../../../..
+      dockerfile: utility/file-uploader/tests/functional/Dockerfile
+      additional_contexts:
+        file_uploader: "service:file-uploader"
+    depends_on:
+      - file-uploader
+    volumes:
+      - file-uploader-api-test:/api
+      - file-uploads-test:/uploads
