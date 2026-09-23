@@ -1,209 +1,50 @@
-# Issue 115: asynchronous file API design review
+# Issue 115: asynchronous file upload design review
 
-This note reviews the control flow proposed in
+This document reviews the file-upload extension proposed in
 [issue 115](https://github.com/SergeyIvanov87/Code-Metric-Visualizer-Platform/issues/115)
-against the current pseudo-filesystem API. It is a design review, not an
-implementation specification.
+and records the selected design. It is a design decision and implementation
+guide, not an implementation itself.
 
-## What the current API guarantees
+## Relationship to the current pseudo-filesystem API
 
-For every legacy operation, the CLI service owns one long-lived `exec` FIFO and
-one long-lived default `result[.<extension>]` FIFO. A request is a
-newline-terminated argument string written to `exec`. The listener executes
-requests serially, but publishes each result from a background process so it can
-return to reading `exec` without waiting for a result consumer.
+The current API already separates request initiation from result consumption. A
+client writes a newline-terminated argument string to the long-lived `exec`
+FIFO, while the generated CLI listener eventually publishes output through
+`result[.<extension>]` or `result[.<extension>]_<SESSION_ID>`. The client does
+not have to consume one result before initiating another request.
 
-`SESSION_ID` selects a per-session result FIFO named
-`result[.<extension>]_<SESSION_ID>`. It does not create a separate request FIFO,
-worker, queue, or durable transaction. Before reusing a session, the listener's
-watchdog drains an unread previous result so that the previous background writer
-cannot block the next request forever. Consequently, the present API has
-"latest request" rather than durable queue semantics.
+The upload proposal does not replace that asynchronous transaction model and
+does not introduce an async path prefix. It extends selected queries with a
+second input phase so a client can stream a file—or, in a future extension, a
+directory representation—after ordinary request metadata has been accepted.
+The improvement is primarily a better upload experience: large binary content
+does not travel in the line-oriented `exec` argument string.
 
-The Python client also treats asynchronous I/O differently from asynchronous
-job execution: `APIQueryInterruptible` bounds how long a client waits while
-opening, writing, or reading a FIFO. It does not cause the server to defer the
-operation.
+A query opts into this behavior through its generated executor. Existing
+queries that do not invoke the common upload processor keep their current
+behavior and paths.
 
-## Reading the proposed flow
+## Selected functional design
 
-The async API is a new, standalone query family. An async path prefix is placed
-between the query path and its `GET`, `POST`, or `PUT` component. For example,
-if the prefix is named `async`, the two APIs are separate endpoints:
+### Query parameter
 
-```text
-/api/<query>/POST/exec        # existing synchronous query
-/api/<query>/async/POST/exec  # new async-only query
-```
+Every participating query declares an ordinary schema parameter named
+`AsyncWaitQueryTimeoutSec`, with a query-specific default such as `5`. Existing
+pseudo-filesystem generation creates the corresponding parameter file, and the
+existing argument machinery applies its persistent value or a per-request
+override exactly like any other query parameter.
 
-`async` is illustrative; the schema must define the final reserved component.
-The async endpoint does not change or overload the result contract of the
-legacy endpoint.
+`AsyncWaitQueryTimeoutSec` is not a boolean switch and does not decide whether a
+query is asynchronous. It defines the maximum **idle interval** while waiting
+for input on the ephemeral FIFO. The generated executor's use of the common
+upload processor is what defines the query's two-phase upload contract.
 
-The proposal introduces a two-stage exchange:
+### Per-query generated executor
 
-1. Write metadata, including `SESSION_ID` and `ASYNC_WAIT_TIMEOUT`, to the
-   operation's existing `exec` FIFO.
-2. Read a newly allocated upload FIFO name from a session-specific handshake
-   result.
-3. Stream the file contents to that FIFO before its acceptance deadline (for
-   example, `cat /host/system/path/file > <input-fifo>`).
-4. Run the operation after input has arrived.
-5. Read the operation result from a second, job-specific FIFO.
-
-This is a useful separation of **job allocation**, **input transfer**, and
-**result retrieval**. A dedicated input FIFO also avoids holding the shared
-`exec` FIFO open for a potentially large payload. However, the issue's process
-flow and naming rules do not yet define a safe protocol.
-
-## Established decisions and mitigations
-
-Review discussion resolved several questions from the original proposal. These
-are design constraints, not remaining objections:
-
-### Standalone async endpoint
-
-The async API is generated under its own reserved path prefix. It does not
-replace a legacy endpoint and does not need an `ASYNC=1` discriminator. The
-prefix must be represented in the API schema so generators, help, discovery,
-and `api_management.py` all recognize the endpoint. Legacy paths and services
-remain unchanged.
-
-### File bytes are streamed by the client
-
-The intended operation is `cat /host/system/path/file > pipe_QSENTR445S`. The
-shell opens the client's local file and sends its bytes; the server never opens
-a client-supplied pathname. The `echo` example in the issue should therefore be
-corrected. Binary payloads must bypass line-oriented argument parsing and shell
-variables.
-
-### The API directory is server-owned
-
-Container user/group policy denies clients write access to the `GET`, `POST`, or
-`PUT` directory. Only the service creates, replaces, and removes FIFO artifacts;
-clients can only use the permitted FIFO endpoints. This mitigates client-created
-artifact and path-substitution attacks. Tests should verify both the configured
-directory permissions and the expected client read/write capabilities.
-
-### Metadata and optional admission are checked before forking
-
-The primary `server_api_listener` validates all metadata read from `exec` before
-creating an ephemeral FIFO or forking a watchdog. Invalid metadata is returned
-through the initial session result and never enters the ephemeral lifecycle.
-
-If resource admission is introduced, the same pre-fork stage can reject an
-excessive input size, timeout, or active-request count. A worker pool is not
-required, and spam protection can be deferred. Finite numeric values should
-still be validated so one accepted request cannot accidentally request
-unbounded resources. The small allocation record should be emitted as one write
-no larger than `PIPE_BUF`.
-
-### Shutdown cleanup uses `api_management.py`
-
-Ephemeral artifacts are reaped by the existing `api_management.py` shutdown
-path rather than a second cleanup subsystem. The async endpoint must be present
-in the schemas consumed by that manager. Its directory and pipe naming must
-allow `remove_api_fs_pipes_node` to unblock the standard handshake result and
-remove the endpoint directory, including its input and async-result FIFOs.
-
-### Listener readiness gates the handshake response
-
-The watchdog generates a unique FIFO name and passes it to the new
-`async_server_listener`. The async listener creates the ephemeral input FIFO
-and the final-result FIFO, opens or initializes everything it needs for input,
-and signals readiness to its watchdog through a private control channel. The
-watchdog verifies that the input node is a FIFO before reporting its name
-through the initial `result_<SESSION_ID>` handshake.
-
-The client therefore cannot observe the name before the async listener has
-started and the endpoint is usable. If the child exits or the readiness wait
-times out, the watchdog reports allocation failure instead of publishing the
-ephemeral FIFO name. Server-owned directory permissions prevent a client from
-substituting a node during this exchange.
-
-### The query executor owns the business result
-
-The Python or Bash query executor is responsible for the actual processing and
-for producing its business result, including any processing failure status.
-The async listener forwards that output to the final-result FIFO. The phrase
-`File uploaded successfully` in the issue is only an example of one successful
-executor outcome; it is not a fixed transport-level response.
-
-## Alternative proposal: executor-level async processor
-
-The alternative proposal removes the reserved async path prefix. A query that
-supports deferred file input declares an ordinary schema parameter named
-`AsyncWaitQueryTimeoutSec` (for example, with a default of `5`). The existing
-pseudo-filesystem generator creates the parameter file and the existing
-executor machinery applies persistent values and per-request overrides just as
-it does for other parameters.
-
-The query's `api_generator.py` then makes its generated executor invoke a common
-utility along these lines:
-
-```text
-${WORK_DIR}/async_query_processor_file_uploader.py \
-  "${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/<microservice>/<query>" \
-  "<path-to-query-processing-executable>" \
-  "${OVERRIDEN_CMD_ARGS[@]}"
-```
-
-The common utility owns allocation, FIFO lifecycle, timeout and signal handling,
-and child-process supervision. The final processing executable is supplied by
-the individual microservice and owns its business logic and result.
-
-### Assessment against the established decisions
-
-| Established decision or mitigation | Coverage by this proposal | Assessment |
-| --- | --- | --- |
-| Async behavior must not silently replace a legacy contract | Conditional | Removing the prefix is safe only when this is a new query, or when its existing contract is intentionally async. Adding the timeout parameter to an existing synchronous query and wrapping its executor changes that query's result into an allocation handshake. |
-| Use existing schema/generator parameter handling | Strong | `AsyncWaitQueryTimeoutSec` fits the current parameter-file and override model, so `build_api_pseudo_fs.py`, `build_api_services.py`, and the common argument-processing path need no async-specific branch. Query schemas and each participating `api_generator.py` still change. |
-| Stream client-side file bytes | Strong | The generic processor can expose an input FIFO while the client continues to use `cat file > FIFO`. The processing-executable contract must say whether it receives a staged pathname, an open descriptor, or standard input. |
-| Keep API artifacts server-owned | Strong | The common processor runs under the service identity and creates nodes in the existing server-owned query directory. Existing container user/group policy can continue to deny clients directory mutation while granting FIFO access. |
-| Validate before allocating or forking work | Strong, if enforced | The generated executor already receives resolved arguments. The common processor can validate `AsyncWaitQueryTimeoutSec`, `SESSION_ID`, executable path, and optional size/digest metadata before creating FIFOs or starting its supervised processing child. |
-| Gate handshake publication on listener readiness | Strong, if the utility is an allocator | The utility can create/open the ephemeral FIFO, establish its reader, create the final-result FIFO, and only then print the input FIFO name as the generated executor's result. Printing before initialization would preserve the original race. |
-| Keep business results owned by the per-query executor | Strong | The microservice-specific executable remains responsible for processing and output. The common processor should transport its stdout/result and preserve its defined failure status rather than inventing a universal success message. |
-| Reuse `api_management.py` shutdown cleanup | Partial | Directory cleanup remains compatible if the async artifacts stay inside the schema-defined query directory. The generic processor must also terminate and reap its processing child when signalled; removing FIFO pathnames alone does not stop processes holding them open. |
-
-### Important interaction with the current generated server
-
-The current CLI server invokes a query executor synchronously, captures its
-stdout, and then publishes that captured value to `result..._<SESSION_ID>`.
-Consequently, the common utility cannot remain in the foreground for the whole
-upload and execution lifecycle: doing so would keep the main per-query listener
-busy and prevent the allocation FIFO name from reaching the client.
-
-The common utility needs two roles:
-
-1. A short-lived **allocator** validates the request, establishes the endpoints
-   and supervised background process, writes only the ephemeral input FIFO name
-   to stdout, and exits.
-2. A detached **supervisor** waits for input, runs the microservice-specific
-   executable, publishes its result, enforces timeouts, and cleans up.
-
-The supervisor must close or redirect every inherited stdout/stderr and pipe
-descriptor used by the generated server's command substitution. Merely forking
-without closing those descriptors can keep command substitution waiting for EOF
-and make the supposedly short allocation request block.
-
-This division lets the unmodified generated server use its normal
-`result..._<SESSION_ID>` path as the allocation handshake. It is the key
-condition behind the proposal's claim that the common `build_api_*` scripts do
-not require changes.
-
-### Parameter and invocation contract
-
-`AsyncWaitQueryTimeoutSec` should remain an ordinary validated query parameter,
-but its meaning must be narrow: it is the maximum wait for upload acceptance,
-not a switch between synchronous and asynchronous behavior. Whether a query is
-async is determined by its generated executor invoking the common processor.
-This avoids treating a timeout value as a hidden boolean protocol selector.
-
-The example array expansion also needs an explicit contract. Passing
-`"${OVERRIDEN_CMD_ARGS[@]}"` from a generated shell script normally supplies one
-argument per array element; serializing it into one quoted string changes
-boundaries for spaces and binary-looking values. Prefer a real argv vector and
-put the executable path after `--` so values cannot be interpreted as options:
+Each participating microservice exposes its upload-capable query in
+`api_generator.py`. Its generated executor invokes a common utility and supplies
+the API directory, the microservice-specific processing executable, and the
+resolved query arguments. The intended interface is:
 
 ```text
 async_query_processor_file_uploader.py \
@@ -212,180 +53,273 @@ async_query_processor_file_uploader.py \
   -- "${OVERRIDEN_CMD_ARGS[@]}"
 ```
 
-The common processor should invoke the per-query executable without a shell and
-pass the validated argument vector unchanged. File bytes do not belong in this
-argument vector; they travel through the ephemeral FIFO.
+The `--` delimiter makes the boundary between utility options and query
+arguments explicit. The common processor invokes the per-query executable
+without a shell and passes the validated argv vector unchanged. Uploaded bytes
+are never placed in argv; they travel through the ephemeral FIFO.
 
-### Implementation-language estimate
+The processing executable may be implemented in Python, Rust, C++, or another
+container-supported language. It is individual to the microservice and owns all
+business processing and output, including business failure status. `File
+uploaded successfully` is only an example of one successful result, not a
+hard-coded transport response.
 
-Python is sufficient for an initial common processor: FIFO creation,
-non-blocking descriptors, selectors, monotonic deadlines, signal handling, and
-child supervision are available through the standard library. Rust or C++ may
-offer stronger static guarantees or lower overhead, but also add a compilation
-and multi-container distribution step. Language choice does not solve the
-protocol races by itself. Measure process count, upload throughput, memory, and
-cleanup latency before treating a native rewrite as an optimization requirement.
+### Common upload processor
 
-### Overall estimate
+`async_query_processor_file_uploader.py` is a shared common utility. It owns:
 
-This proposal is viable and has a smaller generator-level change surface than a
-new async path kind. It addresses most established decisions by concentrating
-the async lifecycle in one common processor and keeping business logic in each
-microservice. Its coverage is strongest if async uploads are exposed as new,
-explicitly async query schemas. Reusing an existing synchronous query path is a
-contract migration, not a transparent parameter addition.
+* validation of upload-control metadata;
+* generation and lifecycle of ephemeral FIFO names;
+* readiness coordination;
+* idle-timeout and signal handling;
+* invocation and reaping of the per-query processing executable;
+* publication and cleanup of the final-result FIFO.
 
-Before implementation, prototype the allocator/supervisor descriptor handoff.
-That experiment should prove that the initial generated listener receives EOF,
-publishes the FIFO name immediately, remains able to accept another allocation,
-and that `api_management.py` plus service signals leave no supervisor or
-processing child behind.
+Python is sufficient for the first implementation because its standard library
+provides `os.mkfifo`, non-blocking descriptors, selectors, monotonic clocks,
+signal handling, and child-process supervision. Rust or C++ can be considered
+later if measurements show that process count, throughput, memory, or cleanup
+latency justify the additional build and distribution complexity.
 
-## Remaining challenges and limitations
+## Control flow
 
-### 1. Unlinking a FIFO is not cancellation
+1. The client writes ordinary configuration and query arguments, including
+   `SESSION_ID` and optionally an `AsyncWaitQueryTimeoutSec` override, to the
+   query's existing `exec` FIFO.
+2. The generated listener resolves parameter-file values and request overrides,
+   then invokes the query's generated executor as it does today.
+3. The generated executor invokes the common upload processor with the API
+   directory, processing-executable path, and resolved argv.
+4. Before creating any ephemeral FIFO or child process, the common processor
+   validates the timeout, `SESSION_ID`, executable path, and any optional upload
+   metadata. It returns an allocation error through the ordinary
+   `result..._<SESSION_ID>` channel if validation fails.
+5. The common processor generates a unique safe FIFO identifier and starts a
+   supervisor. The supervisor creates the ephemeral input FIFO and final-result
+   FIFO, opens or initializes the input side, and signals readiness through a
+   private control channel.
+6. Only after verifying the ready input node is a FIFO does the allocator print
+   its name and exit. The unmodified generated listener captures that value and
+   publishes it through the ordinary `result..._<SESSION_ID>` FIFO.
+7. The client reads the ephemeral FIFO name and streams local bytes into it, for
+   example:
 
-Removing a FIFO pathname after `ASYNC_WAIT_TIMEOUT` does not close file
-descriptors that already refer to it. A listener can therefore remain blocked
-after the name disappears. Opening a FIFO for reading in blocking mode can also
-prevent the listener from observing a deadline.
+   ```text
+   cat /host/system/path/file > <ephemeral-input-fifo>
+   ```
 
-The listener must use non-blocking I/O plus `poll`/`select`, or the watchdog must
-retain the child PID and terminate and reap it on expiry. Timeout must use a
-monotonic clock. Cleanup closes descriptors before removing names and must be
-idempotent when timeout, input arrival, and cancellation race.
+8. The supervisor starts an idle timer when the ephemeral endpoint becomes
+   ready. Every successfully read chunk resets the timer to the full
+   `AsyncWaitQueryTimeoutSec` interval. If no chunk arrives during one complete
+   interval—including when the client reads the FIFO name and then does
+   nothing—the supervisor closes and removes the input FIFO, terminates and
+   reaps the waiting input process, and cleans up the request.
+9. EOF marks the end of the byte stream. After EOF, the upload idle timer no
+   longer applies. The supervisor supplies the received input to the
+   microservice-specific executable using the agreed staged-file, descriptor, or
+   standard-input contract.
+10. The supervisor publishes the processing executable's actual output through
+    `async_query_result_<fifo-id>_<SESSION_ID>`. After the client consumes that
+    output, it reaps the child and removes the ephemeral artifacts.
+11. Service shutdown continues through `api_management.py`, which unblocks the
+    schema-defined query pipes and removes the query directory. The common
+    processor must also respond to termination by stopping and reaping its own
+    children before exiting.
 
-### 2. The upload-completion boundary is underspecified
+## Why the allocator must detach the supervisor
 
-The issue says the timeout stops applying after the listener has read the data.
-A streamed file can arrive partially and then stall, and EOF does not prove that
-a disconnected client sent the entire intended file.
+The current generated CLI server invokes a query executor synchronously,
+captures its stdout, and then publishes the captured value to
+`result..._<SESSION_ID>`. The common upload processor therefore cannot remain in
+the foreground for the full upload and processing lifecycle. If it did, the
+FIFO name would not reach the client until the upload operation had already
+finished—an impossible handshake.
 
-The protocol should define completion using a declared byte count and,
-optionally, a digest. It must also decide whether `ASYNC_WAIT_TIMEOUT` is an
-absolute upload deadline or an idle timeout. Missing, non-numeric, negative, or
-unsupported values are rejected during preflight.
+The utility consequently has two internal roles:
 
-### 3. The generated FIFO identifier must correlate the result
+1. A short-lived **allocator** validates the request, waits for supervisor
+   readiness, writes only the ephemeral input FIFO name to stdout, and exits.
+2. A detached **supervisor** receives the file, refreshes the idle timer, runs
+   the microservice-specific executable, publishes its result, and cleans up.
 
-The unique identifier generated for the input FIFO can also correlate the final
-result. `SESSION_ID` is user-selected context and names the allocation handshake
-FIFO. A user should choose a unique session when allocations may overlap; the
-service must reject or serialize a duplicate active session so a handshake
-cannot reach the wrong client.
+The supervisor must close or redirect every inherited stdout, stderr, and pipe
+descriptor used by the generated server's command substitution. Forking without
+closing those descriptors can keep command substitution waiting for EOF even
+after the allocator exits. This descriptor handoff is the principal prototype
+required to validate the claim that common `build_api_*` scripts need no
+changes.
 
-A final result name can contain both values, for example
-`async_query_result_<fifo-id>_<SESSION_ID>`, or only the FIFO identifier when no
-session is supplied. Generated identifiers use a safe alphabet and atomic
-no-replace creation. Any `SESSION_ID` embedded in a pathname is validated or
-encoded, and shell pathname expansions remain quoted.
+## Established decisions and mitigations
 
-### 4. Result delivery can outlive input acceptance
+### Existing paths and generators remain valid
 
-The async listener intentionally remains alive until the user consumes the
-result, and the watchdog waits for it. `ASYNC_WAIT_TIMEOUT` stops applying once
-input is accepted, so a client that never reads the final result can otherwise
-retain both processes and the result FIFO forever.
+There is no async prefix and no new request kind. A participating query uses its
+existing path and declares one ordinary parameter. `build_api_pseudo_fs.py`,
+`build_api_services.py`, and common parameter handling require no async-specific
+branch. Query schemas, participating `api_generator.py` files, container
+packaging of the common utility, and per-query processing executables do change.
 
-The protocol needs a separate result-delivery timeout or an administrative
-cleanup rule. Expiry may discard an unconsumed result, but it must remain
-distinguishable from executor failure.
+### File bytes are streamed by the client
 
-## Recommended control flow
+The client uses `cat file > FIFO`; it does not write a pathname with `echo` for
+the server to dereference. This works across container path namespaces and
+keeps binary data out of line-oriented shell argument parsing.
 
-The smallest safe extension that preserves the proposed FIFO model is:
+### The API directory is server-owned
 
-1. The client writes one small allocation request to the standalone async
-   endpoint's `exec` FIFO, including `SESSION_ID`, a bounded
-   `ASYNC_WAIT_TIMEOUT`, and optional declared input length and digest.
-2. The async endpoint listener validates all metadata and any enabled resource
-   limits. On failure it reports rejection through the initial handshake result;
-   it creates no ephemeral FIFO and forks no watchdog. On success it starts a
-   watchdog with the validated configuration and operation executor path.
-3. The watchdog generates the unique FIFO name, starts the async listener with
-   that name, and waits on a private readiness channel. The listener creates the
-   input and final-result FIFOs and signals readiness after initialization. The
-   watchdog verifies the input FIFO and only then publishes its name through
-   `result_<SESSION_ID>`. A child exit or readiness timeout produces allocation
-   failure without advertising the FIFO.
-4. The client opens the input FIFO and streams exactly the declared number of
-   bytes. The reader rejects extra bytes, incomplete input, and a digest
-   mismatch. The acceptance deadline remains active until validation completes.
-5. Once input is accepted, the watchdog closes and unlinks the input FIFO,
-   moves the job from `WAITING_FOR_INPUT` to `RUNNING`, and the listener invokes
-   the existing operation executor with the staged file path plus the original
-   validated arguments.
-6. The listener writes the query executor's actual output—including its
-   business success or failure status—to
-   `async_query_result_<fifo-id>_<SESSION_ID>`. It exits after the client consumes
-   the result; the watchdog reaps it and removes the ephemeral nodes.
-7. If input does not complete before `ASYNC_WAIT_TIMEOUT`, the watchdog
-   terminates and reaps the listener and removes both FIFOs. After input is
-   accepted, a separate result-delivery policy governs abandoned output.
-8. Per-request cancellation goes through the watchdog, which closes descriptors,
-   terminates and reaps its child, and performs idempotent cleanup. Service
-   shutdown continues through `api_management.py`, which unblocks the endpoint
-   pipes and removes the async endpoint directory with its ephemeral artifacts.
+Container user/group policy denies clients directory write access. Only the
+service creates, replaces, and removes FIFO artifacts, while clients receive the
+specific FIFO permissions needed to write upload content and read results. This
+mitigates client-created artifact and path-substitution attacks.
 
-Suggested states are:
+### Validation happens before allocation
+
+The common processor validates control metadata before creating FIFOs or
+forking the supervisor. Optional size or concurrency admission can be added at
+this point, but spam protection and a worker pool are not required for the first
+implementation. The allocation request remains a single small write no larger
+than `PIPE_BUF`.
+
+### Readiness gates publication
+
+The allocator publishes no FIFO name until the supervisor has created both
+endpoints, initialized its input handling, signalled readiness, and passed an
+input-node type check. Child exit or readiness timeout returns allocation
+failure without advertising an unusable FIFO.
+
+### Idle timeout protects against inactive and stalled uploaders
+
+`AsyncWaitQueryTimeoutSec` is a silence interval, not an end-to-end deadline.
+The timer begins when the input endpoint is ready and is recharged after every
+chunk read from the FIFO. It therefore cleans up a client that obtains a FIFO
+name and sends nothing, as well as a client that begins an upload and then
+stalls. Continuous progress is allowed even when the total upload lasts longer
+than one timeout interval.
+
+A timer thread may implement this policy, provided chunk-read events reset a
+monotonic deadline and timeout cleanup is synchronized with EOF and signal
+handling. A selector/event-loop implementation is also valid and may avoid a
+thread. Exactly one path must win the transition from waiting for input to
+processing or timeout cleanup.
+
+### The per-query executable owns the business result
+
+The generic processor transports the per-query executable's output unchanged;
+it does not invent a universal upload-success response. The microservice
+executable remains responsible for reporting its actual business outcome.
+
+### Shutdown cleanup stays integrated
+
+All ephemeral artifacts remain inside the schema-defined query directory, so
+`api_management.py` retains directory cleanup responsibility. The common
+supervisor additionally owns termination and reaping of its live processing
+child because unlinking FIFO names alone cannot stop a process holding an open
+descriptor.
+
+## Remaining limitations and decisions
+
+### FIFO unlink is not process cancellation
+
+Removing a FIFO pathname does not close descriptors already referring to it.
+The supervisor must use non-blocking I/O plus `poll`/`select`, or explicitly
+terminate and reap a blocked input child when the idle deadline expires. Cleanup
+must close descriptors before removing names and remain idempotent when a chunk,
+EOF, timeout, signal, and service shutdown race.
+
+### Request correlation must be unambiguous
+
+The generated FIFO identifier correlates the final result. `SESSION_ID` names
+the initial result FIFO and remains user-selected context. Duplicate active
+sessions must be rejected or serialized so a handshake cannot reach the wrong
+client. Generated identifiers use a safe alphabet and atomic no-replace
+creation; any session value embedded in a pathname is validated or encoded.
+
+### Upload completion contract
+
+EOF ends the stream, but detecting a client that deliberately sends only a
+prefix requires an optional declared byte count or digest. Each participating
+query must decide whether it needs those fields. When supplied, the supervisor
+verifies them before invoking business processing.
+
+### Result consumption has a separate lifetime
+
+The upload idle timeout ends at EOF and must not terminate business processing.
+A client that never consumes the final result can keep the supervisor blocked on
+the output FIFO. The implementation must choose a separate result-delivery
+limit or an administrative cleanup policy; expiry of delivery must remain
+distinguishable from the processing executable's business result.
+
+### Processing input contract
+
+Each query must choose whether its executable receives a staged local pathname,
+an inherited descriptor, or standard input. A staged file simplifies retries
+and exact byte-count/digest validation but consumes storage. Streaming reduces
+storage but couples executor speed and failure directly to FIFO ingestion.
+
+## Lifecycle state model
 
 ```text
 PREFLIGHT -> REJECTED
-  -> WATCHDOG_STARTING
-       -> LISTENER_STARTING -> ALLOCATION_FAILED
-            -> ENDPOINT_READY
-                 -> HANDSHAKE_PUBLISHED
-                      -> WAITING_FOR_INPUT
-                           -> RUNNING -> RESULT_READY -> CONSUMED
-                                                    -> RESULT_EXPIRED
-                           -> INPUT_TIMED_OUT
-                           -> CANCELLED
+  -> SUPERVISOR_STARTING -> ALLOCATION_FAILED
+       -> ENDPOINT_READY
+            -> HANDSHAKE_PUBLISHED
+                 -> WAITING_FOR_INPUT
+                      -> CHUNK_READ -> WAITING_FOR_INPUT  (idle timer reset)
+                      -> INPUT_IDLE_TIMED_OUT
+                      -> INPUT_COMPLETE
+                           -> RUNNING
+                                -> RESULT_READY -> CONSUMED
+                                                 -> RESULT_EXPIRED
+                      -> CANCELLED
 ```
 
-Every transition to `RUNNING` or a terminal state must be single-winner and
-atomic from the client's perspective.
+The transition out of `WAITING_FOR_INPUT` must have a single winner. In
+particular, a timer callback must not remove the FIFO after EOF has committed
+`INPUT_COMPLETE`.
 
 ## Decisions required before implementation
 
-1. What is the reserved async path-prefix name and how is an async-only query
-   represented in the JSON schema?
-2. Which input-size, result-size, timeout, and concurrency bounds belong in the
-   initial validation? Admission/spam protection may be deferred independently.
-3. Does the executor receive a staged local pathname, standard input, or both?
-4. Which container users/groups and FIFO modes grant each client its required
-   handshake-read, input-write, and result-read access?
-5. Are retries expected to be idempotent, and for how long is an idempotency key
-   remembered?
-6. Is `ASYNC_WAIT_TIMEOUT` an absolute upload deadline or an idle upload
-   timeout, and what separate limit applies while waiting for result consumption?
+1. Which queries opt into the common upload processor, and what default idle
+   timeout does each declare?
+2. Does each processing executable receive a staged pathname, descriptor, or
+   standard input?
+3. Which queries require declared length and/or digest validation?
+4. Which container users/groups and FIFO modes grant handshake-read,
+   input-write, and result-read access?
+5. How are duplicate active `SESSION_ID` values rejected or serialized?
+6. What independent limit or cleanup policy applies to unconsumed final results?
+7. Are retries idempotent, and how long is any idempotency key retained?
 
 ## Minimum acceptance tests
 
-Implementation should not be considered complete without automated tests for:
+Implementation should include automated tests for:
 
-* legacy queries remaining byte-for-byte compatible and generated under their
-  original paths;
-* async queries being generated only under the reserved path prefix;
-* duplicate active `SESSION_ID` allocations being rejected or serialized as
-  specified, with no handshake delivered to the wrong client;
-* separate allocations receiving different generated FIFO identifiers and
-  result paths;
-* the handshake name not being published until the async listener has created
-  both FIFOs and signalled readiness;
-* listener startup failure and readiness timeout returning allocation failure
-  without publishing an ephemeral FIFO name;
-* binary data, embedded newlines, empty files, and inputs larger than
+* queries that do not opt in retaining their current paths and behavior;
+* `AsyncWaitQueryTimeoutSec` defaults and per-request overrides using existing
+  parameter handling without changes to common `build_api_*` scripts;
+* invalid timeout, session, executable path, and enabled admission checks being
+  rejected before an ephemeral FIFO or supervisor is created;
+* no FIFO name being published until both endpoints exist and the supervisor has
+  signalled readiness;
+* supervisor startup failure and readiness timeout returning allocation failure
+  without publishing an ephemeral name;
+* a client obtaining the name and sending nothing, followed by idle-timeout
+  cleanup;
+* the idle deadline resetting after every chunk;
+* a multi-chunk upload whose total duration exceeds the timeout while every gap
+  remains below it;
+* a partial upload whose next chunk never arrives;
+* EOF racing with idle timeout, with exactly one terminal transition;
+* binary data, embedded newlines, empty files, and payloads larger than
   `PIPE_BUF`;
-* client disconnect before open, midway through upload, and after upload;
-* input arriving exactly at the timeout boundary;
-* invalid timeout, length, digest, session ID, and enabled resource-limit checks
-  being rejected before any ephemeral FIFO or watchdog is created;
-* executor success and business-error output being forwarded unchanged, plus
-  non-zero exit, signal termination, oversized output, and long-running execution;
-* a client that never consumes or acknowledges a result;
-* cancellation racing with input completion and execution completion;
-* `api_management.py` shutdown cleanup in every non-terminal state, including
-  removal of the input FIFO, async-result FIFO, and endpoint directory;
+* optional declared-length and digest success and mismatch behavior;
+* executor success and business-error output being forwarded unchanged;
+* non-zero exit, signal termination, oversized output, and long-running
+  processing;
+* duplicate active sessions never delivering a handshake to the wrong client;
+* a client that never consumes the final result;
+* service termination during allocation, upload, processing, and result
+  delivery leaving no child processes or open descriptors;
+* `api_management.py` removing input/result FIFOs and the query directory;
 * container permissions preventing clients from creating, replacing, or
-  unlinking API artifacts while still allowing the intended FIFO operations;
-* cleanup leaving no child processes, open descriptors, or orphaned nodes.
+  unlinking API artifacts while still allowing intended FIFO operations.
