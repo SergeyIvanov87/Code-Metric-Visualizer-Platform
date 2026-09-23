@@ -106,6 +106,8 @@ def test_schema_uses_relative_query_and_declares_upload_parameters():
         "WaitInitialQueryTimeoutSec", "WaitQueryUpdateTimeoutSec",
         "WaitResultConsumptionTimeoutSec",
     } <= schema["Params"].keys()
+    assert schema["Params"]["WaitInitialQueryTimeoutSec"] == "60"
+    assert schema["Params"]["WaitResultConsumptionTimeoutSec"] == "60"
 
 
 def test_processor_accepts_schema_encoded_empty_values():
