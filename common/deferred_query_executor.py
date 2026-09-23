@@ -54,22 +54,43 @@ def receive(input_path, output, initial_timeout, update_timeout):
 
 def run_processor(command, upload, result_path):
     global processor
+    oversized = False
+    captured = 0
     with upload.open("rb") as source, result_path.open("wb") as result:
-        processor = subprocess.Popen(command, stdin=source, stdout=result, stderr=subprocess.STDOUT)
-        while processor.poll() is None and not stopping:
-            time.sleep(0.05)
-            if result_path.stat().st_size > MAX_RESULT_BYTES:
-                processor.terminate()
+        processor = subprocess.Popen(
+            command, stdin=source, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        )
+        selector = selectors.DefaultSelector()
+        selector.register(processor.stdout, selectors.EVENT_READ)
+        while not stopping:
+            events = selector.select(0.05)
+            if events:
+                chunk = os.read(processor.stdout.fileno(), CHUNK_SIZE)
+                if not chunk:
+                    break
+                available = MAX_RESULT_BYTES - captured
+                if available:
+                    result.write(chunk[:available])
+                    captured += min(len(chunk), available)
+                if len(chunk) > available:
+                    oversized = True
+                    processor.terminate()
+                    break
+            elif processor.poll() is not None:
                 break
-        if stopping and processor.poll() is None:
+        selector.close()
+        if processor.poll() is None and (stopping or oversized):
             processor.terminate()
         try:
             processor.wait(timeout=2)
         except subprocess.TimeoutExpired:
             processor.kill()
             processor.wait()
+        # stdout is a pipe, so the child can never place more than the bounded
+        # kernel pipe capacity beyond the bytes accepted above.
+        processor.stdout.close()
     processor = None
-    if result_path.stat().st_size > MAX_RESULT_BYTES:
+    if oversized:
         result_path.write_bytes(b"processor output exceeded 1048576 bytes\n")
 
 

@@ -3,7 +3,7 @@
     "Method": "POST",
     "Query": "+/file_upload",
     "Params": {
-        "metadata": "\"\"",
+        "metadata": "{}",
         "preferred_filename": "\"\"",
         "destination": "/uploads",
         "WaitInitialQueryTimeoutSec": "5",

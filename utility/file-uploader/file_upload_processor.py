@@ -19,15 +19,25 @@ def value_of(arguments, name, default=None):
     raise ValueError(f"missing {name}")
 
 
+def normalize_empty(value):
+    """Normalize quoted empty values preserved by API parameter files."""
+    return "" if value in ("", "\"\"", "''") else value
+
+
 def validate_arguments(arguments):
-    metadata_text = value_of(arguments, "metadata", "")
+    metadata_text = normalize_empty(value_of(arguments, "metadata", ""))
     metadata = json.loads(metadata_text) if metadata_text else {}
     if not isinstance(metadata, dict):
-        raise ValueError("metadata must be empty or a JSON object")
+        raise ValueError(
+            f"metadata must be empty or a JSON object; got {metadata!r} "
+            f"from raw value {metadata_text!r}"
+        )
 
-    preferred_filename = value_of(arguments, "preferred_filename", "")
+    preferred_filename = normalize_empty(value_of(arguments, "preferred_filename", ""))
     if preferred_filename and Path(preferred_filename).name != preferred_filename:
-        raise ValueError("preferred_filename must be a base filename")
+        raise ValueError(
+            f"preferred_filename must be a base filename; got {preferred_filename!r}"
+        )
 
     destination = Path(value_of(arguments, "destination")).resolve(strict=True)
     if not destination.is_dir():
@@ -57,8 +67,8 @@ def response(error_code, error_description, **values):
 
 
 def main():
-    arguments = [argument for argument in sys.argv[1:] if argument != "--check-arguments"]
-    checking = "--check-arguments" in sys.argv[1:]
+    checking = sys.argv[1:2] == ["--check-arguments"]
+    arguments = sys.argv[2:] if checking else sys.argv[1:]
     try:
         metadata, preferred_filename, destination = validate_arguments(arguments)
         if checking:

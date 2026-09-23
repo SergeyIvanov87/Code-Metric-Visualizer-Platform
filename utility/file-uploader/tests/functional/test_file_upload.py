@@ -96,6 +96,34 @@ def test_schema_uses_relative_query_and_declares_upload_parameters():
     } <= schema["Params"].keys()
 
 
+def test_processor_accepts_schema_encoded_empty_values():
+    with tempfile.TemporaryDirectory() as temporary:
+        result = subprocess.run(
+            [
+                sys.executable, str(PROCESSOR), "--check-arguments",
+                "metadata", "\"\"", "preferred_filename", "\"\"",
+                "destination", temporary,
+            ],
+            text=True, capture_output=True, timeout=3,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert json.loads(result.stdout)["error_code"] == "0"
+
+
+def test_check_arguments_text_is_valid_as_a_preferred_filename():
+    with tempfile.TemporaryDirectory() as temporary:
+        result = subprocess.run(
+            [
+                sys.executable, str(PROCESSOR), "metadata", "{}",
+                "preferred_filename", "--check-arguments",
+                "destination", temporary,
+            ],
+            input=b"content", capture_output=True, timeout=3,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert (Path(temporary) / "--check-arguments").read_bytes() == b"content"
+
+
 def test_running_container_filesystem_api():
     """Exercise the generated service when this test runs under Compose."""
     api_node = Path("/api/api.pmccabe_collector.restapi.org/file-uploader/file_upload/POST")
