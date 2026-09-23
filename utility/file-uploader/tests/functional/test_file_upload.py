@@ -41,6 +41,19 @@ def launch(api, destination, extra_arguments=None):
     return subprocess.run(command, text=True, capture_output=True, timeout=3)
 
 
+def wait_for_fifo(path, timeout=5):
+    """Wait for a FIFO to become visible across the shared container volume."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if stat.S_ISFIFO(path.stat().st_mode):
+                return path
+        except FileNotFoundError:
+            pass
+        time.sleep(0.01)
+    raise AssertionError(f"FIFO did not appear within {timeout} seconds: {path}")
+
+
 def test_deferred_upload_validation_timeout_binary_data_and_cleanup():
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
@@ -70,16 +83,15 @@ def test_deferred_upload_validation_timeout_binary_data_and_cleanup():
 
         started = launch(api, destination)
         assert started.returncode == 0, started.stderr
-        input_fifo = Path(started.stdout.strip())
+        input_fifo = wait_for_fifo(Path(started.stdout.strip()))
         request_directory = input_fifo.parent
-        assert stat.S_ISFIFO(input_fifo.stat().st_mode)
 
         duplicate = launch(api, destination)
         assert duplicate.returncode != 0
 
         payload = b"binary\x00payload\n" * 10000
         input_fifo.write_bytes(payload)
-        result = json.loads((request_directory / "async_result").read_text())
+        result = json.loads(wait_for_fifo(request_directory / "async_result").read_text())
         assert result["error_code"] == "0"
         assert result["error_description"] == ""
         assert result["metadata"] == {}
@@ -140,11 +152,13 @@ def test_running_container_filesystem_api():
         "WaitInitialQueryTimeoutSec=5 WaitQueryUpdateTimeoutSec=0.1 "
         "WaitResultConsumptionTimeoutSec=5"
     )
-    input_fifo = Path((api_node / f"result.json_{session}").read_text().strip())
+    handshake_fifo = wait_for_fifo(api_node / f"result.json_{session}")
+    input_fifo = wait_for_fifo(Path(handshake_fifo.read_text().strip()))
     assert input_fifo.parent.parent == api_node
     assert input_fifo.parent.is_dir()
     payload = b"functional upload\x00\n"
     input_fifo.write_bytes(payload)
-    result = json.loads((input_fifo.parent / "async_result").read_text())
+    result_fifo = wait_for_fifo(input_fifo.parent / "async_result")
+    result = json.loads(result_fifo.read_text())
     assert result["error_code"] == "0"
     assert Path("/uploads/functional.bin").read_bytes() == payload
