@@ -139,20 +139,29 @@ def main(argv=None):
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     options = parser.parse_args(argv)
     arguments = options.arguments[1:] if options.arguments[:1] == ["--"] else options.arguments
-    request_directory = Path(options.input).parent
+    request_directory = Path(options.input)
+    input_path = request_directory / "input"
     result_fifo = request_directory / "async_result"
+    # The input FIFO cannot be passed directly to a processor that starts only
+    # after the upload is complete. This regular staging file preserves the
+    # received bytes until run_processor opens them as the processor's stdin.
     upload_path = request_directory / "upload"
+    # Processor output is staged separately and capped by run_processor. It can
+    # then wait for a client to open async_result without blocking the processor
+    # or keeping it alive for the result-consumption timeout.
     result_path = request_directory / "processor_result"
     try:
+        os.mkfifo(input_path, 0o620)
         os.mkfifo(result_fifo, 0o640)
         (request_directory / "executor.json").write_text(json.dumps({
             "pid": os.getpid(), "session_id": options.session_id,
             "session_lock": options.session_lock,
         }))
-        os.write(options.readiness_fd, b"READY\n")
+        readiness = b"READY\n" + os.fsencode(input_path) + b"\n"
+        os.write(options.readiness_fd, readiness)
         os.close(options.readiness_fd)
         with upload_path.open("wb") as upload:
-            complete = receive(options.input, upload, options.initial_timeout, options.update_timeout)
+            complete = receive(input_path, upload, options.initial_timeout, options.update_timeout)
         if complete and not stopping:
             run_processor([options.processor, *arguments], upload_path, result_path)
             if not stopping:

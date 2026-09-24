@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 
 
 TIMEOUT_ARGUMENTS = {
@@ -50,6 +51,30 @@ def resolved_options(arguments):
 
 def encoded_session(session):
     return base64.urlsafe_b64encode(session.encode()).decode().rstrip("=")
+
+
+def read_readiness(descriptor, timeout):
+    """Read the executor's READY marker and published input FIFO path."""
+    import select
+
+    deadline = time.monotonic() + timeout
+    message = bytearray()
+    while message.count(b"\n") < 2:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        ready, _, _ = select.select([descriptor], [], [], remaining)
+        if not ready:
+            break
+        chunk = os.read(descriptor, 4096)
+        if not chunk:
+            break
+        message.extend(chunk)
+    try:
+        marker, input_path, remainder = bytes(message).split(b"\n", 2)
+        return marker, Path(os.fsdecode(input_path)), remainder
+    except ValueError:
+        return b"", None, bytes(message)
 
 
 def main(argv=None):
@@ -96,11 +121,9 @@ def main(argv=None):
     # synchronously instead of looking like a disappearing deferred request.
     if request_directory.parent != api_directory or not request_directory.is_dir():
         raise RuntimeError(f"failed to create request directory below {api_directory}")
-    input_path = request_directory / "input"
-    os.mkfifo(input_path, 0o620)
     read_fd, write_fd = os.pipe()
     command = [
-        str(executor), "--processor", str(processor), "--input", str(input_path),
+        str(executor), "--processor", str(processor), "--input", str(request_directory),
         "--initial-timeout", str(transport["initial_timeout"]),
         "--update-timeout", str(transport["update_timeout"]),
         "--result-timeout", str(transport["result_timeout"]),
@@ -113,10 +136,10 @@ def main(argv=None):
                                  stderr=subprocess.DEVNULL, start_new_session=True,
                                  close_fds=True, pass_fds=(write_fd,))
         os.close(write_fd)
-        import select
-        ready, _, _ = select.select([read_fd], [], [], options.readiness_timeout)
-        message = os.read(read_fd, 32) if ready else b""
-        if message != b"READY\n" or child.poll() is not None:
+        marker, input_path, remainder = read_readiness(read_fd, options.readiness_timeout)
+        expected_input_path = request_directory / "input"
+        if (marker != b"READY" or input_path != expected_input_path or remainder
+                or child.poll() is not None or not input_path.is_fifo()):
             child.terminate()
             raise RuntimeError("deferred executor did not become ready")
         print(input_path)
@@ -131,6 +154,10 @@ def main(argv=None):
         print(f"deferred request allocation failed: {error}", file=sys.stderr)
         return 1
     finally:
+        try:
+            os.close(write_fd)
+        except OSError:
+            pass
         try:
             os.close(read_fd)
         except OSError:
