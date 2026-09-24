@@ -23,15 +23,13 @@ def interrupt_upload(_signal, _frame):
 
 
 def prepare_api_channel(request_directory):
-    """Create this processor's input and result FIFOs and describe them."""
+    """Create and describe the input FIFO owned by this processor."""
     request_directory = request_directory.resolve(strict=True)
     if not request_directory.is_dir():
         raise ValueError("request directory is not a directory")
     input_path = request_directory / "input"
-    result_path = request_directory / "async_result"
     os.mkfifo(input_path, 0o620)
-    os.mkfifo(result_path, 0o640)
-    return {"input_FIFO": str(input_path), "result_FIFO": str(result_path)}
+    return {"input_FIFO": str(input_path)}
 
 
 def drain_fifo(input_path, output, initial_timeout, update_timeout):

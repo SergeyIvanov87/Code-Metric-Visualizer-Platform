@@ -22,7 +22,7 @@ def request_stop(_signal, _frame):
 
 
 def prepare_api_channel(processor_path, request_directory):
-    """Ask the processor to create and describe its request FIFOs."""
+    """Let the processor create its input FIFO and add our result FIFO."""
     prepared = subprocess.run(
         [processor_path, "--prepare-api-channel", str(request_directory)],
         stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=5,
@@ -31,14 +31,10 @@ def prepare_api_channel(processor_path, request_directory):
         detail = prepared.stderr.strip() or prepared.stdout.strip()
         raise RuntimeError(f"processor API-channel preparation failed: {detail}")
     report = json.loads(prepared.stdout)
-    if not isinstance(report, dict) or set(report) != {"input_FIFO", "result_FIFO"}:
-        raise RuntimeError("processor returned an invalid API-channel report")
     input_path = Path(report["input_FIFO"])
-    result_fifo = Path(report["result_FIFO"])
-    if (input_path != request_directory / "input"
-            or result_fifo != request_directory / "async_result"
-            or not input_path.is_fifo() or not result_fifo.is_fifo()):
-        raise RuntimeError("processor returned invalid API-channel paths")
+    result_fifo = request_directory / "async_result"
+    os.mkfifo(result_fifo, 0o640)
+    report["result_FIFO"] = str(result_fifo)
     return report, input_path, result_fifo
 
 

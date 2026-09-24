@@ -132,6 +132,20 @@ def test_processor_accepts_schema_encoded_empty_values():
         assert json.loads(result.stdout)["error_code"] == "0"
 
 
+def test_processor_prepares_only_its_input_fifo():
+    with tempfile.TemporaryDirectory() as temporary:
+        request_directory = Path(temporary)
+        result = subprocess.run(
+            [sys.executable, str(PROCESSOR), "--prepare-api-channel", temporary],
+            text=True, capture_output=True, timeout=3,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        report = json.loads(result.stdout)
+        assert report == {"input_FIFO": str(request_directory / "input")}
+        assert wait_for_fifo(Path(report["input_FIFO"]))
+        assert not (request_directory / "async_result").exists()
+
+
 def test_check_arguments_text_is_valid_as_a_preferred_filename():
     with tempfile.TemporaryDirectory() as temporary:
         result = subprocess.run(
