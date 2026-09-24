@@ -1,309 +1,169 @@
-# Issue 115: implementation v1 recap and design-conformance review
+# Issue 115: implementation v1 recap
 
-## Purpose and scope
+## Scope
 
-This document records what the first implementation of the asynchronous file
-upload design actually delivers. It compares commit `c30e46e` with the selected
-design in [`Review.md`](Review.md), rather than restating the intended design as
-if every part had been implemented.
+Version 1 adds a streaming file-upload query and a reusable deferred-execution
+lifecycle. It proves that long-running, two-phase requests can use the existing
+pseudo-filesystem API without adding an async path prefix or changing the common
+API generators.
 
-The implementation is a useful end-to-end prototype, but it is **not yet a
-fully conforming implementation of the decision record**. In particular, later
-review-driven changes deliberately transferred input-channel creation and
-upload framing from the generic deferred executor to the file-uploader
-processor. Some of the minimum acceptance matrix also remains unimplemented.
+The implementation deliberately separates two concerns:
 
-## What has been implemented
+* the **deferred executor** is general-purpose lifecycle infrastructure; and
+* the **streaming file-upload processor** owns the upload business rules and
+  selects/prepares its input communication channel.
 
-### Streaming file-uploader container
+## Implemented components
 
-The new `utility/file-uploader` container provides one opt-in `POST` query at
-`+/streaming_file_upload`. Its schema declares:
+### Streaming file uploader
 
-* `metadata`, which must be empty or a JSON object;
-* `preferred_filename`, which may be empty to request a generated name;
-* `destination`, an existing writable directory in the container;
-* `WaitInitialQueryTimeoutSec` (default 60 seconds);
-* `WaitQueryUpdateTimeoutSec` (default 5 seconds);
-* `WaitResultConsumptionTimeoutSec` (default 60 seconds); and
-* `SESSION_ID` (default `default`).
+`utility/file-uploader` exposes `POST +/streaming_file_upload`. Its schema
+contains `metadata`, `preferred_filename`, `destination`, `SESSION_ID`, and the
+three ADR timeouts:
 
-The query uses the normal pseudo-filesystem generator and method directory. No
-new async URL prefix or common generator branch was added. The generated query
-executor calls the common deferred launcher and returns a JSON handshake with
-the per-request `input_FIFO` and `result_FIFO` paths.
+* `WaitInitialQueryTimeoutSec` (60 seconds);
+* `WaitQueryUpdateTimeoutSec` (5 seconds); and
+* `WaitResultConsumptionTimeoutSec` (60 seconds).
 
-The upload processor validates the business arguments, creates the input FIFO,
-reads binary content from it, and writes to a destination-side temporary file.
-It flushes and `fsync`s that file, then installs it by a non-overwriting hard
-link and removes the temporary name. A caller may select a safe base filename,
-or allow generation of an `uploaded.<UTC timestamp>` name with collision
-suffixes. The JSON business result includes `error_code`,
-`error_description`, metadata, destination path, and size.
+The processor validates metadata, filenames, and the destination. It prepares
+its input channel, consumes binary upload data, writes to a temporary file in
+the destination, calls `fsync`, and installs the completed file atomically
+without overwriting an existing preferred filename. It returns the business
+result as JSON.
 
-### Common deferred request lifecycle
+### Deferred launcher
 
-`common/deferred_query_launcher.py` now:
+`common/deferred_query_launcher.py` performs the short-lived allocation phase:
 
-1. parses and validates the three positive, bounded timeout values and a safe
-   `SESSION_ID`;
-2. checks that the API directory, processor, and executor are valid;
-3. invokes the processor's `--check-arguments` mode before allocation;
-4. rejects a duplicate active session through an atomic session-lock directory;
-5. atomically allocates `deferred-<encoded-session>-<unique-suffix>` beneath the
-   query's `POST` directory;
-6. starts the executor in a new process session with inherited server streams
-   redirected;
-7. waits on a private readiness pipe; and
-8. validates the two reported paths and FIFO node types before printing the
-   JSON handshake.
+1. validate timeouts, session, executables, and processor arguments;
+2. reject duplicate active session IDs;
+3. atomically create a unique request directory;
+4. start a detached deferred executor;
+5. wait for its JSON report on the private readiness channel;
+6. validate the reported paths; and
+7. return the report to the API client.
 
-`common/deferred_query_executor.py` owns the long-lived lifecycle. It registers
-its PID and request information, asks the processor to prepare the input
-channel, creates `async_result`, publishes readiness, starts the processor,
-captures at most 1 MiB of combined processor output, publishes that result with
-a bounded wait, and removes the request directory and session lock in a
-`finally` block.
+The launcher exits after the handshake, so the generated API service does not
+wait for upload processing or result consumption.
 
-Unlike the original design, the processor—not the executor—opens and drains the
-input FIFO and enforces upload inactivity timeouts. This avoids a second full
-upload copy: uploaded bytes go directly from the FIFO into the processor's
-atomic destination-side temporary file. Only the small, bounded processor
-result is staged as `processor_result` so processing can finish before a result
-reader connects.
+### General-purpose deferred executor
 
-### Shutdown integration
+`common/deferred_query_executor.py` owns process lifetime, bounded output
+capture, result retention, signal handling, and request cleanup. It must not
+contain file-upload business rules or choose the processor's input transport.
+A processor may select a FIFO now, while another processor could prepare a
+different communication mechanism later.
 
-`common/api_management.py` discovers executors using the `executor.json`
-registration plus `/proc/<pid>/cmdline` verification, rather than a broad
-process-name match. It sends `SIGTERM`, waits for a bounded interval, escalates
-remaining processes with `SIGKILL`, and removes registered request and session
-lock paths. The uploader CI scenario intentionally leaves a request active so
-the post-container artifact check can detect leaked `input` or `async_result`
-FIFOs.
+The contract is:
 
-### Automated coverage and CI
+1. ask the processor to prepare and describe its selected input channel;
+2. receive the processor's JSON channel report;
+3. prepare the executor-owned result endpoint;
+4. complete the report with `input_FIFO` and `result_FIFO`;
+5. send that JSON report to the launcher through the readiness descriptor;
+6. run and supervise the processor;
+7. capture at most 1 MiB of processor output;
+8. publish the result for a bounded period; and
+9. remove the request directory and session lock.
 
-The functional tests currently cover:
+Thus the executor **delivers** the communication-channel selection; it does not
+make the business processor's input-channel decision. The current v1 report and
+launcher validation use FIFO-specific field names and node checks. Supporting a
+non-FIFO channel later will require generalizing that public report and its
+validation, but not moving channel selection into the executor.
 
-* invalid generic timeout and invalid processor metadata before allocation;
-* initial-input timeout and cleanup without a destination file;
-* atomic unique request creation and stable FIFO names;
-* readiness publication only after both FIFO nodes are visible;
-* duplicate active-session rejection;
-* binary data containing NULs and newlines and larger than `PIPE_BUF`;
-* a successful business result and persisted file contents;
-* schema routes, parameters, and the two 60-second defaults;
-* schema-encoded empty optional values;
-* processor ownership of only the input FIFO during channel preparation;
-* handling `--check-arguments` as file data rather than a control flag;
-* execution through the real generated container filesystem API; and
-* shutdown artifact detection in the dedicated GitHub Actions job.
+### Shutdown and CI
 
-## Design targets achieved
+`common/api_management.py` discovers registered deferred executors, signals
+them, waits for bounded cleanup, escalates when necessary, and removes remaining
+request/session artifacts. The dedicated functional job runs the generated
+filesystem API and checks that `exec`, `result*`, `input`, and `async_result`
+artifacts do not survive container shutdown.
 
-| Design target | Status | Evaluation |
-| --- | --- | --- |
-| Opt-in behavior without an async path prefix | Achieved | The query uses the established schema and generator flow; unrelated queries are not changed to deferred behavior. |
-| Binary data excluded from `exec` argv | Achieved | Only metadata travels through normal arguments; file bytes travel through the unique input FIFO. |
-| Three declared timeout parameters | Achieved | All are ordinary schema parameters and can be overridden by the existing request machinery. Initial and result defaults were raised from the design example to 60 seconds for interactive use. |
-| Validation before artifact allocation | Substantially achieved | Transport values, executable paths, and uploader business arguments are checked before the request and lock are created. There are no optional size/concurrency admission controls. |
-| Atomic unique request identity | Achieved | `mkdtemp` supplies a unique suffix and the encoded session is included for diagnosis. FIFO names remain stable inside the directory. |
-| Duplicate session protection | Achieved | An atomic per-session lock rejects another live request with the same `SESSION_ID`. |
-| Detached long-lived owner | Achieved for the intended server interaction | The launcher starts the executor in a new session, redirects inherited standard streams, returns after readiness, and does not wait for the upload lifecycle. |
-| Readiness-gated handshake | Achieved, with an evolved contract | Both FIFO paths and types are checked before a JSON handshake is printed. |
-| No full-size upload staging in the request directory | Achieved as an improvement over an intermediate implementation | The processor streams directly from `input` into its atomic destination temporary file. |
-| Bounded business-result capture | Achieved | Capture is limited to 1 MiB and an oversized producer is terminated. |
-| Result retention and eventual cleanup | Achieved for normal tested paths | Publishing is time-bounded and the request directory is removed after consumption or expiry. |
-| Exact shutdown discovery | Achieved | Registrations and command-line verification replace imprecise substring-only signalling. |
-| Container-level functional exercise | Achieved | A dedicated Compose test drives the generated pseudo-filesystem API, and CI checks for leaked API artifacts. |
+## Targets achieved
 
-## Conditions met from `Review.md`
+* Existing pseudo-filesystem paths and generators remain in use.
+* Binary file data is streamed outside the line-oriented `exec` arguments.
+* Every request receives an atomic unique directory with an encoded session
+  component and stable channel names.
+* Invalid transport and business arguments are rejected before request
+  allocation.
+* Duplicate active sessions are rejected.
+* Readiness is reported only after the communication endpoints exist.
+* The launcher is short-lived while the detached executor owns the request.
+* Processor output is bounded and retained independently of processor lifetime.
+* Uploaded files are installed atomically without an extra full-size staging
+  copy in the request directory.
+* Completion, timeout, and shutdown attempt to remove the whole request.
+* Functional coverage includes validation, initial timeout, duplicate sessions,
+  binary data larger than `PIPE_BUF`, generated API execution, and shutdown
+  artifact detection.
 
-The following selected-design conditions are present in v1:
+## Differences from `Review.md`
 
-* existing API generation and parameter-file machinery are reused;
-* uploaded bytes are streamed by the client rather than represented as a host
-  pathname or line-oriented argument;
-* a unique directory correlates the input and output FIFO;
-* `SESSION_ID` is encoded in the directory name and not repeated in stable FIFO
-  names;
-* malformed timeout, session, executable, and uploader arguments are rejected
-  before the unique request directory is allocated;
-* the launcher/executor handoff uses a private readiness descriptor;
-* inherited standard streams do not keep generated-server command substitution
-  open;
-* processor invocation uses an argv vector without a shell;
-* uploader persistence is atomic and does not overwrite a requested existing
-  filename;
-* processor output is retained separately from processor lifetime and bounded;
-* normal completion, upload cancellation, result expiry, and executor shutdown
-  all attempt idempotent removal of the whole request directory; and
-* active executors are registered for service-shutdown cleanup.
+The implementation evolved from the exact sequence originally recorded in the
+ADR:
 
-## Deviations and violations against the selected design
+* `Review.md` assigns input FIFO creation and upload framing to the generic
+  executor. V1 instead lets the processor prepare and consume its chosen input
+  channel. This keeps transport-specific business integration out of the
+  executor, but requires processors to implement the preparation contract.
+* The ADR describes a plain input-path handshake. V1 returns JSON containing
+  `input_FIFO` and `result_FIFO`, allowing the launcher to deliver the complete
+  per-request channel description.
+* The ADR launches the processor after the executor has committed all input. V1
+  starts the processor to consume its own channel directly, avoiding a second
+  complete upload copy.
+* The executor option named `--input` currently carries the request directory,
+  not an input path; `--request-directory` would describe it more accurately.
 
-### Intentional architectural deviations
+## Known gaps
 
-These are not merely missing tests; the implementation contract differs from
-the text selected in `Review.md`.
+* Update silence currently cancels the upload instead of committing bytes
+  already received as required by `Review.md`.
+* An empty upload is indistinguishable from initial silence and times out.
+* Shutdown removes ordinary API directories before deferred executors are fully
+  reaped, which can race executor cleanup.
+* The FIFO-specific readiness fields and launcher checks do not yet realize the
+  full goal of allowing arbitrary processor-selected channel types.
+* Tests do not yet cover all timeout races, slow multi-chunk uploads, result
+  retention expiry, processor failures, hostile-client permissions, or shutdown
+  during every lifecycle state.
+* Length/digest integrity and retry idempotency remain undefined.
 
-1. **The launcher does not create `input`.** The design assigns unique-directory
-   and input-FIFO creation to the launcher. V1 creates the directory in the
-   launcher, but the uploader processor creates `input` during
-   `--prepare-api-channel`.
-2. **The generic executor does not ingest or frame uploads.** The design assigns
-   FIFO reading and both upload inactivity timers to the generic executor. V1
-   launches the processor immediately; that processor opens `input`, reads the
-   stream, and owns the initial/update timers.
-3. **The executor interface changed.** The design's `--input` value is the input
-   FIFO path. V1 passes the request directory under the option named `--input`,
-   and the processor independently derives `<request-directory>/input`.
-4. **The readiness payload changed.** The selected design says the launcher
-   prints the input FIFO path. V1 prints a JSON object with both `input_FIFO` and
-   `result_FIFO`. This is more useful to clients, but it is a protocol change.
-5. **The processor starts before input completion.** The selected lifecycle has
-   the executor accumulate/commit input and then launch the business processor.
-   V1 starts a FIFO-aware business processor as soon as channels are ready.
-6. **Timeout exit 124 is treated as transport cancellation.** The executor does
-   not publish processor output when the processor returns 124. This embeds an
-   uploader-specific convention in otherwise generic orchestration.
+## Evaluation
 
-### Behavioral gaps or violations
+### Better
 
-1. **Update silence does not commit partial input.** `Review.md` specifies that
-   once the first byte arrives, a full update-timeout interval commits the
-   accumulated stream as successful input. The current processor raises
-   `TimeoutError` for both initial silence and later update silence, returns
-   status 124, deletes its temporary file, and causes the executor to omit the
-   result. EOF works, but update-timeout framing does not follow the design.
-2. **Empty upload is not supported as specified.** Opening and closing the FIFO
-   without bytes is treated like “no initial bytes” and eventually times out.
-   The acceptance list explicitly requires empty-file coverage.
-3. **Shutdown ordering differs from the decision.** The design says to signal
-   executors, observe them finish, and then perform ordinary query-directory
-   cleanup. The current handler signals executors, removes ordinary API method
-   directories, and only then waits/reaps. Removing a parent method directory
-   can race an executor that is still cleaning up or processing.
-4. **Graceful shutdown is not guaranteed before forced cleanup.** The executor
-   signal handler records a flag, but the main thread can be blocked reading
-   processor stdout. API management can ultimately kill it and remove files;
-   this meets bounded container cleanup, but not the stronger condition that
-   every executor first stops and reaps its own processor cleanly.
-5. **The API ownership/permissions condition is only partially demonstrated.**
-   FIFO modes are set (`0620` for input and `0640` for result), but there is no
-   acceptance test proving a client cannot create, replace, or unlink API
-   artifacts while retaining the intended FIFO access.
-6. **No optional integrity contract is implemented.** There is no declared
-   length or digest verification. This was optional per query, so it is a known
-   limitation rather than a mandatory v1 defect.
-7. **Idempotency is not defined.** Duplicate concurrent sessions are rejected,
-   but completed requests have no retained idempotency key and retries may
-   create another generated file.
+* Responsibilities are clearer: the executor manages lifecycle, while the
+  processor owns business validation, persistence, and input-channel selection.
+* Streaming directly into the destination-side temporary file avoids duplicate
+  full-size upload storage and I/O.
+* The JSON readiness report gives clients both request endpoints explicitly.
+* Sixty-second interactive defaults reduce premature cleanup during manual use.
+* PID registration, bounded shutdown, and CI artifact checks improve
+  operational visibility.
 
-## Acceptance-test coverage still missing
+### Worse or incomplete
 
-The minimum list in `Review.md` is broader than the six current Python tests.
-V1 does not yet provide focused automated evidence for:
+* The processor contract is more complex because each processor must prepare
+  and consume its own channel.
+* The present `input_FIFO`/`result_FIFO` protocol and FIFO validation still
+  constrain an architecture intended to allow other communication mechanisms.
+* Direct streaming couples the business processor's lifetime to slow or failed
+  clients.
+* Update-timeout and empty-file behavior do not yet conform to the ADR.
+* Lifecycle and permission testing remains incomplete.
 
-* unchanged behavior of a non-opt-in query;
-* per-request overrides for all three timeout values through generated parameter
-  handling;
-* invalid session and executable-path rejection before allocation;
-* executor startup failure and readiness-timeout cleanup;
-* initial-byte/update-timeout and EOF/chunk race boundaries;
-* update-deadline reset across a deliberately slow multi-chunk writer;
-* update silence committing already received bytes;
-* empty uploads;
-* optional length/digest behavior (if the query elects to support it);
-* exact forwarding of both success and business-error output;
-* non-zero exits, signal termination, oversized output, and long-running
-  processors as individual assertions;
-* result-consumption timeout and bounded result-side unblocking;
-* termination during each of allocation, upload, processing, and delivery;
-* proof that no child process or descriptor remains after shutdown; and
-* hostile-client permission checks.
+## Overall assessment
 
-The CI artifact scan is valuable end-state evidence, but it is not a substitute
-for these state- and race-specific tests.
+Version 1 achieves the primary end-to-end upload goal and establishes a useful
+general-purpose deferred lifecycle. Its key architectural boundary should be
+preserved: the business processor selects and prepares its input communication
+channel, while the deferred executor supervises the request and relays the JSON
+channel report to the launcher through readiness.
 
-## Evaluation: what became better
-
-* **Large uploads are no longer copied twice.** Removing the request-local
-  `upload` staging file reduces request-directory storage, I/O, and latency. The
-  only full copy is the destination-side temporary file required for atomic
-  publication.
-* **The handshake is self-contained.** Returning both FIFO paths as JSON removes
-  the need for a client to derive the result path and makes the protocol easier
-  to extend without ambiguous line parsing.
-* **Channel ownership is explicit for this service.** The file processor owns
-  its specialized input channel, while the generic executor owns result
-  retention. This is flexible for processors needing a custom input mechanism.
-* **Interactive usability improved.** Sixty-second defaults for initial input
-  and result consumption make manual `echo`, `cat`, and `read` workflows much
-  less prone to losing transient artifacts.
-* **File installation is robust.** Destination-side temporary writing, `fsync`,
-  non-overwriting linking, generated-name collision handling, and cleanup on
-  interruption are stronger than a direct write to the final path.
-* **Operational cleanup has concrete integration.** PID registration,
-  `/proc` verification, bounded escalation, a deliberately active shutdown
-  request, and a post-stop artifact scan make leaks visible in CI.
-* **Validation has a business-specific preflight hook.** Invalid metadata,
-  unsafe filenames, and unusable destinations can fail before exposing a
-  deferred request to a client.
-
-## Evaluation: what became worse
-
-* **The common abstraction is less generic.** A processor must now understand
-  `--request-directory`, `--prepare-api-channel`, `--initial-timeout`, and
-  `--update-timeout`, and must implement FIFO framing itself. The selected
-  design allowed an ordinary processor to consume a staged path, descriptor, or
-  standard input behind a generic executor.
-* **Transport policy leaked into business code.** FIFO mechanics and timeout
-  behavior live in `streaming_file_upload_processor.py`, increasing duplicated
-  work and behavioral drift for every future deferred query.
-* **The option name is misleading.** Executor `--input` contains a directory,
-  not an input path. This weakens the command-line contract and complicates
-  maintenance.
-* **Streaming couples persistence to client behavior.** A slow, interrupted, or
-  malicious writer keeps the business processor and a destination temporary
-  file alive. Staging would cost disk space but would separate transport
-  completion from business execution and enable digest/length verification
-  before invocation.
-* **The timeout semantics regressed.** The most important functional mismatch is
-  that update silence cancels instead of committing partial content. This makes
-  the current behavior depend on writer EOF and contradicts the selected
-  framing rule.
-* **The readiness protocol is no longer the documented plain-path contract.**
-  JSON is arguably better, but external clients built from `Review.md` alone
-  will not interoperate until the decision record is amended.
-* **Shutdown relies more on forced external cleanup.** Deleting method
-  directories before reaping their active owners is simpler for artifact
-  removal but weaker for orderly lifecycle guarantees.
-
-## Overall v1 assessment and recommended next targets
-
-V1 achieves the primary product goal: a client can allocate a unique request,
-stream a binary file through a container-visible FIFO, receive the processor's
-JSON result asynchronously, and obtain an atomically installed file. It also
-demonstrates that the existing pseudo-filesystem generators can host this model
-without an async-specific generator branch.
-
-It should nevertheless be labelled a **working prototype with partial design
-conformance**, not completion of every issue 115 target. The next iteration
-should, in priority order:
-
-1. decide whether the decision record should adopt processor-owned input
-   channels and the JSON handshake, or move those responsibilities back to the
-   generic executor;
-2. make update silence commit received bytes while keeping initial silence a
-   cancellation, and define a reliable empty-file signal;
-3. reorder shutdown to reap deferred owners before deleting their parent API
-   directories, with a wakeable/non-blocking executor supervision loop;
-4. rename executor `--input` to `--request-directory` if the evolved contract is
-   retained;
-5. add the missing lifecycle, race, error, timeout, permission, and non-opt-in
-   acceptance tests; and
-6. document whether integrity validation and retry idempotency are explicitly
-   out of scope or required for v2.
-
+The next version should generalize the readiness schema beyond FIFO-only
+validation, correct update-timeout and empty-input semantics, reorder shutdown
+cleanup, rename the executor's request-directory option, and complete the ADR's
+acceptance-test matrix.
