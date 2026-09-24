@@ -122,7 +122,8 @@ def test_processor_accepts_schema_encoded_empty_values():
     with tempfile.TemporaryDirectory() as temporary:
         result = subprocess.run(
             [
-                sys.executable, str(PROCESSOR), "--check-arguments",
+                sys.executable, str(PROCESSOR),
+                "--request-directory", temporary, "--check-arguments", "--",
                 "metadata", "\"\"", "preferred_filename", "\"\"",
                 "destination", temporary,
             ],
@@ -136,7 +137,8 @@ def test_processor_prepares_only_its_input_fifo():
     with tempfile.TemporaryDirectory() as temporary:
         request_directory = Path(temporary)
         result = subprocess.run(
-            [sys.executable, str(PROCESSOR), "--prepare-api-channel", temporary],
+            [sys.executable, str(PROCESSOR), "--request-directory", temporary,
+             "--prepare-api-channel"],
             text=True, capture_output=True, timeout=3,
         )
         assert result.returncode == 0, result.stdout + result.stderr
@@ -148,16 +150,32 @@ def test_processor_prepares_only_its_input_fifo():
 
 def test_check_arguments_text_is_valid_as_a_preferred_filename():
     with tempfile.TemporaryDirectory() as temporary:
-        result = subprocess.run(
-            [
-                sys.executable, str(PROCESSOR), "metadata", "{}",
-                "preferred_filename", "--check-arguments",
-                "destination", temporary,
-            ],
-            input=b"content", capture_output=True, timeout=3,
+        root = Path(temporary)
+        request_directory = root / "request"
+        destination = root / "uploads"
+        request_directory.mkdir()
+        destination.mkdir()
+        prepared = subprocess.run(
+            [sys.executable, str(PROCESSOR),
+             "--request-directory", str(request_directory), "--prepare-api-channel"],
+            text=True, capture_output=True, timeout=3,
         )
-        assert result.returncode == 0, result.stdout + result.stderr
-        assert (Path(temporary) / "--check-arguments").read_bytes() == b"content"
+        assert prepared.returncode == 0, prepared.stdout + prepared.stderr
+        process = subprocess.Popen(
+            [
+                sys.executable, str(PROCESSOR),
+                "--request-directory", str(request_directory),
+                "--initial-timeout", "1", "--update-timeout", "1", "--",
+                "metadata", "{}",
+                "preferred_filename", "--check-arguments",
+                "destination", str(destination),
+            ],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        wait_for_fifo(request_directory / "input").write_bytes(b"content")
+        stdout, stderr = process.communicate(timeout=3)
+        assert process.returncode == 0, stdout + stderr
+        assert (destination / "--check-arguments").read_bytes() == b"content"
 
 
 def test_running_container_filesystem_api():

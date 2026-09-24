@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 import selectors
-import shutil
 import signal
 import sys
 import tempfile
@@ -117,17 +116,17 @@ def response(error_code, error_description, **values):
 
 def parse_arguments(argv=None):
     parser = argparse.ArgumentParser()
+    parser.add_argument("--request-directory", required=True, type=Path)
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--check-arguments", action="store_true")
-    modes.add_argument("--prepare-api-channel", type=Path)
-    modes.add_argument("--input-path", type=Path)
+    modes.add_argument("--prepare-api-channel", action="store_true")
     parser.add_argument("--initial-timeout", type=float)
     parser.add_argument("--update-timeout", type=float)
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     options = parser.parse_args(argv)
-    if options.input_path is not None:
+    if not options.check_arguments and not options.prepare_api_channel:
         if options.initial_timeout is None or options.update_timeout is None:
-            parser.error("--input-path requires both upload timeouts")
+            parser.error("upload processing requires both upload timeouts")
         if options.initial_timeout <= 0 or options.update_timeout <= 0:
             parser.error("upload timeouts must be greater than zero")
     return options
@@ -135,9 +134,9 @@ def parse_arguments(argv=None):
 
 def main(argv=None):
     options = parse_arguments(argv)
-    if options.prepare_api_channel is not None:
+    if options.prepare_api_channel:
         try:
-            print(json.dumps(prepare_api_channel(options.prepare_api_channel)))
+            print(json.dumps(prepare_api_channel(options.request_directory)))
             return 0
         except (OSError, ValueError) as error:
             print(str(error), file=sys.stderr)
@@ -158,13 +157,10 @@ def main(argv=None):
         descriptor, temporary_name = tempfile.mkstemp(prefix=".upload-", dir=destination)
         try:
             with os.fdopen(descriptor, "wb") as output:
-                if options.input_path is None:
-                    shutil.copyfileobj(sys.stdin.buffer, output)
-                else:
-                    drain_fifo(
-                        options.input_path, output,
-                        options.initial_timeout, options.update_timeout,
-                    )
+                drain_fifo(
+                    options.request_directory / "input", output,
+                    options.initial_timeout, options.update_timeout,
+                )
                 output.flush()
                 os.fsync(output.fileno())
             # Linking makes creation non-overwriting and atomic. Retry the generated

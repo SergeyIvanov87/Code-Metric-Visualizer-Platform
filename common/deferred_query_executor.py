@@ -24,18 +24,18 @@ def request_stop(_signal, _frame):
 def prepare_api_channel(processor_path, request_directory):
     """Let the processor create its input FIFO and add our result FIFO."""
     prepared = subprocess.run(
-        [processor_path, "--prepare-api-channel", str(request_directory)],
+        [processor_path, "--request-directory", str(request_directory),
+         "--prepare-api-channel"],
         stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=5,
     )
     if prepared.returncode:
         detail = prepared.stderr.strip() or prepared.stdout.strip()
         raise RuntimeError(f"processor API-channel preparation failed: {detail}")
     report = json.loads(prepared.stdout)
-    input_path = Path(report["input_FIFO"])
     result_fifo = request_directory / "async_result"
     os.mkfifo(result_fifo, 0o640)
     report["result_FIFO"] = str(result_fifo)
-    return report, input_path, result_fifo
+    return report, result_fifo
 
 
 def run_processor(command, result_path):
@@ -128,7 +128,7 @@ def main(argv=None):
             "pid": os.getpid(), "session_id": options.session_id,
             "session_lock": options.session_lock,
         }))
-        report, input_path, result_fifo = prepare_api_channel(
+        report, result_fifo = prepare_api_channel(
             options.processor, request_directory
         )
         readiness = json.dumps(report).encode() + b"\n"
@@ -136,10 +136,10 @@ def main(argv=None):
         os.close(options.readiness_fd)
         complete = run_processor([
             options.processor,
-            "--input-path", str(input_path),
+            "--request-directory", str(request_directory),
             "--initial-timeout", str(options.initial_timeout),
             "--update-timeout", str(options.update_timeout),
-            *arguments,
+            "--", *arguments,
         ], result_path)
         if complete and not stopping:
             publish(result_fifo, result_path, options.result_timeout)

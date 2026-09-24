@@ -101,7 +101,8 @@ def main(argv=None):
             if not executable.is_file() or not os.access(executable, os.X_OK):
                 raise ValueError(f"{label} is not executable: {executable}")
         argument_check = subprocess.run(
-            [str(processor), "--check-arguments", *query_arguments],
+            [str(processor), "--request-directory", str(api_directory),
+             "--check-arguments", "--", *query_arguments],
             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=5,
         )
         if argument_check.returncode:
