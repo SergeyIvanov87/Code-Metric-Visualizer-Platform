@@ -3,6 +3,7 @@
 
 import argparse
 import base64
+import json
 import os
 from pathlib import Path
 import re
@@ -54,12 +55,12 @@ def encoded_session(session):
 
 
 def read_readiness(descriptor, timeout):
-    """Read the executor's READY marker and published input FIFO path."""
+    """Read the processor's JSON API-channel report from the executor."""
     import select
 
     deadline = time.monotonic() + timeout
     message = bytearray()
-    while message.count(b"\n") < 2:
+    while b"\n" not in message:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             break
@@ -70,11 +71,13 @@ def read_readiness(descriptor, timeout):
         if not chunk:
             break
         message.extend(chunk)
-    try:
-        marker, input_path, remainder = bytes(message).split(b"\n", 2)
-        return marker, Path(os.fsdecode(input_path)), remainder
-    except ValueError:
-        return b"", None, bytes(message)
+    line, separator, remainder = bytes(message).partition(b"\n")
+    if not separator or remainder:
+        raise ValueError("incomplete executor readiness report")
+    report = json.loads(os.fsdecode(line))
+    if not isinstance(report, dict):
+        raise ValueError("executor readiness report must be a JSON object")
+    return report
 
 
 def main(argv=None):
@@ -136,13 +139,19 @@ def main(argv=None):
                                  stderr=subprocess.DEVNULL, start_new_session=True,
                                  close_fds=True, pass_fds=(write_fd,))
         os.close(write_fd)
-        marker, input_path, remainder = read_readiness(read_fd, options.readiness_timeout)
+        report = read_readiness(read_fd, options.readiness_timeout)
+        input_path = Path(report["input_FIFO"])
+        result_path = Path(report["result_FIFO"])
         expected_input_path = request_directory / "input"
-        if (marker != b"READY" or input_path != expected_input_path or remainder
-                or child.poll() is not None or not input_path.is_fifo()):
+        expected_result_path = request_directory / "async_result"
+        if (set(report) != {"input_FIFO", "result_FIFO"}
+                or input_path != expected_input_path
+                or result_path != expected_result_path
+                or child.poll() is not None
+                or not input_path.is_fifo() or not result_path.is_fifo()):
             child.terminate()
             raise RuntimeError("deferred executor did not become ready")
-        print(input_path)
+        print(json.dumps(report))
         return 0
     except Exception as error:
         import shutil

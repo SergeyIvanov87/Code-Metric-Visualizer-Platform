@@ -21,6 +21,27 @@ def request_stop(_signal, _frame):
     stopping = True
 
 
+def prepare_api_channel(processor_path, request_directory):
+    """Ask the processor to create and describe its request FIFOs."""
+    prepared = subprocess.run(
+        [processor_path, "--prepare-api-channel", str(request_directory)],
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=5,
+    )
+    if prepared.returncode:
+        detail = prepared.stderr.strip() or prepared.stdout.strip()
+        raise RuntimeError(f"processor API-channel preparation failed: {detail}")
+    report = json.loads(prepared.stdout)
+    if not isinstance(report, dict) or set(report) != {"input_FIFO", "result_FIFO"}:
+        raise RuntimeError("processor returned an invalid API-channel report")
+    input_path = Path(report["input_FIFO"])
+    result_fifo = Path(report["result_FIFO"])
+    if (input_path != request_directory / "input"
+            or result_fifo != request_directory / "async_result"
+            or not input_path.is_fifo() or not result_fifo.is_fifo()):
+        raise RuntimeError("processor returned invalid API-channel paths")
+    return report, input_path, result_fifo
+
+
 def run_processor(command, result_path):
     """Run a FIFO-aware processor and capture its bounded result."""
     global processor
@@ -102,20 +123,19 @@ def main(argv=None):
     options = parser.parse_args(argv)
     arguments = options.arguments[1:] if options.arguments[:1] == ["--"] else options.arguments
     request_directory = Path(options.input)
-    input_path = request_directory / "input"
-    result_fifo = request_directory / "async_result"
     # Processor output is staged separately and capped by run_processor. It can
     # then wait for a client to open async_result without blocking the processor
     # or keeping it alive for the result-consumption timeout.
     result_path = request_directory / "processor_result"
     try:
-        os.mkfifo(input_path, 0o620)
-        os.mkfifo(result_fifo, 0o640)
         (request_directory / "executor.json").write_text(json.dumps({
             "pid": os.getpid(), "session_id": options.session_id,
             "session_lock": options.session_lock,
         }))
-        readiness = b"READY\n" + os.fsencode(input_path) + b"\n"
+        report, input_path, result_fifo = prepare_api_channel(
+            options.processor, request_directory
+        )
+        readiness = json.dumps(report).encode() + b"\n"
         os.write(options.readiness_fd, readiness)
         os.close(options.readiness_fd)
         complete = run_processor([

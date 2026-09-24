@@ -41,6 +41,10 @@ def launch(api, destination, extra_arguments=None):
     return subprocess.run(command, text=True, capture_output=True, timeout=3)
 
 
+def channel_report(launch_result):
+    return json.loads(launch_result.stdout)
+
+
 def wait_for_fifo(path, timeout=5):
     """Wait for a FIFO to become visible across the shared container volume."""
     deadline = time.monotonic() + timeout
@@ -75,7 +79,7 @@ def test_deferred_upload_validation_timeout_binary_data_and_cleanup():
 
         timed_out = launch(api, destination, arguments(destination, session="timeout", initial="0.1"))
         assert timed_out.returncode == 0
-        timed_out_directory = Path(timed_out.stdout.strip()).parent
+        timed_out_directory = Path(channel_report(timed_out)["input_FIFO"]).parent
         deadline = time.monotonic() + 2
         while timed_out_directory.exists() and time.monotonic() < deadline:
             time.sleep(0.01)
@@ -84,8 +88,10 @@ def test_deferred_upload_validation_timeout_binary_data_and_cleanup():
 
         started = launch(api, destination)
         assert started.returncode == 0, started.stderr
-        input_fifo = wait_for_fifo(Path(started.stdout.strip()))
+        report = channel_report(started)
+        input_fifo = wait_for_fifo(Path(report["input_FIFO"]))
         request_directory = input_fifo.parent
+        assert wait_for_fifo(Path(report["result_FIFO"])) == request_directory / "async_result"
         assert not (request_directory / "upload").exists()
 
         duplicate = launch(api, destination)
@@ -157,7 +163,9 @@ def test_running_container_filesystem_api():
         "WaitResultConsumptionTimeoutSec=5"
     )
     handshake_fifo = wait_for_fifo(api_node / f"result.json_{session}")
-    input_fifo = wait_for_fifo(Path(handshake_fifo.read_text().strip()))
+    report = json.loads(handshake_fifo.read_text())
+    input_fifo = wait_for_fifo(Path(report["input_FIFO"]))
+    assert wait_for_fifo(Path(report["result_FIFO"])) == input_fifo.parent / "async_result"
     assert input_fifo.parent.parent == api_node
     assert input_fifo.parent.is_dir()
     payload = b"functional upload\x00\n"
@@ -175,5 +183,6 @@ def test_running_container_filesystem_api():
         f"SESSION_ID={shutdown_session} WaitInitialQueryTimeoutSec=60"
     )
     shutdown_handshake = wait_for_fifo(api_node / f"result.json_{shutdown_session}")
-    shutdown_input = wait_for_fifo(Path(shutdown_handshake.read_text().strip()))
+    shutdown_report = json.loads(shutdown_handshake.read_text())
+    shutdown_input = wait_for_fifo(Path(shutdown_report["input_FIFO"]))
     wait_for_fifo(shutdown_input.parent / "async_result")

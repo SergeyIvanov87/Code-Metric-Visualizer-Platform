@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Validate upload arguments and persist stdin in the selected directory."""
+"""Prepare upload channels, validate arguments, and persist streamed files."""
 
+import argparse
 from datetime import datetime, timezone
 import json
 import os
@@ -19,6 +20,18 @@ UPLOAD_TIMEOUT_EXIT_CODE = 124
 def interrupt_upload(_signal, _frame):
     """Unwind through temporary-file cleanup when the executor stops us."""
     raise InterruptedError("upload interrupted")
+
+
+def prepare_api_channel(request_directory):
+    """Create this processor's input and result FIFOs and describe them."""
+    request_directory = request_directory.resolve(strict=True)
+    if not request_directory.is_dir():
+        raise ValueError("request directory is not a directory")
+    input_path = request_directory / "input"
+    result_path = request_directory / "async_result"
+    os.mkfifo(input_path, 0o620)
+    os.mkfifo(result_path, 0o640)
+    return {"input_FIFO": str(input_path), "result_FIFO": str(result_path)}
 
 
 def drain_fifo(input_path, output, initial_timeout, update_timeout):
@@ -104,23 +117,38 @@ def response(error_code, error_description, **values):
     }))
 
 
-def main():
-    checking = sys.argv[1:2] == ["--check-arguments"]
-    input_path = None
-    if checking:
-        arguments = sys.argv[2:]
-    elif sys.argv[1:2] == ["--input-path"]:
-        if sys.argv[3:4] != ["--initial-timeout"] or sys.argv[5:6] != ["--update-timeout"]:
-            raise SystemExit("invalid FIFO transport arguments")
-        input_path = Path(sys.argv[2])
-        initial_timeout = float(sys.argv[4])
-        update_timeout = float(sys.argv[6])
-        arguments = sys.argv[7:]
-    else:
-        arguments = sys.argv[1:]
+def parse_arguments(argv=None):
+    parser = argparse.ArgumentParser()
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--check-arguments", action="store_true")
+    modes.add_argument("--prepare-api-channel", type=Path)
+    modes.add_argument("--input-path", type=Path)
+    parser.add_argument("--initial-timeout", type=float)
+    parser.add_argument("--update-timeout", type=float)
+    parser.add_argument("arguments", nargs=argparse.REMAINDER)
+    options = parser.parse_args(argv)
+    if options.input_path is not None:
+        if options.initial_timeout is None or options.update_timeout is None:
+            parser.error("--input-path requires both upload timeouts")
+        if options.initial_timeout <= 0 or options.update_timeout <= 0:
+            parser.error("upload timeouts must be greater than zero")
+    return options
+
+
+def main(argv=None):
+    options = parse_arguments(argv)
+    if options.prepare_api_channel is not None:
+        try:
+            print(json.dumps(prepare_api_channel(options.prepare_api_channel)))
+            return 0
+        except (OSError, ValueError) as error:
+            print(str(error), file=sys.stderr)
+            return 1
+
+    arguments = options.arguments[1:] if options.arguments[:1] == ["--"] else options.arguments
     try:
         metadata, preferred_filename, destination = validate_arguments(arguments)
-        if checking:
+        if options.check_arguments:
             response(0, "")
             return 0
 
@@ -132,10 +160,13 @@ def main():
         descriptor, temporary_name = tempfile.mkstemp(prefix=".upload-", dir=destination)
         try:
             with os.fdopen(descriptor, "wb") as output:
-                if input_path is None:
+                if options.input_path is None:
                     shutil.copyfileobj(sys.stdin.buffer, output)
                 else:
-                    drain_fifo(input_path, output, initial_timeout, update_timeout)
+                    drain_fifo(
+                        options.input_path, output,
+                        options.initial_timeout, options.update_timeout,
+                    )
                 output.flush()
                 os.fsync(output.fileno())
             # Linking makes creation non-overwriting and atomic. Retry the generated
