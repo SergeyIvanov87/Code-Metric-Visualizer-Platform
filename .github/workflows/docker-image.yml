@@ -8,6 +8,26 @@ on:
 
 jobs:
 
+  build_and_test_file_uploader:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f
+    - name: Build and test the file uploader
+      run: docker compose -f utility/file-uploader/compose-functional.test.yaml up --build --remove-orphans --abort-on-container-exit --exit-code-from file-uploader-functional-tester
+    - name: Check filesystem API artefacts
+      run: |
+        mkdir -p "${GITHUB_WORKSPACE}/api"
+        docker compose -f utility/file-uploader/compose-functional.test.yaml cp file-uploader:/api/. "${GITHUB_WORKSPACE}/api/"
+        ARTEFACTS=`find ${GITHUB_WORKSPACE}/api/ -regex ".*\(GET\|PUT\|POST\)/\(result.*\|exec\|deferred-[^/]*/\(input\|async_result\)\)"`
+        if [ "${ARTEFACTS}" != "" ]; then
+          echo "${ARTEFACTS}"
+          exit -1
+        fi
+
   unit_testing:
 
     runs-on: ubuntu-latest
