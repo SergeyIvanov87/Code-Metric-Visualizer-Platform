@@ -6,8 +6,14 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import sys
 import tempfile
+
+
+def interrupt_upload(_signal, _frame):
+    """Unwind through temporary-file cleanup when the executor stops us."""
+    raise InterruptedError("upload interrupted")
 
 
 def value_of(arguments, name, default=None):
@@ -112,4 +118,5 @@ def main():
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, interrupt_upload)
     raise SystemExit(main())

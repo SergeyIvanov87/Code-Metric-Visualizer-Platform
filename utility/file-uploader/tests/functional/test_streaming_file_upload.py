@@ -80,11 +80,13 @@ def test_deferred_upload_validation_timeout_binary_data_and_cleanup():
         while timed_out_directory.exists() and time.monotonic() < deadline:
             time.sleep(0.01)
         assert not timed_out_directory.exists()
+        assert list(destination.iterdir()) == []
 
         started = launch(api, destination)
         assert started.returncode == 0, started.stderr
         input_fifo = wait_for_fifo(Path(started.stdout.strip()))
         request_directory = input_fifo.parent
+        assert not (request_directory / "upload").exists()
 
         duplicate = launch(api, destination)
         assert duplicate.returncode != 0

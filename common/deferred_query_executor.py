@@ -9,6 +9,7 @@ import selectors
 import shutil
 import signal
 import subprocess
+import threading
 import time
 
 CHUNK_SIZE = 64 * 1024
@@ -52,46 +53,59 @@ def receive(input_path, output, initial_timeout, update_timeout):
     return False
 
 
-def run_processor(command, upload, result_path):
-    global processor
-    oversized = False
+def capture_processor_output(process, result_path, state):
+    """Drain processor output concurrently without exceeding the result cap."""
     captured = 0
-    with upload.open("rb") as source, result_path.open("wb") as result:
-        processor = subprocess.Popen(
-            command, stdin=source, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-        )
-        selector = selectors.DefaultSelector()
-        selector.register(processor.stdout, selectors.EVENT_READ)
-        while not stopping:
-            events = selector.select(0.05)
-            if events:
-                chunk = os.read(processor.stdout.fileno(), CHUNK_SIZE)
-                if not chunk:
-                    break
-                available = MAX_RESULT_BYTES - captured
-                if available:
-                    result.write(chunk[:available])
-                    captured += min(len(chunk), available)
-                if len(chunk) > available:
-                    oversized = True
-                    processor.terminate()
-                    break
-            elif processor.poll() is not None:
+    with result_path.open("wb") as result:
+        while True:
+            chunk = process.stdout.read(CHUNK_SIZE)
+            if not chunk:
                 break
-        selector.close()
-        if processor.poll() is None and (stopping or oversized):
-            processor.terminate()
+            available = MAX_RESULT_BYTES - captured
+            if available:
+                result.write(chunk[:available])
+                captured += min(len(chunk), available)
+            if len(chunk) > available:
+                state["oversized"] = True
+                process.terminate()
+                break
+
+
+def run_processor(command, input_path, result_path, initial_timeout, update_timeout):
+    """Stream the input FIFO into the processor and capture its result."""
+    global processor
+    state = {"oversized": False}
+    processor = subprocess.Popen(
+        command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
+    output_reader = threading.Thread(
+        target=capture_processor_output,
+        args=(processor, result_path, state),
+        daemon=True,
+    )
+    output_reader.start()
+    try:
+        complete = receive(input_path, processor.stdin, initial_timeout, update_timeout)
+    except BrokenPipeError:
+        complete = False
+    finally:
         try:
-            processor.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            processor.kill()
-            processor.wait()
-        # stdout is a pipe, so the child can never place more than the bounded
-        # kernel pipe capacity beyond the bytes accepted above.
-        processor.stdout.close()
+            processor.stdin.close()
+        except BrokenPipeError:
+            pass
+    if processor.poll() is None and (stopping or state["oversized"] or not complete):
+        processor.terminate()
+    try:
+        processor.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        processor.kill()
+        processor.wait()
+    output_reader.join(timeout=2)
+    processor.stdout.close()
     processor = None
-    if oversized:
+    if state["oversized"]:
         result_path.write_bytes(b"processor output exceeded 1048576 bytes\n")
+    return complete
 
 
 def publish(result_fifo, result_path, timeout):
@@ -142,10 +156,6 @@ def main(argv=None):
     request_directory = Path(options.input)
     input_path = request_directory / "input"
     result_fifo = request_directory / "async_result"
-    # The input FIFO cannot be passed directly to a processor that starts only
-    # after the upload is complete. This regular staging file preserves the
-    # received bytes until run_processor opens them as the processor's stdin.
-    upload_path = request_directory / "upload"
     # Processor output is staged separately and capped by run_processor. It can
     # then wait for a client to open async_result without blocking the processor
     # or keeping it alive for the result-consumption timeout.
@@ -160,12 +170,12 @@ def main(argv=None):
         readiness = b"READY\n" + os.fsencode(input_path) + b"\n"
         os.write(options.readiness_fd, readiness)
         os.close(options.readiness_fd)
-        with upload_path.open("wb") as upload:
-            complete = receive(input_path, upload, options.initial_timeout, options.update_timeout)
+        complete = run_processor(
+            [options.processor, *arguments], input_path, result_path,
+            options.initial_timeout, options.update_timeout,
+        )
         if complete and not stopping:
-            run_processor([options.processor, *arguments], upload_path, result_path)
-            if not stopping:
-                publish(result_fifo, result_path, options.result_timeout)
+            publish(result_fifo, result_path, options.result_timeout)
         return 0
     finally:
         if processor is not None and processor.poll() is None:
