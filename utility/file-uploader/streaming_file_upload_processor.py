@@ -5,15 +5,47 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import selectors
 import shutil
 import signal
 import sys
 import tempfile
+import time
+
+CHUNK_SIZE = 64 * 1024
+UPLOAD_TIMEOUT_EXIT_CODE = 124
 
 
 def interrupt_upload(_signal, _frame):
     """Unwind through temporary-file cleanup when the executor stops us."""
     raise InterruptedError("upload interrupted")
+
+
+def drain_fifo(input_path, output, initial_timeout, update_timeout):
+    """Drain the upload FIFO while enforcing initial and update deadlines."""
+    descriptor = os.open(input_path, os.O_RDONLY | os.O_NONBLOCK)
+    selector = selectors.DefaultSelector()
+    selector.register(descriptor, selectors.EVENT_READ)
+    started = False
+    deadline = time.monotonic() + initial_timeout
+    try:
+        while True:
+            remaining = max(0, deadline - time.monotonic())
+            events = selector.select(remaining)
+            if not events:
+                raise TimeoutError("upload FIFO timed out")
+            chunk = os.read(descriptor, CHUNK_SIZE)
+            if chunk:
+                output.write(chunk)
+                started = True
+                deadline = time.monotonic() + update_timeout
+            elif started:
+                return
+            else:
+                time.sleep(min(0.02, remaining))
+    finally:
+        selector.close()
+        os.close(descriptor)
 
 
 def value_of(arguments, name, default=None):
@@ -74,7 +106,18 @@ def response(error_code, error_description, **values):
 
 def main():
     checking = sys.argv[1:2] == ["--check-arguments"]
-    arguments = sys.argv[2:] if checking else sys.argv[1:]
+    input_path = None
+    if checking:
+        arguments = sys.argv[2:]
+    elif sys.argv[1:2] == ["--input-path"]:
+        if sys.argv[3:4] != ["--initial-timeout"] or sys.argv[5:6] != ["--update-timeout"]:
+            raise SystemExit("invalid FIFO transport arguments")
+        input_path = Path(sys.argv[2])
+        initial_timeout = float(sys.argv[4])
+        update_timeout = float(sys.argv[6])
+        arguments = sys.argv[7:]
+    else:
+        arguments = sys.argv[1:]
     try:
         metadata, preferred_filename, destination = validate_arguments(arguments)
         if checking:
@@ -89,7 +132,10 @@ def main():
         descriptor, temporary_name = tempfile.mkstemp(prefix=".upload-", dir=destination)
         try:
             with os.fdopen(descriptor, "wb") as output:
-                shutil.copyfileobj(sys.stdin.buffer, output)
+                if input_path is None:
+                    shutil.copyfileobj(sys.stdin.buffer, output)
+                else:
+                    drain_fifo(input_path, output, initial_timeout, update_timeout)
                 output.flush()
                 os.fsync(output.fileno())
             # Linking makes creation non-overwriting and atomic. Retry the generated
@@ -112,6 +158,8 @@ def main():
             raise
         response(0, "", metadata=metadata, path=str(final_path), size=final_path.stat().st_size)
         return 0
+    except TimeoutError:
+        return UPLOAD_TIMEOUT_EXIT_CODE
     except (OSError, ValueError, json.JSONDecodeError) as error:
         response(getattr(error, "errno", None) or 1, str(error))
         return 1

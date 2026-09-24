@@ -5,11 +5,9 @@ import argparse
 import json
 import os
 from pathlib import Path
-import selectors
 import shutil
 import signal
 import subprocess
-import threading
 import time
 
 CHUNK_SIZE = 64 * 1024
@@ -23,42 +21,17 @@ def request_stop(_signal, _frame):
     stopping = True
 
 
-def receive(input_path, output, initial_timeout, update_timeout):
-    descriptor = os.open(input_path, os.O_RDONLY | os.O_NONBLOCK)
-    selector = selectors.DefaultSelector()
-    selector.register(descriptor, selectors.EVENT_READ)
-    started = False
-    deadline = time.monotonic() + initial_timeout
-    try:
-        while not stopping:
-            remaining = max(0, deadline - time.monotonic())
-            events = selector.select(remaining)
-            if not events:
-                return started
-            chunk = os.read(descriptor, CHUNK_SIZE)
-            if chunk:
-                output.write(chunk)
-                output.flush()
-                started = True
-                deadline = time.monotonic() + update_timeout
-            elif started:
-                return True
-            else:
-                # No writer is connected yet. Avoid a busy loop while preserving
-                # the initial-silence deadline.
-                time.sleep(min(0.02, remaining))
-    finally:
-        selector.close()
-        os.close(descriptor)
-    return False
-
-
-def capture_processor_output(process, result_path, state):
-    """Drain processor output concurrently without exceeding the result cap."""
+def run_processor(command, result_path):
+    """Run a FIFO-aware processor and capture its bounded result."""
+    global processor
+    processor = subprocess.Popen(
+        command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
+    oversized = False
     captured = 0
     with result_path.open("wb") as result:
-        while True:
-            chunk = process.stdout.read(CHUNK_SIZE)
+        while not stopping:
+            chunk = processor.stdout.read(CHUNK_SIZE)
             if not chunk:
                 break
             available = MAX_RESULT_BYTES - captured
@@ -66,46 +39,21 @@ def capture_processor_output(process, result_path, state):
                 result.write(chunk[:available])
                 captured += min(len(chunk), available)
             if len(chunk) > available:
-                state["oversized"] = True
-                process.terminate()
+                oversized = True
+                processor.terminate()
                 break
-
-
-def run_processor(command, input_path, result_path, initial_timeout, update_timeout):
-    """Stream the input FIFO into the processor and capture its result."""
-    global processor
-    state = {"oversized": False}
-    processor = subprocess.Popen(
-        command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
-    output_reader = threading.Thread(
-        target=capture_processor_output,
-        args=(processor, result_path, state),
-        daemon=True,
-    )
-    output_reader.start()
-    try:
-        complete = receive(input_path, processor.stdin, initial_timeout, update_timeout)
-    except BrokenPipeError:
-        complete = False
-    finally:
-        try:
-            processor.stdin.close()
-        except BrokenPipeError:
-            pass
-    if processor.poll() is None and (stopping or state["oversized"] or not complete):
+    if processor.poll() is None and (stopping or oversized):
         processor.terminate()
     try:
-        processor.wait(timeout=2)
+        return_code = processor.wait(timeout=2)
     except subprocess.TimeoutExpired:
         processor.kill()
-        processor.wait()
-    output_reader.join(timeout=2)
+        return_code = processor.wait()
     processor.stdout.close()
     processor = None
-    if state["oversized"]:
+    if oversized:
         result_path.write_bytes(b"processor output exceeded 1048576 bytes\n")
-    return complete
+    return return_code != 124
 
 
 def publish(result_fifo, result_path, timeout):
@@ -170,10 +118,13 @@ def main(argv=None):
         readiness = b"READY\n" + os.fsencode(input_path) + b"\n"
         os.write(options.readiness_fd, readiness)
         os.close(options.readiness_fd)
-        complete = run_processor(
-            [options.processor, *arguments], input_path, result_path,
-            options.initial_timeout, options.update_timeout,
-        )
+        complete = run_processor([
+            options.processor,
+            "--input-path", str(input_path),
+            "--initial-timeout", str(options.initial_timeout),
+            "--update-timeout", str(options.update_timeout),
+            *arguments,
+        ], result_path)
         if complete and not stopping:
             publish(result_fifo, result_path, options.result_timeout)
         return 0
