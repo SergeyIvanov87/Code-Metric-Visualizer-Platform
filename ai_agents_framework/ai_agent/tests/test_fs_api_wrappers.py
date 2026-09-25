@@ -7,7 +7,7 @@ import pytest
 SOURCES_DIR = Path(__file__).resolve().parents[1] / "sources"
 sys.path.insert(0, str(SOURCES_DIR))
 
-from fs_api_wrappers import execute_put_doc_query
+from fs_api_wrappers import execute_delete_doc_query, execute_put_doc_query
 
 
 class FakeQuery:
@@ -89,3 +89,11 @@ def test_execute_put_doc_query_quotes_doc_data_for_dispatcher():
     )
 
     assert query.exec_args.endswith(f'doc_data="{encoded_document}"')
+
+
+def test_execute_delete_doc_query_uses_dispatcher_ids_option():
+    query = FakeQuery()
+
+    execute_delete_doc_query(query, "session", 10, "12,13", "metadata")
+
+    assert query.exec_args == "SESSION_ID=session -ids=12,13 -metadata=metadata"

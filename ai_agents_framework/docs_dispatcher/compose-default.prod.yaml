@@ -9,6 +9,7 @@ services:
        BE_MYSQL_MYSQL_DATABASE: rag_docs_database
     volumes:
       - api.pmccabe_collector.restapi.org:/api
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage:/mnt/file_storage
     secrets:
        - backend_mysql_db_login
        - backend_mysql_db_password
@@ -17,6 +18,7 @@ volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage:
 
 secrets:
    backend_mysql_db_login:
