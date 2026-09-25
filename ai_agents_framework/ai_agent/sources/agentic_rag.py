@@ -119,6 +119,7 @@ def retrieve_by_vector(collection, query_embedder, document_store, query: str, k
         print(
             f"[RETRIEVAL] Adjusted unsafe k={k!r} to {safe_k}",
             flush=True,
+            file=sys.stderr,
         )
 
 
@@ -151,6 +152,7 @@ def retrieve_by_vector(collection, query_embedder, document_store, query: str, k
                 f"[RETRIEVAL] Rejecting id={document_id}: "
                 f"distance={distance:.4f}, acceptable distance={MAX_ACCEPTABLE_DISTANCE:.4f}",
                 flush=True,
+                file=sys.stderr,
             )
             continue
 
@@ -281,7 +283,7 @@ if __name__ == "__main__":
     model_path = Path(args.assets_models) / model_name
 
     if not os.path.exists(model_path):
-        print(f"Downloading {model_path}...")
+        print(f"Downloading {model_path}...", file=sys.stderr)
         # You may want to replace the model URL by another of your choice
         #model_url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/" + model_name
         #model_url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/" + model_name
@@ -293,7 +295,7 @@ if __name__ == "__main__":
         with open(model_path, 'wb') as f:
             for data in tqdm(response.iter_content(chunk_size=4096), total=total_size//4096):
                 f.write(data)
-        print("Download complete!")
+        print("Download complete!", file=sys.stderr)
 
     '''
     model = ChatLlamaCpp(
@@ -330,6 +332,7 @@ if __name__ == "__main__":
         print(
             f"[TOOL EXECUTED] query={query!r}, k={DEFAULT_RETRIEVAL_RESULTS}",
             flush=True,
+            file=sys.stderr,
         )
 
         return search_knowledge_base_impl(
@@ -339,13 +342,6 @@ if __name__ == "__main__":
             query=query,
             k=DEFAULT_RETRIEVAL_RESULTS,
         )
-
-    print(
-        json.dumps(
-            search_knowledge_base.args_schema.model_json_schema(),
-            indent=2,
-        )
-    )
 
     FORCED_RETRIEVAL_CHOICE = {
         "type": "function",
@@ -369,6 +365,7 @@ if __name__ == "__main__":
                 print(
                     "[MIDDLEWARE] Successful retrieval; allowing final answer",
                     flush=True,
+                    file=sys.stderr,
                 )
                 return handler(request)
 
@@ -385,6 +382,7 @@ if __name__ == "__main__":
             print(
                 f"[MIDDLEWARE] Retrieval failed; error count={error_count}",
                 flush=True,
+                file=sys.stderr,
             )
 
             if error_count >= 2:
@@ -403,6 +401,7 @@ if __name__ == "__main__":
         print(
             "[MIDDLEWARE] Forcing search_knowledge_base",
             flush=True,
+            file=sys.stderr,
         )
 
         return handler(
@@ -411,18 +410,6 @@ if __name__ == "__main__":
             )
         )
 
-
-    # TEST TESt TEST
-    print("Testing retrieval tool directly...", flush=True)
-
-    direct_result = search_knowledge_base.invoke(
-        {
-            "query": args.user_prompt,
-          #  "k": 5,
-        }
-    )
-
-    print("Direct retrieval result:", direct_result, flush=True)
 
     '''
     #TEst Test Test
@@ -471,7 +458,7 @@ if __name__ == "__main__":
 
     Never invent content or Source IDs.
     """,
-        debug=True,
+        debug=False,
     )
 '''
     null_safe_qwen_agent = create_agent(
@@ -479,7 +466,7 @@ if __name__ == "__main__":
         tools=[search_knowledge_base],
         middleware=[force_initial_retrieval],
         system_prompt = args.system_prompt,
-        debug=True,
+        debug=False,
     )
 
     result = null_safe_qwen_agent.invoke(
@@ -493,4 +480,4 @@ if __name__ == "__main__":
         }
     )
 
-    print(result["messages"][-1].content)
+    print(json.dumps({"response": result["messages"][-1].content}))

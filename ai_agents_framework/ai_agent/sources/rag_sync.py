@@ -288,7 +288,7 @@ def main(
         main_service_name,
         {
             "sync": re.compile(r".*ai_agent_rag_dispatcher_sync.*"),
-            "get_docs": re.compile(r".*ai_agent_rag_get_docs.*"),
+            "get_docs": re.compile(r".*ai_agent_rag_dispatcher_get_docs.*"),
             "read_id": re.compile(r".*ai_agent_rag_dispatcher_read_id.*"),
         },
     )
