@@ -1,0 +1,307 @@
+import json
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+
+
+if Path("/opt/deferred_query_launcher.py").exists():
+    LAUNCHER = Path("/opt/deferred_query_launcher.py")
+    EXECUTOR = Path("/opt/deferred_query_executor.py")
+    PROCESSOR = Path("/package/streaming_file_upload_processor.py")
+    SCHEMA = Path("/package/API/streaming_file_upload.json")
+else:
+    ROOT = Path(__file__).parents[4]
+    LAUNCHER = ROOT / "common/deferred_query_launcher.py"
+    EXECUTOR = ROOT / "common/deferred_query_executor.py"
+    PROCESSOR = ROOT / "utility/file-uploader/streaming_file_upload_processor.py"
+    SCHEMA = ROOT / "utility/file-uploader/API/streaming_file_upload.json"
+
+
+def arguments(destination, session="test", initial="1", preferred="binary.dat"):
+    return [
+        "metadata", "", "preferred_filename", preferred,
+        "destination", str(destination),
+        "WaitInitialQueryTimeoutSec", initial,
+        "WaitQueryUpdateTimeoutSec", "0.15",
+        "WaitResultConsumptionTimeoutSec", "1",
+        "SESSION_ID", session,
+    ]
+
+
+def launch(api, destination, extra_arguments=None):
+    command = [
+        sys.executable, str(LAUNCHER), "--api-directory", str(api),
+        "--processor", str(PROCESSOR), "--executor", str(EXECUTOR), "--",
+        *(extra_arguments or arguments(destination)),
+    ]
+    return subprocess.run(command, text=True, capture_output=True, timeout=3)
+
+
+def channel_report(launch_result):
+    return json.loads(launch_result.stdout)
+
+
+def wait_for_fifo(path, timeout=5):
+    """Wait for a FIFO to become visible across the shared container volume."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if stat.S_ISFIFO(path.stat().st_mode):
+                return path
+        except FileNotFoundError:
+            pass
+        time.sleep(0.01)
+    raise AssertionError(f"FIFO did not appear within {timeout} seconds: {path}")
+
+
+def test_deferred_upload_validation_timeout_binary_data_and_cleanup():
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        api = root / "api"
+        destination = root / "uploads"
+        api.mkdir()
+        destination.mkdir()
+
+        invalid = launch(api, destination, arguments(destination, initial="invalid"))
+        assert invalid.returncode != 0
+        assert list(api.iterdir()) == []
+
+        invalid_backend_arguments = arguments(destination)
+        invalid_backend_arguments[1] = "not-json"
+        invalid = launch(api, destination, invalid_backend_arguments)
+        assert invalid.returncode != 0
+        assert "processor argument validation failed" in invalid.stderr
+        assert list(api.iterdir()) == []
+
+        timed_out = launch(api, destination, arguments(destination, session="timeout", initial="0.1"))
+        assert timed_out.returncode == 0
+        timed_out_directory = Path(channel_report(timed_out)["input"]).parent
+        deadline = time.monotonic() + 2
+        while timed_out_directory.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert not timed_out_directory.exists()
+        assert list(destination.iterdir()) == []
+
+        stalled = launch(
+            api, destination,
+            arguments(destination, session="stalled", preferred="stalled.dat"),
+        )
+        assert stalled.returncode == 0, stalled.stderr
+        stalled_input = wait_for_fifo(Path(channel_report(stalled)["input"]))
+        stalled_directory = stalled_input.parent
+        with stalled_input.open("wb", buffering=0) as upload:
+            upload.write(b"partial")
+            time.sleep(0.3)
+        deadline = time.monotonic() + 2
+        while stalled_directory.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert not stalled_directory.exists()
+        assert not (destination / "stalled.dat").exists()
+
+        started = launch(api, destination)
+        assert started.returncode == 0, started.stderr
+        report = channel_report(started)
+        assert {"input", "input_type", "result", "result_type"}.issubset(report)
+        assert report["input_type"] == "FIFO"
+        assert report["result_type"] == "FIFO"
+        input_fifo = wait_for_fifo(Path(report["input"]))
+        request_directory = input_fifo.parent
+        assert wait_for_fifo(Path(report["result"])) == request_directory / "async_result"
+        assert not (request_directory / "upload").exists()
+
+        duplicate = launch(api, destination)
+        assert duplicate.returncode != 0
+
+        payload = b"binary\x00payload\n" * 10000
+        input_fifo.write_bytes(payload)
+        result = json.loads(wait_for_fifo(request_directory / "async_result").read_text())
+        assert result["error_code"] == "0"
+        assert result["error_description"] == ""
+        assert result["received_bytes"] == len(payload)
+        assert result["metadata"] == {}
+        assert (destination / "binary.dat").read_bytes() == payload
+
+
+def test_schema_uses_relative_query_and_declares_upload_parameters():
+    schema = json.loads(SCHEMA.read_text())
+    assert schema["Query"] == "+/streaming_file_upload"
+    assert {
+        "metadata", "preferred_filename", "destination",
+        "WaitInitialQueryTimeoutSec", "WaitQueryUpdateTimeoutSec",
+        "WaitResultConsumptionTimeoutSec",
+    } <= schema["Params"].keys()
+    assert schema["Params"]["WaitInitialQueryTimeoutSec"] == "60"
+    assert schema["Params"]["WaitResultConsumptionTimeoutSec"] == "60"
+
+
+def test_processor_accepts_schema_encoded_empty_values():
+    with tempfile.TemporaryDirectory() as temporary:
+        result = subprocess.run(
+            [
+                sys.executable, str(PROCESSOR),
+                "--request-directory", temporary, "--check-arguments", "--",
+                "metadata", "\"\"", "preferred_filename", "\"\"",
+                "destination", temporary,
+            ],
+            text=True, capture_output=True, timeout=3,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert json.loads(result.stdout)["error_code"] == "0"
+
+
+def test_processor_prepares_only_its_input_fifo():
+    with tempfile.TemporaryDirectory() as temporary:
+        request_directory = Path(temporary)
+        result = subprocess.run(
+            [sys.executable, str(PROCESSOR), "--request-directory", temporary,
+             "--prepare-api-channel"],
+            text=True, capture_output=True, timeout=3,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        report = json.loads(result.stdout)
+        assert report == {
+            "input": str(request_directory / "input"),
+            "input_type": "FIFO",
+        }
+        assert wait_for_fifo(Path(report["input"]))
+        assert not (request_directory / "async_result").exists()
+
+
+def test_check_arguments_text_is_valid_as_a_preferred_filename():
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        request_directory = root / "request"
+        destination = root / "uploads"
+        request_directory.mkdir()
+        destination.mkdir()
+        prepared = subprocess.run(
+            [sys.executable, str(PROCESSOR),
+             "--request-directory", str(request_directory), "--prepare-api-channel"],
+            text=True, capture_output=True, timeout=3,
+        )
+        assert prepared.returncode == 0, prepared.stdout + prepared.stderr
+        process = subprocess.Popen(
+            [
+                sys.executable, str(PROCESSOR),
+                "--request-directory", str(request_directory),
+                "--initial-timeout", "1", "--update-timeout", "1", "--",
+                "metadata", "{}",
+                "preferred_filename", "--check-arguments",
+                "destination", str(destination),
+            ],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        wait_for_fifo(request_directory / "input").write_bytes(b"content")
+        stdout, stderr = process.communicate(timeout=3)
+        assert process.returncode == 0, stdout + stderr
+        assert (destination / "--check-arguments").read_bytes() == b"content"
+
+
+def test_empty_upload_value_collision_and_filename_conflicts():
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        api = root / "api"
+        destination = root / "uploads"
+        api.mkdir()
+        destination.mkdir()
+
+        empty = launch(
+            api, destination,
+            arguments(destination, session="empty", preferred="empty.dat"),
+        )
+        assert empty.returncode == 0, empty.stderr
+        empty_report = channel_report(empty)
+        wait_for_fifo(Path(empty_report["input"])).write_bytes(b"")
+        empty_result = json.loads(
+            wait_for_fifo(Path(empty_report["result"])).read_text()
+        )
+        assert empty_result["error_code"] == "0"
+        assert empty_result["received_bytes"] == 0
+        assert (destination / "empty.dat").read_bytes() == b""
+
+        collision = launch(
+            api, destination,
+            arguments(destination, session="collision", preferred="destination"),
+        )
+        assert collision.returncode == 0, collision.stderr
+        collision_report = channel_report(collision)
+        wait_for_fifo(Path(collision_report["input"])).write_bytes(b"content")
+        collision_result = json.loads(
+            wait_for_fifo(Path(collision_report["result"])).read_text()
+        )
+        assert collision_result["error_code"] == "0"
+        assert (destination / "destination").read_bytes() == b"content"
+
+        existing_path = destination / "existing.dat"
+        existing_path.write_bytes(b"original")
+        preflight_conflict = launch(
+            api, destination,
+            arguments(
+                destination, session="preflight-conflict", preferred="existing.dat",
+            ),
+        )
+        assert preflight_conflict.returncode != 0
+        assert "processor argument validation failed" in preflight_conflict.stderr
+
+        raced = launch(
+            api, destination,
+            arguments(destination, session="race-conflict", preferred="raced.dat"),
+        )
+        assert raced.returncode == 0, raced.stderr
+        raced_report = channel_report(raced)
+        raced_path = destination / "raced.dat"
+        raced_path.write_bytes(b"original")
+        wait_for_fifo(Path(raced_report["input"])).write_bytes(b"replacement")
+        raced_result = json.loads(
+            wait_for_fifo(Path(raced_report["result"])).read_text()
+        )
+        assert raced_result["error_code"] != "0"
+        assert raced_path.read_bytes() == b"original"
+
+
+def test_running_container_filesystem_api():
+    """Exercise the generated service when this test runs under Compose."""
+    api_node = Path("/api/api.pmccabe_collector.restapi.org/file-uploader/streaming_file_upload/POST")
+    if not Path("/api").is_dir():
+        return
+    deadline = time.monotonic() + 30
+    while not (api_node / "exec").exists() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert (api_node / "exec").exists()
+
+    session = f"functional-{os.getpid()}"
+    (api_node / "exec").write_text(
+        f'SESSION_ID={session} metadata="" preferred_filename=functional.bin '
+        "WaitInitialQueryTimeoutSec=5 WaitQueryUpdateTimeoutSec=0.1 "
+        "WaitResultConsumptionTimeoutSec=5"
+    )
+    handshake_fifo = wait_for_fifo(api_node / f"result.json_{session}")
+    report = json.loads(handshake_fifo.read_text())
+    assert report["input_type"] == "FIFO"
+    assert report["result_type"] == "FIFO"
+    input_fifo = wait_for_fifo(Path(report["input"]))
+    assert wait_for_fifo(Path(report["result"])) == input_fifo.parent / "async_result"
+    assert input_fifo.parent.parent == api_node
+    assert input_fifo.parent.is_dir()
+    payload = b"functional upload\x00\n"
+    input_fifo.write_bytes(payload)
+    result_fifo = wait_for_fifo(input_fifo.parent / "async_result")
+    result = json.loads(result_fifo.read_text())
+    assert result["error_code"] == "0"
+    assert Path("/uploads/functional.bin").read_bytes() == payload
+
+    # Leave a deferred request active when the tester exits. Docker Compose then
+    # stops the uploader, and the workflow's artifact check verifies shutdown
+    # removed both FIFOs from this unique request directory.
+    shutdown_session = f"shutdown-cleanup-{os.getpid()}"
+    (api_node / "exec").write_text(
+        f"SESSION_ID={shutdown_session} WaitInitialQueryTimeoutSec=60"
+    )
+    shutdown_handshake = wait_for_fifo(api_node / f"result.json_{shutdown_session}")
+    shutdown_report = json.loads(shutdown_handshake.read_text())
+    shutdown_input = wait_for_fifo(Path(shutdown_report["input"]))
+    wait_for_fifo(shutdown_input.parent / "async_result")

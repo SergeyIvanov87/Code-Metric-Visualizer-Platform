@@ -2,6 +2,7 @@
 
 
 import argparse
+import json
 import os
 import signal
 
@@ -12,6 +13,7 @@ signal.pthread_sigmask(signal.SIG_BLOCK, SHUTDOWN_SIGNALS)
 
 import shutil
 import sys
+import time
 
 from renew_pseudo_fs_pipes import remove_api_fs_pipes_node
 from api_schema_utils import deserialize_api_request_from_schema_file
@@ -48,6 +50,55 @@ for schema_file in schema_files:
 
 shutdown_started = False
 
+
+def signal_deferred_executors(mount_point):
+    """Discover verified deferred request owners and ask them to terminate."""
+    registrations = []
+    for root, _directories, files in os.walk(mount_point):
+        if "executor.json" not in files:
+            continue
+        registry = os.path.join(root, "executor.json")
+        try:
+            with open(registry, encoding="utf-8") as registry_file:
+                registration = json.load(registry_file)
+                pid = int(registration["pid"])
+                session_lock = registration["session_lock"]
+            with open(f"/proc/{pid}/cmdline", "rb") as command_file:
+                command_line = command_file.read().replace(b"\0", b" ").decode()
+            if "deferred_query_executor.py" not in command_line or root not in command_line:
+                continue
+            os.kill(pid, signal.SIGTERM)
+            registrations.append((pid, root, session_lock))
+        except (FileNotFoundError, PermissionError, ProcessLookupError, ValueError,
+                KeyError, json.JSONDecodeError):
+            continue
+
+    return registrations
+
+
+def reap_deferred_executors(registrations, timeout=5.0):
+    """Wait for signalled owners, escalate if needed, and remove artifacts."""
+    deadline = time.monotonic() + timeout
+    remaining = list(registrations)
+    while remaining and time.monotonic() < deadline:
+        alive = []
+        for pid, directory, session_lock in remaining:
+            try:
+                os.kill(pid, 0)
+                alive.append((pid, directory, session_lock))
+            except ProcessLookupError:
+                pass
+        remaining = alive
+        if remaining:
+            time.sleep(0.05)
+    for pid, _directory, _session_lock in remaining:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    for _pid, directory, session_lock in registrations:
+        shutil.rmtree(directory, ignore_errors=True)
+        shutil.rmtree(session_lock, ignore_errors=True)
 def unblock_pipes_signal_handler(sig, frame):
     global valid_queries_dict
     global args
@@ -60,6 +111,8 @@ def unblock_pipes_signal_handler(sig, frame):
     print(f'Signal caught: {sig}', flush=True)
     deleted_pipes = []
     cleanup_errors = []
+    deferred_executors = signal_deferred_executors(args.mount_point)
+    print(f"Signalled deferred executors: {deferred_executors}", flush=True)
     for communication_type in ("server", "client"):
         print(f"unblock {communication_type} pipes", flush=True)
         for req_name, query in valid_queries_dict.items():
@@ -80,6 +133,9 @@ def unblock_pipes_signal_handler(sig, frame):
                     flush=True,
                 )
 
+    reap_deferred_executors(deferred_executors)
+    print(f"Reaped deferred executors: {deferred_executors}", flush=True)
+
     exec_node_directories = {os.path.dirname(path) for path in deleted_pipes}
     for d in exec_node_directories:
         try:
@@ -89,7 +145,6 @@ def unblock_pipes_signal_handler(sig, frame):
         except OSError as error:
             cleanup_errors.append((d, "directory", error))
             print(f"Failed to remove API directory {d}: {error}", file=sys.stderr, flush=True)
-
     removed_paths = deleted_pipes + sorted(exec_node_directories)
     print(f"Removed API paths: {removed_paths}", flush=True)
     raise SystemExit(1 if cleanup_errors else 0)
