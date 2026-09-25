@@ -87,8 +87,10 @@ make the business processor input-channel decision.
 ### Shutdown and CI
 
 `common/api_management.py` discovers registered deferred executors, signals
-them, waits for bounded cleanup, escalates when necessary, and removes remaining
-request/session artifacts. The dedicated functional job runs the generated
+them, unblocks top-level API pipes, waits for bounded cleanup, and escalates when
+necessary. Only after deferred owners are reaped does it remove their parent API
+directories and any remaining request or session artifacts. The dedicated
+functional job runs the generated
 filesystem API and checks that `exec`, `result*`, `input`, and `async_result`
 artifacts do not survive container shutdown.
 
@@ -111,7 +113,8 @@ artifacts do not survive container shutdown.
   parameter names remain valid.
 * Uploaded files are installed atomically without an extra full-size staging
   copy in the request directory.
-* Completion, timeout, and shutdown attempt to remove the whole request.
+* Completion and timeout remove the whole request. Shutdown reaps deferred
+  owners before removing their parent API directories.
 * Functional coverage includes validation, empty uploads, initial and
   update-silence timeouts, duplicate sessions, argument-name collisions,
   preferred-filename conflict races, binary data larger than `PIPE_BUF`,
@@ -140,8 +143,6 @@ ADR:
 
 * Update silence currently cancels the upload instead of committing bytes
   already received as required by `Review.md`.
-* Shutdown removes ordinary API directories before deferred executors are fully
-  reaped, which can race executor cleanup.
 * The readiness field names now describe paths and types without embedding FIFO
   in each key. However, only FIFO channels are verified, the executor-owned
   result endpoint and publisher remain FIFO-specific, and behavior for other
@@ -153,38 +154,46 @@ ADR:
 
 ## Evaluation
 
-### Better
+### Better than the initial design
 
-* Responsibilities are clearer: the executor manages lifecycle, while the
-  processor owns business validation, persistence, and input-channel selection.
-* Streaming directly into the destination-side temporary file avoids duplicate
-  full-size upload storage and I/O.
-* The extensible JSON readiness report gives clients both endpoints and their
-  declared transport types explicitly.
-* Sixty-second interactive defaults reduce premature cleanup during manual use.
-* PID registration, bounded shutdown, and CI artifact checks improve
-  operational visibility.
+* The deferred executor stays narrow and generalized: it owns process lifetime,
+  bounded result capture, publication, and cleanup. Channel preparation, upload
+  behavior, validation, and persistence remain customizable inside the streaming
+  processor instead of accumulating in shared infrastructure.
+* Direct streaming into a destination-side temporary file avoids an extra
+  full-size copy. `fsync` and non-overwriting atomic installation provide a
+  strong persistence boundary.
+* The extensible handshake reports both endpoint paths and transport types, while
+  permitting additional metadata without changing the required fields.
+* Preflight validation rejects known conflicts before allocation; race conflicts
+  are reported after draining input. Empty uploads and `received_bytes` are also
+  covered explicitly.
+* Duplicate-session protection, bounded output, verified executor-first shutdown
+  ordering, cleanup checks, and end-to-end tests make the lifecycle more
+  operationally concrete than the original design sketch.
 
-### Worse or incomplete
+### Worse or incomplete compared with the initial design
 
-* The processor contract is more complex because each processor must prepare
-  and consume its own channel.
-* The report schema no longer embeds FIFO in field names, but the executor-owned
-  result channel and publisher still constrain the lifecycle to a FIFO result.
-* Direct streaming couples the business processor's lifetime to slow or failed
-  clients.
-* Update-timeout behavior does not yet conform to the ADR.
-* Lifecycle and permission testing remains incomplete.
+* Readiness is published after FIFO creation but before the long-running
+  processor opens the read side, so a client writer can briefly block and a
+  post-handshake startup failure has weaker guarantees than `Review.md`.
+* Update silence cancels the upload, while `Review.md` defines it as successful
+  end-of-input. This contract difference must be resolved explicitly.
+* Direct streaming ties processor lifetime to client speed and makes retries or
+  pre-processing length/digest validation harder than staged input.
+* Transport generality is incomplete: result publication remains FIFO-only,
+  unknown channel types have no type-specific validation, and reported paths are
+  not constrained to the allocated request directory.
+* Coverage for retention expiry, hostile permissions, startup failures, and all
+  lifecycle races remains incomplete.
 
 ## Overall assessment
 
-Version 1 achieves the primary end-to-end upload goal and establishes a useful
-general-purpose deferred lifecycle. Its key architectural boundary should be
-preserved: the business processor selects and prepares its input communication
-channel, while the deferred executor supervises the request and relays the JSON
-channel report to the launcher through readiness.
+V1 is better both as a concrete uploader and as an architectural separation of
+concerns. The deferred executor is small and reusable; upload-specific choices
+are isolated in the processor, where they can evolve without expanding common
+lifecycle code.
 
-The next version should define validation and lifecycle behavior for non-FIFO
-channel types, reconcile update-timeout semantics with the ADR, reorder
-shutdown cleanup, rename the executor request-directory
-option, and complete the ADR acceptance-test matrix.
+The remaining work is to strengthen the boundary: define update-timeout
+semantics, tighten readiness and path-containment guarantees, and specify
+non-FIFO validation.

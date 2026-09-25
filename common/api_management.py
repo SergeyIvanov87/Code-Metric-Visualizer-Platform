@@ -133,6 +133,9 @@ def unblock_pipes_signal_handler(sig, frame):
                     flush=True,
                 )
 
+    reap_deferred_executors(deferred_executors)
+    print(f"Reaped deferred executors: {deferred_executors}", flush=True)
+
     exec_node_directories = {os.path.dirname(path) for path in deleted_pipes}
     for d in exec_node_directories:
         try:
@@ -142,11 +145,8 @@ def unblock_pipes_signal_handler(sig, frame):
         except OSError as error:
             cleanup_errors.append((d, "directory", error))
             print(f"Failed to remove API directory {d}: {error}", file=sys.stderr, flush=True)
-
     removed_paths = deleted_pipes + sorted(exec_node_directories)
     print(f"Removed API paths: {removed_paths}", flush=True)
-    reap_deferred_executors(deferred_executors)
-    print(f"Reaped deferred executors: {deferred_executors}", flush=True)
     raise SystemExit(1 if cleanup_errors else 0)
 
 if __name__ == "__main__":
