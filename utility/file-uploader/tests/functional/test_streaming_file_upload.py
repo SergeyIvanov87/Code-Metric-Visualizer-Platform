@@ -201,6 +201,68 @@ def test_check_arguments_text_is_valid_as_a_preferred_filename():
         assert (destination / "--check-arguments").read_bytes() == b"content"
 
 
+def test_empty_upload_value_collision_and_filename_conflicts():
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        api = root / "api"
+        destination = root / "uploads"
+        api.mkdir()
+        destination.mkdir()
+
+        empty = launch(
+            api, destination,
+            arguments(destination, session="empty", preferred="empty.dat"),
+        )
+        assert empty.returncode == 0, empty.stderr
+        empty_report = channel_report(empty)
+        wait_for_fifo(Path(empty_report["input"])).write_bytes(b"")
+        empty_result = json.loads(
+            wait_for_fifo(Path(empty_report["result"])).read_text()
+        )
+        assert empty_result["error_code"] == "0"
+        assert empty_result["received_bytes"] == 0
+        assert (destination / "empty.dat").read_bytes() == b""
+
+        collision = launch(
+            api, destination,
+            arguments(destination, session="collision", preferred="destination"),
+        )
+        assert collision.returncode == 0, collision.stderr
+        collision_report = channel_report(collision)
+        wait_for_fifo(Path(collision_report["input"])).write_bytes(b"content")
+        collision_result = json.loads(
+            wait_for_fifo(Path(collision_report["result"])).read_text()
+        )
+        assert collision_result["error_code"] == "0"
+        assert (destination / "destination").read_bytes() == b"content"
+
+        existing_path = destination / "existing.dat"
+        existing_path.write_bytes(b"original")
+        preflight_conflict = launch(
+            api, destination,
+            arguments(
+                destination, session="preflight-conflict", preferred="existing.dat",
+            ),
+        )
+        assert preflight_conflict.returncode != 0
+        assert "processor argument validation failed" in preflight_conflict.stderr
+
+        raced = launch(
+            api, destination,
+            arguments(destination, session="race-conflict", preferred="raced.dat"),
+        )
+        assert raced.returncode == 0, raced.stderr
+        raced_report = channel_report(raced)
+        raced_path = destination / "raced.dat"
+        raced_path.write_bytes(b"original")
+        wait_for_fifo(Path(raced_report["input"])).write_bytes(b"replacement")
+        raced_result = json.loads(
+            wait_for_fifo(Path(raced_report["result"])).read_text()
+        )
+        assert raced_result["error_code"] != "0"
+        assert raced_path.read_bytes() == b"original"
+
+
 def test_running_container_filesystem_api():
     """Exercise the generated service when this test runs under Compose."""
     api_node = Path("/api/api.pmccabe_collector.restapi.org/file-uploader/streaming_file_upload/POST")

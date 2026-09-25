@@ -53,18 +53,16 @@ def drain_fifo(input_path, output, initial_timeout, update_timeout):
             if chunk:
                 output.write(chunk)
                 deadline = time.monotonic() + update_timeout
-            elif bytes_read != 0:
-                return bytes_read
             else:
-                time.sleep(min(0.02, remaining))
+                return bytes_read
     finally:
         selector.close()
         os.close(descriptor)
 
 
 def value_of(arguments, name, default=None):
-    for index, argument in enumerate(arguments[:-1]):
-        if argument.lstrip("-") == name:
+    for index in range(0, len(arguments) - 1, 2):
+        if arguments[index].lstrip("-") == name:
             return arguments[index + 1]
     if default is not None:
         return default
@@ -157,14 +155,13 @@ def main(argv=None):
     captured_bytes_from_input = 0
     try:
         metadata, preferred_filename, destination = validate_arguments(arguments)
-        if options.check_arguments:
-            response(0, "")
-            return 0
-
         filename = preferred_filename or generated_filename(destination)
         final_path = destination / filename
-        if preferred_filename and final_path.exists():
-            raise FileExistsError(f"preferred filename already exists: {final_path}")
+        if options.check_arguments:
+            if preferred_filename and final_path.exists():
+                raise FileExistsError(f"preferred filename already exists: {final_path}")
+            response(0, "")
+            return 0
 
         descriptor, temporary_name = tempfile.mkstemp(prefix=".upload-", dir=destination)
         try:

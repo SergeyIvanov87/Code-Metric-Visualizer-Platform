@@ -30,7 +30,9 @@ its input channel, consumes binary upload data, writes to a temporary file in
 the destination, calls `fsync`, and installs the completed file atomically
 without overwriting an existing preferred filename. It returns the business
 result as JSON, including `received_bytes` so callers can compare the reported
-byte count with the persisted file size.
+byte count with the persisted file size. Known preferred-filename conflicts are
+rejected before request allocation; if a conflict appears after the handshake,
+the processor drains the input before returning the conflict result.
 
 ### Deferred launcher
 
@@ -103,13 +105,17 @@ artifacts do not survive container shutdown.
   four required report fields can be extended with additional metadata.
 * The launcher is short-lived while the detached executor owns the request.
 * Processor output is bounded and retained independently of processor lifetime.
-* Successful uploads report the number of bytes received.
+* Successful uploads, including empty files, report the number of bytes
+  received.
+* Query arguments are parsed strictly as name/value pairs, so values that match
+  parameter names remain valid.
 * Uploaded files are installed atomically without an extra full-size staging
   copy in the request directory.
 * Completion, timeout, and shutdown attempt to remove the whole request.
-* Functional coverage includes validation, initial and update-silence timeouts,
-  duplicate sessions, binary data larger than `PIPE_BUF`, generated API
-  execution, and shutdown artifact detection.
+* Functional coverage includes validation, empty uploads, initial and
+  update-silence timeouts, duplicate sessions, argument-name collisions,
+  preferred-filename conflict races, binary data larger than `PIPE_BUF`,
+  generated API execution, and shutdown artifact detection.
 
 ## Differences from `Review.md`
 
@@ -134,7 +140,6 @@ ADR:
 
 * Update silence currently cancels the upload instead of committing bytes
   already received as required by `Review.md`.
-* An empty upload is indistinguishable from initial silence and times out.
 * Shutdown removes ordinary API directories before deferred executors are fully
   reaped, which can race executor cleanup.
 * The readiness field names now describe paths and types without embedding FIFO
@@ -168,7 +173,7 @@ ADR:
   result channel and publisher still constrain the lifecycle to a FIFO result.
 * Direct streaming couples the business processor's lifetime to slow or failed
   clients.
-* Update-timeout and empty-file behavior do not yet conform to the ADR.
+* Update-timeout behavior does not yet conform to the ADR.
 * Lifecycle and permission testing remains incomplete.
 
 ## Overall assessment
@@ -180,6 +185,6 @@ channel, while the deferred executor supervises the request and relays the JSON
 channel report to the launcher through readiness.
 
 The next version should define validation and lifecycle behavior for non-FIFO
-channel types, reconcile update-timeout semantics with the ADR, correct
-empty-input behavior, reorder shutdown cleanup, rename the executor request-directory
+channel types, reconcile update-timeout semantics with the ADR, reorder
+shutdown cleanup, rename the executor request-directory
 option, and complete the ADR acceptance-test matrix.
