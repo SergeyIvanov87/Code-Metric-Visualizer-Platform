@@ -34,7 +34,8 @@ def prepare_api_channel(processor_path, request_directory):
     report = json.loads(prepared.stdout)
     result_fifo = request_directory / "async_result"
     os.mkfifo(result_fifo, 0o640)
-    report["result_FIFO"] = str(result_fifo)
+    report["result"] = str(result_fifo)
+    report["result_type"] = "FIFO"
     return report, result_fifo
 
 

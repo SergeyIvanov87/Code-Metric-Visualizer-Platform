@@ -80,6 +80,17 @@ def read_readiness(descriptor, timeout):
     return report
 
 
+def check_validity_of_processors_arguments(processor, api_directory, query_arguments):
+    argument_check = subprocess.run(
+        [str(processor), "--request-directory", str(api_directory),
+            "--check-arguments", "--", *query_arguments],
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=5,
+    )
+    if argument_check.returncode:
+        detail = argument_check.stdout.strip() or argument_check.stderr.strip()
+        raise ValueError(f"processor argument validation failed: {detail}")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--api-directory", required=True)
@@ -96,18 +107,12 @@ def main(argv=None):
         processor = Path(options.processor).resolve(strict=True)
         executor = Path(options.executor).resolve(strict=True)
         if not api_directory.is_dir():
-            raise ValueError("API directory is not a directory")
+            raise ValueError(f"API directory: {options.api_directory} is not a directory")
         for label, executable in (("processor", processor), ("executor", executor)):
             if not executable.is_file() or not os.access(executable, os.X_OK):
                 raise ValueError(f"{label} is not executable: {executable}")
-        argument_check = subprocess.run(
-            [str(processor), "--request-directory", str(api_directory),
-             "--check-arguments", "--", *query_arguments],
-            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=5,
-        )
-        if argument_check.returncode:
-            detail = argument_check.stdout.strip() or argument_check.stderr.strip()
-            raise ValueError(f"processor argument validation failed: {detail}")
+
+        check_validity_of_processors_arguments(processor, api_directory, query_arguments)
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
         parser.error(str(error))
 
@@ -141,17 +146,23 @@ def main(argv=None):
                                  close_fds=True, pass_fds=(write_fd,))
         os.close(write_fd)
         report = read_readiness(read_fd, options.readiness_timeout)
-        input_path = Path(report["input_FIFO"])
-        result_path = Path(report["result_FIFO"])
-        expected_input_path = request_directory / "input"
-        expected_result_path = request_directory / "async_result"
-        if (set(report) != {"input_FIFO", "result_FIFO"}
-                or input_path != expected_input_path
-                or result_path != expected_result_path
-                or child.poll() is not None
-                or not input_path.is_fifo() or not result_path.is_fifo()):
+        required_fields = {"input", "input_type", "result", "result_type"}
+        if not required_fields.issubset(report) or child.poll() is not None:
             child.terminate()
-            raise RuntimeError("deferred executor did not become ready")
+            raise RuntimeError(f"Received unrecognized report from the executor: {executor}, report: {report}")
+
+        input_path = Path(report["input"])
+        input_type = report["input_type"]
+        result_path = Path(report["result"])
+        result_type = report["result_type"]
+        if input_type.lower() == "fifo" and not input_path.is_fifo():
+            child.terminate()
+            raise RuntimeError(f"The execurot: {executor} reports 'input_type': {input_type}, but: {input_path} is not a {input_type}")
+
+        if result_type.lower() == "fifo" and not result_path.is_fifo():
+            child.terminate()
+            raise RuntimeError(f"The execurot: {executor} reports 'input_type': {result_type}, but: {result_path} is not a {result_type}")
+
         print(json.dumps(report))
         return 0
     except Exception as error:

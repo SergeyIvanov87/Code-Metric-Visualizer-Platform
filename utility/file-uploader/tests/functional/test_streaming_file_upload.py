@@ -79,19 +79,38 @@ def test_deferred_upload_validation_timeout_binary_data_and_cleanup():
 
         timed_out = launch(api, destination, arguments(destination, session="timeout", initial="0.1"))
         assert timed_out.returncode == 0
-        timed_out_directory = Path(channel_report(timed_out)["input_FIFO"]).parent
+        timed_out_directory = Path(channel_report(timed_out)["input"]).parent
         deadline = time.monotonic() + 2
         while timed_out_directory.exists() and time.monotonic() < deadline:
             time.sleep(0.01)
         assert not timed_out_directory.exists()
         assert list(destination.iterdir()) == []
 
+        stalled = launch(
+            api, destination,
+            arguments(destination, session="stalled", preferred="stalled.dat"),
+        )
+        assert stalled.returncode == 0, stalled.stderr
+        stalled_input = wait_for_fifo(Path(channel_report(stalled)["input"]))
+        stalled_directory = stalled_input.parent
+        with stalled_input.open("wb", buffering=0) as upload:
+            upload.write(b"partial")
+            time.sleep(0.3)
+        deadline = time.monotonic() + 2
+        while stalled_directory.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert not stalled_directory.exists()
+        assert not (destination / "stalled.dat").exists()
+
         started = launch(api, destination)
         assert started.returncode == 0, started.stderr
         report = channel_report(started)
-        input_fifo = wait_for_fifo(Path(report["input_FIFO"]))
+        assert {"input", "input_type", "result", "result_type"}.issubset(report)
+        assert report["input_type"] == "FIFO"
+        assert report["result_type"] == "FIFO"
+        input_fifo = wait_for_fifo(Path(report["input"]))
         request_directory = input_fifo.parent
-        assert wait_for_fifo(Path(report["result_FIFO"])) == request_directory / "async_result"
+        assert wait_for_fifo(Path(report["result"])) == request_directory / "async_result"
         assert not (request_directory / "upload").exists()
 
         duplicate = launch(api, destination)
@@ -102,6 +121,7 @@ def test_deferred_upload_validation_timeout_binary_data_and_cleanup():
         result = json.loads(wait_for_fifo(request_directory / "async_result").read_text())
         assert result["error_code"] == "0"
         assert result["error_description"] == ""
+        assert result["received_bytes"] == len(payload)
         assert result["metadata"] == {}
         assert (destination / "binary.dat").read_bytes() == payload
 
@@ -143,8 +163,11 @@ def test_processor_prepares_only_its_input_fifo():
         )
         assert result.returncode == 0, result.stdout + result.stderr
         report = json.loads(result.stdout)
-        assert report == {"input_FIFO": str(request_directory / "input")}
-        assert wait_for_fifo(Path(report["input_FIFO"]))
+        assert report == {
+            "input": str(request_directory / "input"),
+            "input_type": "FIFO",
+        }
+        assert wait_for_fifo(Path(report["input"]))
         assert not (request_directory / "async_result").exists()
 
 
@@ -196,8 +219,10 @@ def test_running_container_filesystem_api():
     )
     handshake_fifo = wait_for_fifo(api_node / f"result.json_{session}")
     report = json.loads(handshake_fifo.read_text())
-    input_fifo = wait_for_fifo(Path(report["input_FIFO"]))
-    assert wait_for_fifo(Path(report["result_FIFO"])) == input_fifo.parent / "async_result"
+    assert report["input_type"] == "FIFO"
+    assert report["result_type"] == "FIFO"
+    input_fifo = wait_for_fifo(Path(report["input"]))
+    assert wait_for_fifo(Path(report["result"])) == input_fifo.parent / "async_result"
     assert input_fifo.parent.parent == api_node
     assert input_fifo.parent.is_dir()
     payload = b"functional upload\x00\n"
@@ -216,5 +241,5 @@ def test_running_container_filesystem_api():
     )
     shutdown_handshake = wait_for_fifo(api_node / f"result.json_{shutdown_session}")
     shutdown_report = json.loads(shutdown_handshake.read_text())
-    shutdown_input = wait_for_fifo(Path(shutdown_report["input_FIFO"]))
+    shutdown_input = wait_for_fifo(Path(shutdown_report["input"]))
     wait_for_fifo(shutdown_input.parent / "async_result")

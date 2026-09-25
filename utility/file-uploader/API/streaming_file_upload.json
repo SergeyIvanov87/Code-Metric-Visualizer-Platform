@@ -13,7 +13,7 @@
     },
     "Description": {
         "header": "Allocates an ephemeral FIFO and uploads a file into this container.",
-        "body": "Write the request arguments to exec, read the returned JSON object containing input_FIFO and result_FIFO, stream the file to input_FIFO, and read the result from result_FIFO. metadata may be empty or a JSON object. destination is an existing container directory. preferred_filename may be empty to generate an uploaded.<UTC timestamp> name automatically.",
+        "body": "Write the request arguments to exec, read the returned JSON object containing 'input', 'input_type', 'result' and 'result_type', stream the file to 'input' FIFO, and read the result from 'result' FIFO. metadata may be empty or a JSON object. destination is an existing container directory. preferred_filename may be empty to generate an uploaded.<UTC timestamp> name automatically.",
         "footer": "The three timeout parameters bound initial upload silence, silence between upload chunks, and final result retention. Initial upload and result consumption default to 60 seconds so interactive clients have time to open and consume the deferred FIFOs."
     }
 }

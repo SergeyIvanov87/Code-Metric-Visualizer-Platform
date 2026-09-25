@@ -21,14 +21,18 @@ def interrupt_upload(_signal, _frame):
     raise InterruptedError("upload interrupted")
 
 
-def prepare_api_channel(request_directory):
-    """Create and describe the input FIFO owned by this processor."""
+def validate_request_dir(request_directory):
     request_directory = request_directory.resolve(strict=True)
     if not request_directory.is_dir():
-        raise ValueError("request directory is not a directory")
+        raise ValueError(f"request directory: {request_directory} is not a directory")
+
+
+def prepare_api_channel(request_directory):
+    """Create and describe the input FIFO owned by this processor."""
+    validate_request_dir(request_directory)
     input_path = request_directory / "input"
     os.mkfifo(input_path, 0o620)
-    return {"input_FIFO": str(input_path)}
+    return {"input": str(input_path), "input_type": "FIFO"}
 
 
 def drain_fifo(input_path, output, initial_timeout, update_timeout):
@@ -36,21 +40,21 @@ def drain_fifo(input_path, output, initial_timeout, update_timeout):
     descriptor = os.open(input_path, os.O_RDONLY | os.O_NONBLOCK)
     selector = selectors.DefaultSelector()
     selector.register(descriptor, selectors.EVENT_READ)
-    started = False
     deadline = time.monotonic() + initial_timeout
+    bytes_read = 0
     try:
         while True:
             remaining = max(0, deadline - time.monotonic())
             events = selector.select(remaining)
             if not events:
-                raise TimeoutError("upload FIFO timed out")
+                raise TimeoutError(f"upload FIFO timed out: {input_path}")
             chunk = os.read(descriptor, CHUNK_SIZE)
+            bytes_read += len(chunk)
             if chunk:
                 output.write(chunk)
-                started = True
                 deadline = time.monotonic() + update_timeout
-            elif started:
-                return
+            elif bytes_read != 0:
+                return bytes_read
             else:
                 time.sleep(min(0.02, remaining))
     finally:
@@ -134,6 +138,13 @@ def parse_arguments(argv=None):
 
 def main(argv=None):
     options = parse_arguments(argv)
+
+    try:
+        validate_request_dir(options.request_directory)
+    except (OSError, ValueError) as error:
+        response(getattr(error, "errno", None) or 1, str(error))
+        return 1
+
     if options.prepare_api_channel:
         try:
             print(json.dumps(prepare_api_channel(options.request_directory)))
@@ -143,6 +154,7 @@ def main(argv=None):
             return 1
 
     arguments = options.arguments[1:] if options.arguments[:1] == ["--"] else options.arguments
+    captured_bytes_from_input = 0
     try:
         metadata, preferred_filename, destination = validate_arguments(arguments)
         if options.check_arguments:
@@ -152,12 +164,12 @@ def main(argv=None):
         filename = preferred_filename or generated_filename(destination)
         final_path = destination / filename
         if preferred_filename and final_path.exists():
-            raise FileExistsError(f"preferred filename already exists: {filename}")
+            raise FileExistsError(f"preferred filename already exists: {final_path}")
 
         descriptor, temporary_name = tempfile.mkstemp(prefix=".upload-", dir=destination)
         try:
             with os.fdopen(descriptor, "wb") as output:
-                drain_fifo(
+                captured_bytes_from_input = drain_fifo(
                     options.request_directory / "input", output,
                     options.initial_timeout, options.update_timeout,
                 )
@@ -181,7 +193,7 @@ def main(argv=None):
             except FileNotFoundError:
                 pass
             raise
-        response(0, "", metadata=metadata, path=str(final_path), size=final_path.stat().st_size)
+        response(0, "", received_bytes=captured_bytes_from_input, metadata=metadata, path=str(final_path), size=final_path.stat().st_size)
         return 0
     except TimeoutError:
         return UPLOAD_TIMEOUT_EXIT_CODE

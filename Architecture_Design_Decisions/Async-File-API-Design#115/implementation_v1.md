@@ -29,7 +29,8 @@ The processor validates metadata, filenames, and the destination. It prepares
 its input channel, consumes binary upload data, writes to a temporary file in
 the destination, calls `fsync`, and installs the completed file atomically
 without overwriting an existing preferred filename. It returns the business
-result as JSON.
+result as JSON, including `received_bytes` so callers can compare the reported
+byte count with the persisted file size.
 
 ### Deferred launcher
 
@@ -40,7 +41,7 @@ result as JSON.
 3. atomically create a unique request directory;
 4. start a detached deferred executor;
 5. wait for its JSON report on the private readiness channel;
-6. validate the reported paths; and
+6. require the four channel fields and validate endpoints declared as FIFOs; and
 7. return the report to the API client.
 
 The launcher exits after the handshake, so the generated API service does not
@@ -57,20 +58,29 @@ different communication mechanism later.
 The contract is:
 
 1. ask the processor to prepare and describe its selected input channel;
-2. receive the processor's JSON channel report;
-3. prepare the executor-owned result endpoint;
-4. complete the report with `input_FIFO` and `result_FIFO`;
+2. receive the processor's JSON channel report containing at least `input` and
+   `input_type`;
+3. prepare the executor-owned result FIFO;
+4. append `result` and `result_type` to the report;
 5. send that JSON report to the launcher through the readiness descriptor;
 6. run and supervise the processor;
 7. capture at most 1 MiB of processor output;
 8. publish the result for a bounded period; and
 9. remove the request directory and session lock.
 
+The public readiness report uses transport-neutral field names. The current
+uploader reports `input_type` as `FIFO`, and the executor reports `result_type`
+as `FIFO`. The launcher requires `input`, `input_type`, `result`, and
+`result_type`, but permits additional fields so processors and executors can add
+metadata without breaking the handshake. For channels whose type is `FIFO`
+(case-insensitive), the launcher verifies that the reported path is a FIFO.
+Other declared channel types are passed through without FIFO-specific checks.
+The result publisher itself remains FIFO-specific, so the schema is extensible
+even though the complete executor lifecycle does not yet support arbitrary
+result transports.
+
 Thus the executor **delivers** the communication-channel selection; it does not
-make the business processor's input-channel decision. The current v1 report and
-launcher validation use FIFO-specific field names and node checks. Supporting a
-non-FIFO channel later will require generalizing that public report and its
-validation, but not moving channel selection into the executor.
+make the business processor input-channel decision.
 
 ### Shutdown and CI
 
@@ -89,15 +99,17 @@ artifacts do not survive container shutdown.
 * Invalid transport and business arguments are rejected before request
   allocation.
 * Duplicate active sessions are rejected.
-* Readiness is reported only after the communication endpoints exist.
+* Readiness is reported only after the communication endpoints exist, and the
+  four required report fields can be extended with additional metadata.
 * The launcher is short-lived while the detached executor owns the request.
 * Processor output is bounded and retained independently of processor lifetime.
+* Successful uploads report the number of bytes received.
 * Uploaded files are installed atomically without an extra full-size staging
   copy in the request directory.
 * Completion, timeout, and shutdown attempt to remove the whole request.
-* Functional coverage includes validation, initial timeout, duplicate sessions,
-  binary data larger than `PIPE_BUF`, generated API execution, and shutdown
-  artifact detection.
+* Functional coverage includes validation, initial and update-silence timeouts,
+  duplicate sessions, binary data larger than `PIPE_BUF`, generated API
+  execution, and shutdown artifact detection.
 
 ## Differences from `Review.md`
 
@@ -108,9 +120,10 @@ ADR:
   executor. V1 instead lets the processor prepare and consume its chosen input
   channel. This keeps transport-specific business integration out of the
   executor, but requires processors to implement the preparation contract.
-* The ADR describes a plain input-path handshake. V1 returns JSON containing
-  `input_FIFO` and `result_FIFO`, allowing the launcher to deliver the complete
-  per-request channel description.
+* The ADR describes a plain input-path handshake. V1 returns an extensible JSON
+  object with required `input`, `input_type`, `result`, and `result_type` fields,
+  allowing the launcher to deliver the complete per-request channel description
+  while accepting additional metadata.
 * The ADR launches the processor after the executor has committed all input. V1
   starts the processor to consume its own channel directly, avoiding a second
   complete upload copy.
@@ -124,8 +137,10 @@ ADR:
 * An empty upload is indistinguishable from initial silence and times out.
 * Shutdown removes ordinary API directories before deferred executors are fully
   reaped, which can race executor cleanup.
-* The FIFO-specific readiness fields and launcher checks do not yet realize the
-  full goal of allowing arbitrary processor-selected channel types.
+* The readiness field names now describe paths and types without embedding FIFO
+  in each key. However, only FIFO channels are verified, the executor-owned
+  result endpoint and publisher remain FIFO-specific, and behavior for other
+  declared types is not yet defined.
 * Tests do not yet cover all timeout races, slow multi-chunk uploads, result
   retention expiry, processor failures, hostile-client permissions, or shutdown
   during every lifecycle state.
@@ -139,7 +154,8 @@ ADR:
   processor owns business validation, persistence, and input-channel selection.
 * Streaming directly into the destination-side temporary file avoids duplicate
   full-size upload storage and I/O.
-* The JSON readiness report gives clients both request endpoints explicitly.
+* The extensible JSON readiness report gives clients both endpoints and their
+  declared transport types explicitly.
 * Sixty-second interactive defaults reduce premature cleanup during manual use.
 * PID registration, bounded shutdown, and CI artifact checks improve
   operational visibility.
@@ -148,8 +164,8 @@ ADR:
 
 * The processor contract is more complex because each processor must prepare
   and consume its own channel.
-* The present `input_FIFO`/`result_FIFO` protocol and FIFO validation still
-  constrain an architecture intended to allow other communication mechanisms.
+* The report schema no longer embeds FIFO in field names, but the executor-owned
+  result channel and publisher still constrain the lifecycle to a FIFO result.
 * Direct streaming couples the business processor's lifetime to slow or failed
   clients.
 * Update-timeout and empty-file behavior do not yet conform to the ADR.
@@ -163,7 +179,7 @@ preserved: the business processor selects and prepares its input communication
 channel, while the deferred executor supervises the request and relays the JSON
 channel report to the launcher through readiness.
 
-The next version should generalize the readiness schema beyond FIFO-only
-validation, correct update-timeout and empty-input semantics, reorder shutdown
-cleanup, rename the executor's request-directory option, and complete the ADR's
-acceptance-test matrix.
+The next version should define validation and lifecycle behavior for non-FIFO
+channel types, reconcile update-timeout semantics with the ADR, correct
+empty-input behavior, reorder shutdown cleanup, rename the executor request-directory
+option, and complete the ADR acceptance-test matrix.
