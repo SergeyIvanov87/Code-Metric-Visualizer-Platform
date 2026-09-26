@@ -1,0 +1,17 @@
+include:
+  - tests/compose-functional.test.yaml
+
+services:
+  file-uploader:
+    build:
+      context: ../..
+      dockerfile: utility/file-uploader/Dockerfile
+    environment:
+      - MICROSERVICE_NAME=file-uploader
+    volumes:
+      - file-uploader-api-test:/api
+      - file-uploads-test:/uploads
+
+volumes:
+  file-uploader-api-test:
+  file-uploads-test:
