@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -5,6 +6,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 
 
 if Path("/package/streaming_directory_upload_processor.py").exists():
@@ -23,6 +25,13 @@ def arguments(destination, workers="2"):
         "file_regex", ".*", "conflict_policy", "fail",
         "StatusHeartbeatIntervalSec", "1", "SESSION_ID", "directory-test",
     ]
+
+
+def load_processor_module():
+    spec = importlib.util.spec_from_file_location("directory_processor", PROCESSOR)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_schema_declares_directory_transport_contract():
@@ -81,3 +90,43 @@ def test_preflight_rejects_invalid_worker_regex_and_session():
                 text=True, capture_output=True, timeout=3,
             )
             assert result.returncode != 0
+
+
+def test_concurrent_nested_allocations_are_individually_framed():
+    processor = load_processor_module()
+    with tempfile.TemporaryDirectory() as temporary:
+        api = Path(temporary)
+        exec_fifo = api / "exec"
+        os.mkfifo(exec_fifo)
+        requests = []
+
+        def server():
+            for _ in range(2):
+                request = exec_fifo.read_text()
+                requests.append(request)
+                session = request.removeprefix("SESSION_ID=")
+                handshake = api / f"result.json_{session}"
+                os.mkfifo(handshake)
+                handshake.write_text(json.dumps({"session": session}))
+                handshake.unlink()
+
+        server_thread = threading.Thread(target=server)
+        server_thread.start()
+        reports = {}
+
+        def allocate(session):
+            reports[session] = processor.allocate_nested_upload(
+                api, api / f"result.json_{session}", f"SESSION_ID={session}",
+            )
+
+        workers = [threading.Thread(target=allocate, args=(session,))
+                   for session in ("one", "two")]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join(timeout=3)
+            assert not worker.is_alive()
+        server_thread.join(timeout=3)
+        assert not server_thread.is_alive()
+        assert sorted(requests) == ["SESSION_ID=one", "SESSION_ID=two"]
+        assert reports == {"one": {"session": "one"}, "two": {"session": "two"}}

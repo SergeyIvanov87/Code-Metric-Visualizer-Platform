@@ -24,6 +24,12 @@ MAX_DIRECTORIES = 10000
 MAX_TOTAL_BYTES = 100 * 1024 * 1024 * 1024
 RECONCILE_INTERVAL = 0.1
 stop_event = threading.Event()
+# The generated pseudo-filesystem API uses one shared exec FIFO. A request is
+# framed by its writer closing that FIFO, so two writers must never overlap:
+# otherwise the server reads both argument strings as one request. Keep the
+# lock until the server has published and we have consumed the handshake;
+# publication proves it observed EOF for this request.
+nested_allocation_lock = threading.Lock()
 
 
 def value_of(arguments, name, default=None):
@@ -174,10 +180,29 @@ def wait_for_path(path, timeout, fifo=False):
     raise TimeoutError(f"timed out waiting for {path}")
 
 
+def wait_for_absence(path, timeout):
+    """Wait for a prior session artifact to be removed before session reuse."""
+    deadline = time.monotonic() + timeout
+    while path.exists() and time.monotonic() < deadline and not stop_event.is_set():
+        time.sleep(0.02)
+    if path.exists():
+        raise TimeoutError(f"timed out waiting for stale API artifact cleanup: {path}")
+
+
+def allocate_nested_upload(api_directory, result_fifo, request):
+    """Atomically frame one request on the shared exec FIFO and read its reply."""
+    with nested_allocation_lock:
+        # A worker reuses its derived session. Do not mistake the preceding
+        # request's handshake FIFO for the response to this request.
+        wait_for_absence(result_fifo, 5)
+        exec_fifo = wait_for_path(api_directory / "exec", 5, fifo=True)
+        exec_fifo.write_text(request)
+        return json.loads(wait_for_path(result_fifo, 5, fifo=True).read_text())
+
+
 def nested_upload(api_directory, session, worker_id, source, relative, destination,
                   metadata, writer, heartbeat, initial_timeout, update_timeout):
     nested_session = f"{session}.worker-{worker_id}"
-    exec_fifo = api_directory / "exec"
     result_fifo = api_directory / f"result.json_{nested_session}"
     request = " ".join([
         f"SESSION_ID={nested_session}",
@@ -190,8 +215,7 @@ def nested_upload(api_directory, session, worker_id, source, relative, destinati
         "WaitResultConsumptionTimeoutSec=60",
     ])
     # The API parser uses shell request syntax; JSON strings safely preserve spaces.
-    wait_for_path(exec_fifo, 5, fifo=True).write_text(request)
-    report = json.loads(wait_for_path(result_fifo, 5, fifo=True).read_text())
+    report = allocate_nested_upload(api_directory, result_fifo, request)
     api_root = api_directory.resolve(strict=True)
     input_fifo = Path(report["input"])
     output_fifo = Path(report["result"])
