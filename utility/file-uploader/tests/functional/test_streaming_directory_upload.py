@@ -176,21 +176,23 @@ def test_terminal_status_waits_briefly_for_a_late_reader():
         status_fifo = Path(temporary) / "status-1"
         os.mkfifo(status_fifo)
         writer = processor.StatusWriter(status_fifo, 1)
-        writer_thread = threading.Thread(
-            target=writer.emit, args=("file.txt", 4, 4, "done"),
-            kwargs={"terminal": True},
+        # The immediate bounded attempt expires without a reader, but the
+        # coalesced terminal record remains available during the quiet period.
+        writer.emit("file.txt", 4, 4, "done", terminal=True)
+        received = []
+        reader_thread = threading.Thread(
+            target=lambda: received.append(json.loads(status_fifo.open().readline()))
         )
-        writer_thread.start()
-        # Attach after the first nonblocking open has observed no reader.
+        reader_thread.start()
         time.sleep(0.05)
-        record = json.loads(status_fifo.open().readline())
-        writer_thread.join(timeout=3)
+        assert writer.flush_pending()
         writer.close()
-        assert not writer_thread.is_alive()
-        assert record == {
+        reader_thread.join(timeout=3)
+        assert not reader_thread.is_alive()
+        assert received == [{
             "worker_id": 1, "path": "file.txt", "bytes": 4,
             "total_bytes": 4, "status": "done",
-        }
+        }]
 
 
 def test_running_container_uploads_more_files_than_workers_and_reports_status():

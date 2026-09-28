@@ -141,11 +141,27 @@ def generated_directory(destination):
 class StatusWriter:
     def __init__(self, path, worker_id):
         self.path, self.worker_id = path, worker_id
-        # Keep one nonblocking read/write descriptor for the worker lifetime.
-        # O_RDWR lets late readers attach after short files have already
-        # completed, bounds unread records by FIFO capacity, and guarantees
-        # readers observe EOF when even an idle worker exits.
-        self.descriptor = os.open(self.path, os.O_RDWR | os.O_NONBLOCK)
+        self.descriptor = None
+        self.pending = None
+
+    def flush_pending(self):
+        """Connect a waiting reader and deliver the latest coalesced record."""
+        try:
+            if self.descriptor is None:
+                # O_WRONLY intentionally reports ENXIO when no reader is
+                # attached. Unlike O_RDWR, it does not hide reader absence or
+                # discard buffered records when the worker exits.
+                self.descriptor = os.open(self.path, os.O_WRONLY | os.O_NONBLOCK)
+            if self.pending is not None:
+                os.write(self.descriptor, self.pending)
+                self.pending = None
+            return True
+        except OSError as error:
+            if error.errno in (errno.EPIPE, errno.ENXIO):
+                self.close()
+            elif error.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
+                raise
+            return False
 
     def emit(self, relative, copied, total, status_value, terminal=False):
         record = json.dumps({
@@ -155,21 +171,17 @@ class StatusWriter:
         pipe_buf = os.pathconf(self.path, "PC_PIPE_BUF")
         if len(record) > pipe_buf:
             return
+        # Keep only one bounded pending record. This coalesces progress under
+        # backpressure while allowing a reader that attaches during the quiet
+        # period to receive the latest status.
+        self.pending = record
         deadline = time.monotonic() + 0.25 if terminal else time.monotonic()
         while True:
-            try:
-                if self.descriptor is None:
-                    self.descriptor = os.open(self.path, os.O_RDWR | os.O_NONBLOCK)
-                os.write(self.descriptor, record)
+            if self.flush_pending():
                 return
-            except OSError as error:
-                if error.errno in (errno.EPIPE, errno.ENXIO):
-                    self.close()
-                elif error.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
-                    raise
-                if not terminal or time.monotonic() >= deadline or stop_event.is_set():
-                    return
-                time.sleep(0.01)
+            if not terminal or time.monotonic() >= deadline or stop_event.is_set():
+                return
+            time.sleep(0.01)
 
     def close(self):
         if self.descriptor is not None:
@@ -296,7 +308,13 @@ def process_directory(options, arguments):
         status_writer = StatusWriter(request / f"status-{worker_id}", worker_id)
         try:
             while True:
-                item = tasks.get()
+                try:
+                    item = tasks.get(timeout=0.1)
+                except queue.Empty:
+                    # Retry a coalesced status for late readers and connect an
+                    # idle worker's waiting reader so it receives EOF later.
+                    status_writer.flush_pending()
+                    continue
                 if item is None:
                     tasks.task_done()
                     return
