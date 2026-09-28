@@ -10,3 +10,4 @@ services:
     volumes:
       - file-uploader-api-test:/api
       - file-uploads-test:/uploads
+      - file-uploader-staging-test:/dev/shm/file-uploader

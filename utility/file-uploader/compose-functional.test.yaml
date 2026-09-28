@@ -11,7 +11,13 @@ services:
     volumes:
       - file-uploader-api-test:/api
       - file-uploads-test:/uploads
+      - file-uploader-staging-test:/dev/shm/file-uploader
 
 volumes:
   file-uploader-api-test:
   file-uploads-test:
+  file-uploader-staging-test:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=256m,mode=0770

@@ -1,0 +1,23 @@
+{
+    "Content-Type": "application/json",
+    "Method": "POST",
+    "Query": "+/streaming_directory_upload",
+    "Params": {
+        "metadata": "{}",
+        "destination": "/uploads",
+        "preferred_directory": "\"\"",
+        "workers": "4",
+        "file_regex": ".*",
+        "conflict_policy": "fail",
+        "StatusHeartbeatIntervalSec": "1",
+        "WaitInitialQueryTimeoutSec": "60",
+        "WaitQueryUpdateTimeoutSec": "5",
+        "WaitResultConsumptionTimeoutSec": "60",
+        "SESSION_ID": "default"
+    },
+    "Description": {
+        "header": "Allocates a staging directory and ingests its completed files concurrently.",
+        "body": "Copy a directory tree into the returned input directory. Each status FIFO emits JSON Lines progress for one worker; the result FIFO returns the aggregate result after the staging tree is idle and drained.",
+        "footer": "Only regular, single-link files are accepted. Paths are recreated below destination/preferred_directory and existing paths are never overwritten."
+    }
+}

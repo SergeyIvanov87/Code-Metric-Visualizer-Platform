@@ -94,7 +94,16 @@ def validate_arguments(arguments):
         raise ValueError("destination must be an existing directory")
     if not os.access(destination, os.W_OK):
         raise ValueError("destination is not writable")
-    return metadata, preferred_filename, destination
+    expected_text = normalize_empty(value_of(arguments, "expected_bytes", ""))
+    expected_bytes = None
+    if expected_text:
+        try:
+            expected_bytes = int(expected_text)
+        except ValueError:
+            raise ValueError("expected_bytes must be empty or a non-negative integer") from None
+        if expected_bytes < 0:
+            raise ValueError("expected_bytes must be empty or a non-negative integer")
+    return metadata, preferred_filename, destination, expected_bytes
 
 
 def generated_filename(destination):
@@ -154,7 +163,7 @@ def main(argv=None):
     arguments = options.arguments[1:] if options.arguments[:1] == ["--"] else options.arguments
     captured_bytes_from_input = 0
     try:
-        metadata, preferred_filename, destination = validate_arguments(arguments)
+        metadata, preferred_filename, destination, expected_bytes = validate_arguments(arguments)
         filename = preferred_filename or generated_filename(destination)
         final_path = destination / filename
         if options.check_arguments:
@@ -170,6 +179,10 @@ def main(argv=None):
                     options.request_directory / "input", output,
                     options.initial_timeout, options.update_timeout,
                 )
+                if expected_bytes is not None and captured_bytes_from_input != expected_bytes:
+                    raise ValueError(
+                        f"received {captured_bytes_from_input} bytes; expected {expected_bytes}"
+                    )
                 output.flush()
                 os.fsync(output.fileno())
             # Linking makes creation non-overwriting and atomic. Retry the generated

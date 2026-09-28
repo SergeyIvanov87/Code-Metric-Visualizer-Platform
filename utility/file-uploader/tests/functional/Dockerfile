@@ -1,6 +1,6 @@
 FROM streaming_file_uploader
 
 RUN apk add --no-cache py3-pytest
-COPY utility/file-uploader/tests/functional/test_streaming_file_upload.py /tests/
+COPY utility/file-uploader/tests/functional/test_*.py /tests/
 
-ENTRYPOINT ["pytest", "-v", "/tests/test_streaming_file_upload.py"]
+ENTRYPOINT ["pytest", "-v", "/tests"]

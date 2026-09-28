@@ -153,6 +153,27 @@ def test_processor_accepts_schema_encoded_empty_values():
         assert json.loads(result.stdout)["error_code"] == "0"
 
 
+def test_expected_bytes_mismatch_never_installs_file():
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        api = root / "api"
+        destination = root / "uploads"
+        api.mkdir()
+        destination.mkdir()
+        upload_arguments = arguments(
+            destination, session="expected-mismatch", preferred="short.dat",
+        )
+        upload_arguments.extend(["expected_bytes", "100"])
+        started = launch(api, destination, upload_arguments)
+        assert started.returncode == 0, started.stderr
+        report = channel_report(started)
+        wait_for_fifo(Path(report["input"])).write_bytes(b"short")
+        result = json.loads(wait_for_fifo(Path(report["result"])).read_text())
+        assert result["error_code"] != "0"
+        assert "expected 100" in result["error_description"]
+        assert not (destination / "short.dat").exists()
+
+
 def test_processor_prepares_only_its_input_fifo():
     with tempfile.TemporaryDirectory() as temporary:
         request_directory = Path(temporary)

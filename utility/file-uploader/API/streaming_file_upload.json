@@ -6,6 +6,7 @@
         "metadata": "{}",
         "preferred_filename": "\"\"",
         "destination": "/uploads",
+        "expected_bytes": "\"\"",
         "WaitInitialQueryTimeoutSec": "60",
         "WaitQueryUpdateTimeoutSec": "5",
         "WaitResultConsumptionTimeoutSec": "60",
