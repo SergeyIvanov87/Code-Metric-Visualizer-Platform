@@ -141,9 +141,13 @@ def generated_directory(destination):
 class StatusWriter:
     def __init__(self, path, worker_id):
         self.path, self.worker_id = path, worker_id
-        self.descriptor = None
+        # Keep one nonblocking read/write descriptor for the worker lifetime.
+        # O_RDWR lets late readers attach after short files have already
+        # completed, bounds unread records by FIFO capacity, and guarantees
+        # readers observe EOF when even an idle worker exits.
+        self.descriptor = os.open(self.path, os.O_RDWR | os.O_NONBLOCK)
 
-    def emit(self, relative, copied, total, status_value):
+    def emit(self, relative, copied, total, status_value, terminal=False):
         record = json.dumps({
             "worker_id": self.worker_id, "path": relative,
             "bytes": copied, "total_bytes": total, "status": status_value,
@@ -151,15 +155,21 @@ class StatusWriter:
         pipe_buf = os.pathconf(self.path, "PC_PIPE_BUF")
         if len(record) > pipe_buf:
             return
-        try:
-            if self.descriptor is None:
-                self.descriptor = os.open(self.path, os.O_WRONLY | os.O_NONBLOCK)
-            os.write(self.descriptor, record)
-        except OSError as error:
-            if error.errno in (errno.EPIPE, errno.ENXIO):
-                self.close()
-            elif error.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
-                raise
+        deadline = time.monotonic() + 0.25 if terminal else time.monotonic()
+        while True:
+            try:
+                if self.descriptor is None:
+                    self.descriptor = os.open(self.path, os.O_RDWR | os.O_NONBLOCK)
+                os.write(self.descriptor, record)
+                return
+            except OSError as error:
+                if error.errno in (errno.EPIPE, errno.ENXIO):
+                    self.close()
+                elif error.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
+                    raise
+                if not terminal or time.monotonic() >= deadline or stop_event.is_set():
+                    return
+                time.sleep(0.01)
 
     def close(self):
         if self.descriptor is not None:
@@ -180,21 +190,13 @@ def wait_for_path(path, timeout, fifo=False):
     raise TimeoutError(f"timed out waiting for {path}")
 
 
-def wait_for_absence(path, timeout):
-    """Wait for a prior session artifact to be removed before session reuse."""
-    deadline = time.monotonic() + timeout
-    while path.exists() and time.monotonic() < deadline and not stop_event.is_set():
-        time.sleep(0.02)
-    if path.exists():
-        raise TimeoutError(f"timed out waiting for stale API artifact cleanup: {path}")
-
-
 def allocate_nested_upload(api_directory, result_fifo, request):
     """Atomically frame one request on the shared exec FIFO and read its reply."""
     with nested_allocation_lock:
-        # A worker reuses its derived session. Do not mistake the preceding
-        # request's handshake FIFO for the response to this request.
-        wait_for_absence(result_fifo, 5)
+        # Session result FIFOs are persistent API nodes. Writing the request
+        # first ensures the subsequent read belongs to this allocation; the
+        # server also waits for its previous response writer before accepting
+        # another request for the same derived session.
         exec_fifo = wait_for_path(api_directory / "exec", 5, fifo=True)
         exec_fifo.write_text(request)
         return json.loads(wait_for_path(result_fifo, 5, fifo=True).read_text())
@@ -251,10 +253,10 @@ def nested_upload(api_directory, session, worker_id, source, relative, destinati
         if result.get("error_code") != "0" or result.get("received_bytes") != sent or sent != source_stat.st_size:
             raise RuntimeError(result.get("error_description") or "nested upload byte count mismatch")
         source.unlink()
-        writer.emit(relative, sent, source_stat.st_size, "done")
+        writer.emit(relative, sent, source_stat.st_size, "done", terminal=True)
         return sent
     except BaseException:
-        writer.emit(relative, sent, source_stat.st_size, "failed")
+        writer.emit(relative, sent, source_stat.st_size, "failed", terminal=True)
         raise
 
 
@@ -287,6 +289,7 @@ def process_directory(options, arguments):
     result = {"completed": 0, "bytes": 0, "failed": [], "skipped": 0}
     queued = set()
     active = 0
+    failed = threading.Event()
 
     def worker(worker_id):
         nonlocal active
@@ -314,7 +317,9 @@ def process_directory(options, arguments):
                 except BaseException:
                     with lock:
                         result["failed"].append(relative)
-                    stop_event.set()
+                    # A business failure stops discovery, but must not cancel
+                    # unrelated workers already streaming their files.
+                    failed.set()
                 finally:
                     with lock:
                         active -= 1
@@ -333,7 +338,7 @@ def process_directory(options, arguments):
     directory_names = set()
     previous_directories = set()
     try:
-        while not stop_event.is_set():
+        while not stop_event.is_set() and not failed.is_set():
             current = {}
             current_directories = set()
             for root, directories, files in os.walk(stage, followlinks=False):
@@ -360,6 +365,8 @@ def process_directory(options, arguments):
             if current or current_directories != previous_directories:
                 last_activity = time.monotonic()
             for relative, identity in current.items():
+                if failed.is_set():
+                    break
                 if relative in queued or snapshots.get(relative) != identity:
                     continue
                 source = stage.joinpath(*PurePosixPath(relative).parts)

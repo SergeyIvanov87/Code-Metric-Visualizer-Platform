@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 
 
 if Path("/package/streaming_directory_upload_processor.py").exists():
@@ -32,6 +33,18 @@ def load_processor_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def wait_for_fifo(path, timeout=5):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if stat.S_ISFIFO(path.stat().st_mode):
+                return path
+        except FileNotFoundError:
+            pass
+        time.sleep(0.01)
+    raise AssertionError(f"FIFO did not appear within {timeout} seconds: {path}")
 
 
 def test_schema_declares_directory_transport_contract():
@@ -108,7 +121,6 @@ def test_concurrent_nested_allocations_are_individually_framed():
                 handshake = api / f"result.json_{session}"
                 os.mkfifo(handshake)
                 handshake.write_text(json.dumps({"session": session}))
-                handshake.unlink()
 
         server_thread = threading.Thread(target=server)
         server_thread.start()
@@ -130,3 +142,95 @@ def test_concurrent_nested_allocations_are_individually_framed():
         assert not server_thread.is_alive()
         assert sorted(requests) == ["SESSION_ID=one", "SESSION_ID=two"]
         assert reports == {"one": {"session": "one"}, "two": {"session": "two"}}
+
+
+def test_nested_worker_session_reuses_persistent_result_fifo():
+    processor = load_processor_module()
+    with tempfile.TemporaryDirectory() as temporary:
+        api = Path(temporary)
+        exec_fifo = api / "exec"
+        result_fifo = api / "result.json_parent.worker-1"
+        os.mkfifo(exec_fifo)
+        os.mkfifo(result_fifo)
+        requests = []
+
+        def server():
+            for sequence in (1, 2):
+                requests.append(exec_fifo.read_text())
+                result_fifo.write_text(json.dumps({"sequence": sequence}))
+
+        server_thread = threading.Thread(target=server)
+        server_thread.start()
+        reports = [processor.allocate_nested_upload(
+            api, result_fifo, "SESSION_ID=parent.worker-1",
+        ) for _ in range(2)]
+        server_thread.join(timeout=3)
+        assert not server_thread.is_alive()
+        assert requests == ["SESSION_ID=parent.worker-1"] * 2
+        assert reports == [{"sequence": 1}, {"sequence": 2}]
+
+
+def test_terminal_status_waits_briefly_for_a_late_reader():
+    processor = load_processor_module()
+    with tempfile.TemporaryDirectory() as temporary:
+        status_fifo = Path(temporary) / "status-1"
+        os.mkfifo(status_fifo)
+        writer = processor.StatusWriter(status_fifo, 1)
+        writer_thread = threading.Thread(
+            target=writer.emit, args=("file.txt", 4, 4, "done"),
+            kwargs={"terminal": True},
+        )
+        writer_thread.start()
+        # Attach after the first nonblocking open has observed no reader.
+        time.sleep(0.05)
+        record = json.loads(status_fifo.open().readline())
+        writer_thread.join(timeout=3)
+        writer.close()
+        assert not writer_thread.is_alive()
+        assert record == {
+            "worker_id": 1, "path": "file.txt", "bytes": 4,
+            "total_bytes": 4, "status": "done",
+        }
+
+
+def test_running_container_uploads_more_files_than_workers_and_reports_status():
+    api = Path(
+        "/api/api.pmccabe_collector.restapi.org/file-uploader/"
+        "streaming_directory_upload/POST"
+    )
+    if not Path("/api").is_dir():
+        return
+    wait_for_fifo(api / "exec", timeout=30)
+    session = f"directory-functional-{os.getpid()}"
+    (api / "exec").write_text(
+        f"SESSION_ID={session} workers=4 preferred_directory={session} "
+        "WaitInitialQueryTimeoutSec=5 WaitQueryUpdateTimeoutSec=0.2 "
+        "WaitResultConsumptionTimeoutSec=5 StatusHeartbeatIntervalSec=0.05"
+    )
+    report = json.loads(wait_for_fifo(api / f"result.json_{session}").read_text())
+    statuses = {path: [] for path in report["status"]}
+
+    def consume_status(path):
+        with Path(path).open() as stream:
+            statuses[path].extend(json.loads(line) for line in stream)
+
+    readers = [threading.Thread(target=consume_status, args=(path,))
+               for path in report["status"]]
+    for reader in readers:
+        reader.start()
+    staging = Path(report["input"])
+    for number in range(8):
+        (staging / f"file-{number}.txt").write_text(f"payload-{number}")
+    result = json.loads(wait_for_fifo(Path(report["result"]), timeout=15).read_text())
+    for reader in readers:
+        reader.join(timeout=3)
+        assert not reader.is_alive()
+    assert result["error_code"] == "0"
+    assert result["files_completed"] == "8/8"
+    destination = Path(result["path"])
+    assert len(list(destination.iterdir())) == 8
+    done_paths = {
+        record["path"] for records in statuses.values() for record in records
+        if record["status"] == "done"
+    }
+    assert done_paths == {f"file-{number}.txt" for number in range(8)}
