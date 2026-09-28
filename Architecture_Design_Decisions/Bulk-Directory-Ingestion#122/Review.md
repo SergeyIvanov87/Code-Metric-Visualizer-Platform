@@ -9,13 +9,16 @@ not the implementation itself.
 ## Executive decision
 
 Add `POST +/streaming_directory_upload` to `utility/file-uploader`. The query
-allocates a request-scoped **staging directory** and a **status FIFO**, returns
-both in the existing deferred-query readiness report, ingests closed files into
-an existing persistent destination with a bounded worker pool, and returns one
-final JSON result through the executor-owned `async_result` FIFO.
+allocates a request-scoped **staging directory** and one **status FIFO per
+worker**, returns them in the deferred-query readiness report, ingests closed
+files into an existing persistent destination with a bounded worker pool, and
+returns one final JSON result through the executor-owned `async_result` FIFO.
 
-Reuse `common/deferred_query_launcher.py` and
-`common/deferred_query_executor.py` unchanged for the first implementation.
+Reuse `common/deferred_query_launcher.py` unchanged and retain the existing
+`common/deferred_query_executor.py` lifecycle. The executor receives two small,
+backward-compatible enhancements: pass resolved query arguments to channel
+preparation, and bound/publish the final result as one `PIPE_BUF`-sized atomic
+FIFO record.
 The new processor follows the same three-mode contract as
 `streaming_file_upload_processor.py`:
 
@@ -26,8 +29,8 @@ The new processor follows the same three-mode contract as
 
 This design deliberately does **not** send progress on processor stdout.
 Processor stdout is already reserved for the bounded final result captured by
-the deferred executor. Live progress uses an additional processor-owned FIFO
-advertised in the extensible readiness report.
+the deferred executor. Live progress and heartbeats use processor-owned
+`status-<id>` FIFOs advertised in the extensible readiness report.
 
 The issue's “zero-copy” wording is not adopted. Reading from `tmpfs` into a
 64-KiB userspace buffer and writing it to persistent storage is a copy. The
@@ -55,7 +58,7 @@ Add `utility/file-uploader/streaming_directory_upload_processor.py`. It owns:
 * bounded scheduling and worker concurrency;
 * destination-side temporary files, durability, atomic installation, and
   source deletion;
-* JSON Lines progress events; and
+* per-worker JSON progress/heartbeat FIFOs; and
 * final aggregate result generation.
 
 Upload behavior remains out of the common deferred executor, just as file
@@ -70,12 +73,14 @@ upload behavior does in implementation v1.
   `inotify-tools` remains useful for diagnosis but must not be parsed as a
   filename protocol because arbitrary Unix filenames can contain separators
   and newlines.
-* Document and test that the shared API mount is ephemeral. The processor can
-  guarantee that its staging directory is below the allocated API request
-  directory, but it cannot make a Docker named volume become `tmpfs`. A Linux
-  deployment that requires RAM-backed staging must mount the shared API volume
-  from host `/dev/shm`, or use an equivalent shareable tmpfs-backed volume, in
-  every client and service container.
+* Mount a shared tmpfs-backed staging root at the same absolute path (proposed
+  `/dev/shm/file-uploader`) in the service and client containers. Channel
+  preparation creates the real staging directory there and an `input` symbolic
+  link inside the API request directory. This needs no `CAP_SYS_ADMIN`: the
+  mount is configured by the container runtime, not created by the service.
+  The single-file query already keeps payload bytes out of API arguments and
+  streams them directly to destination storage; it does not need a second
+  payload staging directory.
 * Keep persistent output on `/uploads` by default; deployments may override it
   with another mounted directory.
 
@@ -91,7 +96,7 @@ upload behavior does in implementation v1.
 
 ## Reuse of the streaming-file implementation
 
-### Components reused as-is
+### Components reused and minimally extended
 
 `deferred_query_launcher.py` already provides everything needed for allocation:
 
@@ -110,12 +115,32 @@ allocation:
 * executor-owned `async_result` creation;
 * lifecycle ownership independent of the generated API listener;
 * signal forwarding and bounded child termination;
-* a 1-MiB bounded final-result capture;
+* bounded final-result capture;
 * bounded final-result retention; and
 * whole-request and session-lock cleanup.
 
 The executor intentionally remains unaware of directories, inotify, workers,
-progress messages, and destination persistence.
+progress messages, and destination persistence. Its channel-preparation command
+is extended from:
+
+```text
+processor --request-directory <request> --prepare-api-channel
+```
+
+to:
+
+```text
+processor --request-directory <request> --prepare-api-channel -- <resolved query arguments>
+```
+
+The current single-file processor already accepts trailing arguments in this
+mode and can ignore them, so its behavior does not change. The directory
+processor uses `workers` to create every `status-<id>` FIFO before readiness.
+
+The executor also queries `_PC_PIPE_BUF` from `async_result`, rejects processor
+output larger than that runtime limit, and publishes the complete final JSON in
+one write. This replaces the fixed 1-MiB capture limit with the platform's
+atomic FIFO-record limit for both upload queries.
 
 ### Existing extension points used
 
@@ -126,8 +151,13 @@ but permits additional fields. The directory processor returns:
 {
   "input": "/api/.../deferred-.../input",
   "input_type": "DIRECTORY",
-  "status": "/api/.../deferred-.../status",
-  "status_type": "FIFO",
+  "status": [
+    "/api/.../deferred-.../status-0",
+    "/api/.../deferred-.../status-1",
+    "/api/.../deferred-.../status-2",
+    "/api/.../deferred-.../status-3"
+  ],
+  "status_type": "FIFO[]",
   "protocol": "cmvp.directory-upload.v1"
 }
 ```
@@ -142,9 +172,9 @@ The executor adds:
 ```
 
 This is the intended use of the transport-neutral v1 report. The launcher only
-applies FIFO checks to its required `input` and `result` fields today, so no
-common-code change is necessary. The processor must therefore perform strict
-post-creation checks on its directory and status FIFO. A later hardening change
+applies FIFO checks to its required `input` and `result` fields today, so its
+code does not change. The processor must therefore perform strict post-creation
+checks on the staging-directory link and every status FIFO. A later hardening change
 may teach the launcher to validate all typed report fields and containment, but
 that is not a prerequisite for issue 122 and should be made as a separate,
 backward-compatible common-infrastructure change.
@@ -170,6 +200,7 @@ The schema uses these ordinary parameters:
 | `workers` | `4` | Fixed ingestion worker count, restricted to `1..32`. |
 | `file_regex` | `.*` | Regular expression matched against each slash-separated relative file path; only matching files are copied. |
 | `conflict_policy` | `fail` | V1 supports only non-overwriting installation; the explicit value leaves room for future policies. |
+| `StatusHeartbeatIntervalSec` | `1` | Maximum interval between status records from an active worker. |
 | `WaitInitialQueryTimeoutSec` | `60` | Maximum wait for the first accepted filesystem activity. |
 | `WaitQueryUpdateTimeoutSec` | `5` | Quiet period after activity which commits an empty staging tree as complete. |
 | `WaitResultConsumptionTimeoutSec` | `60` | Existing final-result retention period. |
@@ -180,37 +211,58 @@ The schema uses these ordinary parameters:
 base name, not an absolute or multi-component path. The final root must not
 exist at preflight. Because the existing channel-preparation call intentionally
 does not receive business arguments, this check can race after the handshake.
-Normal processor startup takes an atomic, destination-side reservation for the
-name; a lost race is returned as a business conflict before any input is
-deleted. V1 never overwrites an existing file, directory, or symlink.
+Normal processor startup atomically creates the final destination root; a lost
+race is returned as a business conflict before any input is deleted. V1 never
+overwrites an existing file, directory, or symlink.
 
 `file_regex` is compiled during preflight and applied with full-match semantics
 to the normalized relative path, never an absolute host or container path. The
 default `.*` accepts every regular file. Invalid expressions and expressions
 over the configured pattern-length limit are rejected before allocation. A
-closed file that does not match is reported as `file_skipped` and removed from
-staging without being created below the destination. Directories are still
-reproduced, including empty directories, so filtering affects files only. A
-skipped file does not contribute to the file totals or byte totals in the final
-result.
+closed file that does not match is counted as skipped and removed from staging
+without being created below the destination. Destination directories are
+created lazily only when they contain a matching file, and a bottom-up sweep
+removes every zero-file directory after its files were filtered out. Therefore
+a directory whose entire subtree is excluded by `file_regex` is absent from the
+published destination. A skipped file does not contribute to copied/failed file
+or byte totals; it contributes to the separate `files_skipped` counter.
 
-The status protocol is UTF-8 JSON Lines. Every record must fit within
-`PIPE_BUF`, and only one publisher thread writes the FIFO. Example records are:
+Each worker owns an independent status FIFO exposed as `status-<id>`, where
+`<id>` is the decimal worker ID from `0` through `workers - 1`. Channel
+preparation creates `workers/<id>/status` without requiring the low-level
+channel helper to know the ID, then creates a relative symbolic link named
+`status-<id>` to that FIFO. The readiness report lists the public symlink paths.
+This realizes the suggested aliasing model while keeping one writer and one
+ordered stream per worker. It does not require the existing single-file
+processor to manage a worker pool; the FIFO-creation helper may be shared by
+both processors if implementation reveals an identical contract.
+
+The status protocol is UTF-8 JSON Lines. Every record contains exactly the
+worker ID as a JSON number, normalized relative path, bytes copied so far,
+source file size, and status. `status` is one of `in progress`, `done`, or
+`failed`. Example records from `status-2` are:
 
 ```json
-{"event":"file_completed","worker_id":"worker-2","path":"src/main.py","bytes":8431,"files_completed":"7/9","bytes_completed":91820}
-{"event":"file_failed","worker_id":"worker-1","path":"data.bin","error_code":"EIO","error_description":"..."}
-{"event":"complete","worker_id":null,"files_completed":"12/12","directories_completed":"4/4","bytes_completed":105321}
+{"worker_id":2,"path":"src/main.py","bytes":65536,"total_bytes":184321,"status":"in progress"}
+{"worker_id":2,"path":"src/main.py","bytes":131072,"total_bytes":184321,"status":"in progress"}
+{"worker_id":2,"path":"src/main.py","bytes":184321,"total_bytes":184321,"status":"done"}
 ```
 
 Paths in events are slash-separated paths relative to the staging root. Error
-text is length-bounded so a record remains atomic. Consumers terminate on the
-`complete`, `failed`, or `cancelled` event and subsequent FIFO EOF; a magic
-`EOF_ALL_DONE` payload is unnecessary and could collide with application data.
-Each worker has a stable request-local ID (`worker-0` through
-`worker-(workers-1)`) included in every file event. Events produced by the
-monitor or dispatcher rather than a pool worker, including terminal events and
-`file_skipped`, use JSON `null` as `worker_id`.
+records use the same five fields and the last successfully copied byte count;
+detailed error descriptions remain in the final result. A worker emits `done`
+only after the destination file is durable and atomically installed, making the
+record both a completion notification and the signal that the individual file
+is ready. While copying, it emits `in progress` after chunks as needed so no
+active worker is silent longer than `StatusHeartbeatIntervalSec`. Thus each
+`status-<id>` is both a progress stream and an external heartbeat channel.
+
+Each JSON line, including its newline, must be no larger than the runtime
+`_PC_PIPE_BUF` for that FIFO and is written with one `write` call. Because each
+FIFO has exactly one worker writer, records remain ordered and atomic. The FIFO
+persists for the request and may describe several files processed sequentially
+by that worker. It closes when the worker terminates; completion of the whole
+request is authoritative in `async_result`, not a magic `EOF_ALL_DONE` record.
 
 The final `async_result` is one JSON object using the existing business-result
 shape:
@@ -225,7 +277,8 @@ shape:
   "directories_completed": "4/4",
   "bytes_completed": 105321,
   "files_failed": "0/12",
-  "files_failed_path": []
+  "files_failed_path": [],
+  "files_skipped": 3
 }
 ```
 
@@ -235,14 +288,19 @@ result it is fixed. The denominator of `files_completed` and `files_failed` is
 the same total number of regular files accepted by `file_regex`.
 `directories_completed` uses the total number of discovered directories.
 `files_failed_path` contains every failed file's normalized relative path, in
-lexical order, and is empty on success. Admission limits must account for these
-paths and reject a request before the final result could exceed the deferred
-executor's 1-MiB output limit; the list is never silently truncated.
+lexical order, and is empty on success. `files_skipped` is the number of closed
+regular files excluded by `file_regex`. Admission limits must account for all
+failed paths and reject further input before the final JSON could exceed the
+runtime `_PC_PIPE_BUF` limit of `async_result`; the list is never silently
+truncated.
 
-Progress is best-effort observability; the final result is authoritative.
-Failure to attach a status reader must not stop ingestion or fill unbounded
-memory. The status publisher keeps a bounded queue, coalesces aggregate
-progress when necessary, and always attempts to retain the terminal event.
+Progress is operational output: external consumers use it as a worker heartbeat
+and as notification that an individual file is ready. Failure to attach a
+status reader must nevertheless not stop ingestion or fill unbounded memory.
+Workers open and write their FIFO non-blockingly; they may coalesce intermediate
+`in progress` records under backpressure, but retain the latest progress and
+make a bounded attempt to deliver `done` or `failed`. The final result remains
+the authoritative request summary.
 
 ## Control flow
 
@@ -255,24 +313,33 @@ progress when necessary, and always attempts to retain the terminal event.
    destination existence/writability, preferred base name, and destination-root
    conflict. Validation creates no request artifacts.
 4. The launcher takes the existing session lock, allocates the unique request
-   directory, and starts the existing detached executor.
-5. The executor invokes `--prepare-api-channel`. The processor validates the
-   canonical request directory, creates `input` as mode `02770` directory and
-   `status` as mode `0660` FIFO, verifies their node types without following a
-   symlink, and returns its channel report.
+   directory below the API tree, and starts the existing detached executor. The
+   API directory contains no payload data.
+5. The executor invokes `--prepare-api-channel` with the resolved query
+   arguments. The processor validates the canonical request directory and the
+   pre-mounted shared `/dev/shm/file-uploader` root, creates the real mode
+   `02770` staging directory below that tmpfs root, and places an `input`
+   symlink in the request directory. The absolute symlink target is valid in
+   every participant because the shared tmpfs is mounted at the same path. It
+   also creates one mode `0660`
+   worker FIFO and public `status-<id>` symlink per worker, verifies the target
+   node types and containment, and returns its channel report. No runtime mount
+   or `CAP_SYS_ADMIN` is required.
 6. The executor creates `async_result`, adds it to the report, and returns the
    report to the launcher. The launcher publishes it through the existing
    `result.json_<SESSION_ID>` handshake and exits.
 7. In parallel with publication, the executor starts the normal processor. The
-   processor atomically creates a destination-side reservation and hidden
-   temporary root, starts the observer, performs an initial recursive
-   reconciliation scan, then accepts work. The scan closes the
+   processor atomically creates the public destination root, starts the
+   observer, performs an initial recursive reconciliation scan, then accepts
+   work. The scan closes the
    readiness-to-observer race: entries copied after channel creation but before
    watcher startup are not lost.
-8. The client starts reading `status` and populates `input`. A file becomes
-   eligible only after a close-write event, a move into the tree, or a
-   reconciliation scan establishes a stable candidate. Directories are created
-   at the destination as they appear so empty directories are preserved.
+8. The client opens the reported `status-<id>` FIFOs and copies files,
+   directories, and nested directory trees into the reported `input` directory.
+   A file becomes eligible only after a close-write event, a move into the tree,
+   or a reconciliation scan establishes a stable candidate. Destination
+   directories are created lazily for matching files; zero-file directories
+   produced only by filtering are pruned.
 9. The dispatcher normalizes the relative path, rejects unsafe node types, and
    evaluates `file_regex`. It deletes and reports a closed nonmatching file;
    otherwise it inserts a deduplicated task into a bounded `queue.Queue`. It
@@ -285,19 +352,23 @@ progress when necessary, and always attempts to retain the terminal event.
 11. The observer resets the update deadline for every accepted create, close,
     move, or deletion event. Periodic reconciliation discovers events missed
     through startup races or inotify queue overflow.
-12. Before the first accepted activity, initial-timeout expiry cancels the
+12. Each worker reports chunk progress and periodic heartbeats to its own
+    `status-<id>` FIFO, then reports `done` after durable installation or
+    `failed` at its terminal copy boundary.
+13. Before the first accepted activity, initial-timeout expiry cancels the
     request without committing a destination tree. After activity, completion
     requires all of: the update quiet period elapsed, the task queue is empty,
     no worker is active, reconciliation finds no regular files, and all pending
-    status records have been handed to the bounded publisher.
-13. On completion, the processor uses a non-overwriting rename to install its
-    temporary destination root at the reserved final name, releases the
-    reservation, emits a terminal status event, closes the status FIFO, and
-    writes only the final JSON object to stdout.
-14. The unchanged executor captures that object, publishes it through
-    `async_result`, and applies `WaitResultConsumptionTimeoutSec`. Consumption,
-    retention expiry, cancellation, or shutdown removes the complete request
-    directory and releases the existing session lock.
+    terminal worker status records have received their bounded delivery attempt.
+14. On completion, the processor prunes zero-file destination directories,
+    `fsync`s the destination root, closes every worker FIFO, prunes the tmpfs
+    staging tree, and writes only the final JSON object to stdout.
+15. The executor verifies that object fits the runtime atomic pipe limit,
+    publishes it with one write through `async_result`, and applies
+    `WaitResultConsumptionTimeoutSec`. Consumption, retention expiry,
+    cancellation, or shutdown removes the complete request directory, removes
+    any remaining tmpfs request directory, and releases the existing session
+    lock.
 
 ## Completion semantics
 
@@ -344,21 +415,24 @@ A source file is deleted only after all of these succeed:
 4. non-overwriting installation succeeded; and
 5. the destination parent directory was `fsync`ed.
 
-The final destination tree is built under a hidden sibling temporary root. An
-exclusive hidden reservation prevents cooperating requests from claiming the
-same name. Successful request completion uses a Linux non-overwriting rename
-(`renameat2(..., RENAME_NOREPLACE)`, wrapped and tested explicitly) to publish
-the root, so a non-cooperating writer cannot be overwritten between preflight
-and commit. On failure, the reservation and temporary destination root are
-removed, so clients never observe a partially successful final tree. This
-request-level atomicity costs no second full copy because the temporary and
-final roots share the same persistent filesystem.
+The final destination root is created atomically before workers accept input.
+Each worker writes a hidden temporary file in the target directory and installs
+that individual file without overwrite. A `done` status therefore means the
+final path is already durable and visible to an external consumer; the status
+is not emitted for a file that exists only in a request-private tree.
+
+This deliberately chooses per-file atomic visibility over request-level atomic
+rollback, matching issue 122's immediate file-ready notification and source
+reclamation requirements. If a later file fails, earlier `done` files remain
+available and are listed in the final partial-failure result. The processor
+removes empty directories it created, but never removes a successfully
+installed file during rollback or shutdown.
 
 ### Resource bounds and backpressure
 
 Memory is bounded by `workers * 64 KiB`, queue metadata, path-state metadata,
-and a fixed status-event queue; it is not proportional to file contents. It can
-still grow with the number of path names unless admission bounds are defined.
+and one fixed pending-status slot per worker; it is not proportional to file
+contents. It can still grow with the number of path names unless admission bounds are defined.
 V1 therefore sets limits for maximum relative-path bytes, depth, files,
 directories, and total observed bytes. Crossing a limit stops acceptance and
 returns a business error.
@@ -370,12 +444,13 @@ the source of truth; notifications are latency hints.
 
 ### Status FIFO behavior
 
-Workers never write the FIFO directly. They enqueue compact status objects and
-a single publisher serializes them. It opens/writes non-blockingly, tolerates a
-late or absent reader, and cannot delay persistence or processor shutdown.
-Individual file events may be coalesced or dropped after the bounded queue is
-full. Aggregate counters and the terminal state remain available in the final
-result.
+Each worker is the sole writer of its own `status-<id>` FIFO and writes complete
+JSON records no larger than that FIFO's `_PC_PIPE_BUF`. It opens and writes
+non-blockingly, tolerates a late or absent reader, and cannot delay persistence
+or processor shutdown. At most the latest `in progress` record is retained per
+worker, so slow consumers cause progress coalescing rather than unbounded
+queuing. The worker makes a bounded delivery attempt for `done` or `failed`;
+aggregate counters and failure details remain available in the final result.
 
 ## Failure and shutdown behavior
 
@@ -386,9 +461,10 @@ result.
   not silent fallback. Inotify queue overflow triggers reconciliation; repeated
   overflow that prevents convergence fails the request.
 * Processor `SIGTERM` stops observation and scheduling, wakes the monitor,
-  cancels pending tasks, joins workers for a bounded period, removes its hidden
-  destination root, closes status, and exits. Signal handlers only set/wake a
-  stop condition.
+  cancels pending tasks, joins workers for a bounded period, removes incomplete
+  temporary files and empty destination directories, removes its tmpfs staging
+  directory, closes all status FIFOs, and exits. Successfully installed files
+  remain available. Signal handlers only set/wake a stop condition.
 * The existing executor terminates and reaps the processor, removes the request
   directory, and releases the session lock. Existing `api_management.py`
   executor discovery and shutdown ordering are reused unchanged.
@@ -416,8 +492,8 @@ PREFLIGHT -> REJECTED
                                                -> RECONCILE
                                                     -> WORK_REMAINS -> ACCEPTING
                                                     -> QUEUE_EMPTY + NO_ACTIVE_WORK
-                                                         -> FINAL_TREE_COMMITTED
-                                                              -> STATUS_TERMINAL
+                                                         -> DESTINATION_ROOT_SYNCED
+                                                              -> WORKER_STATUSES_CLOSED
                                                                    -> RESULT_CAPTURED
                                                                         -> RESULT_CONSUMED
                                                                              -> CLEANED
@@ -426,7 +502,7 @@ PREFLIGHT -> REJECTED
                  -> SERVICE_STOP -> CANCELLED -> CLEANED
 ```
 
-Only the monitor may transition from accepting work to final commit. It checks
+Only the monitor may transition from accepting work to request completion. It checks
 the quiet deadline, dispatcher generation, queue unfinished count, active-worker
 count, reconciliation result, and stop flag under one synchronization policy.
 An event racing the quiet deadline either increments the generation before the
@@ -449,11 +525,13 @@ reclamation or live per-file progress. It also introduces archive traversal,
 link, ownership, and decompression concerns. It remains a useful separate API
 for clients that cannot share a staging filesystem.
 
-### Let every worker write `status` directly
+### Multiplex every worker onto one `status` FIFO
 
-Rejected because writes larger than `PIPE_BUF` can interleave, a missing reader
-can block all workers, and worker scheduling then becomes coupled to
-observability. One nonblocking publisher gives the protocol a clear owner.
+Rejected because consumers cannot independently monitor a worker, a slow
+reader couples every worker's observability, and worker identity becomes only a
+payload convention. One `status-<id>` FIFO per worker gives each heartbeat an
+independent ordered channel. Nonblocking writes and `_PC_PIPE_BUF`-bounded JSON
+records prevent an absent reader from blocking ingestion.
 
 ### Treat inotify as a complete event log
 
@@ -461,11 +539,13 @@ Rejected because watches are installed asynchronously, queues can overflow,
 and recursive watching has directory-creation races. Initial and periodic
 reconciliation are necessary for correctness.
 
-### Install each file directly into the public final root
+### Hide the whole tree until request completion
 
-Rejected for v1 because a failed request would expose a partial tree. A hidden
-destination-side root plus final rename provides request-level atomic visibility
-without duplicating file contents.
+Rejected because `done` must notify an external consumer that the individual
+file is ready, and issue 122 requires immediate source reclamation and per-file
+availability. V1 installs each file atomically in the public destination root.
+Its final result explicitly describes partial failure instead of rolling back
+files that were already reported ready.
 
 ## Implementation sequence
 
@@ -473,13 +553,16 @@ without duplicating file contents.
 2. Implement processor argument validation and channel preparation; test node
    types, modes, containment, and readiness report fields.
 3. Implement safe reconciliation and single-worker durable copy; test nested
-   and empty directories, binary/large files, conflicts, and unsafe nodes.
+   directories, filtering/pruning, binary/large files, conflicts, and unsafe
+   nodes.
 4. Add recursive observation, deduplication, bounded queue, and worker pool;
    test files arriving before watcher startup, during copying, and by rename.
-5. Add status publisher and completion monitor; test absent/slow readers,
-   atomic records, burst gaps, initial timeout, update quiet period, and races.
-6. Add request-level destination commit and rollback; inject copy, fsync,
-   rename, observer, and limit failures.
+5. Add per-worker status FIFOs, progress heartbeats, and the completion monitor;
+   test absent/slow readers, atomic records, burst gaps, initial timeout, update
+   quiet period, and races.
+6. Add public destination creation, per-file atomic installation, directory
+   pruning, and partial-failure reporting; inject copy, fsync, rename, observer,
+   and limit failures.
 7. Exercise the generated pseudo-filesystem API under Compose and verify
    shutdown during initial wait, active copying, quiet detection, result wait,
    and a disconnected writer leaves no processes or request artifacts.
@@ -488,70 +571,81 @@ without duplicating file contents.
 
 Implementation is complete only when automated coverage includes:
 
-* the existing `streaming_file_upload` query remaining unchanged;
-* the new query using the existing launcher/executor and returning all six
-  channel fields plus the protocol version;
+* the existing `streaming_file_upload` query retaining its API behavior after
+  resolved arguments are added to channel preparation and the final result is
+  limited to one atomic FIFO record;
+* the new query using the existing launcher/executor lifecycle and returning
+  its input link, `workers` status FIFO paths, channel types, result, and
+  protocol version;
 * invalid metadata, destination, preferred directory, worker count,
   `file_regex`, conflict policy, timeout, and duplicate session rejection before
   request allocation;
-* staging directory and status/result FIFO types, permissions, containment,
-  uniqueness, and cleanup;
+* a real staging directory on the pre-mounted shared tmpfs, an API-directory
+  `input` symlink that resolves identically in service and client containers,
+  per-worker status FIFO targets/symlinks, result FIFO types, permissions,
+  containment, uniqueness, and cleanup without `CAP_SYS_ADMIN`;
 * a producer copying before observer startup, incremental close-write, atomic
   move-in, dynamically created nested directories, empty directories, and
   reconciliation after simulated inotify overflow;
 * arbitrary safe filenames including spaces and newlines, with JSON escaping;
 * the default `.*` copying all regular files, selective relative-path matching,
-  nested-path full-match behavior, excluded-file deletion and `file_skipped`
-  status, and empty-directory preservation under filtering;
+  nested-path full-match behavior, excluded-file deletion, accurate
+  `files_skipped`, and pruning directories whose files were all filtered out;
 * rejection of traversal, symlinks, hard links, FIFOs, sockets, devices, and
   source identity changes while queued or copied;
 * binary files, empty files, files larger than `PIPE_BUF`, many small files,
   total input larger than available process memory, and worker concurrency;
 * destination non-overwrite behavior, per-file durability ordering, source
-  deletion only after durable installation, final atomic tree publication, and
-  rollback after injected failure;
+  deletion only after durable installation, `done` only after the public file is
+  ready, and preservation/reporting of earlier successful files after an
+  injected later failure;
 * initial silence cancellation, activity-reset update timing, bursts whose
   total duration exceeds the update timeout, and no premature completion while
   work is queued or active;
 * a first event racing initial timeout and a new event racing final quiet
   detection, each with exactly one valid transition;
-* status records from one publisher, stable request-local `worker_id` values,
-  null worker IDs on dispatcher/monitor events, records no larger than
-  `PIPE_BUF`, a late reader, no reader, slow reader, queue coalescing, terminal
-  event, and FIFO EOF;
+* one `status-<id>` FIFO per worker, numeric stable request-local `worker_id`,
+  the exact five-field schema, all three status values, chunk byte progress,
+  heartbeat timing, file-ready `done`, records no larger than `_PC_PIPE_BUF`, a
+  late reader, no reader, slow reader, per-worker coalescing, and FIFO EOF;
 * final success/error JSON, completed/total ratios, and the lexically ordered
-  complete `files_failed_path` array delivered unchanged through
-  `async_result`, plus rejection before the final result can exceed 1 MiB and
-  result-retention expiry;
-* admission-limit, observer-startup, queue-overflow, copy, fsync, and final
-  rename failures producing bounded errors without a public partial tree; and
+  complete `files_failed_path` array and `files_skipped` count delivered
+  unchanged through `async_result`, plus rejection before the final result can
+  exceed runtime `_PC_PIPE_BUF`, one-write publication, and result-retention
+  expiry;
+* admission-limit, observer-startup, queue-overflow, copy, fsync, and per-file
+  rename failures producing bounded errors and an accurate partial result; and
 * service termination in every lifecycle phase reaping the processor and
-  workers and leaving no staging directory, FIFO, session lock, hidden
-  destination tree, or deferred executor.
+  workers and leaving no tmpfs staging directory, FIFO, session lock,
+  incomplete temporary destination file, or deferred executor.
 
 ## Decisions fixed by this review
 
 1. The feature is a new file-uploader query, not a new service and not a mode
    added to the single-file query.
-2. The common launcher, executor, API management, and API generators require no
-   behavioral changes for v1.
-3. The processor chooses a directory input transport and an additional FIFO
-   progress transport through the extensible readiness report.
-4. Processor stdout contains exactly one final bounded result; status is a
-   separate best-effort JSON Lines stream.
+2. The common launcher, API management, and API generators require no
+   behavioral changes. The executor only passes resolved arguments to channel
+   preparation and enforces atomic final-result publication.
+3. The processor chooses a tmpfs directory input transport and one FIFO
+   progress/heartbeat transport per worker through the extensible readiness
+   report.
+4. Processor stdout contains exactly one `_PC_PIPE_BUF`-bounded final result;
+   each worker has a separate JSON Lines heartbeat and file-ready stream.
 5. Completion uses initial and update inactivity timeouts plus a fully drained,
    reconciled system. Empty staging alone is insufficient.
 6. Source deletion follows durable non-overwriting destination installation.
-7. The complete destination tree becomes visible atomically at request success.
+7. Every completed file becomes visible atomically before its worker emits
+   `done`; request failure does not roll back files already reported ready.
 8. Inotify accelerates discovery; reconciliation establishes correctness.
-9. RAM-backed behavior is a mount/deployment property and must be configured
-   and verified rather than inferred from an `/api` pathname.
+9. Payload staging resides on a shared `/dev/shm` mount and is linked from the
+   API request directory; the container runtime supplies the mount without
+   granting the service `CAP_SYS_ADMIN`.
 
 ## Follow-up decisions before coding
 
 The implementation PR should choose and record concrete defaults for maximum
 path length, depth, file count, directory count, total bytes, task-queue size,
-status-queue size, reconciliation interval, and bounded worker shutdown. It
+heartbeat interval bounds, reconciliation interval, and bounded worker shutdown. It
 should also decide whether the functional Compose environment can reliably
 provision a shareable tmpfs-backed volume in CI; if not, correctness tests may
 use a normal volume while a Linux-only mount test verifies the deployment
