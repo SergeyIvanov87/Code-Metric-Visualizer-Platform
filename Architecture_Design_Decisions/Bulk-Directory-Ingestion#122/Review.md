@@ -33,7 +33,7 @@ the deferred executor. Live progress and heartbeats use processor-owned
 `status-<id>` FIFOs advertised in the extensible readiness report.
 
 The issue's “zero-copy” wording is not adopted. Reading from `tmpfs` into a
-64-KiB userspace buffer and writing it to persistent storage is a copy. The
+bounded userspace buffer and writing it to the nested upload FIFO is a copy. The
 useful guarantee is instead **bounded userspace memory and prompt source-space
 reclamation**, independent of the total dataset size.
 
@@ -47,6 +47,9 @@ reclamation**, independent of the total dataset size.
   changing only the processor path.
 * Keep the existing pseudo-filesystem request, handshake, session, and result
   paths. No new common generator behavior or async URL prefix is required.
+* Extend the existing streaming-file schema and processor with optional
+  `expected_bytes`; existing callers that leave it empty retain current
+  behavior.
 
 ### 2. Directory-ingestion processor
 
@@ -56,8 +59,9 @@ Add `utility/file-uploader/streaming_directory_upload_processor.py`. It owns:
 * recursive filesystem observation and reconciliation;
 * safe relative-path reconstruction;
 * bounded scheduling and worker concurrency;
-* destination-side temporary files, durability, atomic installation, and
-  source deletion;
+* invoking the existing `streaming_file_upload` pseudo-filesystem API once per
+  accepted file, streaming source bytes into the returned input FIFO, consuming
+  its result, and deleting the source only after API-confirmed success;
 * per-worker JSON progress/heartbeat FIFOs; and
 * final aggregate result generation.
 
@@ -152,10 +156,10 @@ but permits additional fields. The directory processor returns:
   "input": "/api/.../deferred-.../input",
   "input_type": "DIRECTORY",
   "status": [
-    "/api/.../deferred-.../status-0",
     "/api/.../deferred-.../status-1",
     "/api/.../deferred-.../status-2",
-    "/api/.../deferred-.../status-3"
+    "/api/.../deferred-.../status-3",
+    "/api/.../deferred-.../status-4"
   ],
   "status_type": "FIFO[]",
   "protocol": "cmvp.directory-upload.v1"
@@ -179,14 +183,69 @@ may teach the launcher to validate all typed report fields and containment, but
 that is not a prerequisite for issue 122 and should be made as a separate,
 backward-compatible common-infrastructure change.
 
-### Components not reused
+### Mandatory reuse through the streaming-file API
 
-`streaming_file_upload_processor.py` is not expanded with a second code path.
-Its single FIFO maps to one destination file, whereas directory ingestion needs
-event observation, a scheduler, per-path state, progress publication, and a
-completion barrier. Combining them would weaken validation and make both
-processors harder to reason about. Small pure helpers may be factored out only
-after their contracts are identical in code, not speculatively.
+The pool does not import, execute, or otherwise call
+`streaming_file_upload_processor.py`, `deferred_query_launcher.py`, or
+`deferred_query_executor.py` for an individual file. Each pool worker acts only
+as a client of the already generated `streaming_file_upload` pseudo-filesystem
+API:
+
+1. write one request to `streaming_file_upload/POST/exec`;
+2. read its session-specific handshake result;
+3. stream the staged source file into the returned `input` channel;
+4. read the returned `result` channel; and
+5. accept the file only when that API reports success and matching
+   `received_bytes`.
+
+This makes validation, timeout handling, destination-side temporary files,
+`fsync`, non-overwriting installation, business-result formatting, and
+per-request cleanup the responsibility of the existing API implementation. The
+directory processor owns only discovery, filtering, scheduling, progress, and
+aggregation.
+
+One backward-compatible streaming-file API enhancement is required for safe
+composition: add optional `expected_bytes` (empty by default). When present,
+`streaming_file_upload_processor.py` verifies the received byte count before
+installing its temporary file. A mismatch returns an error and removes the
+temporary file. Every directory worker supplies the stable source size. This
+prevents worker cancellation or a broken FIFO writer from publishing a valid
+but truncated destination file. The directory pool still reaches this behavior
+only through the public streaming-file API.
+
+For parent `SESSION_ID=P` and one-based worker ID `N`, every nested request uses
+`SESSION_ID=P.worker-N`. A worker processes only one file at a time, fully
+consumes the nested result, and then reuses that same derived session for its
+next file. If cleanup is still releasing the prior session, the worker observes
+duplicate-session rejection through the API and retries with bounded backoff;
+it never reads or manipulates the streaming query's internal session lock.
+Different workers therefore run concurrently under distinct sessions while
+preserving parent and worker correlation. Preflight limits `P` so the derived
+value still satisfies the existing safe-character and 128-character
+constraints. If an unrelated direct API client owns a derived session beyond
+the bounded retry period, that worker reports failure rather than reading or
+writing the unrelated request's channels.
+
+The directory processor locates the sibling generated API node through its
+configured shared API root and canonical service/query components; it does not
+construct an executable path. For every file, a worker performs the same public
+sequence available to an external client:
+
+```text
+write SESSION_ID=<P.worker-N>, destination=<target-parent>,
+      preferred_filename=<basename>, expected_bytes=<source-size>, and metadata
+      to .../streaming_file_upload/POST/exec
+read .../streaming_file_upload/POST/result.json_<P.worker-N>
+parse its input/result channel report
+stream the source bytes to input
+read and validate result
+```
+
+All argument values use the existing API request encoding rather than shell
+evaluation. The worker validates that every returned channel is contained in
+the sibling streaming-file query directory and has its declared type before it
+opens the channel. A nested response is never accepted merely because its path
+was present in JSON.
 
 ## Proposed query contract
 
@@ -205,6 +264,11 @@ The schema uses these ordinary parameters:
 | `WaitQueryUpdateTimeoutSec` | `5` | Quiet period after activity which commits an empty staging tree as complete. |
 | `WaitResultConsumptionTimeoutSec` | `60` | Existing final-result retention period. |
 | `SESSION_ID` | `default` | Existing deferred-request correlation and duplicate lock. |
+
+For this query, `SESSION_ID` must also leave room for `.worker-<id>` within the
+streaming-file API's 128-character session limit. With the v1 maximum of 32
+workers, the parent is therefore limited to 118 safe characters. The exact
+derived ID is visible in nested API artifacts and logs for correlation.
 
 `destination/preferred_directory` is the ingestion root. All paths placed in
 `input` are reproduced relative to that root. `preferred_directory` must be a
@@ -228,14 +292,12 @@ published destination. A skipped file does not contribute to copied/failed file
 or byte totals; it contributes to the separate `files_skipped` counter.
 
 Each worker owns an independent status FIFO exposed as `status-<id>`, where
-`<id>` is the decimal worker ID from `0` through `workers - 1`. Channel
-preparation creates `workers/<id>/status` without requiring the low-level
-channel helper to know the ID, then creates a relative symbolic link named
-`status-<id>` to that FIFO. The readiness report lists the public symlink paths.
-This realizes the suggested aliasing model while keeping one writer and one
-ordered stream per worker. It does not require the existing single-file
-processor to manage a worker pool; the FIFO-creation helper may be shared by
-both processors if implementation reveals an identical contract.
+`<id>` is the decimal worker ID from `1` through `workers`. The directory
+processor creates these FIFOs directly during channel preparation and lists
+their paths in the readiness report. No status symlink, per-worker subprocess,
+or change to the streaming-file processor is necessary: status describes the
+directory worker that is driving nested API calls, not an internal process of
+the streaming-file implementation.
 
 The status protocol is UTF-8 JSON Lines. Every record contains exactly the
 worker ID as a JSON number, normalized relative path, bytes copied so far,
@@ -251,7 +313,8 @@ source file size, and status. `status` is one of `in progress`, `done`, or
 Paths in events are slash-separated paths relative to the staging root. Error
 records use the same five fields and the last successfully copied byte count;
 detailed error descriptions remain in the final result. A worker emits `done`
-only after the destination file is durable and atomically installed, making the
+only after the nested streaming-file API returns success with matching
+`received_bytes`, making the
 record both a completion notification and the signal that the individual file
 is ready. While copying, it emits `in progress` after chunks as needed so no
 active worker is silent longer than `StatusHeartbeatIntervalSec`. Thus each
@@ -321,10 +384,9 @@ the authoritative request summary.
    `02770` staging directory below that tmpfs root, and places an `input`
    symlink in the request directory. The absolute symlink target is valid in
    every participant because the shared tmpfs is mounted at the same path. It
-   also creates one mode `0660`
-   worker FIFO and public `status-<id>` symlink per worker, verifies the target
-   node types and containment, and returns its channel report. No runtime mount
-   or `CAP_SYS_ADMIN` is required.
+   also creates one mode `0660` `status-<id>` FIFO per worker, verifies every
+   node type and path containment, and returns its channel report. No runtime
+   mount or `CAP_SYS_ADMIN` is required.
 6. The executor creates `async_result`, adds it to the report, and returns the
    report to the launcher. The launcher publishes it through the existing
    `result.json_<SESSION_ID>` handshake and exits.
@@ -344,17 +406,22 @@ the authoritative request summary.
    evaluates `file_regex`. It deletes and reports a closed nonmatching file;
    otherwise it inserts a deduplicated task into a bounded `queue.Queue`. It
    never submits an unbounded number of futures.
-10. A fixed worker pool copies each regular file into a temporary file located
-    in its destination directory using a reusable 64-KiB buffer. It flushes and
-    `fsync`s the file, installs it without overwrite, `fsync`s the parent
-    directory, and only then unlinks the source. Failed sources remain in
-    staging for diagnosis until whole-request cleanup.
+10. A fixed worker creates the file's destination parent directory, derives
+    `<parent SESSION_ID>.worker-<id>`, and invokes only the existing
+    `streaming_file_upload` API. Its request supplies the derived session,
+    destination parent, relative-path basename as `preferred_filename`, parent
+    metadata, and nested lifecycle timeouts. It does not execute the
+    streaming-file processor or deferred utilities directly.
 11. The observer resets the update deadline for every accepted create, close,
     move, or deletion event. Periodic reconciliation discovers events missed
     through startup races or inotify queue overflow.
-12. Each worker reports chunk progress and periodic heartbeats to its own
-    `status-<id>` FIFO, then reports `done` after durable installation or
-    `failed` at its terminal copy boundary.
+12. After reading the nested API handshake, the worker opens its returned input
+    FIFO, reads the tmpfs source in bounded chunks, writes those chunks to the
+    FIFO, and reports byte progress and periodic heartbeats to `status-<id>`.
+    It then immediately consumes the nested API result. Matching
+    `received_bytes` and `error_code == "0"` produce `done` and permit source
+    deletion; allocation, transport, business-result, or byte-count failure
+    produces `failed` and retains the source until parent-request cleanup.
 13. Before the first accepted activity, initial-timeout expiry cancels the
     request without committing a destination tree. After activity, completion
     requires all of: the update quiet period elapsed, the task queue is empty,
@@ -409,17 +476,19 @@ path outside either root.
 
 A source file is deleted only after all of these succeed:
 
-1. the complete contents were copied;
-2. the source identity and size still match the eligible closed file;
-3. the destination temporary file was flushed and `fsync`ed;
-4. non-overwriting installation succeeded; and
-5. the destination parent directory was `fsync`ed.
+1. the source identity and size still match the eligible closed file;
+2. all bytes were written to the nested API's returned input FIFO;
+3. the nested final result has `error_code == "0"`;
+4. its `received_bytes` equals both the worker's sent count and the stable source
+   size; and
+5. the worker fully consumed the nested result.
 
 The final destination root is created atomically before workers accept input.
-Each worker writes a hidden temporary file in the target directory and installs
-that individual file without overwrite. A `done` status therefore means the
-final path is already durable and visible to an external consumer; the status
-is not emitted for a file that exists only in a request-private tree.
+The existing streaming-file API writes its destination-side temporary file,
+performs `fsync`, installs the individual file without overwrite, and reports
+the final path. The directory worker does not duplicate any of those operations.
+A `done` status therefore means the final path is already durable and visible
+to an external consumer; it never means merely that FIFO transmission ended.
 
 This deliberately chooses per-file atomic visibility over request-level atomic
 rollback, matching issue 122's immediate file-ready notification and source
@@ -457,17 +526,24 @@ aggregate counters and failure details remain available in the final result.
 * A per-file failure stops new scheduling, lets in-flight workers reach a safe
   boundary, emits `failed`, and returns a nonzero business result. No source is
   deleted before its own durable installation.
+* Parent cancellation closes each active nested input writer and consumes the
+  nested result for a bounded period. Because `expected_bytes` is mandatory for
+  nested calls, a partial stream cannot be installed as success. Nested initial,
+  update, and result timeouts provide a bounded fallback; service shutdown still
+  lets `api_management.py` terminate all deferred requests in both queries.
 * Observer startup failure and inotify watch exhaustion are business failures,
   not silent fallback. Inotify queue overflow triggers reconciliation; repeated
   overflow that prevents convergence fails the request.
 * Processor `SIGTERM` stops observation and scheduling, wakes the monitor,
-  cancels pending tasks, joins workers for a bounded period, removes incomplete
-  temporary files and empty destination directories, removes its tmpfs staging
-  directory, closes all status FIFOs, and exits. Successfully installed files
-  remain available. Signal handlers only set/wake a stop condition.
-* The existing executor terminates and reaps the processor, removes the request
-  directory, and releases the session lock. Existing `api_management.py`
-  executor discovery and shutdown ordering are reused unchanged.
+  cancels pending tasks, joins workers for a bounded period, lets each nested
+  streaming-file request clean its own temporary file, removes empty destination
+  directories and its tmpfs staging directory, closes all status FIFOs, and
+  exits. Successfully installed files remain available. Signal handlers only
+  set/wake a stop condition.
+* The existing executor terminates and reaps the directory processor, removes
+  the parent request directory, and releases its session lock. Existing
+  `api_management.py` executor discovery and shutdown ordering also covers the
+  nested streaming-file requests and is reused unchanged.
 * A host still writing beneath `input` during cancellation may receive normal
   filesystem errors when cleanup removes the request. The client owns retry
   policy; v1 does not claim idempotency.
@@ -485,9 +561,11 @@ PREFLIGHT -> REJECTED
                                 -> INITIAL_TIMEOUT -> CANCELLED
                                 -> ACTIVITY
                                      -> ACCEPTING
-                                          -> FILE_READY -> QUEUED -> COPYING
-                                               -> DURABLE -> SOURCE_REMOVED
-                                               -> FAILED
+                                          -> FILE_READY -> QUEUED
+                                               -> NESTED_API_ALLOCATED
+                                                    -> STREAMING -> RESULT_VALIDATED
+                                                         -> SOURCE_REMOVED
+                                                    -> FAILED
                                           -> UPDATE_QUIET
                                                -> RECONCILE
                                                     -> WORK_REMAINS -> ACCEPTING
@@ -510,6 +588,14 @@ commit snapshot and is processed, or arrives after watcher shutdown and is
 rejected by the closing staging directory.
 
 ## Rejected alternatives
+
+### Call the streaming-file processor or deferred launcher directly
+
+Rejected because it duplicates the generated API's argument resolution,
+handshake, timeout, result, session-lock, and cleanup contract inside the pool.
+Workers are ordinary clients of `streaming_file_upload/POST/exec` and its
+returned channels. The only supported per-file integration boundary is that
+pseudo-filesystem API.
 
 ### Put directory logic in `deferred_query_executor.py`
 
@@ -552,18 +638,21 @@ files that were already reported ready.
 1. Add schema and generated executor; assert generated paths and parameters.
 2. Implement processor argument validation and channel preparation; test node
    types, modes, containment, and readiness report fields.
-3. Implement safe reconciliation and single-worker durable copy; test nested
-   directories, filtering/pruning, binary/large files, conflicts, and unsafe
-   nodes.
-4. Add recursive observation, deduplication, bounded queue, and worker pool;
-   test files arriving before watcher startup, during copying, and by rename.
-5. Add per-worker status FIFOs, progress heartbeats, and the completion monitor;
+3. Add `expected_bytes` to the existing streaming-file API and prove unchanged
+   behavior when omitted plus rejection/cleanup on mismatch.
+4. Implement safe reconciliation and a single worker as a pseudo-filesystem API
+   client; test nested directories, filtering/pruning, binary/large files,
+   conflicts, derived-session reuse, and unsafe nodes.
+5. Add recursive observation, deduplication, bounded queue, and the remaining
+   API-client workers; test files arriving before watcher startup, during
+   streaming, and by rename.
+6. Add per-worker status FIFOs, progress heartbeats, and the completion monitor;
    test absent/slow readers, atomic records, burst gaps, initial timeout, update
    quiet period, and races.
-6. Add public destination creation, per-file atomic installation, directory
-   pruning, and partial-failure reporting; inject copy, fsync, rename, observer,
-   and limit failures.
-7. Exercise the generated pseudo-filesystem API under Compose and verify
+7. Add public destination creation, directory pruning, and partial-failure
+   aggregation; inject nested allocation, input, business-result, byte-count,
+   observer, and limit failures.
+8. Exercise both generated pseudo-filesystem APIs under Compose and verify
    shutdown during initial wait, active copying, quiet detection, result wait,
    and a disconnected writer leaves no processes or request artifacts.
 
@@ -574,6 +663,8 @@ Implementation is complete only when automated coverage includes:
 * the existing `streaming_file_upload` query retaining its API behavior after
   resolved arguments are added to channel preparation and the final result is
   limited to one atomic FIFO record;
+* streaming-file `expected_bytes` omitted, matched, empty-file, mismatched, and
+  interrupted-writer behavior, with mismatch never installing a destination;
 * the new query using the existing launcher/executor lifecycle and returning
   its input link, `workers` status FIFO paths, channel types, result, and
   protocol version;
@@ -582,7 +673,7 @@ Implementation is complete only when automated coverage includes:
   request allocation;
 * a real staging directory on the pre-mounted shared tmpfs, an API-directory
   `input` symlink that resolves identically in service and client containers,
-  per-worker status FIFO targets/symlinks, result FIFO types, permissions,
+  direct per-worker status FIFOs, result FIFO types, permissions,
   containment, uniqueness, and cleanup without `CAP_SYS_ADMIN`;
 * a producer copying before observer startup, incremental close-write, atomic
   move-in, dynamically created nested directories, empty directories, and
@@ -595,10 +686,16 @@ Implementation is complete only when automated coverage includes:
   source identity changes while queued or copied;
 * binary files, empty files, files larger than `PIPE_BUF`, many small files,
   total input larger than available process memory, and worker concurrency;
-* destination non-overwrite behavior, per-file durability ordering, source
-  deletion only after durable installation, `done` only after the public file is
-  ready, and preservation/reporting of earlier successful files after an
-  injected later failure;
+* every worker invoking only `streaming_file_upload/POST/exec` and returned
+  channels, with tests that fail if it executes/imports the streaming processor,
+  launcher, or executor directly;
+* derived sessions exactly `<parent>.worker-<id>`, concurrent distinct worker
+  sessions, sequential reuse by one worker, bounded duplicate-session retry,
+  maximum parent-session length, and collision with an unrelated API client;
+* destination non-overwrite behavior inherited through the nested API, source
+  deletion only after successful result and matching `received_bytes`, `done`
+  only after the public file is ready, and preservation/reporting of earlier
+  successful files after an injected later failure;
 * initial silence cancellation, activity-reset update timing, bursts whose
   total duration exceeds the update timeout, and no premature completion while
   work is queued or active;
@@ -613,8 +710,9 @@ Implementation is complete only when automated coverage includes:
   unchanged through `async_result`, plus rejection before the final result can
   exceed runtime `_PC_PIPE_BUF`, one-write publication, and result-retention
   expiry;
-* admission-limit, observer-startup, queue-overflow, copy, fsync, and per-file
-  rename failures producing bounded errors and an accurate partial result; and
+* admission-limit, observer-startup, queue-overflow, nested allocation/input/
+  result failure, expected-byte mismatch, and nested result timeout producing
+  bounded errors and an accurate partial result; and
 * service termination in every lifecycle phase reaping the processor and
   workers and leaving no tmpfs staging directory, FIFO, session lock,
   incomplete temporary destination file, or deferred executor.
@@ -633,11 +731,15 @@ Implementation is complete only when automated coverage includes:
    each worker has a separate JSON Lines heartbeat and file-ready stream.
 5. Completion uses initial and update inactivity timeouts plus a fully drained,
    reconciled system. Empty staging alone is insufficient.
-6. Source deletion follows durable non-overwriting destination installation.
-7. Every completed file becomes visible atomically before its worker emits
+6. Pool workers never call streaming-file implementation executables; each file
+   is transferred exclusively through the existing pseudo-filesystem API using
+   `<parent SESSION_ID>.worker-<id>`.
+7. Source deletion follows nested API success plus exact `expected_bytes` and
+   `received_bytes` agreement.
+8. Every completed file becomes visible atomically before its worker emits
    `done`; request failure does not roll back files already reported ready.
-8. Inotify accelerates discovery; reconciliation establishes correctness.
-9. Payload staging resides on a shared `/dev/shm` mount and is linked from the
+9. Inotify accelerates discovery; reconciliation establishes correctness.
+10. Payload staging resides on a shared `/dev/shm` mount and is linked from the
    API request directory; the container runtime supplies the mount without
    granting the service `CAP_SYS_ADMIN`.
 
