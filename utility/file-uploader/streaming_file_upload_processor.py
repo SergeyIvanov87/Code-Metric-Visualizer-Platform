@@ -74,6 +74,13 @@ def normalize_empty(value):
     return "" if value in ("", "\"\"", "''") else value
 
 
+def boolean_value(arguments, name, default="false"):
+    value = normalize_empty(value_of(arguments, name, default)).lower()
+    if value not in ("true", "false"):
+        raise ValueError(f"{name} must be true or false")
+    return value == "true"
+
+
 def validate_arguments(arguments):
     metadata_text = normalize_empty(value_of(arguments, "metadata", ""))
     metadata = json.loads(metadata_text) if metadata_text else {}
@@ -103,7 +110,15 @@ def validate_arguments(arguments):
             raise ValueError("expected_bytes must be empty or a non-negative integer") from None
         if expected_bytes < 0:
             raise ValueError("expected_bytes must be empty or a non-negative integer")
-    return metadata, preferred_filename, destination, expected_bytes
+    need_flush = boolean_value(arguments, "need_flush", "true")
+    return metadata, preferred_filename, destination, expected_bytes, need_flush
+
+
+def flush_output(output, need_flush):
+    """Publish buffered bytes and optionally make the file data durable."""
+    output.flush()
+    if need_flush:
+        os.fsync(output.fileno())
 
 
 def generated_filename(destination):
@@ -163,7 +178,8 @@ def main(argv=None):
     arguments = options.arguments[1:] if options.arguments[:1] == ["--"] else options.arguments
     captured_bytes_from_input = 0
     try:
-        metadata, preferred_filename, destination, expected_bytes = validate_arguments(arguments)
+        (metadata, preferred_filename, destination,
+         expected_bytes, need_flush) = validate_arguments(arguments)
         filename = preferred_filename or generated_filename(destination)
         final_path = destination / filename
         if options.check_arguments:
@@ -183,8 +199,7 @@ def main(argv=None):
                     raise ValueError(
                         f"received {captured_bytes_from_input} bytes; expected {expected_bytes}"
                     )
-                output.flush()
-                os.fsync(output.fileno())
+                flush_output(output, need_flush)
             # Linking makes creation non-overwriting and atomic. Retry the generated
             # name if another upload claimed the same millisecond concurrently.
             while True:

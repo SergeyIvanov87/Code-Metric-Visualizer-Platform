@@ -62,6 +62,8 @@ def test_schema_declares_directory_transport_contract():
     assert "file_regex" not in schema["Params"]
     assert schema["Params"]["conflict_policy"] == "fail"
     assert schema["Params"]["tolerate_errors"] == "false"
+    assert schema["Params"]["flush_file_threshold"] == "256"
+    assert schema["Params"]["flush_byte_threshold"] == "67108864"
     assert "StatusHeartbeatIntervalSec" in schema["Params"]
 
 
@@ -117,6 +119,8 @@ def test_preflight_rejects_invalid_worker_regex_and_session():
             [*arguments(destination), "file_regex", ".*"],
             [*arguments(destination)[:-2], "SESSION_ID", "x" * 119],
             [*arguments(destination), "tolerate_errors", "sometimes"],
+            [*arguments(destination), "flush_file_threshold", "0"],
+            [*arguments(destination), "flush_byte_threshold", "invalid"],
         ):
             result = subprocess.run(
                 [sys.executable, str(PROCESSOR), "--request-directory", str(request),
@@ -136,8 +140,9 @@ def test_concurrent_nested_allocations_are_individually_framed():
 
         def server():
             for _ in range(2):
-                request = exec_fifo.read_text()
-                requests.append(request)
+                with exec_fifo.open() as stream:
+                    requests.append(stream.readline().rstrip("\n"))
+            for request in requests:
                 session = request.removeprefix("SESSION_ID=")
                 handshake = api / f"result.json_{session}"
                 os.mkfifo(handshake)
@@ -177,7 +182,7 @@ def test_nested_worker_session_reuses_persistent_result_fifo():
 
         def server():
             for sequence in (1, 2):
-                requests.append(exec_fifo.read_text())
+                requests.append(exec_fifo.read_text().rstrip("\n"))
                 result_fifo.write_text(json.dumps({"sequence": sequence}))
 
         server_thread = threading.Thread(target=server)
@@ -309,6 +314,82 @@ def test_lstat_if_exists_tolerates_reconciliation_race():
         assert processor.lstat_if_exists(vanished) is None
 
 
+def test_durability_batcher_flushes_thresholds_and_final_batch(monkeypatch):
+    processor = load_processor_module()
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        stage = root / "stage"
+        destination = root / "destination"
+        stage.mkdir()
+        destination.mkdir()
+        flushes = []
+
+        monkeypatch.setattr(
+            processor,
+            "synchronize_completed_files",
+            lambda batch_root, paths: flushes.append(
+                (batch_root, tuple(paths))
+            ),
+        )
+
+        count_batch = processor.DurabilityBatcher(
+            destination, file_threshold=2, byte_threshold=1000,
+        )
+        first_source = stage / "first"
+        first_destination = destination / "first"
+        first_source.write_bytes(b"one")
+        first_destination.write_bytes(b"one")
+        count_batch.complete(first_source, first_destination, 3)
+        assert first_source.exists()
+        assert flushes == []
+
+        second_source = stage / "second"
+        second_destination = destination / "second"
+        second_source.write_bytes(b"two")
+        second_destination.write_bytes(b"two")
+        count_batch.complete(second_source, second_destination, 3)
+        assert not first_source.exists()
+        assert not second_source.exists()
+        assert flushes == [(
+            destination, (first_destination, second_destination),
+        )]
+
+        byte_batch = processor.DurabilityBatcher(
+            destination, file_threshold=10, byte_threshold=5,
+        )
+        third_source = stage / "third"
+        third_destination = destination / "third"
+        third_source.write_bytes(b"12345")
+        third_destination.write_bytes(b"12345")
+        byte_batch.complete(third_source, third_destination, 5)
+        assert not third_source.exists()
+        assert len(flushes) == 2
+
+        final_source = stage / "final"
+        final_destination = destination / "final"
+        final_source.write_bytes(b"x")
+        final_destination.write_bytes(b"x")
+        byte_batch.complete(final_source, final_destination, 1)
+        assert final_source.exists()
+        byte_batch.flush()
+        assert not final_source.exists()
+        assert len(flushes) == 3
+
+
+def test_inotify_watcher_reports_activity_when_available():
+    processor = load_processor_module()
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        watcher = processor.InotifyTreeWatcher.create(root)
+        if watcher is None:
+            return
+        try:
+            (root / "created.txt").write_text("activity")
+            assert watcher.wait(1)
+        finally:
+            watcher.close()
+
+
 def test_allow_and_skip_regex_semantics_and_directory_defaults():
     processor = load_processor_module()
     match_all = processor.re.compile(".*")
@@ -339,11 +420,16 @@ def test_file_and_directory_filters_control_ingestion(monkeypatch, capsys):
 
     def fake_nested_upload(
             api_directory, session, worker_id, source, relative, destination,
-            metadata, writer, heartbeat, initial_timeout, update_timeout):
+            metadata, writer, heartbeat, initial_timeout, update_timeout,
+            durability=None):
         time.sleep(0.2)
         copied = source.stat().st_size
-        shutil.copyfile(source, destination / source.name)
-        source.unlink()
+        uploaded = destination / source.name
+        shutil.copyfile(source, uploaded)
+        if durability is None:
+            source.unlink()
+        else:
+            durability.complete(source, uploaded, copied)
         return copied
 
     with tempfile.TemporaryDirectory() as temporary:

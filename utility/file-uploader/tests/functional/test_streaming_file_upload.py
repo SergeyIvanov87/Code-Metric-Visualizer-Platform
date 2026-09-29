@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -19,6 +20,13 @@ else:
     EXECUTOR = ROOT / "common/deferred_query_executor.py"
     PROCESSOR = ROOT / "utility/file-uploader/streaming_file_upload_processor.py"
     SCHEMA = ROOT / "utility/file-uploader/API/streaming_file_upload.json"
+
+
+def load_processor_module():
+    spec = importlib.util.spec_from_file_location("file_processor", PROCESSOR)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def arguments(destination, session="test", initial="1", preferred="binary.dat"):
@@ -131,11 +139,44 @@ def test_schema_uses_relative_query_and_declares_upload_parameters():
     assert schema["Query"] == "+/streaming_file_upload"
     assert {
         "metadata", "preferred_filename", "destination",
+        "need_flush",
         "WaitInitialQueryTimeoutSec", "WaitQueryUpdateTimeoutSec",
         "WaitResultConsumptionTimeoutSec",
     } <= schema["Params"].keys()
+    assert schema["Params"]["need_flush"] == "true"
     assert schema["Params"]["WaitInitialQueryTimeoutSec"] == "60"
     assert schema["Params"]["WaitResultConsumptionTimeoutSec"] == "60"
+
+
+def test_need_flush_defaults_true_and_controls_fsync(monkeypatch):
+    processor = load_processor_module()
+    with tempfile.TemporaryDirectory() as temporary:
+        destination = Path(temporary)
+        default_values = processor.validate_arguments(arguments(destination))
+        deferred_values = processor.validate_arguments([
+            *arguments(destination), "need_flush", "false",
+        ])
+        assert default_values[-1] is True
+        assert deferred_values[-1] is False
+
+        fsync_calls = []
+        monkeypatch.setattr(
+            processor.os, "fsync", lambda descriptor: fsync_calls.append(descriptor),
+        )
+        with tempfile.NamedTemporaryFile() as output:
+            processor.flush_output(output, False)
+            assert fsync_calls == []
+            processor.flush_output(output, True)
+            assert fsync_calls == [output.fileno()]
+
+        try:
+            processor.validate_arguments([
+                *arguments(destination), "need_flush", "sometimes",
+            ])
+        except ValueError as error:
+            assert str(error) == "need_flush must be true or false"
+        else:
+            raise AssertionError("invalid need_flush value was accepted")
 
 
 def test_processor_accepts_schema_encoded_empty_values():

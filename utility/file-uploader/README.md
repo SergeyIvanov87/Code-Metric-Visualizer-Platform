@@ -42,9 +42,13 @@ use ordinary filesystem tools directly, for example:
 cp -r /path/to/project "$(jq -r .input < handshake.json)/"
 ```
 
-Each successfully transferred staging file is deleted immediately after the
-nested upload confirms its exact byte count. Failed staging files remain until
-request cleanup so their paths can be reported. The input tree is request-scoped
+Directory uploads disable the nested uploader's per-file `fsync` and use a
+coordinated durability barrier after either `flush_file_threshold` files
+(default 256) or `flush_byte_threshold` bytes (default 64 MiB), whichever comes
+first. A final barrier always runs before the aggregate result is returned.
+Successfully transferred staging files are deleted only after their batch is
+durable. Failed staging files remain until request cleanup so their paths can be
+reported. The input tree is request-scoped
 and is deleted together with the deferred request after completion, timeout,
 or shutdown. Deployments that require tmpfs staging can mount the shared API
 volume itself on tmpfs; the directory must
@@ -74,3 +78,13 @@ file data. File, directory, and byte admission counts are evaluated after the
 size and regex filters, so excluded paths do not consume those limits. These
 bounds keep reconciliation metadata and the final bounded FIFO result finite
 and protect a long-lived service from an unbounded staging tree.
+
+`streaming_file_upload` accepts `need_flush=true|false` and defaults to `true`.
+With the default, it preserves the existing behavior of synchronizing file data
+before reporting success. `need_flush=false` is intended only for bulk
+coordinators that provide their own durability barrier; it is not a promise that
+data has reached stable storage when the individual file result is returned.
+
+On Linux, reconciliation uses filesystem events to wake scans promptly and backs
+them with periodic full scans. Unsupported or exhausted watchers fall back to
+the original polling behavior without changing filtering or admission semantics.
