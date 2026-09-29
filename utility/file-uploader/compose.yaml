@@ -3,9 +3,16 @@ services:
     build:
       context: ../..
       dockerfile: utility/file-uploader/Dockerfile
+    environment:
+      FILE_UPLOADER_STAGING_ROOT: ${FILE_UPLOADER_STAGING_ROOT:-/dev/shm/file-uploader}
     volumes:
       - file-uploader-api:/api
       - file-uploads:/uploads
+      # This must be the same absolute path on the host and in the container so
+      # request-directory input symlinks resolve in both mount namespaces.
+      - type: bind
+        source: ${FILE_UPLOADER_STAGING_ROOT:-/dev/shm/file-uploader}
+        target: ${FILE_UPLOADER_STAGING_ROOT:-/dev/shm/file-uploader}
 
 volumes:
   file-uploader-api:

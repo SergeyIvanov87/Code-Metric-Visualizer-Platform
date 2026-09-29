@@ -61,18 +61,20 @@ def test_preflight_and_channel_preparation():
         root = Path(temporary)
         request = root / "request"
         destination = root / "uploads"
+        staging = root / "host-tmpfs"
         request.mkdir()
         destination.mkdir()
+        environment = {**os.environ, "FILE_UPLOADER_STAGING_ROOT": str(staging)}
         checked = subprocess.run(
             [sys.executable, str(PROCESSOR), "--request-directory", str(request),
              "--check-arguments", "--", *arguments(destination)],
-            text=True, capture_output=True, timeout=3,
+            text=True, capture_output=True, env=environment, timeout=3,
         )
         assert checked.returncode == 0, checked.stdout + checked.stderr
         prepared = subprocess.run(
             [sys.executable, str(PROCESSOR), "--request-directory", str(request),
              "--prepare-api-channel", "--", *arguments(destination)],
-            text=True, capture_output=True, timeout=3,
+            text=True, capture_output=True, env=environment, timeout=3,
         )
         assert prepared.returncode == 0, prepared.stdout + prepared.stderr
         report = json.loads(prepared.stdout)
@@ -81,8 +83,10 @@ def test_preflight_and_channel_preparation():
         assert report["protocol"] == "cmvp.directory-upload.v1"
         input_path = Path(report["input"])
         assert input_path.is_dir()
-        assert not input_path.is_symlink()
+        assert input_path.is_symlink()
         assert input_path.parent == request
+        assert input_path.resolve().parent == staging.resolve()
+        assert stat.S_IMODE(input_path.resolve().stat().st_mode) == 0o2770
         source = root / "source-tree"
         source.mkdir()
         (source / "host-visible.txt").write_text("host copy")

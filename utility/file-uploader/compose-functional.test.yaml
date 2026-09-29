@@ -8,9 +8,13 @@ services:
       dockerfile: utility/file-uploader/Dockerfile
     environment:
       - MICROSERVICE_NAME=file-uploader
+      - FILE_UPLOADER_STAGING_ROOT=${FILE_UPLOADER_STAGING_ROOT:-/dev/shm/file-uploader}
     volumes:
       - file-uploader-api-test:/api
       - file-uploads-test:/uploads
+      - type: bind
+        source: ${FILE_UPLOADER_STAGING_ROOT:-/dev/shm/file-uploader}
+        target: ${FILE_UPLOADER_STAGING_ROOT:-/dev/shm/file-uploader}
 
 volumes:
   file-uploader-api-test:

@@ -93,19 +93,33 @@ def validate_arguments(arguments):
     return metadata, destination, preferred, workers, pattern, heartbeat, session
 
 
+def staging_root():
+    """Return the host/container shared tmpfs root for directory payloads."""
+    configured = Path(os.environ.get(
+        "FILE_UPLOADER_STAGING_ROOT", "/dev/shm/file-uploader",
+    ))
+    if not configured.is_absolute():
+        raise ValueError("FILE_UPLOADER_STAGING_ROOT must be an absolute path")
+    return configured
+
+
 def prepare_channels(request_directory, arguments):
     request = validate_request_dir(request_directory)
     _, _, _, workers, _, _, _ = validate_arguments(arguments)
-    # The API tree is the transport shared with both container and host
-    # clients. Keep the staging directory in the request itself: an absolute
-    # symlink into the container's /dev/shm is dangling from the host and makes
-    # ordinary `cp -r source input/` fail.
+    root = staging_root()
+    root.mkdir(mode=0o2770, parents=True, exist_ok=True)
+    root = root.resolve(strict=True)
+    stage = root / request.name
+    stage.mkdir(mode=0o2770)
+    # mkdir honors the process umask; restore the advertised group-writable
+    # mode explicitly for host producers sharing the staging-root group.
+    stage.chmod(0o2770)
     input_path = request / "input"
-    input_path.mkdir(mode=0o2770)
+    input_path.symlink_to(stage, target_is_directory=True)
     statuses = []
     try:
-        if input_path.resolve(strict=True).parent != request:
-            raise ValueError("input directory escaped request directory")
+        if input_path.resolve(strict=True) != stage or not stage.is_relative_to(root):
+            raise ValueError("staging directory escaped configured staging root")
         for worker_id in range(1, workers + 1):
             status_path = request / f"status-{worker_id}"
             os.mkfifo(status_path, 0o660)
@@ -113,7 +127,8 @@ def prepare_channels(request_directory, arguments):
                 raise ValueError(f"status channel is not a FIFO: {status_path}")
             statuses.append(str(status_path))
     except BaseException:
-        shutil.rmtree(input_path, ignore_errors=True)
+        input_path.unlink(missing_ok=True)
+        shutil.rmtree(stage, ignore_errors=True)
         raise
     return {
         "input": str(input_path), "input_type": "DIRECTORY",
@@ -280,8 +295,9 @@ def process_directory(options, arguments):
     metadata, destination, preferred, workers, pattern, heartbeat, session = validate_arguments(arguments)
     request = validate_request_dir(options.request_directory)
     stage = (request / "input").resolve(strict=True)
-    if stage.parent != request:
-        raise ValueError("input directory is outside the request directory")
+    root = staging_root().resolve(strict=True)
+    if not stage.is_relative_to(root) or stage.parent != root:
+        raise ValueError("input directory is outside the configured staging root")
     final = destination / (preferred or generated_directory(destination))
     final.mkdir(mode=0o770)
     streaming_api = request.parent.parent.parent / "streaming_file_upload" / "POST"
@@ -462,9 +478,10 @@ def main(argv=None):
         if processing:
             try:
                 request = validate_request_dir(options.request_directory)
-                input_path = (request / "input").resolve(strict=True)
-                if input_path.parent == request:
-                    shutil.rmtree(input_path, ignore_errors=True)
+                stage = (request / "input").resolve(strict=True)
+                root = staging_root().resolve(strict=True)
+                if stage.parent == root:
+                    shutil.rmtree(stage, ignore_errors=True)
             except (OSError, ValueError):
                 pass
 

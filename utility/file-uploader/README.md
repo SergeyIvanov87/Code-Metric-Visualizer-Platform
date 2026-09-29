@@ -34,18 +34,35 @@ and the final result is authoritative. Copy files into `input`, preferably by
 renaming completed files into place. The request completes after the configured
 update quiet period once the staging tree and worker queue are empty.
 
-`input` is a real directory inside the deferred request directory, not a
-container-only symbolic link. Consequently, a host that mounts the API tree can
-use ordinary filesystem tools directly, for example:
+`input` is a symbolic link to a request-scoped directory in a shared tmpfs
+staging root. The default root is `/dev/shm/file-uploader`. Compose bind-mounts
+that exact absolute host path at the exact same container path, which is
+required so that the published link resolves in both mount namespaces.
+
+On a native Linux host, prepare the root before starting Compose:
+
+```sh
+export FILE_UPLOADER_STAGING_ROOT=/dev/shm/file-uploader
+mkdir -p "$FILE_UPLOADER_STAGING_ROOT"
+chmod 2770 "$FILE_UPLOADER_STAGING_ROOT"
+docker compose -f utility/file-uploader/compose.yaml up
+```
+
+`FILE_UPLOADER_STAGING_ROOT` may be changed, but it must be an absolute,
+tmpfs-backed host path and must retain the same value inside the service and
+every producer container. The supplied Compose files apply that mapping to the
+service and functional-test producer.
+
+The host can then use ordinary filesystem tools through the API symlink:
 
 ```sh
 cp -r /path/to/project "$(jq -r .input < handshake.json)/"
 ```
 
-The input tree is request-scoped and is deleted together with the deferred
-request after completion, timeout, or shutdown. Deployments that require tmpfs
-staging can mount the shared API volume itself on tmpfs; the directory must
-remain visible at the path published in the handshake to every producer.
+The real staging tree is deleted together with the deferred request after
+completion, timeout, or shutdown. Docker Desktop users must choose a path that
+is shared by the Docker VM and the host; the `/dev/shm` default is intended for
+native Linux deployments.
 
 Paths matching `file_regex` are recreated beneath
 `destination/preferred_directory`; other regular files are counted as skipped.

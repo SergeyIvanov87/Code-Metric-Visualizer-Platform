@@ -10,3 +10,6 @@ services:
     volumes:
       - file-uploader-api-test:/api
       - file-uploads-test:/uploads
+      - type: bind
+        source: ${FILE_UPLOADER_STAGING_ROOT:-/dev/shm/file-uploader}
+        target: ${FILE_UPLOADER_STAGING_ROOT:-/dev/shm/file-uploader}
