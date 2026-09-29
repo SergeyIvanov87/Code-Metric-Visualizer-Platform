@@ -198,7 +198,7 @@ def execute_delete_doc_query(
     exec_args = " ".join(
         [
             f"SESSION_ID={session_id}",
-            f"-id={doc_id}",
+            f"-ids={doc_id}",
             f"-metadata={doc_metadata}",
         ]
     )

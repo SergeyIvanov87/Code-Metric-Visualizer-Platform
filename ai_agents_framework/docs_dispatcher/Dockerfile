@@ -16,6 +16,7 @@ RUN <<EOF
     mkdir /opt
     mkdir /package
     mkdir -p /etc/dispatcher
+    mkdir -p /mnt/file_storage
 EOF
 
 COPY common/modules /opt/modules
@@ -62,7 +63,7 @@ RUN <<EOF
     chown -R ${USER}:${GROUPNAME} /API
 EOF
 
-VOLUME ["/api", "/etc/dispatcher"]
+VOLUME ["/api", "/etc/dispatcher", "/mnt/file_storage"]
 
 USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/etc/dispatcher", "/opt", "/api"]
