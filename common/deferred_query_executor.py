@@ -11,7 +11,6 @@ import subprocess
 import time
 
 CHUNK_SIZE = 64 * 1024
-MAX_RESULT_BYTES = 1024 * 1024
 stopping = False
 processor = None
 
@@ -21,11 +20,11 @@ def request_stop(_signal, _frame):
     stopping = True
 
 
-def prepare_api_channel(processor_path, request_directory):
+def prepare_api_channel(processor_path, request_directory, arguments):
     """Let the processor create its input FIFO and add our result FIFO."""
     prepared = subprocess.run(
         [processor_path, "--request-directory", str(request_directory),
-         "--prepare-api-channel"],
+         "--prepare-api-channel", "--", *arguments],
         stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=5,
     )
     if prepared.returncode:
@@ -45,6 +44,7 @@ def run_processor(command, result_path):
     processor = subprocess.Popen(
         command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     )
+    pipe_buf = os.pathconf(result_path.parent / "async_result", "PC_PIPE_BUF")
     oversized = False
     captured = 0
     with result_path.open("wb") as result:
@@ -52,7 +52,7 @@ def run_processor(command, result_path):
             chunk = processor.stdout.read(CHUNK_SIZE)
             if not chunk:
                 break
-            available = MAX_RESULT_BYTES - captured
+            available = pipe_buf - captured
             if available:
                 result.write(chunk[:available])
                 captured += min(len(chunk), available)
@@ -70,7 +70,9 @@ def run_processor(command, result_path):
     processor.stdout.close()
     processor = None
     if oversized:
-        result_path.write_bytes(b"processor output exceeded 1048576 bytes\n")
+        result_path.write_bytes(
+            f"processor output exceeded atomic FIFO limit ({pipe_buf} bytes)\n".encode()
+        )
     return return_code != 124
 
 
@@ -86,20 +88,14 @@ def publish(result_fifo, result_path, timeout):
                 time.sleep(0.02)
         if descriptor is None:
             return False
-        with result_path.open("rb") as result:
-            while not stopping:
-                chunk = result.read(CHUNK_SIZE)
-                if not chunk:
-                    return True
-                view = memoryview(chunk)
-                while view and time.monotonic() < deadline:
-                    try:
-                        written = os.write(descriptor, view)
-                        view = view[written:]
-                    except BlockingIOError:
-                        time.sleep(0.02)
-                if view:
-                    return False
+        payload = result_path.read_bytes()
+        if len(payload) > os.fpathconf(descriptor, "PC_PIPE_BUF"):
+            return False
+        while not stopping and time.monotonic() < deadline:
+            try:
+                return os.write(descriptor, payload) == len(payload)
+            except BlockingIOError:
+                time.sleep(0.02)
     finally:
         if descriptor is not None:
             os.close(descriptor)
@@ -130,7 +126,7 @@ def main(argv=None):
             "session_lock": options.session_lock,
         }))
         report, result_fifo = prepare_api_channel(
-            options.processor, request_directory
+            options.processor, request_directory, arguments
         )
         readiness = json.dumps(report).encode() + b"\n"
         os.write(options.readiness_fd, readiness)
