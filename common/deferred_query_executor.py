@@ -11,6 +11,7 @@ import subprocess
 import time
 
 CHUNK_SIZE = 64 * 1024
+MAX_RESULT_BYTES = 64 * 1024 * 1024
 stopping = False
 processor = None
 
@@ -38,13 +39,14 @@ def prepare_api_channel(processor_path, request_directory, arguments):
     return report, result_fifo
 
 
-def run_processor(command, result_path):
+def run_processor(command, result_path, max_result_bytes=MAX_RESULT_BYTES):
     """Run a FIFO-aware processor and capture its bounded result."""
     global processor
+    if max_result_bytes <= 0:
+        raise ValueError("max_result_bytes must be positive")
     processor = subprocess.Popen(
         command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     )
-    pipe_buf = os.pathconf(result_path.parent / "async_result", "PC_PIPE_BUF")
     oversized = False
     captured = 0
     with result_path.open("wb") as result:
@@ -52,7 +54,7 @@ def run_processor(command, result_path):
             chunk = processor.stdout.read(CHUNK_SIZE)
             if not chunk:
                 break
-            available = pipe_buf - captured
+            available = max_result_bytes - captured
             if available:
                 result.write(chunk[:available])
                 captured += min(len(chunk), available)
@@ -70,13 +72,18 @@ def run_processor(command, result_path):
     processor.stdout.close()
     processor = None
     if oversized:
-        result_path.write_bytes(
-            f"processor output exceeded atomic FIFO limit ({pipe_buf} bytes)\n".encode()
-        )
+        result_path.write_text(json.dumps({
+            "error_code": "1",
+            "error_description": (
+                "processor output exceeded configured result limit "
+                f"({max_result_bytes} bytes)"
+            ),
+        }, separators=(",", ":")))
     return return_code != 124
 
 
 def publish(result_fifo, result_path, timeout):
+    """Stream one request result through its single-writer FIFO."""
     deadline = time.monotonic() + timeout
     descriptor = None
     try:
@@ -88,14 +95,22 @@ def publish(result_fifo, result_path, timeout):
                 time.sleep(0.02)
         if descriptor is None:
             return False
-        payload = result_path.read_bytes()
-        if len(payload) > os.fpathconf(descriptor, "PC_PIPE_BUF"):
-            return False
-        while not stopping and time.monotonic() < deadline:
-            try:
-                return os.write(descriptor, payload) == len(payload)
-            except BlockingIOError:
-                time.sleep(0.02)
+
+        with result_path.open("rb") as result:
+            pending = memoryview(b"")
+            while not stopping and time.monotonic() < deadline:
+                if not pending:
+                    chunk = result.read(CHUNK_SIZE)
+                    if not chunk:
+                        return True
+                    pending = memoryview(chunk)
+                try:
+                    written = os.write(descriptor, pending)
+                    pending = pending[written:]
+                except BlockingIOError:
+                    time.sleep(0.02)
+                except BrokenPipeError:
+                    return False
     finally:
         if descriptor is not None:
             os.close(descriptor)
@@ -116,7 +131,7 @@ def main(argv=None):
     options = parser.parse_args(argv)
     arguments = options.arguments[1:] if options.arguments[:1] == ["--"] else options.arguments
     request_directory = Path(options.input)
-    # Processor output is staged separately and capped by run_processor. It can
+    # Processor output is staged separately and bounded by run_processor. It can
     # then wait for a client to open async_result without blocking the processor
     # or keeping it alive for the result-consumption timeout.
     result_path = request_directory / "processor_result"

@@ -23,6 +23,10 @@ MAX_FILES = 10000
 MAX_DIRECTORIES = 10000
 MAX_TOTAL_BYTES = 100 * 1024 * 1024 * 1024
 RECONCILE_INTERVAL = 0.1
+MATCH_NOTHING_REGEX = r"(?!)"
+DEFAULT_DIR_SKIP_REGEX = (
+    r"(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)"
+)
 stop_event = threading.Event()
 # The generated pseudo-filesystem API uses one shared exec FIFO. A request is
 # framed by its writer closing that FIFO, so two writers must never overlap:
@@ -43,6 +47,37 @@ def value_of(arguments, name, default=None):
 
 def normalize_empty(value):
     return "" if value in ("", '""', "''") else value
+
+
+def boolean_value(arguments, name, default="false"):
+    value = normalize_empty(value_of(arguments, name, default)).lower()
+    if value not in ("true", "false"):
+        raise ValueError(f"{name} must be true or false")
+    return value == "true"
+
+
+def has_argument(arguments, name):
+    return any(
+        arguments[index].lstrip("-") == name
+        for index in range(0, len(arguments) - 1, 2)
+    )
+
+
+def regex_value(arguments, name, default):
+    text = value_of(arguments, name, default)
+    if len(text) > 1024:
+        raise ValueError(f"{name} exceeds 1024 characters")
+    try:
+        return re.compile(text)
+    except re.error as error:
+        raise ValueError(f"invalid {name}: {error}") from None
+
+
+def path_is_allowed(relative, allow_pattern, skip_pattern):
+    return (
+        allow_pattern.fullmatch(relative) is not None
+        and skip_pattern.fullmatch(relative) is None
+    )
 
 
 def validate_request_dir(path):
@@ -69,15 +104,19 @@ def validate_arguments(arguments):
         raise ValueError("workers must be an integer") from None
     if not 1 <= workers <= MAX_WORKERS:
         raise ValueError(f"workers must be between 1 and {MAX_WORKERS}")
-    pattern_text = value_of(arguments, "file_regex", ".*")
-    if len(pattern_text) > 1024:
-        raise ValueError("file_regex exceeds 1024 characters")
-    try:
-        pattern = re.compile(pattern_text)
-    except re.error as error:
-        raise ValueError(f"invalid file_regex: {error}") from None
+    if has_argument(arguments, "file_regex"):
+        raise ValueError("file_regex was renamed to file_allow_regex")
+    file_allow_pattern = regex_value(arguments, "file_allow_regex", ".*")
+    file_skip_pattern = regex_value(
+        arguments, "file_skip_regex", MATCH_NOTHING_REGEX,
+    )
+    dir_allow_pattern = regex_value(arguments, "dir_allow_regex", ".*")
+    dir_skip_pattern = regex_value(
+        arguments, "dir_skip_regex", DEFAULT_DIR_SKIP_REGEX,
+    )
     if value_of(arguments, "conflict_policy", "fail") != "fail":
         raise ValueError("conflict_policy must be 'fail'")
+    tolerate_errors = boolean_value(arguments, "tolerate_errors")
     try:
         heartbeat = float(value_of(arguments, "StatusHeartbeatIntervalSec", "1"))
     except ValueError:
@@ -90,12 +129,17 @@ def validate_arguments(arguments):
     final = destination / preferred if preferred else None
     if final is not None and final.exists():
         raise FileExistsError(f"preferred directory already exists: {final}")
-    return metadata, destination, preferred, workers, pattern, heartbeat, session
+    return (
+        metadata, destination, preferred, workers,
+        file_allow_pattern, file_skip_pattern,
+        dir_allow_pattern, dir_skip_pattern,
+        heartbeat, session, tolerate_errors,
+    )
 
 
 def prepare_channels(request_directory, arguments):
     request = validate_request_dir(request_directory)
-    _, _, _, workers, _, _, _ = validate_arguments(arguments)
+    workers = validate_arguments(arguments)[3]
     # The API tree is the transport shared with both container and host
     # clients. Keep the staging directory in the request itself: an absolute
     # symlink into the container's /dev/shm is dangling from the host and makes
@@ -259,6 +303,9 @@ def nested_upload(api_directory, session, worker_id, source, relative, destinati
         result = json.loads(wait_for_path(output_fifo, 65, fifo=True).read_text())
         if result.get("error_code") != "0" or result.get("received_bytes") != sent or sent != source_stat.st_size:
             raise RuntimeError(result.get("error_description") or "nested upload byte count mismatch")
+        # The staging copy is consumed only after the destination confirms the
+        # exact byte count. A failed unlink therefore turns the file into a
+        # reported worker failure instead of claiming completion.
         source.unlink()
         writer.emit(relative, sent, source_stat.st_size, "done", terminal=True)
         return sent
@@ -286,8 +333,53 @@ def skip_unsupported_entry(path):
         pass
 
 
+def lstat_if_exists(path):
+    """Return lstat data, or None when a concurrently consumed node vanished."""
+    try:
+        return path.lstat()
+    except FileNotFoundError:
+        return None
+
+
+def record_worker_failure(result, lock, relative, failed, tolerate_errors):
+    with lock:
+        result["failed"].append(relative)
+    if not tolerate_errors:
+        failed.set()
+
+
+def build_response(metadata, final, result, directory_names, error=None):
+    accepted = result["completed"] + len(result["failed"])
+    if error is not None:
+        error_code = str(getattr(error, "errno", None) or 1)
+        error_description = str(error)
+    elif result["failed"]:
+        error_code = "1"
+        error_description = "one or more files failed"
+    else:
+        error_code = "0"
+        error_description = ""
+    return {
+        "error_code": error_code, "error_description": error_description,
+        "metadata": metadata, "path": str(final),
+        "files_completed": "{}/{}".format(result["completed"], accepted),
+        "directories_completed": "{}/{}".format(
+            len(directory_names), len(directory_names),
+        ),
+        "bytes_completed": result["bytes"],
+        "files_failed": "{}/{}".format(len(result["failed"]), accepted),
+        "files_failed_path": sorted(result["failed"]),
+        "files_skipped": result["skipped"],
+        "items_skipped": len(result["unsupported"]),
+        "items_skipped_path": sorted(result["unsupported"]),
+    }
+
+
 def process_directory(options, arguments):
-    metadata, destination, preferred, workers, pattern, heartbeat, session = validate_arguments(arguments)
+    (metadata, destination, preferred, workers,
+     file_allow_pattern, file_skip_pattern,
+     dir_allow_pattern, dir_skip_pattern,
+     heartbeat, session, tolerate_errors) = validate_arguments(arguments)
     request = validate_request_dir(options.request_directory)
     stage = (request / "input").resolve(strict=True)
     if stage.parent != request:
@@ -308,6 +400,7 @@ def process_directory(options, arguments):
         "unsupported": set(),
     }
     queued = set()
+    accepted_file_names = set()
     active = 0
     failed = threading.Event()
 
@@ -341,11 +434,12 @@ def process_directory(options, arguments):
                         result["completed"] += 1
                         result["bytes"] += copied
                 except BaseException:
-                    with lock:
-                        result["failed"].append(relative)
-                    # A business failure stops discovery, but must not cancel
-                    # unrelated workers already streaming their files.
-                    failed.set()
+                    # A business failure never cancels workers already in
+                    # flight. tolerate_errors additionally keeps discovery and
+                    # scheduling open for later files.
+                    record_worker_failure(
+                        result, lock, relative, failed, tolerate_errors,
+                    )
                 finally:
                     with lock:
                         active -= 1
@@ -364,48 +458,103 @@ def process_directory(options, arguments):
     directory_names = set()
     previous_directories = set()
     unsupported_inodes = set()
+    processing_error = None
     try:
         while not stop_event.is_set() and not failed.is_set():
             current = {}
             current_directories = set()
+            excluded_directories = set()
             observed_activity = False
             for root, directories, files in os.walk(stage, followlinks=False):
                 root_path = Path(root)
+                root_relative = (
+                    "" if root_path == stage else safe_relative(stage, root_path)
+                )
+                root_is_excluded = root_relative in excluded_directories
                 for name in directories[:]:
                     node = root_path / name
                     relative = safe_relative(stage, node)
-                    info = node.lstat()
+                    info = lstat_if_exists(node)
+                    if info is None:
+                        # A worker may have consumed the node after os.walk
+                        # captured the directory listing.
+                        directories.remove(name)
+                        continue
                     if not stat.S_ISDIR(info.st_mode):
                         # Prevent os.walk from considering this node for
                         # descent, then remove it without following links.
                         directories.remove(name)
                         skip_unsupported_entry(node)
-                        if relative not in result["unsupported"]:
+                        if (not root_is_excluded and
+                                relative not in result["unsupported"]):
                             result["unsupported"].add(relative)
                             observed_activity = True
                         continue
-                    directory_names.add(relative)
                     current_directories.add(relative)
+                    if (
+                        root_is_excluded
+                        or not path_is_allowed(
+                            relative, dir_allow_pattern, dir_skip_pattern,
+                        )
+                    ):
+                        excluded_directories.add(relative)
+                    else:
+                        directory_names.add(relative)
                 for name in files:
                     node = root_path / name
                     relative = safe_relative(stage, node)
-                    info = node.lstat()
+                    info = lstat_if_exists(node)
+                    if info is None:
+                        # Normal TOCTOU race: successful workers unlink their
+                        # source files while reconciliation is walking.
+                        continue
                     inode = (info.st_dev, info.st_ino)
                     if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
                             inode in unsupported_inodes):
                         if stat.S_ISREG(info.st_mode):
                             unsupported_inodes.add(inode)
                         skip_unsupported_entry(node)
-                        if relative not in result["unsupported"]:
+                        if (not root_is_excluded and
+                                relative not in result["unsupported"]):
                             result["unsupported"].add(relative)
                             observed_activity = True
                         continue
-                    current[relative] = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
-            if len(current) + len(queued) > MAX_FILES or len(directory_names) > MAX_DIRECTORIES:
-                raise ValueError("directory ingestion admission limit exceeded")
-            if sum(value[2] for value in current.values()) > MAX_TOTAL_BYTES:
-                raise ValueError("directory ingestion byte limit exceeded")
-            if current or observed_activity or current_directories != previous_directories:
+                    file_is_allowed = (
+                        info.st_size > 0
+                        and not root_is_excluded
+                        and path_is_allowed(
+                            relative, file_allow_pattern, file_skip_pattern,
+                        )
+                    )
+                    current[relative] = (
+                        info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
+                        file_is_allowed,
+                    )
+            admitted_file_names = accepted_file_names.union(
+                relative
+                for relative, identity in current.items()
+                if identity[4]
+            )
+            if (len(admitted_file_names) > MAX_FILES or
+                    len(directory_names) > MAX_DIRECTORIES):
+                raise ValueError(
+                    "items ingestion admission limit exceeded, limits are: "
+                    f"directories [{len(directory_names)}/{MAX_DIRECTORIES}], "
+                    f"files [{len(admitted_file_names)}/{MAX_FILES}]"
+                )
+            byte_sum = sum(
+                identity[2] for identity in current.values() if identity[4]
+            )
+            if byte_sum > MAX_TOTAL_BYTES:
+                raise ValueError(
+                    "directory ingestion byte limit exceeded: "
+                    f"[{byte_sum}/{MAX_TOTAL_BYTES}]"
+                )
+            files_changed = any(
+                snapshots.get(relative) != identity
+                for relative, identity in current.items()
+            )
+            if files_changed or observed_activity or current_directories != previous_directories:
                 last_activity = time.monotonic()
             for relative, identity in current.items():
                 if failed.is_set():
@@ -414,7 +563,8 @@ def process_directory(options, arguments):
                     continue
                 source = stage.joinpath(*PurePosixPath(relative).parts)
                 queued.add(relative)
-                if pattern.fullmatch(relative):
+                if identity[4]:
+                    accepted_file_names.add(relative)
                     tasks.put((source, relative))
                 else:
                     source.unlink()
@@ -424,15 +574,22 @@ def process_directory(options, arguments):
             now = time.monotonic()
             with lock:
                 idle = tasks.unfinished_tasks == 0 and active == 0
-            remaining_files = bool(current)
+            # Failed sources deliberately remain for request cleanup. They have
+            # already reached a terminal state and must not prevent tolerant
+            # requests from completing their quiet period.
+            remaining_files = any(relative not in queued for relative in current)
             if last_activity is None:
                 if now - started >= options.initial_timeout:
                     raise TimeoutError("no directory upload activity before initial timeout")
             elif idle and not remaining_files and now - last_activity >= options.update_timeout:
                 break
             time.sleep(RECONCILE_INTERVAL)
-        tasks.join()
+    except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as error:
+        processing_error = error
     finally:
+        # Finish every task accepted before discovery failed so the aggregate
+        # response reflects all transfers that reached a worker.
+        tasks.join()
         for _ in threads:
             tasks.put(None)
         for thread in threads:
@@ -444,21 +601,11 @@ def process_directory(options, arguments):
                 directory.rmdir()
             except OSError:
                 pass
-    accepted = result["completed"] + len(result["failed"])
-    response = {
-        "error_code": "0" if not result["failed"] else "1",
-        "error_description": "" if not result["failed"] else "one or more files failed",
-        "metadata": metadata, "path": str(final),
-        "files_completed": f'{result["completed"]}/{accepted}',
-        "directories_completed": f"{len(directory_names)}/{len(directory_names)}",
-        "bytes_completed": result["bytes"],
-        "files_failed": f'{len(result["failed"])}/{accepted}',
-        "files_failed_path": sorted(result["failed"]),
-        "files_skipped": result["skipped"],
-        "items_skipped": len(result["unsupported"]),
-        "items_skipped_path": sorted(result["unsupported"]),
-    }
+    response = build_response(
+        metadata, final, result, directory_names, processing_error,
+    )
     print(json.dumps(response, separators=(",", ":")))
+    return 0 if response["error_code"] == "0" else 1
 
 
 def main(argv=None):
@@ -483,7 +630,7 @@ def main(argv=None):
         else:
             if not options.initial_timeout or not options.update_timeout:
                 raise ValueError("processing requires positive upload timeouts")
-            process_directory(options, arguments)
+            return process_directory(options, arguments)
         return 0
     except TimeoutError:
         return 124

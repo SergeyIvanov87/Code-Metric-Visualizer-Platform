@@ -7,8 +7,12 @@
         "destination": "/uploads",
         "preferred_directory": "\"\"",
         "workers": "4",
-        "file_regex": ".*",
+        "file_allow_regex": ".*",
+        "file_skip_regex": "(?!)",
+        "dir_allow_regex": ".*",
+        "dir_skip_regex": "(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)",
         "conflict_policy": "fail",
+        "tolerate_errors": "false",
         "StatusHeartbeatIntervalSec": "1",
         "WaitInitialQueryTimeoutSec": "60",
         "WaitQueryUpdateTimeoutSec": "5",
@@ -17,7 +21,7 @@
     },
     "Description": {
         "header": "Allocates a staging directory and ingests its completed files concurrently.",
-        "body": "Copy a directory tree into the returned input directory. Each status FIFO emits JSON Lines progress for one worker; the result FIFO returns the aggregate result after the staging tree is idle and drained.",
-        "footer": "Only regular, single-link files are accepted. Paths are recreated below destination/preferred_directory and existing paths are never overwritten."
+        "body": "Copy a directory tree into the returned input directory. Each status FIFO emits JSON Lines progress for one worker; the result FIFO returns the aggregate result after the staging tree is idle and drained. Set tolerate_errors=true to continue discovering and copying files after an individual transfer failure.",
+        "footer": "Only non-empty, regular, single-link files are accepted. Paths are recreated below destination/preferred_directory and existing paths are never overwritten."
     }
 }
