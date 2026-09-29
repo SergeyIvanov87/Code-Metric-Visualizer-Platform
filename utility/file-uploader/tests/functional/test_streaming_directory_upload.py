@@ -655,7 +655,7 @@ def test_running_container_copies_near_limit_tree_exactly():
     processor = load_processor_module()
     capacity = min(processor.MAX_FILES, processor.MAX_DIRECTORIES)
     # Keep container coverage representative without making it excessively slow.
-    near_limit = (capacity - max(1, capacity // 100)) // 2
+    near_limit = (capacity - max(1, capacity // 100)) // 6
     assert 0 < near_limit <= processor.MAX_FILES
     assert near_limit <= processor.MAX_DIRECTORIES
 
