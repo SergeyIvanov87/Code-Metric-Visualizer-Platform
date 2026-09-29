@@ -2,6 +2,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 import sys
@@ -60,28 +61,33 @@ def test_preflight_and_channel_preparation():
         root = Path(temporary)
         request = root / "request"
         destination = root / "uploads"
-        staging = root / "staging"
         request.mkdir()
         destination.mkdir()
-        environment = {**os.environ, "FILE_UPLOADER_STAGING_ROOT": str(staging)}
         checked = subprocess.run(
             [sys.executable, str(PROCESSOR), "--request-directory", str(request),
              "--check-arguments", "--", *arguments(destination)],
-            text=True, capture_output=True, env=environment, timeout=3,
+            text=True, capture_output=True, timeout=3,
         )
         assert checked.returncode == 0, checked.stdout + checked.stderr
         prepared = subprocess.run(
             [sys.executable, str(PROCESSOR), "--request-directory", str(request),
              "--prepare-api-channel", "--", *arguments(destination)],
-            text=True, capture_output=True, env=environment, timeout=3,
+            text=True, capture_output=True, timeout=3,
         )
         assert prepared.returncode == 0, prepared.stdout + prepared.stderr
         report = json.loads(prepared.stdout)
         assert report["input_type"] == "DIRECTORY"
         assert report["status_type"] == "FIFO[]"
         assert report["protocol"] == "cmvp.directory-upload.v1"
-        assert Path(report["input"]).is_symlink()
-        assert Path(report["input"]).resolve().parent == staging.resolve()
+        input_path = Path(report["input"])
+        assert input_path.is_dir()
+        assert not input_path.is_symlink()
+        assert input_path.parent == request
+        source = root / "source-tree"
+        source.mkdir()
+        (source / "host-visible.txt").write_text("host copy")
+        shutil.copytree(source, input_path / source.name)
+        assert (input_path / source.name / "host-visible.txt").read_text() == "host copy"
         assert len(report["status"]) == 2
         assert all(stat.S_ISFIFO(Path(path).stat().st_mode) for path in report["status"])
 

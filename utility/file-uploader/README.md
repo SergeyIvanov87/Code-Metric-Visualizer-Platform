@@ -34,10 +34,18 @@ and the final result is authoritative. Copy files into `input`, preferably by
 renaming completed files into place. The request completes after the configured
 update quiet period once the staging tree and worker queue are empty.
 
-The Compose deployment mounts the same tmpfs-backed volume at
-`/dev/shm/file-uploader` in producers and the service. Deployments using a
-separate producer container must mount `file-uploader-staging` there at that
-same absolute path so the handshake's directory symlink resolves identically.
+`input` is a real directory inside the deferred request directory, not a
+container-only symbolic link. Consequently, a host that mounts the API tree can
+use ordinary filesystem tools directly, for example:
+
+```sh
+cp -r /path/to/project "$(jq -r .input < handshake.json)/"
+```
+
+The input tree is request-scoped and is deleted together with the deferred
+request after completion, timeout, or shutdown. Deployments that require tmpfs
+staging can mount the shared API volume itself on tmpfs; the directory must
+remain visible at the path published in the handshake to every producer.
 
 Paths matching `file_regex` are recreated beneath
 `destination/preferred_directory`; other regular files are counted as skipped.
