@@ -2,7 +2,7 @@
 """Ingest a directory through bounded clients of streaming_file_upload."""
 
 import argparse
-import ctypes
+from collections import deque
 from datetime import datetime, timezone
 import errno
 import json
@@ -10,11 +10,9 @@ import os
 from pathlib import Path, PurePosixPath
 import queue
 import re
-import select
 import shutil
 import signal
 import stat
-import struct
 import threading
 import time
 
@@ -26,18 +24,17 @@ MAX_FILES = 10000
 MAX_DIRECTORIES = 10000
 MAX_TOTAL_BYTES = 100 * 1024 * 1024 * 1024
 RECONCILE_INTERVAL = 0.1
-RECONCILE_FALLBACK_INTERVAL = 1.0
-DEFAULT_FLUSH_FILE_THRESHOLD = 256
-DEFAULT_FLUSH_BYTE_THRESHOLD = 64 * 1024 * 1024
 MATCH_NOTHING_REGEX = r"(?!)"
 DEFAULT_DIR_SKIP_REGEX = (
     r"(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)"
 )
 stop_event = threading.Event()
-# Oversized records can require multiple writes, so serialize only the shared
-# FIFO write. Handshake waits happen concurrently after the complete newline-
-# terminated record has been published.
-nested_fifo_write_lock = threading.Lock()
+# The generated pseudo-filesystem API uses one shared exec FIFO. A request is
+# framed by its writer closing that FIFO, so two writers must never overlap:
+# otherwise the server reads both argument strings as one request. Keep the
+# lock until the server has published and we have consumed the handshake;
+# publication proves it observed EOF for this request.
+nested_allocation_lock = threading.Lock()
 
 
 def value_of(arguments, name, default=None):
@@ -65,16 +62,6 @@ def has_argument(arguments, name):
         arguments[index].lstrip("-") == name
         for index in range(0, len(arguments) - 1, 2)
     )
-
-
-def positive_integer_value(arguments, name, default):
-    try:
-        value = int(value_of(arguments, name, str(default)))
-    except ValueError:
-        raise ValueError(f"{name} must be an integer") from None
-    if value <= 0:
-        raise ValueError(f"{name} must be greater than zero")
-    return value
 
 
 def regex_value(arguments, name, default):
@@ -140,12 +127,6 @@ def validate_arguments(arguments):
     session = value_of(arguments, "SESSION_ID", "default")
     if len(session) > 118:
         raise ValueError("SESSION_ID must be at most 118 characters for directory upload")
-    flush_file_threshold = positive_integer_value(
-        arguments, "flush_file_threshold", DEFAULT_FLUSH_FILE_THRESHOLD,
-    )
-    flush_byte_threshold = positive_integer_value(
-        arguments, "flush_byte_threshold", DEFAULT_FLUSH_BYTE_THRESHOLD,
-    )
     final = destination / preferred if preferred else None
     if final is not None and final.exists():
         raise FileExistsError(f"preferred directory already exists: {final}")
@@ -154,7 +135,6 @@ def validate_arguments(arguments):
         file_allow_pattern, file_skip_pattern,
         dir_allow_pattern, dir_skip_pattern,
         heartbeat, session, tolerate_errors,
-        flush_file_threshold, flush_byte_threshold,
     )
 
 
@@ -202,19 +182,19 @@ class StatusWriter:
     def __init__(self, path, worker_id):
         self.path, self.worker_id = path, worker_id
         self.descriptor = None
-        self.pending = None
+        self.pending = deque()
 
     def flush_pending(self):
-        """Connect a waiting reader and deliver the latest coalesced record."""
+        """Connect a waiting reader and deliver every queued record in order."""
         try:
             if self.descriptor is None:
                 # O_WRONLY intentionally reports ENXIO when no reader is
                 # attached. Unlike O_RDWR, it does not hide reader absence or
-                # discard buffered records when the worker exits.
+                # pretend queued records were delivered.
                 self.descriptor = os.open(self.path, os.O_WRONLY | os.O_NONBLOCK)
-            if self.pending is not None:
-                os.write(self.descriptor, self.pending)
-                self.pending = None
+            while self.pending:
+                os.write(self.descriptor, self.pending[0])
+                self.pending.popleft()
             return True
         except OSError as error:
             if error.errno in (errno.EPIPE, errno.ENXIO):
@@ -230,18 +210,14 @@ class StatusWriter:
         }, separators=(",", ":")).encode() + b"\n"
         pipe_buf = os.pathconf(self.path, "PC_PIPE_BUF")
         if len(record) > pipe_buf:
-            return
-        # Keep only one bounded pending record. This coalesces progress under
-        # backpressure while allowing a reader that attaches during the quiet
-        # period to receive the latest status.
-        self.pending = record
-        deadline = time.monotonic() + 0.25 if terminal else time.monotonic()
-        while True:
-            if self.flush_pending():
-                return
-            if not terminal or time.monotonic() >= deadline or stop_event.is_set():
-                return
-            time.sleep(0.01)
+            raise ValueError("status record exceeds the atomic FIFO write limit")
+        # Preserve the complete ordered history while the reader is absent or
+        # the FIFO is backpressured. A successful atomic write removes exactly
+        # one record from this backlog.
+        self.pending.append(record)
+        # The backlog makes a special terminal-event wait unnecessary. Delivery
+        # is retried by this worker before its next event and while it is idle.
+        self.flush_pending()
 
     def close(self):
         if self.descriptor is not None:
@@ -262,32 +238,20 @@ def wait_for_path(path, timeout, fifo=False):
     raise TimeoutError(f"timed out waiting for {path}")
 
 
-def write_fifo_record(path, request):
-    """Write one newline-framed request without interleaving other writers."""
-    record = request.encode() + b"\n"
-    with nested_fifo_write_lock:
-        descriptor = os.open(path, os.O_WRONLY)
-        try:
-            written = 0
-            while written < len(record):
-                count = os.write(descriptor, record[written:])
-                if count == 0:
-                    raise BrokenPipeError("zero-byte write to nested exec FIFO")
-                written += count
-        finally:
-            os.close(descriptor)
-
-
 def allocate_nested_upload(api_directory, result_fifo, request):
-    """Frame one request, then wait independently for its session reply."""
-    exec_fifo = wait_for_path(api_directory / "exec", 5, fifo=True)
-    write_fifo_record(exec_fifo, request)
-    return json.loads(wait_for_path(result_fifo, 5, fifo=True).read_text())
+    """Atomically frame one request on the shared exec FIFO and read its reply."""
+    with nested_allocation_lock:
+        # Session result FIFOs are persistent API nodes. Writing the request
+        # first ensures the subsequent read belongs to this allocation; the
+        # server also waits for its previous response writer before accepting
+        # another request for the same derived session.
+        exec_fifo = wait_for_path(api_directory / "exec", 5, fifo=True)
+        exec_fifo.write_text(request)
+        return json.loads(wait_for_path(result_fifo, 5, fifo=True).read_text())
 
 
 def nested_upload(api_directory, session, worker_id, source, relative, destination,
-                  metadata, writer, heartbeat, initial_timeout, update_timeout,
-                  durability=None):
+                  metadata, writer, heartbeat, initial_timeout, update_timeout):
     nested_session = f"{session}.worker-{worker_id}"
     result_fifo = api_directory / f"result.json_{nested_session}"
     request = " ".join([
@@ -299,7 +263,6 @@ def nested_upload(api_directory, session, worker_id, source, relative, destinati
         f"WaitInitialQueryTimeoutSec={initial_timeout}",
         f"WaitQueryUpdateTimeoutSec={update_timeout}",
         "WaitResultConsumptionTimeoutSec=60",
-        f"need_flush={'false' if durability is not None else 'true'}",
     ])
     # The API parser uses shell request syntax; JSON strings safely preserve spaces.
     report = allocate_nested_upload(api_directory, result_fifo, request)
@@ -331,22 +294,16 @@ def nested_upload(api_directory, session, worker_id, source, relative, destinati
                 output.write(chunk)
                 sent += len(chunk)
                 now = time.monotonic()
-                if now - last_status >= heartbeat:
+                if sent < source_stat.st_size and now - last_status >= heartbeat:
                     writer.emit(relative, sent, source_stat.st_size, "in progress")
                     last_status = now
         result = json.loads(wait_for_path(output_fifo, 65, fifo=True).read_text())
         if result.get("error_code") != "0" or result.get("received_bytes") != sent or sent != source_stat.st_size:
             raise RuntimeError(result.get("error_description") or "nested upload byte count mismatch")
-        if durability is None:
-            # Standalone nested uploads synchronize their own destination and
-            # can consume staging immediately.
-            source.unlink()
-        else:
-            uploaded_path = Path(result.get("path", "")).resolve(strict=True)
-            expected_path = (destination / source.name).resolve(strict=True)
-            if uploaded_path != expected_path:
-                raise ValueError(f"nested upload returned an unexpected path: {uploaded_path}")
-            durability.complete(source, uploaded_path, sent)
+        # The staging copy is consumed only after the destination confirms the
+        # exact byte count. A failed unlink therefore turns the file into a
+        # reported worker failure instead of claiming completion.
+        source.unlink()
         writer.emit(relative, sent, source_stat.st_size, "done", terminal=True)
         return sent
     except BaseException:
@@ -379,194 +336,6 @@ def lstat_if_exists(path):
         return path.lstat()
     except FileNotFoundError:
         return None
-
-
-def synchronize_completed_files(root, paths):
-    """Flush one filesystem, with a portable per-file fallback."""
-    root_descriptor = os.open(
-        root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
-    )
-    try:
-        syncfs = getattr(os, "syncfs", None)
-        if syncfs is not None:
-            syncfs(root_descriptor)
-            return
-        try:
-            libc = ctypes.CDLL(None, use_errno=True)
-            syncfs = libc.syncfs
-        except AttributeError:
-            syncfs = None
-        if syncfs is not None:
-            syncfs.argtypes = [ctypes.c_int]
-            syncfs.restype = ctypes.c_int
-            if syncfs(root_descriptor) == 0:
-                return
-            error_number = ctypes.get_errno()
-            if error_number != errno.ENOSYS:
-                raise OSError(error_number, os.strerror(error_number))
-    finally:
-        os.close(root_descriptor)
-
-    directories = {Path(root)}
-    for path in paths:
-        descriptor = os.open(
-            path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
-        )
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-        directories.add(Path(path).parent)
-    for directory in directories:
-        descriptor = os.open(
-            directory, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
-        )
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-
-
-class DurabilityBatcher:
-    """Coordinate one durability barrier and source cleanup for many workers."""
-
-    def __init__(self, root, file_threshold, byte_threshold):
-        self.root = root
-        self.file_threshold = file_threshold
-        self.byte_threshold = byte_threshold
-        self.lock = threading.Lock()
-        self.pending = []
-        self.pending_bytes = 0
-        self.error = None
-
-    def complete(self, source, destination, byte_count):
-        with self.lock:
-            if self.error is not None:
-                raise RuntimeError("a previous durability batch failed") from self.error
-            self.pending.append((source, destination, byte_count))
-            self.pending_bytes += byte_count
-            if (len(self.pending) >= self.file_threshold or
-                    self.pending_bytes >= self.byte_threshold):
-                self._flush_locked()
-
-    def flush(self):
-        with self.lock:
-            if self.error is not None:
-                raise RuntimeError("a previous durability batch failed") from self.error
-            self._flush_locked()
-
-    def _flush_locked(self):
-        if not self.pending:
-            return
-        try:
-            synchronize_completed_files(
-                self.root, [entry[1] for entry in self.pending],
-            )
-        except OSError as error:
-            self.error = error
-            raise
-
-        remaining = []
-        first_error = None
-        for source, destination, byte_count in self.pending:
-            try:
-                source.unlink(missing_ok=True)
-            except OSError as error:
-                remaining.append((source, destination, byte_count))
-                if first_error is None:
-                    first_error = error
-        self.pending = remaining
-        self.pending_bytes = sum(entry[2] for entry in remaining)
-        if first_error is not None:
-            self.error = first_error
-            raise first_error
-
-
-class InotifyTreeWatcher:
-    """Use Linux filesystem events as a scan wake-up hint, never as truth."""
-
-    EVENT = struct.Struct("iIII")
-    IN_IGNORED = 0x00008000
-    WATCH_MASK = (
-        0x00000002  # IN_MODIFY
-        | 0x00000004  # IN_ATTRIB
-        | 0x00000008  # IN_CLOSE_WRITE
-        | 0x00000040  # IN_MOVED_FROM
-        | 0x00000080  # IN_MOVED_TO
-        | 0x00000100  # IN_CREATE
-        | 0x00000200  # IN_DELETE
-        | 0x00000400  # IN_DELETE_SELF
-        | 0x00000800  # IN_MOVE_SELF
-    )
-
-    def __init__(self, root):
-        self.libc = ctypes.CDLL(None, use_errno=True)
-        init = self.libc.inotify_init1
-        init.argtypes = [ctypes.c_int]
-        init.restype = ctypes.c_int
-        self.add_watch = self.libc.inotify_add_watch
-        self.add_watch.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_uint32]
-        self.add_watch.restype = ctypes.c_int
-        self.descriptor = init(os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0))
-        if self.descriptor < 0:
-            error_number = ctypes.get_errno()
-            raise OSError(error_number, os.strerror(error_number))
-        self.paths = {}
-        self.watches = {}
-        try:
-            self.watch(root)
-        except BaseException:
-            self.close()
-            raise
-
-    @classmethod
-    def create(cls, root):
-        try:
-            return cls(root)
-        except (AttributeError, OSError):
-            return None
-
-    def watch(self, path):
-        path = Path(path)
-        if path in self.paths:
-            return
-        watch = self.add_watch(
-            self.descriptor, os.fsencode(path), self.WATCH_MASK,
-        )
-        if watch < 0:
-            error_number = ctypes.get_errno()
-            raise OSError(error_number, os.strerror(error_number), str(path))
-        old_path = self.watches.get(watch)
-        if old_path is not None:
-            self.paths.pop(old_path, None)
-        self.paths[path] = watch
-        self.watches[watch] = path
-
-    def wait(self, timeout):
-        readable, _, _ = select.select([self.descriptor], [], [], timeout)
-        if not readable:
-            return False
-        while True:
-            try:
-                events = os.read(self.descriptor, 64 * 1024)
-            except BlockingIOError:
-                break
-            offset = 0
-            if not events:
-                break
-            while offset + self.EVENT.size <= len(events):
-                watch, mask, _, name_length = self.EVENT.unpack_from(events, offset)
-                offset += self.EVENT.size + name_length
-                if mask & self.IN_IGNORED:
-                    path = self.watches.pop(watch, None)
-                    if path is not None:
-                        self.paths.pop(path, None)
-        return True
-
-    def close(self):
-        if self.descriptor is not None:
-            os.close(self.descriptor)
-            self.descriptor = None
 
 
 def record_worker_failure(result, lock, relative, failed, tolerate_errors):
@@ -607,17 +376,13 @@ def process_directory(options, arguments):
     (metadata, destination, preferred, workers,
      file_allow_pattern, file_skip_pattern,
      dir_allow_pattern, dir_skip_pattern,
-     heartbeat, session, tolerate_errors,
-     flush_file_threshold, flush_byte_threshold) = validate_arguments(arguments)
+     heartbeat, session, tolerate_errors) = validate_arguments(arguments)
     request = validate_request_dir(options.request_directory)
     stage = (request / "input").resolve(strict=True)
     if stage.parent != request:
         raise ValueError("input directory is outside the request directory")
     final = destination / (preferred or generated_directory(destination))
     final.mkdir(mode=0o770)
-    durability = DurabilityBatcher(
-        final, flush_file_threshold, flush_byte_threshold,
-    )
     streaming_api = request.parent.parent.parent / "streaming_file_upload" / "POST"
     if not streaming_api.is_dir():
         override = os.environ.get("STREAMING_FILE_UPLOAD_API")
@@ -644,8 +409,8 @@ def process_directory(options, arguments):
                 try:
                     item = tasks.get(timeout=0.1)
                 except queue.Empty:
-                    # Retry a coalesced status for late readers and connect an
-                    # idle worker's waiting reader so it receives EOF later.
+                    # Retry queued statuses for late readers and connect an idle
+                    # worker's waiting reader so it receives EOF later.
                     status_writer.flush_pending()
                     continue
                 if item is None:
@@ -660,7 +425,7 @@ def process_directory(options, arguments):
                     copied = nested_upload(
                         streaming_api, session, worker_id, source, relative, target_parent,
                         metadata, status_writer, heartbeat, options.initial_timeout,
-                        options.update_timeout, durability,
+                        options.update_timeout,
                     )
                     with lock:
                         result["completed"] += 1
@@ -686,7 +451,6 @@ def process_directory(options, arguments):
 
     started = time.monotonic()
     last_activity = None
-    watcher = InotifyTreeWatcher.create(stage)
     snapshots = {}
     directory_names = set()
     previous_directories = set()
@@ -700,12 +464,6 @@ def process_directory(options, arguments):
             observed_activity = False
             for root, directories, files in os.walk(stage, followlinks=False):
                 root_path = Path(root)
-                if watcher is not None:
-                    try:
-                        watcher.watch(root_path)
-                    except OSError:
-                        watcher.close()
-                        watcher = None
                 root_relative = (
                     "" if root_path == stage else safe_relative(stage, root_path)
                 )
@@ -822,54 +580,17 @@ def process_directory(options, arguments):
                     raise TimeoutError("no directory upload activity before initial timeout")
             elif idle and not remaining_files and now - last_activity >= options.update_timeout:
                 break
-            if watcher is None or remaining_files:
-                wait_timeout = RECONCILE_INTERVAL
-            elif last_activity is None:
-                wait_timeout = min(
-                    RECONCILE_FALLBACK_INTERVAL,
-                    max(0, started + options.initial_timeout - now),
-                )
-            elif idle:
-                wait_timeout = min(
-                    RECONCILE_FALLBACK_INTERVAL,
-                    max(0, last_activity + options.update_timeout - now),
-                )
-            else:
-                wait_timeout = RECONCILE_FALLBACK_INTERVAL
-            if watcher is None:
-                time.sleep(wait_timeout)
-            else:
-                wait_started = time.monotonic()
-                try:
-                    event_received = watcher.wait(wait_timeout)
-                    if event_received:
-                        debounce = max(
-                            0, RECONCILE_INTERVAL
-                            - (time.monotonic() - wait_started),
-                        )
-                        if debounce:
-                            time.sleep(debounce)
-                        watcher.wait(0)
-                except OSError:
-                    watcher.close()
-                    watcher = None
+            time.sleep(RECONCILE_INTERVAL)
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as error:
         processing_error = error
     finally:
         # Finish every task accepted before discovery failed so the aggregate
         # response reflects all transfers that reached a worker.
         tasks.join()
-        try:
-            durability.flush()
-        except (OSError, RuntimeError) as error:
-            if processing_error is None:
-                processing_error = error
         for _ in threads:
             tasks.put(None)
         for thread in threads:
             thread.join(timeout=2)
-        if watcher is not None:
-            watcher.close()
 
     for directory in sorted(final.rglob("*"), key=lambda p: len(p.parts), reverse=True):
         if directory.is_dir():

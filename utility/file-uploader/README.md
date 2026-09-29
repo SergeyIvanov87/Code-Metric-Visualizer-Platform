@@ -29,10 +29,14 @@ Write the query arguments, including a unique `SESSION_ID`, to
 ```
 
 Open status FIFOs before copying when every progress event is important. Status
-is deliberately non-blocking: an absent or slow reader never stalls ingestion,
-and the final result is authoritative. Copy files into `input`, preferably by
-renaming completed files into place. The request completes after the configured
-update quiet period once the staging tree and worker queue are empty.
+is deliberately non-blocking: an absent or slow reader never stalls ingestion.
+Each worker retains an ordered backlog of events that could not yet be written;
+when a reader reconnects, it receives the complete backlog rather than only the
+latest event. The reader must drain the FIFO, and the history exists only for the
+lifetime of the directory-upload processor. The final result remains
+authoritative. Copy files into `input`, preferably by renaming completed files
+into place. The request completes after the configured update quiet period once
+the staging tree and worker queue are empty.
 
 `input` is a real directory inside the deferred request directory, not a
 container-only symbolic link. Consequently, a host that mounts the API tree can
@@ -42,13 +46,9 @@ use ordinary filesystem tools directly, for example:
 cp -r /path/to/project "$(jq -r .input < handshake.json)/"
 ```
 
-Directory uploads disable the nested uploader's per-file `fsync` and use a
-coordinated durability barrier after either `flush_file_threshold` files
-(default 256) or `flush_byte_threshold` bytes (default 64 MiB), whichever comes
-first. A final barrier always runs before the aggregate result is returned.
-Successfully transferred staging files are deleted only after their batch is
-durable. Failed staging files remain until request cleanup so their paths can be
-reported. The input tree is request-scoped
+Each successfully transferred staging file is deleted immediately after the
+nested upload confirms its exact byte count. Failed staging files remain until
+request cleanup so their paths can be reported. The input tree is request-scoped
 and is deleted together with the deferred request after completion, timeout,
 or shutdown. Deployments that require tmpfs staging can mount the shared API
 volume itself on tmpfs; the directory must
@@ -81,10 +81,5 @@ and protect a long-lived service from an unbounded staging tree.
 
 `streaming_file_upload` accepts `need_flush=true|false` and defaults to `true`.
 With the default, it preserves the existing behavior of synchronizing file data
-before reporting success. `need_flush=false` is intended only for bulk
-coordinators that provide their own durability barrier; it is not a promise that
-data has reached stable storage when the individual file result is returned.
-
-On Linux, reconciliation uses filesystem events to wake scans promptly and backs
-them with periodic full scans. Unsupported or exhausted watchers fall back to
-the original polling behavior without changing filtering or admission semantics.
+before reporting success. `need_flush=false` is intended only for a coordinator
+that provides its own safe durability barrier.
