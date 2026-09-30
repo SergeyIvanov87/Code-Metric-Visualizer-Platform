@@ -11,7 +11,9 @@ services:
     volumes:
       - file-uploader-api-test:/api
       - file-uploads-test:/uploads
+      - file-uploader-staging-test:/staging
 
 volumes:
   file-uploader-api-test:
   file-uploads-test:
+  file-uploader-staging-test:

@@ -1,0 +1,20 @@
+{
+    "Content-Type": "application/json",
+    "Method": "POST",
+    "Query": "+/streaming_directory_events",
+    "Params": {
+        "file_allow_regex": ".*",
+        "file_skip_regex": "(?!)",
+        "dir_allow_regex": ".*",
+        "dir_skip_regex": "(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)",
+        "WaitInitialQueryTimeoutSec": "60",
+        "WaitQueryUpdateTimeoutSec": "0.25",
+        "WaitResultConsumptionTimeoutSec": "60",
+        "SESSION_ID": "default"
+    },
+    "Description": {
+        "header": "Reports completed files placed in a shared staging directory.",
+        "body": "Copy files into the returned input directory. Each open-and-drain of the events FIFO returns one JSON batch containing every ready event accumulated since the previous delivered batch. The result FIFO returns one final summary after the event session becomes idle. Files remain in shared staging and are not copied to /uploads.",
+        "footer": "Read events through EOF; a FIFO is a byte stream and one read call is not a message boundary. Producers should atomically rename completed files into input."
+    }
+}

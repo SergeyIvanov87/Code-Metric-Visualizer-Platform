@@ -1,6 +1,6 @@
 # Streaming uploads
 
-The file-uploader service exposes two deferred pseudo-filesystem queries:
+The file-uploader service exposes three deferred pseudo-filesystem queries:
 
 * `streaming_file_upload` accepts one byte stream through a FIFO. Its optional
   `expected_bytes` argument prevents a short or interrupted stream from being
@@ -8,6 +8,34 @@ The file-uploader service exposes two deferred pseudo-filesystem queries:
 * `streaming_directory_upload` accepts a tree through a request-scoped staging
   directory and transfers each closed, stable file through the existing
   `streaming_file_upload` API.
+* `streaming_directory_events` observes files copied into shared staging and
+  returns batches of per-file readiness events without copying them to
+  `/uploads`.
+
+## Shared-staging directory events
+
+`streaming_directory_events` is intended for containers that mount the same
+staging volume at `/staging`. Its handshake returns an `input` directory on
+that volume, a live `events` FIFO, and the ordinary final `result` FIFO.
+Producers should copy beneath an excluded
+temporary directory (for example `.incoming`, which the default directory
+filter excludes) and atomically rename completed files to their final paths.
+
+Every open-and-drain of `events` returns one JSON document containing all
+events accumulated since the previous successfully delivered batch:
+
+```json
+{"first_sequence":1,"last_sequence":40,"events":[...40 events...]}
+```
+
+Read until EOF; a FIFO is a byte stream, so a single `read(2)` is not guaranteed
+to contain the complete JSON document. Events are sequence numbered and also
+contain the relative path, byte count, modification time, device, and inode.
+The files remain in shared staging after the API request expires. This endpoint
+reports readiness only: it does not copy to `/uploads`, guarantee persistent
+storage, or report that a consumer has processed a file. After the event
+session idle timeout, `result` returns a final summary and the common deferred
+executor cleans up the request-local FIFOs and journal.
 
 ## Directory upload
 

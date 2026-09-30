@@ -2,7 +2,7 @@ FROM alpine:3.20.6
 WORKDIR /package
 
 RUN apk add --no-cache bash coreutils inotify-tools python3
-RUN mkdir -p /opt /uploads
+RUN mkdir -p /opt /uploads /staging
 
 COPY common/modules /opt/modules
 COPY common/shell_utils /opt/shell_utils
@@ -14,5 +14,5 @@ COPY utility/file-uploader/API /package/API
 COPY utility/file-uploader/*.py utility/file-uploader/*.sh /package/
 RUN chmod +x /opt/*.py /package/*.py /package/*.sh
 
-VOLUME ["/api", "/uploads"]
+VOLUME ["/api", "/uploads", "/staging"]
 ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api"]

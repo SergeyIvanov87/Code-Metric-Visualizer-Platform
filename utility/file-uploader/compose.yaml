@@ -6,7 +6,9 @@ services:
     volumes:
       - file-uploader-api:/api
       - file-uploads:/uploads
+      - file-uploader-staging:/staging
 
 volumes:
   file-uploader-api:
   file-uploads:
+  file-uploader-staging:
