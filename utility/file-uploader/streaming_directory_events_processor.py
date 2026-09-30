@@ -82,10 +82,18 @@ def prepare(request, arguments):
     root = staging_root()
     stage = root / f"events-{session}-{request.name}"
     stage.mkdir(mode=0o2770)
+    if stage.resolve(strict=True).parent != root:
+        raise ValueError("shared staging directory escaped its configured root")
+    input_path = request / "input"
+    input_path.symlink_to(stage, target_is_directory=True)
+    if (not input_path.is_symlink()
+            or input_path.resolve(strict=True) != stage.resolve(strict=True)):
+        raise ValueError("input link does not resolve to shared staging")
     events_fifo = request / "events"
     os.mkfifo(events_fifo, 0o640)
     return {
-        "input": str(stage), "input_type": "DIRECTORY",
+        "input": str(input_path), "input_type": "DIRECTORY",
+        "staging": str(stage), "staging_type": "DIRECTORY",
         "events": str(events_fifo), "events_type": "FIFO",
         "protocol": "cmvp.directory-events.v1",
     }
@@ -167,7 +175,12 @@ def run(options, arguments):
     request = options.request_directory.resolve(strict=True)
     report_path = request / "stage.json"
     if report_path.exists():
-        stage = Path(json.loads(report_path.read_text())["input"])
+        report = json.loads(report_path.read_text())
+        stage = Path(report["staging"]).resolve(strict=True)
+        input_path = Path(report["input"])
+        if (not input_path.is_symlink()
+                or input_path.resolve(strict=True) != stage):
+            raise ValueError("input link no longer resolves to shared staging")
     else:
         # The executor records the preparation report for independently invoked tests.
         candidates = sorted(staging_root().glob(f"events-*-{request.name}"))

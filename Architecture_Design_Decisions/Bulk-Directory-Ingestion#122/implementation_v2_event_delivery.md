@@ -43,13 +43,14 @@ flowchart LR
 The shared volume must be mounted at an identical absolute location, for
 example `/dev/shm/file-uploader`, in the API container, producer container, and
 target container. The processor creates a unique request directory below that
-root and returns its path as `input`.
+root and returns its canonical path as `staging`.
 
-The API request tree may contain a symbolic link to that directory only if the
-same absolute mount is visible to every client of the link. Returning the
-shared path directly is less ambiguous. A request identifier must be validated
-as a safe base name, and the real staging path must remain below the configured
-shared root after resolution.
+The API request tree contains an `input` symbolic link to that directory, so
+the same absolute mount must be visible to every client of the link. The
+handshake also returns the canonical `staging` path for consumers that need to
+retain access after request cleanup removes the link. A request identifier must
+be validated as a safe base name, and the real staging path must remain below
+the configured shared root after resolution.
 
 An event carries a normalized relative path, never a producer-supplied
 absolute path. A consumer reconstructs the path below the staging root and

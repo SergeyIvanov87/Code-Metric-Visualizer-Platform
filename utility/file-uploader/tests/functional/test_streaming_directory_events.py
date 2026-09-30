@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 import sys
@@ -67,12 +68,22 @@ def test_preflight_creates_input_on_configured_shared_mount():
         assert prepared.returncode == 0, prepared.stdout + prepared.stderr
         report = json.loads(prepared.stdout)
         input_path = Path(report["input"])
+        staging_path = Path(report["staging"])
         assert report["protocol"] == "cmvp.directory-events.v1"
         assert report["input_type"] == "DIRECTORY"
+        assert report["staging_type"] == "DIRECTORY"
         assert input_path.is_dir()
-        assert input_path.parent == staging.resolve()
+        assert input_path.is_symlink()
+        assert input_path.parent == request
+        assert input_path.resolve() == staging_path
+        assert staging_path.parent == staging.resolve()
         assert report["events_type"] == "FIFO"
         assert stat.S_ISFIFO(Path(report["events"]).stat().st_mode)
+
+        (input_path / "survives.txt").write_text("shared content")
+        shutil.rmtree(request)
+        assert not input_path.exists()
+        assert (staging_path / "survives.txt").read_text() == "shared content"
 
 
 def test_events_fifo_batches_all_events_since_previous_delivery():
@@ -120,9 +131,11 @@ def test_events_fifo_batches_all_events_since_previous_delivery():
             assert all(path.exists() for path in input_path.iterdir())
             stdout, stderr = process.communicate(timeout=2)
             assert process.returncode == 0, stdout + stderr
-            assert json.loads(stdout) == {
+            final = json.loads(stdout)
+            assert final == {
                 "error_code": "0", "error_description": "",
-                "path": str(input_path), "events_delivered": 43,
+                "path": str(Path(json.loads(prepared.stdout)["staging"])),
+                "events_delivered": 43,
                 "last_sequence": 43,
             }
         finally:
@@ -172,13 +185,17 @@ def test_running_container_delivers_forty_events_without_copying_to_uploads():
     )
     assert report["protocol"] == "cmvp.directory-events.v1"
     assert report["events_type"] == "FIFO"
-    staging = Path(report["input"])
+    input_path = Path(report["input"])
+    staging = Path(report["staging"])
+    assert input_path.is_symlink()
+    assert input_path.resolve() == staging
+    assert input_path.is_relative_to(api)
     assert staging.is_relative_to(Path("/staging"))
     try:
         for number in range(40):
-            temporary_path = staging / f".{number}.tmp"
+            temporary_path = input_path / f".{number}.tmp"
             temporary_path.write_text(f"payload {number}")
-            temporary_path.rename(staging / f"file-{number}.txt")
+            temporary_path.rename(input_path / f"file-{number}.txt")
         batch = json.loads(Path(report["events"]).read_text())
         assert batch["first_sequence"] == 1
         assert batch["last_sequence"] == 40
@@ -193,5 +210,4 @@ def test_running_container_delivers_forty_events_without_copying_to_uploads():
     finally:
         # Shared-staging content intentionally survives request cleanup, so the
         # integration client releases its own test data.
-        import shutil
         shutil.rmtree(staging, ignore_errors=True)
