@@ -68,9 +68,11 @@ def validate(arguments):
     return patterns, session, result_timeout
 
 
-def staging_root():
-    root = Path(os.environ.get("FILE_UPLOADER_STAGING_ROOT", "/staging")).resolve()
-    root.mkdir(parents=True, exist_ok=True)
+def staging_root(request):
+    """Return staging beside deferred requests on their shared API volume."""
+    root = request.parent / ".staging"
+    root.mkdir(mode=0o2770, exist_ok=True)
+    root = root.resolve(strict=True)
     if not root.is_dir():
         raise ValueError("shared staging root is not a directory")
     return root
@@ -79,13 +81,15 @@ def staging_root():
 def prepare(request, arguments):
     _, session, _ = validate(arguments)
     request = request.resolve(strict=True)
-    root = staging_root()
+    root = staging_root(request)
     stage = root / f"events-{session}-{request.name}"
     stage.mkdir(mode=0o2770)
     if stage.resolve(strict=True).parent != root:
         raise ValueError("shared staging directory escaped its configured root")
     input_path = request / "input"
-    input_path.symlink_to(stage, target_is_directory=True)
+    input_path.symlink_to(
+        os.path.relpath(stage, start=request), target_is_directory=True,
+    )
     if (not input_path.is_symlink()
             or input_path.resolve(strict=True) != stage.resolve(strict=True)):
         raise ValueError("input link does not resolve to shared staging")
@@ -183,7 +187,7 @@ def run(options, arguments):
             raise ValueError("input link no longer resolves to shared staging")
     else:
         # The executor records the preparation report for independently invoked tests.
-        candidates = sorted(staging_root().glob(f"events-*-{request.name}"))
+        candidates = sorted(staging_root(request).glob(f"events-*-{request.name}"))
         if len(candidates) != 1:
             raise ValueError("prepared shared staging directory not found")
         stage = candidates[0]

@@ -8,9 +8,10 @@
 > meaning: one final summary after the processor exits.
 
 This architecture is possible, and it is substantially simpler than copying
-every staged file through `streaming_file_upload`. It is appropriate only when
-the producer, the directory processor, and every consumer mount the same tmpfs
-volume at the same absolute path.
+every staged file through `streaming_file_upload`. It is appropriate when the
+producer, directory processor, and consumers share the API volume; that volume
+may be mounted at different absolute paths because request `input` links are
+relative.
 
 In this mode the directory processor is not an uploader. It is a **readiness
 observer**:
@@ -40,17 +41,15 @@ flowchart LR
 
 ## Mount and path contract
 
-The shared volume must be mounted at an identical absolute location, for
-example `/dev/shm/file-uploader`, in the API container, producer container, and
-target container. The processor creates a unique request directory below that
-root and returns its canonical path as `staging`.
-
-The API request tree contains an `input` symbolic link to that directory, so
-the same absolute mount must be visible to every client of the link. The
-handshake also returns the canonical `staging` path for consumers that need to
-retain access after request cleanup removes the link. A request identifier must
-be validated as a safe base name, and the real staging path must remain below
-the configured shared root after resolution.
+Staging is a hidden sibling of deferred requests on the query's shared API
+volume: `POST/.staging/<request>`. The request tree contains an `input` symbolic
+link whose target is relative to the request directory. Consequently, a host
+may mount the API volume anywhere without also creating a root-level
+`/staging`. The handshake returns the container's canonical `staging` path for
+diagnostics, but portable clients should enter through `input` or translate the
+equivalent path within their API-volume mount. A request identifier must be
+validated as a safe base name, and the real staging path must remain below the
+query-local `.staging` root after resolution.
 
 An event carries a normalized relative path, never a producer-supplied
 absolute path. A consumer reconstructs the path below the staging root and
@@ -204,7 +203,7 @@ batch size is a safer limit than only a maximum event count.
 | Result FIFO | One aggregate final report | One final event-session summary |
 | Durability | Per-file data `fsync()` by default | None; tmpfs lifetime only |
 | Source cleanup | After confirmed nested upload | After release/expiry or consumer acknowledgement |
-| Target isolation | Target needs `/uploads` | Target needs the shared staging mount |
+| Target isolation | Target needs `/uploads` | Target needs the shared API mount |
 | Recovery | Persistent destination survives request cleanup | Journal and files require explicit retention |
 
 ## Recommendation

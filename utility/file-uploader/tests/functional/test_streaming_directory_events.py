@@ -55,16 +55,15 @@ def test_schema_declares_distinct_shared_staging_query():
     assert "workers" not in schema["Params"]
 
 
-def test_preflight_creates_input_on_configured_shared_mount():
+def test_preflight_creates_portable_input_link_on_shared_api_volume():
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        request = root / "request"
-        staging = root / "shared-staging"
-        request.mkdir()
-        env = {**os.environ, "FILE_UPLOADER_STAGING_ROOT": str(staging)}
-        checked = invoke(request, "--check-arguments", env=env)
+        api = root / "container-api"
+        request = api / "POST" / "request"
+        request.mkdir(parents=True)
+        checked = invoke(request, "--check-arguments")
         assert checked.returncode == 0, checked.stdout + checked.stderr
-        prepared = invoke(request, "--prepare-api-channel", env=env)
+        prepared = invoke(request, "--prepare-api-channel")
         assert prepared.returncode == 0, prepared.stdout + prepared.stderr
         report = json.loads(prepared.stdout)
         input_path = Path(report["input"])
@@ -74,11 +73,18 @@ def test_preflight_creates_input_on_configured_shared_mount():
         assert report["staging_type"] == "DIRECTORY"
         assert input_path.is_dir()
         assert input_path.is_symlink()
+        assert not Path(os.readlink(input_path)).is_absolute()
         assert input_path.parent == request
         assert input_path.resolve() == staging_path
-        assert staging_path.parent == staging.resolve()
+        assert staging_path.parent == request.parent / ".staging"
         assert report["events_type"] == "FIFO"
         assert stat.S_ISFIFO(Path(report["events"]).stat().st_mode)
+
+        host_api = root / "host-api-mount"
+        host_api.symlink_to(api, target_is_directory=True)
+        host_input = host_api / "POST" / "request" / "input"
+        (host_input / "host-visible.txt").write_text("host view")
+        assert (staging_path / "host-visible.txt").read_text() == "host view"
 
         (input_path / "survives.txt").write_text("shared content")
         shutil.rmtree(request)
@@ -90,10 +96,8 @@ def test_events_fifo_batches_all_events_since_previous_delivery():
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
         request = root / "request"
-        staging = root / "shared-staging"
         request.mkdir()
-        env = {**os.environ, "FILE_UPLOADER_STAGING_ROOT": str(staging)}
-        prepared = invoke(request, "--prepare-api-channel", env=env)
+        prepared = invoke(request, "--prepare-api-channel")
         assert prepared.returncode == 0, prepared.stdout + prepared.stderr
         input_path = Path(json.loads(prepared.stdout)["input"])
         events_fifo = Path(json.loads(prepared.stdout)["events"])
@@ -102,7 +106,7 @@ def test_events_fifo_batches_all_events_since_previous_delivery():
             sys.executable, str(PROCESSOR), "--request-directory", str(request),
             "--initial-timeout", "2", "--update-timeout", "0.1",
             "--", *arguments(),
-        ], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+        ], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
             for number in range(40):
                 temporary_path = input_path / f".{number}.tmp"
@@ -148,17 +152,15 @@ def test_unread_events_do_not_keep_common_executor_processor_alive_forever():
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
         request = root / "request"
-        staging = root / "shared-staging"
         request.mkdir()
-        env = {**os.environ, "FILE_UPLOADER_STAGING_ROOT": str(staging)}
-        prepared = invoke(request, "--prepare-api-channel", env=env)
+        prepared = invoke(request, "--prepare-api-channel")
         input_path = Path(json.loads(prepared.stdout)["input"])
         (input_path / "unread.txt").write_text("payload")
         process = subprocess.run([
             sys.executable, str(PROCESSOR), "--request-directory", str(request),
             "--initial-timeout", "1", "--update-timeout", "0.05",
             "--", *arguments(),
-        ], text=True, capture_output=True, timeout=2, env=env)
+        ], text=True, capture_output=True, timeout=2)
         assert process.returncode == 1
         final = json.loads(process.stdout)
         assert final["error_code"] == "1"
@@ -190,7 +192,8 @@ def test_running_container_delivers_forty_events_without_copying_to_uploads():
     assert input_path.is_symlink()
     assert input_path.resolve() == staging
     assert input_path.is_relative_to(api)
-    assert staging.is_relative_to(Path("/staging"))
+    assert staging.parent == api / ".staging"
+    assert not Path(os.readlink(input_path)).is_absolute()
     try:
         for number in range(40):
             temporary_path = input_path / f".{number}.tmp"

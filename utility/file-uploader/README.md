@@ -14,12 +14,13 @@ The file-uploader service exposes three deferred pseudo-filesystem queries:
 
 ## Shared-staging directory events
 
-`streaming_directory_events` is intended for containers that mount the same
-staging volume at `/staging`. Its handshake returns an `input` directory on
-the familiar deferred API path, the canonical `staging` directory, a live
-`events` FIFO, and the ordinary final `result` FIFO. `input` is a symbolic link
-to `staging`; all participating containers must therefore mount `/staging` at
-the same absolute path.
+`streaming_directory_events` keeps staging in a hidden `.staging` directory
+beside the deferred request directories on the shared API volume. Its handshake
+returns an `input` directory on the familiar deferred API path, the canonical
+`staging` directory, a live `events` FIFO, and the ordinary final `result` FIFO.
+`input` is a relative symbolic link to `staging`, so it remains usable when the
+same API volume is mounted at a different absolute path on the host or in
+another container. No host `/staging` mount is required.
 Producers should copy beneath an excluded
 temporary directory (for example `.incoming`, which the default directory
 filter excludes) and atomically rename completed files to their final paths.
@@ -40,8 +41,8 @@ storage, or report that a consumer has processed a file. After the event
 session idle timeout, `result` returns a final summary and the common deferred
 executor cleans up the request-local FIFOs and journal.
 Cleanup unlinks the request-local `input` link but does not traverse it or
-remove the files in `staging`. Consumers that need files after request cleanup
-must retain the canonical `staging` path from the handshake.
+remove the sibling `.staging` content. Consumers that need files after request
+cleanup must retain the corresponding path in the shared API volume.
 
 ## Directory upload
 
