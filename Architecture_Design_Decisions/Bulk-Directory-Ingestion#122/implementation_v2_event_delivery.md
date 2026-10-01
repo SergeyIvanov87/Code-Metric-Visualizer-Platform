@@ -170,6 +170,11 @@ processor lifecycle phases:
 6. **Finish:** print one final summary to stdout. The common executor publishes
    it once through `result` and cleans request-local FIFOs and the journal.
 
+`EventSessionIdleTimeoutSec` controls the idle transition from Serve to Finish
+and defaults to one second. It is deliberately separate from
+`WaitResultConsumptionTimeoutSec`, which remains the common executor's final
+result-reader retention window and also bounds an undelivered events batch.
+
 Shared staging is outside the executor's request directory and therefore
 survives final-result cleanup. An explicit acknowledgement can mean either
 “event received” or “file no longer needed”; these should be separate

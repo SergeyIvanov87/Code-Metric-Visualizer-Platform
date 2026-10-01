@@ -9,6 +9,7 @@
         "dir_skip_regex": "(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)",
         "WaitInitialQueryTimeoutSec": "60",
         "WaitQueryUpdateTimeoutSec": "0.25",
+        "EventSessionIdleTimeoutSec": "1",
         "WaitResultConsumptionTimeoutSec": "60",
         "SESSION_ID": "default"
     },

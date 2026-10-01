@@ -44,6 +44,14 @@ Cleanup unlinks the request-local `input` link but does not traverse it or
 remove the sibling `.staging` content. Consumers that need files after request
 cleanup must retain the corresponding path in the shared API volume.
 
+`EventSessionIdleTimeoutSec` defaults to one second and controls how long the
+processor remains available for another group of files after delivering its
+latest event batch. Once that idle period expires, the processor emits its
+final summary. `WaitResultConsumptionTimeoutSec` retains its common deferred
+API meaning: how long the executor waits for a reader of the final `result`
+FIFO. It also bounds how long an undelivered event batch can wait for an
+`events` reader.
+
 ## Directory upload
 
 Write the query arguments, including a unique `SESSION_ID`, to

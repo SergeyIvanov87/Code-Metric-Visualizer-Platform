@@ -65,7 +65,17 @@ def validate(arguments):
         raise ValueError(
             "WaitResultConsumptionTimeoutSec must be greater than 0 and at most 86400"
         )
-    return patterns, session, result_timeout
+    try:
+        event_idle_timeout = float(value_of(
+            arguments, "EventSessionIdleTimeoutSec", "1",
+        ))
+    except ValueError:
+        raise ValueError("EventSessionIdleTimeoutSec must be a number") from None
+    if not 0 < event_idle_timeout <= 86400:
+        raise ValueError(
+            "EventSessionIdleTimeoutSec must be greater than 0 and at most 86400"
+        )
+    return patterns, session, result_timeout, event_idle_timeout
 
 
 def staging_root(request):
@@ -79,7 +89,7 @@ def staging_root(request):
 
 
 def prepare(request, arguments):
-    _, session, _ = validate(arguments)
+    _, session, _, _ = validate(arguments)
     request = request.resolve(strict=True)
     root = staging_root(request)
     stage = root / f"events-{session}-{request.name}"
@@ -175,7 +185,7 @@ def write_batch(result_fifo, events):
 
 
 def run(options, arguments):
-    patterns, session, result_timeout = validate(arguments)
+    patterns, session, result_timeout, event_idle_timeout = validate(arguments)
     request = options.request_directory.resolve(strict=True)
     report_path = request / "stage.json"
     if report_path.exists():
@@ -232,7 +242,7 @@ def run(options, arguments):
         if not current and last_delivery is None and now - started >= options.initial_timeout:
             return 124
         if (last_delivery is not None and not pending
-                and now - last_delivery >= result_timeout
+                and now - last_delivery >= event_idle_timeout
                 and now - last_activity >= options.update_timeout):
             break
         if pending and now - last_activity >= result_timeout:

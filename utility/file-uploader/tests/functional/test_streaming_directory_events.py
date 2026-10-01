@@ -23,6 +23,7 @@ def arguments(session="events-test"):
         "file_allow_regex", ".*", "file_skip_regex", r"(?!)",
         "dir_allow_regex", ".*", "dir_skip_regex", r"(?!)",
         "WaitResultConsumptionTimeoutSec", "0.3",
+        "EventSessionIdleTimeoutSec", "0.1",
         "SESSION_ID", session,
     ]
 
@@ -51,6 +52,7 @@ def test_schema_declares_distinct_shared_staging_query():
     schema = json.loads(SCHEMA.read_text())
     assert schema["Query"] == "+/streaming_directory_events"
     assert schema["Params"]["WaitQueryUpdateTimeoutSec"] == "0.25"
+    assert schema["Params"]["EventSessionIdleTimeoutSec"] == "1"
     assert "destination" not in schema["Params"]
     assert "workers" not in schema["Params"]
 
@@ -90,6 +92,21 @@ def test_preflight_creates_portable_input_link_on_shared_api_volume():
         shutil.rmtree(request)
         assert not input_path.exists()
         assert (staging_path / "survives.txt").read_text() == "shared content"
+
+
+def test_preflight_rejects_invalid_event_session_idle_timeout():
+    with tempfile.TemporaryDirectory() as temporary:
+        request = Path(temporary) / "request"
+        request.mkdir()
+        for value in ("0", "86401", "not-a-number"):
+            changed = arguments()
+            changed[changed.index("EventSessionIdleTimeoutSec") + 1] = value
+            result = subprocess.run(
+                [sys.executable, str(PROCESSOR), "--request-directory", str(request),
+                 "--check-arguments", "--", *changed],
+                text=True, capture_output=True, timeout=3,
+            )
+            assert result.returncode != 0
 
 
 def test_events_fifo_batches_all_events_since_previous_delivery():
@@ -180,7 +197,8 @@ def test_running_container_delivers_forty_events_without_copying_to_uploads():
     session = f"directory-events-{os.getpid()}-{time.time_ns()}"
     (api / "exec").write_text(
         f"SESSION_ID={session} WaitInitialQueryTimeoutSec=5 "
-        "WaitQueryUpdateTimeoutSec=0.2 WaitResultConsumptionTimeoutSec=2"
+        "WaitQueryUpdateTimeoutSec=0.2 EventSessionIdleTimeoutSec=1 "
+        "WaitResultConsumptionTimeoutSec=2"
     )
     report = json.loads(
         wait_for_fifo(api / f"result.json_{session}").read_text()
