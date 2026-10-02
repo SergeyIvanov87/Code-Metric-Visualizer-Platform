@@ -31,8 +31,22 @@ def make_streaming_directory_upload_script(script, desired_file_ext=""):
     script.writelines(line + "\n" for line in body)
 
 
+def make_streaming_directory_events_script(script, desired_file_ext=""):
+    extension = "." + desired_file_ext if desired_file_ext else ""
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), "",
+        *api_fs_exec_utils.generate_get_result_type(extension), "",
+        *api_fs_exec_utils.generate_api_node_env_init(), "",
+        *api_fs_exec_utils.generate_read_api_fs_args(), "",
+        'exec "${OPT_DIR}/deferred_query_launcher.py" --api-directory "${API_NODE}/POST" '
+        '--processor "${WORK_DIR}/streaming_directory_events_processor.py" -- "${OVERRIDEN_CMD_ARGS[@]}"',
+    )
+    script.writelines(line + "\n" for line in body)
+
+
 def get():
     return {
         "streaming_file_upload": make_streaming_file_upload_script,
         "streaming_directory_upload": make_streaming_directory_upload_script,
+        "streaming_directory_events": make_streaming_directory_events_script,
     }, {}

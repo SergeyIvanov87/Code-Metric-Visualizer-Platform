@@ -1,5 +1,10 @@
 # Bulk directory ingestion: implementation v1
 
+> A proposed alternative that keeps files on shared tmpfs and turns result
+> delivery into a sequence-numbered event stream is documented in
+> [implementation_v2_event_delivery.md](./implementation_v2_event_delivery.md).
+> It is a notification protocol rather than a durable upload protocol.
+
 ## Scope and conclusion
 
 This document evaluates the implementation at commit `82237f9` against the
