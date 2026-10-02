@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 
 
 if Path("/package/streaming_directory_events_processor.py").exists():
@@ -34,6 +36,13 @@ def invoke(request, *options, env=None):
          *options, "--", *arguments()],
         text=True, capture_output=True, timeout=3, env=env,
     )
+
+
+def load_processor_module():
+    spec = importlib.util.spec_from_file_location("events_processor", PROCESSOR)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def wait_for_fifo(path, timeout=10):
@@ -81,7 +90,7 @@ def assert_delivered_files_exist(staging, events):
 def test_schema_declares_distinct_shared_staging_query():
     schema = json.loads(SCHEMA.read_text())
     assert schema["Query"] == "+/streaming_directory_events"
-    assert schema["Params"]["WaitQueryUpdateTimeoutSec"] == "5"
+    assert schema["Params"]["WaitQueryUpdateTimeoutSec"] == "10"
     assert "EventSessionIdleTimeoutSec" not in schema["Params"]
     assert "destination" not in schema["Params"]
     assert "workers" not in schema["Params"]
@@ -187,6 +196,43 @@ def test_events_fifo_streams_immediately_and_explicit_seal_terminates_it():
             if process.poll() is None:
                 process.terminate()
                 process.wait(timeout=3)
+
+
+def test_explicit_seal_forces_a_post_seal_reconciliation(monkeypatch, capsys):
+    processor = load_processor_module()
+    with tempfile.TemporaryDirectory() as temporary:
+        request = Path(temporary) / "request"
+        request.mkdir()
+        report = processor.prepare(request, arguments())
+        (request / "stage.json").write_text(json.dumps(report))
+        reader = EventReader(report["events"])
+        identity = (1, 2, 7, 3)
+        scans = iter([
+            ({}, set(), False),
+            ({"last.txt": identity}, {"last.txt"}, True),
+            ({"last.txt": identity}, {"last.txt"}, False),
+        ])
+        monkeypatch.setattr(processor, "scan", lambda *_: next(scans))
+        seal_checks = iter([True, False, False])
+        monkeypatch.setattr(
+            processor, "seal_requested", lambda *_: next(seal_checks),
+        )
+
+        try:
+            result = processor.run(SimpleNamespace(
+                request_directory=request, initial_timeout=1, update_timeout=10,
+            ), arguments())
+        finally:
+            reader.close()
+
+        assert result == 0
+        journal = [
+            json.loads(line)
+            for line in (request / "event_journal.jsonl").read_text().splitlines()
+        ]
+        assert [event["status"] for event in journal] == ["ready", "terminated"]
+        assert journal[0]["path"] == "last.txt"
+        assert json.loads(capsys.readouterr().out)["events_generated"] == 1
 
 
 def test_unread_events_do_not_prevent_idle_sealing():

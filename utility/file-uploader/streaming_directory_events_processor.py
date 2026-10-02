@@ -241,6 +241,7 @@ def run(options, arguments):
     started = last_activity = time.monotonic()
     activity_seen = False
     sealed = False
+    post_seal_scan_required = False
     seal_reason = ""
     delivered = 0
     generated = 0
@@ -277,10 +278,12 @@ def run(options, arguments):
 
             if not sealed and seal_requested(seal_descriptor):
                 sealed = True
+                post_seal_scan_required = True
                 seal_reason = "explicit"
             if (not sealed and activity_seen
                     and now - last_activity >= options.update_timeout):
                 sealed = True
+                post_seal_scan_required = True
                 seal_reason = "idle timeout"
             if (not sealed and not activity_seen
                     and now - started >= options.initial_timeout):
@@ -292,8 +295,13 @@ def run(options, arguments):
             )
             previous = current
             previously_observed = observed
-            if sealed and all_stable_events_created:
-                break
+            if sealed:
+                if post_seal_scan_required:
+                    # A producer can rename its final file after this scan but
+                    # before the seal read. Always reconcile at least once more.
+                    post_seal_scan_required = False
+                elif all_stable_events_created:
+                    break
             time.sleep(SCAN_INTERVAL)
 
         sequence += 1
