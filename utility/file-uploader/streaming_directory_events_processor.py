@@ -19,6 +19,16 @@ MAX_DIRECTORIES = 10000
 MAX_TOTAL_BYTES = 100 * 1024 * 1024 * 1024
 SCAN_INTERVAL = 0.05
 DEFAULT_DIR_SKIP_REGEX = r"(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)"
+QUERY_PARAMETER_DEFAULTS = {
+    "file_allow_regex": ".*",
+    "file_skip_regex": r"(?!)",
+    "dir_allow_regex": ".*",
+    "dir_skip_regex": DEFAULT_DIR_SKIP_REGEX,
+    "WaitInitialQueryTimeoutSec": "60",
+    "WaitQueryUpdateTimeoutSec": "10",
+    "WaitResultConsumptionTimeoutSec": "60",
+    "SESSION_ID": "default",
+}
 stopping = False
 
 
@@ -47,13 +57,20 @@ def regex_value(arguments, name, default):
 
 
 def validate(arguments):
+    if len(arguments) % 2:
+        raise ValueError("query arguments must be name/value pairs")
+    names = {arguments[index].lstrip("-") for index in range(0, len(arguments), 2)}
+    unknown = names - QUERY_PARAMETER_DEFAULTS.keys()
+    if unknown:
+        raise ValueError(f"unsupported query parameters: {', '.join(sorted(unknown))}")
+    defaults = QUERY_PARAMETER_DEFAULTS
     patterns = (
-        regex_value(arguments, "file_allow_regex", ".*"),
-        regex_value(arguments, "file_skip_regex", r"(?!)"),
-        regex_value(arguments, "dir_allow_regex", ".*"),
-        regex_value(arguments, "dir_skip_regex", DEFAULT_DIR_SKIP_REGEX),
+        regex_value(arguments, "file_allow_regex", defaults["file_allow_regex"]),
+        regex_value(arguments, "file_skip_regex", defaults["file_skip_regex"]),
+        regex_value(arguments, "dir_allow_regex", defaults["dir_allow_regex"]),
+        regex_value(arguments, "dir_skip_regex", defaults["dir_skip_regex"]),
     )
-    session = value_of(arguments, "SESSION_ID", "default")
+    session = value_of(arguments, "SESSION_ID", defaults["SESSION_ID"])
     if not re.fullmatch(r"[A-Za-z0-9_.:@+-]{1,128}", session):
         raise ValueError("SESSION_ID must contain 1-128 safe characters")
     return patterns, session

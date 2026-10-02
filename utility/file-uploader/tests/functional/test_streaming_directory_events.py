@@ -101,11 +101,29 @@ def assert_delivered_files_exist(staging, events):
 
 def test_schema_declares_distinct_shared_staging_query():
     schema = json.loads(SCHEMA.read_text())
+    processor = load_processor_module()
     assert schema["Query"] == "+/streaming_directory_events"
+    assert schema["Params"] == processor.QUERY_PARAMETER_DEFAULTS
     assert schema["Params"]["WaitQueryUpdateTimeoutSec"] == "10"
     assert "EventSessionIdleTimeoutSec" not in schema["Params"]
     assert "destination" not in schema["Params"]
     assert "workers" not in schema["Params"]
+
+
+def test_preflight_rejects_unknown_and_unpaired_query_parameters():
+    with tempfile.TemporaryDirectory() as temporary:
+        request = Path(temporary)
+        command = [
+            sys.executable, str(PROCESSOR), "--request-directory", str(request),
+            "--check-arguments", "--", "unknown_parameter", "value",
+        ]
+        rejected = subprocess.run(command, text=True, capture_output=True, timeout=3)
+        assert rejected.returncode == 1
+        assert "unsupported query parameters: unknown_parameter" in rejected.stdout
+        command.pop()
+        unpaired = subprocess.run(command, text=True, capture_output=True, timeout=3)
+        assert unpaired.returncode == 1
+        assert "name/value pairs" in unpaired.stdout
 
 
 def test_preflight_creates_portable_input_link_on_shared_api_volume():
