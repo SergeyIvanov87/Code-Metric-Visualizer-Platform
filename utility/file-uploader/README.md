@@ -53,7 +53,7 @@ cleanup must retain the corresponding path in the shared API volume.
 After the producer has finished copying and renaming files, write a non-empty
 message to `seal`. The processor performs final reconciliation, sends remaining
 events and the terminal event, and emits its final summary. As a compatibility
-fallback, `WaitQueryUpdateTimeoutSec` defaults to five seconds and seals after
+fallback, `WaitQueryUpdateTimeoutSec` defaults to ten seconds and seals after
 that interval passes without a newly observed filesystem entity. New regular,
 filtered, and unsupported entries all reset this timer.
 

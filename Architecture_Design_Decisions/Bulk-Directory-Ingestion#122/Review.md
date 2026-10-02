@@ -261,7 +261,7 @@ The schema uses these ordinary parameters:
 | `conflict_policy` | `fail` | V1 supports only non-overwriting installation; the explicit value leaves room for future policies. |
 | `StatusHeartbeatIntervalSec` | `1` | Maximum interval between status records from an active worker. |
 | `WaitInitialQueryTimeoutSec` | `60` | Maximum wait for the first accepted filesystem activity. |
-| `WaitQueryUpdateTimeoutSec` | `5` | Quiet period after activity which commits an empty staging tree as complete. |
+| `WaitQueryUpdateTimeoutSec` | `10` | Quiet period after activity which commits an empty staging tree as complete. |
 | `WaitResultConsumptionTimeoutSec` | `60` | Existing final-result retention period. |
 | `SESSION_ID` | `default` | Existing deferred-request correlation and duplicate lock. |
 

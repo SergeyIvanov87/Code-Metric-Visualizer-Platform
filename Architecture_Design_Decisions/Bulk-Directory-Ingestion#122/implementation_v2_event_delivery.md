@@ -169,7 +169,7 @@ processor lifecycle phases:
 6. **Finish:** print one final summary to stdout. The common executor publishes
    it once through `result` and cleans request-local FIFOs and the journal.
 
-`WaitQueryUpdateTimeoutSec` controls fallback sealing and defaults to five
+`WaitQueryUpdateTimeoutSec` controls fallback sealing and defaults to ten
 seconds. `WaitResultConsumptionTimeoutSec` remains the common executor's final
 result-reader retention window. Unread events do not extend either phase; the
 final summary exposes generated, delivered, and undelivered counts.
