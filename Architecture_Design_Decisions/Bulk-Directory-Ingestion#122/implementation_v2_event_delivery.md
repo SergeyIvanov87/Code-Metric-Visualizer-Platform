@@ -34,7 +34,7 @@ flowchart LR
     P["Producer"] -->|"temporary file + atomic rename"| S["shared tmpfs staging"]
     O["directory observer"] -->|"close/move plus reconciliation"| S
     O -->|"append ready event"| J["request event journal"]
-    R["events FIFO reader"] -->|"open and drain to EOF"| D["event delivery"]
+    R["events FIFO reader"] -->|"continuous JSON Lines"| D["event delivery"]
     J -->|"all events after cursor"| D
     C["target container"] -->|"read by relative path"| S
 ```
@@ -105,26 +105,24 @@ coalesce many writes into one read. Therefore the statement “the next read
 returns exactly the 40 events since the previous read” cannot be guaranteed by
 a single `read(2)` call.
 
-The closest reliable FIFO contract is:
+The implemented FIFO contract is:
 
-* the client opens `events`, reads **until EOF**, and parses one framed JSON
-  batch;
-* the writer snapshots all events after the request's delivery cursor, writes
-  one batch, and closes its end of the FIFO;
-* events arriving after the snapshot remain for the next open/drain cycle;
-* an empty batch is permitted after a configured wait timeout; and
-* the client uses `last_sequence` to discard a replay after a disconnect.
+* the client opens `events` and parses newline-delimited JSON batch envelopes;
+* the writer remains connected and immediately writes newly ready events;
+* absent-reader and backpressure records are retained and flushed together;
+* the processor writes a final `terminated` event and then closes, making EOF a
+  session boundary rather than a batch boundary; and
+* sequence numbers let reconnecting clients detect gaps or duplicates.
 
-For example, if sequences 1 through 40 are pending when the writer takes its
-snapshot, one open-and-drain operation returns:
+For example, if sequences 1 through 40 are pending when a reader becomes
+available, one backlog flush writes:
 
 ```json
 {"first_sequence":1,"last_sequence":40,"events":[...40 event objects...]}
 ```
 
-The batch may exceed `PIPE_BUF`, so it must be length-prefixed or delimited by
-writer close, and the client must drain to EOF. It must not assume that one
-language-level `read()` returns the complete JSON document.
+The batch may exceed `PIPE_BUF`, so a client must buffer until newline. It must
+not assume that one language-level `read()` returns a complete JSON document.
 
 ### Delivery needs a journal, not an in-memory FIFO backlog
 
@@ -158,22 +156,23 @@ report. This preserves the common executor's legacy contract while adding these
 processor lifecycle phases:
 
 1. **Allocate:** create the shared staging directory, journal, `events` FIFO,
-   and optional request/ack FIFO; return their paths in the handshake. The
-   common executor separately adds its ordinary final `result` FIFO.
+   and `seal` FIFO; return their paths in the handshake. The common executor
+   separately adds its ordinary final `result` FIFO.
 2. **Observe:** discover completed files and append readiness events.
-3. **Serve:** on every events-reader connection, publish the next journal
-   batch and close the writer so EOF frames it.
-4. **Seal:** stop accepting files after an explicit producer `seal` marker or,
-   for compatibility, an idle timeout followed by final reconciliation.
+3. **Serve:** retain the events writer and publish JSON-Line batches as soon as
+   a reader and pipe capacity are available.
+4. **Seal:** stop accepting files after a non-empty producer message on `seal`
+   or, for compatibility, after `WaitQueryUpdateTimeoutSec` passes without a
+   newly observed filesystem entity; then perform final reconciliation.
 5. **Retain:** keep staged files and unacknowledged journal entries available
    for a configured retention period.
 6. **Finish:** print one final summary to stdout. The common executor publishes
    it once through `result` and cleans request-local FIFOs and the journal.
 
-`EventSessionIdleTimeoutSec` controls the idle transition from Serve to Finish
-and defaults to one second. It is deliberately separate from
-`WaitResultConsumptionTimeoutSec`, which remains the common executor's final
-result-reader retention window and also bounds an undelivered events batch.
+`WaitQueryUpdateTimeoutSec` controls fallback sealing and defaults to five
+seconds. `WaitResultConsumptionTimeoutSec` remains the common executor's final
+result-reader retention window. Unread events do not extend either phase; the
+final summary exposes generated, delivered, and undelivered counts.
 
 Shared staging is outside the executor's request directory and therefore
 survives final-result cleanup. An explicit acknowledgement can mean either

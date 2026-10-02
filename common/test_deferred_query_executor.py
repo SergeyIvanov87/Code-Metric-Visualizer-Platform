@@ -70,3 +70,26 @@ def test_publish_streams_payload_larger_than_pipe_buf():
 
         assert not reader.is_alive()
         assert received == [payload]
+
+
+def test_notify_event_stream_closing_wakes_late_reader():
+    with tempfile.TemporaryDirectory() as temporary:
+        request = Path(temporary)
+        events_fifo = request / "events"
+        os.mkfifo(events_fifo)
+        received = []
+        executor.stopping = False
+        reader = threading.Thread(
+            target=lambda: received.append(events_fifo.read_text())
+        )
+        reader.start()
+
+        assert executor.notify_event_stream_closing({
+            "events": str(events_fifo), "events_type": "FIFO",
+        }, request)
+        reader.join(timeout=2)
+
+        assert not reader.is_alive()
+        assert json.loads(received[0]) == {
+            "type": "transport_closed", "reason": "request cleanup",
+        }

@@ -17,7 +17,8 @@ The file-uploader service exposes three deferred pseudo-filesystem queries:
 `streaming_directory_events` keeps staging in a hidden `.staging` directory
 beside the deferred request directories on the shared API volume. Its handshake
 returns an `input` directory on the familiar deferred API path, the canonical
-`staging` directory, a live `events` FIFO, and the ordinary final `result` FIFO.
+`staging` directory, live `events` and `seal` FIFOs, and the ordinary final
+`result` FIFO.
 `input` is a relative symbolic link to `staging`, so it remains usable when the
 same API volume is mounted at a different absolute path on the host or in
 another container. No host `/staging` mount is required.
@@ -25,16 +26,21 @@ Producers should copy beneath an excluded
 temporary directory (for example `.incoming`, which the default directory
 filter excludes) and atomically rename completed files to their final paths.
 
-Every open-and-drain of `events` returns one JSON document containing all
-events accumulated since the previous successfully delivered batch:
+Keep `events` open and parse one JSON document per line. When a reader is
+connected, each new ready event is written immediately. When no reader is
+connected or the FIFO is backpressured, records accumulate and the next
+successful write contains the complete pending batch:
 
 ```json
 {"first_sequence":1,"last_sequence":40,"events":[...40 events...]}
 ```
 
-Read until EOF; a FIFO is a byte stream, so a single `read(2)` is not guaranteed
-to contain the complete JSON document. Events are sequence numbered and also
-contain the relative path, byte count, modification time, device, and inode.
+The writer remains connected across batches. It emits a final `terminated`
+event and then closes, so EOF denotes session termination rather than a batch
+boundary. A FIFO is a byte stream, so clients must buffer through newline
+instead of assuming one `read(2)` returns one document. Events are sequence
+numbered and contain the relative path, byte count, modification time, device,
+and inode.
 The files remain in shared staging after the API request expires. This endpoint
 reports readiness only: it does not copy to `/uploads`, guarantee persistent
 storage, or report that a consumer has processed a file. After the event
@@ -44,13 +50,19 @@ Cleanup unlinks the request-local `input` link but does not traverse it or
 remove the sibling `.staging` content. Consumers that need files after request
 cleanup must retain the corresponding path in the shared API volume.
 
-`EventSessionIdleTimeoutSec` defaults to one second and controls how long the
-processor remains available for another group of files after delivering its
-latest event batch. Once that idle period expires, the processor emits its
-final summary. `WaitResultConsumptionTimeoutSec` retains its common deferred
-API meaning: how long the executor waits for a reader of the final `result`
-FIFO. It also bounds how long an undelivered event batch can wait for an
-`events` reader.
+After the producer has finished copying and renaming files, write a non-empty
+message to `seal`. The processor performs final reconciliation, sends remaining
+events and the terminal event, and emits its final summary. As a compatibility
+fallback, `WaitQueryUpdateTimeoutSec` defaults to five seconds and seals after
+that interval passes without a newly observed filesystem entity. New regular,
+filtered, and unsupported entries all reset this timer.
+
+Unread event records do not prevent sealing. The final result reports generated,
+delivered, and undelivered counts. `WaitResultConsumptionTimeoutSec` retains its
+common deferred API meaning: after processor completion, it is how long the
+executor waits for a reader of the final `result` FIFO before cleanup. Just
+before cleanup, the executor tries for one second to wake a late `events` reader
+with a `transport_closed` JSON record.
 
 ## Directory upload
 

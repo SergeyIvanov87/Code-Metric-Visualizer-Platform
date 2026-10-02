@@ -117,6 +117,35 @@ def publish(result_fifo, result_path, timeout):
     return False
 
 
+def notify_event_stream_closing(report, request_directory, timeout=1):
+    """Best-effort wake-up for a late reader before event-request cleanup."""
+    if (not isinstance(report, dict)
+            or report.get("events_type", "").lower() != "fifo"
+            or "events" not in report):
+        return False
+    events_fifo = Path(report["events"])
+    try:
+        if events_fifo.parent != request_directory or not events_fifo.is_fifo():
+            return False
+    except OSError:
+        return False
+    payload = json.dumps({
+        "type": "transport_closed", "reason": "request cleanup",
+    }, separators=(",", ":")).encode() + b"\n"
+    deadline = time.monotonic() + timeout
+    while not stopping and time.monotonic() < deadline:
+        descriptor = None
+        try:
+            descriptor = os.open(events_fifo, os.O_WRONLY | os.O_NONBLOCK)
+            return os.write(descriptor, payload) == len(payload)
+        except OSError:
+            time.sleep(0.02)
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+    return False
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--processor", required=True)
@@ -135,6 +164,7 @@ def main(argv=None):
     # then wait for a client to open async_result without blocking the processor
     # or keeping it alive for the result-consumption timeout.
     result_path = request_directory / "processor_result"
+    report = None
     try:
         (request_directory / "executor.json").write_text(json.dumps({
             "pid": os.getpid(), "session_id": options.session_id,
@@ -159,6 +189,7 @@ def main(argv=None):
     finally:
         if processor is not None and processor.poll() is None:
             processor.terminate()
+        notify_event_stream_closing(report, request_directory)
         shutil.rmtree(request_directory, ignore_errors=True)
         try:
             Path(options.session_lock).rmdir()
