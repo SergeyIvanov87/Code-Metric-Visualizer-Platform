@@ -15,6 +15,7 @@ import time
 MAX_PATH_BYTES = 1024
 MAX_DEPTH = 64
 MAX_FILES = 10000
+MAX_DIRECTORIES = 10000
 MAX_TOTAL_BYTES = 100 * 1024 * 1024 * 1024
 SCAN_INTERVAL = 0.05
 DEFAULT_DIR_SKIP_REGEX = r"(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)"
@@ -110,6 +111,7 @@ def scan(stage, patterns, previously_observed):
     file_allow, file_skip, dir_allow, dir_skip = patterns
     found = {}
     observed = set()
+    admitted_directories = 0
     for root, directories, files in os.walk(stage, followlinks=False):
         root_path = Path(root)
         for name in directories[:]:
@@ -126,6 +128,8 @@ def scan(stage, patterns, previously_observed):
                        and not dir_skip.fullmatch(relative))
             if not allowed:
                 directories.remove(name)
+            else:
+                admitted_directories += 1
         for name in files:
             node = root_path / name
             relative = safe_relative(stage, node)
@@ -140,6 +144,8 @@ def scan(stage, patterns, previously_observed):
                 found[relative] = (
                     info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
                 )
+    if admitted_directories > MAX_DIRECTORIES:
+        raise ValueError("shared staging directory admission limit exceeded")
     if len(found) > MAX_FILES or sum(item[2] for item in found.values()) > MAX_TOTAL_BYTES:
         raise ValueError("shared staging admission limit exceeded")
     return found, observed, bool(observed - previously_observed)

@@ -147,6 +147,26 @@ def test_preflight_creates_portable_input_link_on_shared_api_volume():
         assert (staging_path / "survives.txt").read_text() == "shared content"
 
 
+def test_scan_enforces_documented_directory_admission_limit():
+    processor = load_processor_module()
+    patterns, _ = processor.validate(arguments())
+    with tempfile.TemporaryDirectory() as temporary:
+        stage = Path(temporary)
+        (stage / "one").mkdir()
+        (stage / "two").mkdir()
+        original_limit = processor.MAX_DIRECTORIES
+        processor.MAX_DIRECTORIES = 1
+        try:
+            try:
+                processor.scan(stage, patterns, set())
+            except ValueError as error:
+                assert "directory admission limit" in str(error)
+            else:
+                raise AssertionError("directory admission limit was not enforced")
+        finally:
+            processor.MAX_DIRECTORIES = original_limit
+
+
 def test_events_fifo_streams_immediately_and_explicit_seal_terminates_it():
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
