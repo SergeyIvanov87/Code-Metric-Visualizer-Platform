@@ -8,6 +8,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from types import SimpleNamespace
 
@@ -19,6 +20,17 @@ else:
     ROOT = Path(__file__).parents[4]
     PROCESSOR = ROOT / "utility/file-uploader/streaming_directory_events_processor.py"
     SCHEMA = ROOT / "utility/file-uploader/API/streaming_directory_events.json"
+
+if Path("/opt/modules/directory_event_protocol.py").exists():
+    PROTOCOL_MODULE = Path("/opt/modules/directory_event_protocol.py")
+else:
+    PROTOCOL_MODULE = Path(__file__).parents[4] / "common/modules/directory_event_protocol.py"
+protocol_spec = importlib.util.spec_from_file_location(
+    "directory_event_protocol", PROTOCOL_MODULE,
+)
+protocol_module = importlib.util.module_from_spec(protocol_spec)
+protocol_spec.loader.exec_module(protocol_module)
+parse_directory_event_stream = protocol_module.parse_directory_event_stream
 
 
 def arguments(session="events-test"):
@@ -340,3 +352,84 @@ def test_running_container_delivers_forty_events_without_copying_to_uploads():
         # Shared-staging content intentionally survives request cleanup, so the
         # integration client releases its own test data.
         shutil.rmtree(staging, ignore_errors=True)
+
+
+def test_running_container_streams_every_file_from_near_limit_tree():
+    api = Path(
+        "/api/api.pmccabe_collector.restapi.org/file-uploader/"
+        "streaming_directory_events/POST"
+    )
+    if not Path("/api").is_dir():
+        return
+
+    processor = load_processor_module()
+    capacity = min(processor.MAX_FILES, processor.MAX_DIRECTORIES)
+    near_limit = (
+        capacity - max(1, capacity // 100)
+    ) // 6
+    assert 0 < near_limit <= processor.MAX_FILES
+    assert near_limit <= processor.MAX_DIRECTORIES
+    wait_for_fifo(api / "exec", timeout=30)
+    session = f"directory-events-near-limit-{os.getpid()}-{time.time_ns()}"
+
+    with tempfile.TemporaryDirectory() as temporary:
+        source = Path(temporary) / "source-tree"
+        source.mkdir()
+        (source / "payload.bin").write_bytes(os.urandom(32))
+        for number in range(near_limit - 1):
+            directory = source / f"directory-{number:05d}"
+            directory.mkdir()
+            (directory / "payload.bin").write_bytes(os.urandom(32))
+        expected_paths = {
+            f"{source.name}/{path.relative_to(source).as_posix()}"
+            for path in source.rglob("*") if path.is_file()
+        }
+        assert len(expected_paths) == near_limit
+
+        (api / "exec").write_text(
+            f"SESSION_ID={session} WaitInitialQueryTimeoutSec=60 "
+            "WaitQueryUpdateTimeoutSec=10 "
+            "WaitResultConsumptionTimeoutSec=900"
+        )
+        report = json.loads(
+            wait_for_fifo(api / f"result.json_{session}").read_text()
+        )
+        staging = Path(report["staging"])
+        parsed_events = []
+        reader_errors = []
+        reader_ready = threading.Event()
+
+        def consume_events():
+            try:
+                with Path(report["events"]).open("rb", buffering=0) as stream:
+                    reader_ready.set()
+                    parsed_events.extend(parse_directory_event_stream(stream))
+            except BaseException as error:
+                reader_errors.append(error)
+                reader_ready.set()
+
+        reader = threading.Thread(target=consume_events, daemon=True)
+        reader.start()
+        try:
+            assert reader_ready.wait(timeout=10)
+            assert not reader_errors
+            shutil.copytree(source, Path(report["input"]) / source.name)
+            Path(report["seal"]).write_text("seal\n")
+            reader.join(timeout=180)
+            assert not reader.is_alive()
+            assert not reader_errors
+
+            ready_events = [
+                event for event in parsed_events if event.get("status") == "ready"
+            ]
+            assert len(ready_events) == near_limit
+            assert {event["path"] for event in ready_events} == expected_paths
+            assert parsed_events[-1]["status"] == "terminated"
+
+            result = json.loads(Path(report["result"]).read_text())
+            assert result["error_code"] == "0", result
+            assert result["events_generated"] == near_limit
+            assert result["events_delivered"] == near_limit
+            assert result["events_undelivered"] == 0
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
