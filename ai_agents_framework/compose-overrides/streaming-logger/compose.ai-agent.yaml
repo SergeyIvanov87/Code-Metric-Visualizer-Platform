@@ -1,0 +1,9 @@
+services:
+  ai_agent:
+    logging: &streaming-logging
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
+  ai_agent_rag_db:
+    logging: *streaming-logging
+  ai_agent_docs_dispatcher:
+    logging: *streaming-logging
