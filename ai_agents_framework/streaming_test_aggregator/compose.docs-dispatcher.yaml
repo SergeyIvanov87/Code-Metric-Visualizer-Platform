@@ -1,0 +1,7 @@
+services:
+  docs-dispatcher:
+    logging: &streaming-logging
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
+  docs-dispatcher-functional-tester:
+    logging: *streaming-logging

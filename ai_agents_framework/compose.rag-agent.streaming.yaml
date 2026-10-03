@@ -1,0 +1,63 @@
+# Agentic RAG stack connected to the streaming test aggregator's Envoy syslog endpoint.
+# The logger and aggregator subsystems must be started before these services.
+services:
+  rag-agent:
+    extends:
+      file: ./ai_agent/compose-default.prod.yaml
+      service: ai_agent
+    environment:
+      VECTORDB_HOST: rag-db
+      VECTORDB_PORT: 8000
+    depends_on:
+      rag-db:
+        condition: service_started
+      rag-doc-storage-dispatcher:
+        condition: service_started
+    logging: &streaming-logging
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+
+  rag-db:
+    extends:
+      file: ./RAG/compose.yaml
+      service: rag-db
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.project.ai-agents-framework.rag.db:/mnt
+
+  rag-doc-storage-dispatcher:
+    extends:
+      file: ./docs_dispatcher/compose-default.prod.yaml
+      service: docs_dispatcher
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
+
+volumes:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true
+  api.pmccabe_collector.project.ai-agents-framework.rag.db:
+    name: api.pmccabe_collector.project.ai-agents-framework.rag.db
+    external: true
+  api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage:
+
+secrets:
+  backend_mysql_db_login:
+    file: ./docs_dispatcher/sources/backend/mysql/default_user.txt
+  backend_mysql_db_password:
+    file: ./docs_dispatcher/sources/backend/mysql/default_pwd.txt
