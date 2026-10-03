@@ -12,6 +12,11 @@ jobs:
     timeout-minutes: 40
     env:
       TEST_EXECUTION_ID: agentic-rag-${{ github.run_id }}-${{ github.run_attempt }}
+      # Keep the single capture open across all three sequential RAG suites.
+      WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC: 1800000
+      WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC: 1800000
+      MAX_WAIT_MSEC_UNTIL_FINISH: 2400000
+      MAX_WAIT_SECONDS: 2400
 
     steps:
     - uses: actions/checkout@v4
@@ -80,6 +85,12 @@ jobs:
         -f ai_agents_framework/ai_agent/test/compose-functional.prod.yaml
         -f ai_agents_framework/streaming_test_aggregator/compose.ai-agent.yaml
         up --abort-on-container-exit --exit-code-from ai_agent_rag_functional_tester
+    - name: Finish streaming capture after all Agentic RAG tests
+      shell: bash
+      run: |
+        set -euo pipefail
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml \
+          stop --timeout 180 tap_subscriber
     - name: Verify aggregated Agentic RAG test logs
       shell: bash
       run: |

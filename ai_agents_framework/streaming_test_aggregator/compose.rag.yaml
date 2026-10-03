@@ -5,3 +5,8 @@ services:
       options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
   rag-functional-tester:
     logging: *streaming-logging
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
