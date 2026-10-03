@@ -48,7 +48,7 @@ flowchart LR
     Dispatcher -->|select configured backend| Backend[Persistence backend]
 
     Backend -->|authoritative content and hierarchy| FS[(Docker volume<br/>filesystem)]
-    Backend -->|allocate IDs; mirror metadata| SQL[(MySQL<br/>metadata index)]
+    Backend -->|allocate IDs and mirror metadata| SQL[(MySQL<br/>metadata index)]
 
     Agent -->|embeddings and routing metadata| Chroma[(Chroma<br/>vector index)]
     Agent -->|read chunk by ID| Dispatcher
@@ -117,7 +117,7 @@ sequenceDiagram
     Client->>Agent: add document (URI/type/metadata/content)
     Agent->>Agent: split text and calculate embeddings
     Agent->>Dispatcher: put_doc(full document)
-    Dispatcher->>SQL: insert metadata row; allocate document ID
+    Dispatcher->>SQL: insert metadata row and allocate document ID
     SQL-->>Dispatcher: document ID
     Dispatcher->>FS: write document and hierarchy record
     Dispatcher->>SQL: finalize mirrored fields
