@@ -1,0 +1,10 @@
+Retrieval-augmented generation (RAG) is a technique that enables large language models (LLMs) to retrieve and incorporate new information from external data sources.
+With RAG, LLMs first refer to a specified set of documents, then respond to user queries.
+These documents supplement information from the LLM's pre-existing training data.
+This allows LLMs to use domain-specific and/or updated information that is not available in the training data.
+For example, this helps LLM-based chatbots access internal company data or generate responses based on authoritative sources.
+
+RAG improves large language models (LLMs) by incorporating information retrieval before generating responses.
+Unlike LLMs that rely on static training data, RAG pulls relevant text from databases, uploaded documents, or web sources.
+According to Ars Technica, "RAG is a way of improving LLM performance, in essence by blending the LLM process with a web search or other document look-up process to help LLMs stick to the facts."
+This method helps reduce AI hallucinations, which have caused chatbots to describe policies that don't exist, or recommend nonexistent legal cases to lawyers that are looking for citations to support their arguments.

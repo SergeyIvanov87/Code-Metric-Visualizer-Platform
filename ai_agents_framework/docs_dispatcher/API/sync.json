@@ -1,0 +1,12 @@
+{
+    "Content-Type" : "application/json",
+    "Method" : "PUT",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/sync/v1",
+    "Params": {
+    },
+    "Description": {
+        "header": "Sync persistent storage",
+        "body": "Returns a number of synchronized objects",
+        "footer": ""
+    }
+}

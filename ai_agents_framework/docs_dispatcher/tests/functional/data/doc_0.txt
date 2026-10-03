@@ -1,0 +1,1 @@
+this is the document for test called "doc_0.txt"

@@ -61,7 +61,7 @@ def build_ask_dependency_api_service(dep_api_schema_file, output_services_path, 
     req_name, request_data = deserialize_api_request_from_schema_file(dep_api_schema_file)
 
     #generate CLI API server only
-    cli_server_content = build_api_services.create_cli_server_content_from_schema(req_name, request_data)
+    cli_server_content = build_api_services.create_cli_server_content_from_schema(req_name, request_data, output_exec_script_path)
     api_server_script_file_path = build_api_services.get_api_cli_service_script_path(generated_api_server_scripts_path, req_name)
     with open(api_server_script_file_path, "w") as server_file:
         server_file.write("#!/bin/bash\n\n")

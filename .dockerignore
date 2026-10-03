@@ -1,4 +1,8 @@
 assets
+**/.cache
+**/.config
+**/.chroma
+**/.local
 diagrams
 HowTo
 *.yaml

@@ -1,0 +1,13 @@
+{
+    "Content-Type": "application/json",
+    "Method": "PUT",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/sync/v1",
+    "Params": {
+        "-batch_size": "100"
+    },
+    "Description": {
+        "header": "Synchronize file storage, the document DB, and Chroma",
+        "body": "First synchronizes persistent file storage into the document DB, then retrieves documents from rag_get_docs in batches controlled by -batch_size. Each batch is read, embedded, and upserted into Chroma before the offset advances. After all batches are processed, Chroma records whose IDs are not current chunk IDs are deleted. Success and error responses both include confirmed created, updated, and deleted Chroma ID arrays, synchronized_count, current Chroma size, and the completed filesystem_db_sync result when available.",
+        "footer": ""
+    }
+}
