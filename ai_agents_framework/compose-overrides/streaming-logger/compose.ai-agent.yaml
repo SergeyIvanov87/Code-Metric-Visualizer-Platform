@@ -7,5 +7,3 @@ services:
     logging: *streaming-logging
   ai_agent_docs_dispatcher:
     logging: *streaming-logging
-  ai_agent_rag_functional_tester:
-    logging: *streaming-logging

@@ -3,7 +3,7 @@
 services:
   rag-agent:
     extends:
-      file: ./ai_agent/compose-default.prod.yaml
+      file: ../../ai_agent/compose-default.prod.yaml
       service: ai_agent
     environment:
       VECTORDB_HOST: rag-db
@@ -23,7 +23,7 @@ services:
 
   rag-db:
     extends:
-      file: ./RAG/compose.yaml
+      file: ../../RAG/compose.yaml
       service: rag-db
     logging: *streaming-logging
     networks:
@@ -33,7 +33,7 @@ services:
 
   rag-doc-storage-dispatcher:
     extends:
-      file: ./docs_dispatcher/compose-default.prod.yaml
+      file: ../../docs_dispatcher/compose-default.prod.yaml
       service: docs_dispatcher
     logging: *streaming-logging
     networks:
@@ -58,6 +58,6 @@ volumes:
 
 secrets:
   backend_mysql_db_login:
-    file: ./docs_dispatcher/sources/backend/mysql/default_user.txt
+    file: ../../docs_dispatcher/sources/backend/mysql/default_user.txt
   backend_mysql_db_password:
-    file: ./docs_dispatcher/sources/backend/mysql/default_pwd.txt
+    file: ../../docs_dispatcher/sources/backend/mysql/default_pwd.txt

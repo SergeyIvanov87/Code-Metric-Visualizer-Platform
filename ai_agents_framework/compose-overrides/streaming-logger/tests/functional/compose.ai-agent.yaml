@@ -1,0 +1,5 @@
+services:
+  ai_agent_rag_functional_tester:
+    logging:
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }

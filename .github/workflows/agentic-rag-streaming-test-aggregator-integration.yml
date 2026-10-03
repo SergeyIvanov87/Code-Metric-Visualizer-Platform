@@ -35,16 +35,22 @@ jobs:
         docker volume create -d local -o type=none -o device="${GITHUB_WORKSPACE}/log" -o o=bind api.pmccabe_collector.logger.org
         docker volume create api.pmccabe_collector.restapi.org
         docker volume create api.pmccabe_collector.project.ai-agents-framework.rag.db
+    - name: Build AI RAG docs dispatcher Docker image[prod]
+      run: docker build -f ai_agents_framework/docs_dispatcher/Dockerfile -t docs-dispatcher:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
+    - name: Build AI agent Docker image
+      run: docker build -f ai_agents_framework/ai_agent/Dockerfile -t ai-agent:$DATE .
+      env:
+        DATE: ${{ steps.date.outputs.date }}
     - name: Build all required services, including Agentic RAG
       shell: bash
       run: |
         set -euo pipefail
-        docker build -f ai_agents_framework/docs_dispatcher/Dockerfile -t docs-dispatcher:$DATE .
-        docker build -f ai_agents_framework/ai_agent/Dockerfile -t ai-agent:$DATE .
         docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml build
         docker compose -f ai_agents_framework/RAG/compose-functional.test.yaml build
         docker compose -f ai_agents_framework/ai_agent/test/compose-functional.prod.yaml build
-        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml build
+        docker compose -f ai_agents_framework/compose-overrides/streaming-logger/compose.rag-agent.yaml build
         docker compose -f common/images/compose-logger-subsystem.yaml build
         docker compose -f common/images/compose-test-aggregator-subsystem.yaml build
       env:
@@ -58,32 +64,24 @@ jobs:
         docker compose -f common/images/compose-test-aggregator-subsystem.yaml up --detach \
           kafka proxy-ready log_event_aggregator tap_subscriber
     - name: Launch Agentic RAG services
-      run: docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml up --detach --remove-orphans rag-db rag-doc-storage-dispatcher rag-agent
-    - name: Build AI RAG docs dispatcher Docker image[prod]
-      run: docker build -f ai_agents_framework/docs_dispatcher/Dockerfile -t docs-dispatcher:$DATE .
-      env:
-        DATE: ${{ steps.date.outputs.date }}
+      run: docker compose -f ai_agents_framework/compose-overrides/streaming-logger/compose.rag-agent.yaml up --detach --remove-orphans rag-db rag-doc-storage-dispatcher rag-agent
     - name: Test AI RAG docs dispatcher Docker image[prod]
       run: >-
         docker compose
         -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml
-        -f ai_agents_framework/streaming_test_aggregator/compose.docs-dispatcher.yaml
+        -f ai_agents_framework/compose-overrides/streaming-logger/tests/compose.docs-dispatcher.yaml
         up --abort-on-container-exit --exit-code-from docs-dispatcher-functional-tester
     - name: Test AI RAG impl
       run: >-
         docker compose
         -f ai_agents_framework/RAG/compose-functional.test.yaml
-        -f ai_agents_framework/streaming_test_aggregator/compose.rag.yaml
+        -f ai_agents_framework/compose-overrides/streaming-logger/tests/compose.rag.yaml
         up --abort-on-container-exit --exit-code-from rag-functional-tester
-    - name: Build AI agent Docker image
-      run: docker build -f ai_agents_framework/ai_agent/Dockerfile -t ai-agent:$DATE .
-      env:
-        DATE: ${{ steps.date.outputs.date }}
     - name: Test AI agent RAG filesystem API
       run: >-
         docker compose
         -f ai_agents_framework/ai_agent/test/compose-functional.prod.yaml
-        -f ai_agents_framework/streaming_test_aggregator/compose.ai-agent.yaml
+        -f ai_agents_framework/compose-overrides/streaming-logger/tests/compose.ai-agent.yaml
         up --abort-on-container-exit --exit-code-from ai_agent_rag_functional_tester
     - name: Finish streaming capture after all Agentic RAG tests
       shell: bash
@@ -113,17 +111,17 @@ jobs:
         docker compose -f common/images/compose-test-aggregator-subsystem.yaml cp \
           log_event_aggregator:/logs/. "${diagnostics}/aggregator/" 2>/dev/null || true
         for compose_file in \
-          ai_agents_framework/compose.rag-agent.streaming.yaml \
+          ai_agents_framework/compose-overrides/streaming-logger/compose.rag-agent.yaml \
           common/images/compose-logger-subsystem.yaml \
           common/images/compose-test-aggregator-subsystem.yaml; do
           slug=$(echo "${compose_file}" | tr '/.' '--')
           docker compose -f "${compose_file}" ps --all > "${diagnostics}/${slug}-ps.txt" 2>&1
           docker compose -f "${compose_file}" logs --no-color > "${diagnostics}/${slug}-logs.txt" 2>&1
         done
-        docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml -f ai_agents_framework/streaming_test_aggregator/compose.docs-dispatcher.yaml down --volumes --remove-orphans || true
-        docker compose -f ai_agents_framework/RAG/compose-functional.test.yaml -f ai_agents_framework/streaming_test_aggregator/compose.rag.yaml down --volumes --remove-orphans || true
-        docker compose -f ai_agents_framework/ai_agent/test/compose-functional.prod.yaml -f ai_agents_framework/streaming_test_aggregator/compose.ai-agent.yaml down --volumes --remove-orphans || true
-        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml down --remove-orphans || true
+        docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml -f ai_agents_framework/compose-overrides/streaming-logger/tests/compose.docs-dispatcher.yaml down --volumes --remove-orphans || true
+        docker compose -f ai_agents_framework/RAG/compose-functional.test.yaml -f ai_agents_framework/compose-overrides/streaming-logger/tests/compose.rag.yaml down --volumes --remove-orphans || true
+        docker compose -f ai_agents_framework/ai_agent/test/compose-functional.prod.yaml -f ai_agents_framework/compose-overrides/streaming-logger/tests/compose.ai-agent.yaml down --volumes --remove-orphans || true
+        docker compose -f ai_agents_framework/compose-overrides/streaming-logger/compose.rag-agent.yaml down --remove-orphans || true
         docker compose -f common/images/compose-test-aggregator-subsystem.yaml down --volumes --remove-orphans || true
         docker compose -f common/images/compose-logger-subsystem.yaml down --volumes --remove-orphans || true
         docker volume rm api.pmccabe_collector.restapi.org api.pmccabe_collector.project.ai-agents-framework.rag.db 2>/dev/null || true

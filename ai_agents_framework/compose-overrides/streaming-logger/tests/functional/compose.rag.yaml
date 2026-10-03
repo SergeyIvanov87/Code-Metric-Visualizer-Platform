@@ -1,0 +1,5 @@
+services:
+  rag-functional-tester:
+    logging:
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
