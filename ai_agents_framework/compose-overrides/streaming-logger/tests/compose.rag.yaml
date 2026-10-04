@@ -1,0 +1,4 @@
+# Paths are resolved from the primary RAG Compose file.
+include:
+  - ../compose-overrides/streaming-logger/compose.rag.yaml
+  - ../compose-overrides/streaming-logger/tests/functional/compose.rag.yaml

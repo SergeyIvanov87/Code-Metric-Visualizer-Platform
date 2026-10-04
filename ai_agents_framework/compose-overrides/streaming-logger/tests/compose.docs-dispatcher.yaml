@@ -1,0 +1,4 @@
+# Paths are resolved from the primary docs-dispatcher Compose file.
+include:
+  - ../compose-overrides/streaming-logger/compose.docs-dispatcher.yaml
+  - ../compose-overrides/streaming-logger/tests/functional/compose.docs-dispatcher.yaml

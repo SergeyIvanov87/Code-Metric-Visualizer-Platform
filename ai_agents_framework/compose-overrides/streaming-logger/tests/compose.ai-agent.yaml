@@ -1,0 +1,4 @@
+# Paths are resolved from the primary ai_agent/test Compose file.
+include:
+  - ../../compose-overrides/streaming-logger/compose.ai-agent.yaml
+  - ../../compose-overrides/streaming-logger/tests/functional/compose.ai-agent.yaml
