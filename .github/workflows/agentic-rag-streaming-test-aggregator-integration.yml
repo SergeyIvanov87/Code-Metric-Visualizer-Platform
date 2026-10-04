@@ -1,0 +1,106 @@
+name: Agentic RAG Streaming Test Aggregator Integration CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build_and_test_agentic_rag_with_streaming_aggregator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TEST_EXECUTION_ID: agentic-rag-${{ github.run_id }}-${{ github.run_attempt }}
+      WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC: 1800000
+      WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC: 1800000
+      MAX_WAIT_MSEC_UNTIL_FINISH: 2400000
+      MAX_WAIT_SECONDS: 2400
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: Prepare shared streaming resources
+      shell: bash
+      run: |
+        mkdir -p "${GITHUB_WORKSPACE}/log" "${RUNNER_TEMP}/agentic-rag-streaming-diagnostics"
+        chmod 777 "${GITHUB_WORKSPACE}/log"
+        docker network create -d bridge api.pmccabe_collector.network
+        docker volume create -d local -o type=none -o device="${GITHUB_WORKSPACE}/log" -o o=bind api.pmccabe_collector.logger.org
+    - name: Validate Compose configurations
+      run: |
+        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml config --quiet
+        docker compose -f common/images/compose-logger-subsystem.yaml config --quiet
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml config --quiet
+    - name: Build Agentic RAG, logger, and aggregator services
+      run: |
+        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml build
+        docker compose -f common/images/compose-logger-subsystem.yaml build
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml build
+    - name: Launch streaming logger subsystem
+      run: >-
+        docker compose -f common/images/compose-logger-subsystem.yaml up --detach
+        syslog-ng-streaming envoy envoy-ready
+    - name: Launch streaming test aggregator subsystem
+      run: >-
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml up --detach
+        kafka proxy-ready log_event_aggregator tap_subscriber
+    - name: Launch Agentic RAG services
+      run: >-
+        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml up --detach
+        rag-db rag-document-storage-permissions rag-doc-storage-dispatcher
+        test_pseudo_fs rag-agent
+    - name: Test AI agent RAG filesystem API
+      run: >-
+        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml up
+        --no-deps --abort-on-container-exit
+        --exit-code-from ai-agent-rag-functional-tester
+        ai-agent-rag-functional-tester
+    - name: Finish streaming capture
+      if: ${{ !cancelled() }}
+      run: >-
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml
+        stop --timeout 180 tap_subscriber
+    - name: Verify aggregated AI-agent test logs
+      run: |
+        set -euo pipefail
+        aggregator_id=$(docker compose -f common/images/compose-test-aggregator-subsystem.yaml ps --all --quiet log_event_aggregator)
+        test -n "${aggregator_id}"
+        aggregator_exit_code=$(docker wait "${aggregator_id}")
+        if [[ "${aggregator_exit_code}" != "0" ]]; then
+          docker compose -f common/images/compose-test-aggregator-subsystem.yaml logs --no-color log_event_aggregator
+          exit "${aggregator_exit_code}"
+        fi
+    - name: Collect integration diagnostics and clean up
+      if: always()
+      shell: bash
+      run: |
+        set +e
+        diagnostics="${RUNNER_TEMP}/agentic-rag-streaming-diagnostics"
+        mkdir -p "${diagnostics}/logger-volume" "${diagnostics}/aggregator"
+        cp -a "${GITHUB_WORKSPACE}/log/." "${diagnostics}/logger-volume/" 2>/dev/null || true
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml cp \
+          log_event_aggregator:/logs/. "${diagnostics}/aggregator/" 2>/dev/null || true
+        for compose_file in \
+          ai_agents_framework/compose.rag-agent.streaming.yaml \
+          common/images/compose-logger-subsystem.yaml \
+          common/images/compose-test-aggregator-subsystem.yaml; do
+          slug=$(echo "${compose_file}" | tr '/.' '--')
+          docker compose -f "${compose_file}" ps --all > "${diagnostics}/${slug}-ps.txt" 2>&1
+          docker compose -f "${compose_file}" logs --no-color > "${diagnostics}/${slug}-logs.txt" 2>&1
+          docker compose -f "${compose_file}" config > "${diagnostics}/${slug}-config.yaml" 2>&1
+        done
+        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml down --volumes --remove-orphans || true
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml down --volumes --remove-orphans || true
+        docker compose -f common/images/compose-logger-subsystem.yaml down --volumes --remove-orphans || true
+        docker network rm api.pmccabe_collector.network 2>/dev/null || true
+        rm -rf "${GITHUB_WORKSPACE}/log"
+    - name: Upload Agentic RAG streaming diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: agentic-rag-streaming-diagnostics-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/agentic-rag-streaming-diagnostics
+        if-no-files-found: warn
+        retention-days: 14

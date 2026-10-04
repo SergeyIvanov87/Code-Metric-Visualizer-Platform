@@ -1,0 +1,111 @@
+# Agentic RAG and its AI-agent functional test connected to the streaming logger.
+# Start the logger and test-aggregator subsystems before launching this project.
+include:
+  - ../common/images/test_pseudo_fs/compose.yaml
+
+services:
+  rag-agent:
+    extends:
+      file: ./ai_agent/compose-default.prod.yaml
+      service: ai_agent
+    environment:
+      VECTORDB_HOST: rag-db
+      VECTORDB_PORT: 8000
+    depends_on:
+      rag-db:
+        condition: service_started
+      rag-doc-storage-dispatcher:
+        condition: service_started
+    logging: &streaming-logging
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-agent-api:/api
+      - rag-agent-models:/assets/models
+
+  rag-db:
+    build:
+      context: ..
+      dockerfile: ai_agents_framework/RAG/Dockerfile
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-data:/mnt
+
+  rag-doc-storage-dispatcher:
+    extends:
+      file: ./docs_dispatcher/compose-default.prod.yaml
+      service: docs_dispatcher
+    depends_on:
+      rag-document-storage-permissions:
+        condition: service_healthy
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-agent-api:/api
+      - rag-dispatcher-config:/etc/dispatcher
+      - rag-document-storage:/mnt/file_storage
+
+  rag-document-storage-permissions:
+    image: alpine:3.20.6
+    command: >
+      sh -ec "mkdir -p /mnt/file_storage;
+      chmod -R 0777 /mnt/file_storage;
+      touch /tmp/ready;
+      exec tail -f /dev/null"
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 1s
+      timeout: 1s
+      retries: 10
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-document-storage:/mnt/file_storage
+
+  test_pseudo_fs:
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+
+  ai-agent-rag-functional-tester:
+    build:
+      context: ..
+      dockerfile: ai_agents_framework/ai_agent/test/Dockerfile
+      additional_contexts:
+        test_pseudo_fs: service:test_pseudo_fs
+    environment:
+      EXIT_ONCE_DONE: "true"
+    depends_on:
+      rag-agent:
+        condition: service_started
+      test_pseudo_fs:
+        condition: service_started
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-agent-api:/api
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
+
+volumes:
+  rag-agent-api:
+  rag-agent-models:
+  rag-data:
+  rag-dispatcher-config:
+  rag-document-storage:
+
+secrets:
+  backend_mysql_db_login:
+    file: ./docs_dispatcher/tests/backend_mysql_default_user.txt
+  backend_mysql_db_password:
+    file: ./docs_dispatcher/tests/backend_mysql_default_pwd.txt
