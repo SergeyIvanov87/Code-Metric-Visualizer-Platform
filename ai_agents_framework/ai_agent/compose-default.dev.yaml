@@ -10,10 +10,20 @@ services:
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.project.ai-agents-framework.ai-agent.src:/package
       - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:/assets/models
+      - api.pmccabe_collector.ai-agent.staging:/staging
+
+  file-uploader:
+    build:
+      context: ../..
+      dockerfile: utility/file-uploader/Dockerfile
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - api.pmccabe_collector.ai-agent.staging:/staging
 
 volumes:
   api.pmccabe_collector.restapi.org:
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:
+  api.pmccabe_collector.ai-agent.staging:
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.src:
     driver: local
     driver_opts:

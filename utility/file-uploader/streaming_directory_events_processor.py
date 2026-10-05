@@ -77,8 +77,9 @@ def validate(arguments):
 
 
 def staging_root(request):
-    """Return staging beside deferred requests on their shared API volume."""
-    root = request.parent / ".staging"
+    """Return the staging volume shared with consumers such as RAG bulk add."""
+    configured = os.environ.get("STAGING_ROOT")
+    root = Path(configured) if configured else request.parent / ".staging"
     root.mkdir(mode=0o2770, exist_ok=True)
     root = root.resolve(strict=True)
     if not root.is_dir():
