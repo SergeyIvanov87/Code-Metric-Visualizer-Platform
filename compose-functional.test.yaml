@@ -136,11 +136,32 @@ services:
     volumes:
       - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
       - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models.test:/assets/models
+      - api.pmccabe_collector.project.ai-agents-framework.ai-agent.staging.test:/staging
     depends_on:
       docs-dispatcher:
         condition: service_started
       rag:
         condition: service_started
+      file-uploader:
+        condition: service_started
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  file-uploader:
+    extends:
+      file: ai_agents_framework/ai_agent/compose-default.prod.yaml
+      service: file-uploader
+    volumes:
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
+      - api.pmccabe_collector.project.ai-agents-framework.ai-agent.staging.test:/staging
+    depends_on:
+      test_aggregator:
+        condition: service_healthy
     logging:
       driver: syslog
       options:
@@ -251,6 +272,7 @@ volumes:
   api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.cfg.test:
   api.pmccabe_collector.project.ai-agents-framework.rag.test:
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.models.test:
+  api.pmccabe_collector.project.ai-agents-framework.ai-agent.staging.test:
 
 secrets:
    backend_mysql_db_login:
