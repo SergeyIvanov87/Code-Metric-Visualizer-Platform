@@ -3,6 +3,19 @@
 import api_fs_exec_utils
 import api_fs_bash_utils
 
+
+def make_script_rag_bulk_add(script, desired_file_ext=""):
+    extension = "." + desired_file_ext if desired_file_ext else ""
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), "",
+        *api_fs_exec_utils.generate_get_result_type(extension), "",
+        *api_fs_exec_utils.generate_api_node_env_init(), "",
+        *api_fs_exec_utils.generate_read_api_fs_args(), "",
+        'exec "${OPT_DIR}/deferred_query_launcher.py" --api-directory "${API_NODE}/POST" '
+        '--processor "${WORK_DIR}/rag_bulk_add.py" -- "${OVERRIDEN_CMD_ARGS[@]}"',
+    )
+    script.writelines(line + "\n" for line in body)
+
 """
 Provides a functions set which manages to generate API executor scripts
 """
@@ -143,6 +156,7 @@ def make_script_chat_help():
 def get():
     scripts_generator = {
         "rag_add": make_script_rag_add,
+        "rag_bulk_add": make_script_rag_bulk_add,
         "rag_delete": make_script_rag_delete,
         "rag_get_docs": make_script_rag_get_docs,
         "rag_sync": make_script_rag_sync,

@@ -1,0 +1,17 @@
+{
+    "Content-Type": "application/json",
+    "Method": "POST",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/bulk_add/v1",
+    "Params": {
+        "-metadata": "",
+        "WaitInitialQueryTimeoutSec": "60",
+        "WaitQueryUpdateTimeoutSec": "10",
+        "WaitResultConsumptionTimeoutSec": "60",
+        "SESSION_ID": "default"
+    },
+    "Description": {
+        "header": "Stream a directory of documents into RAG",
+        "body": "Returns a deferred request with an input directory link, an events FIFO, and an async_result FIFO. Copy completed files through input. Each successful upload is passed to rag_add and reported through events. Read async_result for the final added and failed file report.",
+        "footer": "Metadata is augmented with every component of each uploaded file path. The request seals after the uploader idle timeout."
+    }
+}
