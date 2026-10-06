@@ -10,8 +10,9 @@ RUN <<EOF
     apt-get install -y --no-install-recommends coreutils python3 python3-pip python-is-python3 dos2unix inotify-tools bash doas cmake libgomp1 gcc g++
 EOF
 
-# Keep CMake, GCC/G++, and libgomp1 for llama-cpp-python builds, including the
-# GCC host compiler/runtime used by NVIDIA CUDA builds.
+# Keep CMake, GCC/G++, and libgomp1 for llama-cpp-python source builds, including
+# the GCC host compiler/runtime used by NVIDIA CUDA. Intel's Vulkan dependencies
+# are installed conditionally in the backend selection below.
 
 WORKDIR /package
 
@@ -32,7 +33,6 @@ RUN <<EOF
       *) echo "Unsupported LLM_BACKEND: $LLM_BACKEND" >&2; exit 1 ;;
     esac
     FORCE_CMAKE=1 pip install --break-system-packages --no-cache-dir --no-binary=llama-cpp-python llama-cpp-python==0.3.16
-    pip install --break-system-packages llama-cpp-python
     pip install --break-system-packages chromadb pypdf requests pydantic tqdm
 EOF
 
