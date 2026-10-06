@@ -1,0 +1,64 @@
+# Agentic RAG services connected to the streaming logger.
+# Start the streaming logger subsystem before launching this project.
+services:
+  rag-agent:
+    extends:
+      file: ./ai_agent/compose-default.prod.yaml
+      service: ai_agent
+    environment:
+      VECTORDB_HOST: rag-db
+      VECTORDB_PORT: 8000
+    depends_on:
+      rag-db:
+        condition: service_started
+      rag-doc-storage-dispatcher:
+        condition: service_started
+    logging: &streaming-logging
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-agent-api:/api
+      - rag-agent-models:/assets/models
+
+  rag-db:
+    build:
+      context: ..
+      dockerfile: ai_agents_framework/RAG/Dockerfile
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-data:/mnt
+
+  rag-doc-storage-dispatcher:
+    extends:
+      file: ./docs_dispatcher/compose-default.prod.yaml
+      service: docs_dispatcher
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-agent-api:/api
+      - rag-dispatcher-config:/etc/dispatcher
+      - rag-document-storage:/mnt/file_storage
+
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
+
+volumes:
+  rag-agent-api:
+  rag-agent-models:
+  rag-data:
+  rag-dispatcher-config:
+  rag-document-storage:
+
+secrets:
+  backend_mysql_db_login:
+    file: ./docs_dispatcher/tests/backend_mysql_default_user.txt
+  backend_mysql_db_password:
+    file: ./docs_dispatcher/tests/backend_mysql_default_pwd.txt

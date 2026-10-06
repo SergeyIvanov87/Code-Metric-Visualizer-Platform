@@ -1,0 +1,49 @@
+name: Agentic RAG Subsystem CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build_and_test_agentic_rag_subsystems:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Clear docker environment
+      run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
+    - name: Build AI RAG docs dispatcher services[prod]
+      run: docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml build
+    - name: Test AI RAG docs dispatcher Docker image[prod]
+      run: docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml up --remove-orphans --abort-on-container-exit --exit-code-from docs-dispatcher-functional-tester
+    - name: Build AI RAG implementation services
+      run: docker compose -f ai_agents_framework/RAG/compose-functional.test.yaml build
+    - name: Test AI RAG impl
+      run: docker compose -f ai_agents_framework/RAG/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rag-functional-tester
+    - name: Collect Agentic RAG diagnostics and clean up
+      if: always()
+      shell: bash
+      run: |
+        set +e
+        diagnostics="${RUNNER_TEMP}/agentic-rag-diagnostics"
+        mkdir -p "${diagnostics}"
+        for compose_file in \
+          ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml \
+          ai_agents_framework/RAG/compose-functional.test.yaml; do
+          slug=$(echo "${compose_file}" | tr '/.' '--')
+          docker compose -f "${compose_file}" ps --all > "${diagnostics}/${slug}-ps.txt" 2>&1
+          docker compose -f "${compose_file}" logs --no-color > "${diagnostics}/${slug}-logs.txt" 2>&1
+          docker compose -f "${compose_file}" config > "${diagnostics}/${slug}-config.yaml" 2>&1
+          docker compose -f "${compose_file}" down --volumes --remove-orphans || true
+        done
+    - name: Upload Agentic RAG diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: agentic-rag-diagnostics-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/agentic-rag-diagnostics
+        if-no-files-found: warn
+        retention-days: 14
