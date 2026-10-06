@@ -1,0 +1,57 @@
+# Test overlay for compose.rag-agent.streaming.yaml.
+# Use the service Compose file first; paths are relative to ai_agents_framework/:
+# docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml \
+#   -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml up
+services:
+  rag-doc-storage-dispatcher:
+    depends_on:
+      rag-document-storage-permissions:
+        condition: service_healthy
+
+  rag-document-storage-permissions:
+    image: alpine:3.20.6
+    command: >
+      sh -ec "mkdir -p /mnt/file_storage;
+      chmod -R 0777 /mnt/file_storage;
+      touch /tmp/ready;
+      exec tail -f /dev/null"
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 1s
+      timeout: 1s
+      retries: 10
+    logging: &streaming-logging
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-document-storage:/mnt/file_storage
+
+  test_pseudo_fs:
+    extends:
+      file: ../common/images/test_pseudo_fs/compose.yaml
+      service: test_pseudo_fs
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+
+  ai-agent-rag-functional-tester:
+    build:
+      context: ..
+      dockerfile: ai_agents_framework/ai_agent/test/Dockerfile
+      additional_contexts:
+        test_pseudo_fs: service:test_pseudo_fs
+    environment:
+      EXIT_ONCE_DONE: "true"
+    depends_on:
+      rag-agent:
+        condition: service_started
+      test_pseudo_fs:
+        condition: service_started
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-agent-api:/api
+
