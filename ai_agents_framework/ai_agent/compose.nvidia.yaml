@@ -1,0 +1,24 @@
+services:
+  ai_agent:
+    extends:
+      file: compose-default.prod.yaml
+      service: ai_agent
+    build:
+      args:
+        LLM_BACKEND: nvidia
+        BASE_IMAGE: nvidia/cuda:12.4.1-devel-ubuntu24.04
+    environment:
+      AI_AGENT_INFERENCE_CONFIG: /config/inference.nvidia.json
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./config:/config:ro
+
+volumes:
+  api.pmccabe_collector.restapi.org:
+  api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:
