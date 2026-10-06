@@ -15,7 +15,6 @@ import sys
 import chromadb
 
 from langchain.agents import create_agent
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain.tools import tool
 from langchain_community.chat_models import ChatLlamaCpp
 from llama_cpp.llama_chat_format import Jinja2ChatFormatter
