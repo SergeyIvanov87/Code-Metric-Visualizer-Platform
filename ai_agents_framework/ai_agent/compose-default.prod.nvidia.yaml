@@ -6,7 +6,7 @@ services:
     build:
       args:
         LLM_BACKEND: nvidia
-        BASE_IMAGE: nvidia/cuda:12.4.1-devel-ubuntu24.04
+        BASE_IMAGE: nvidia/cuda:12.6.3-devel-ubuntu24.04
     environment:
       AI_AGENT_INFERENCE_CONFIG: /config/inference.nvidia.json
     deploy:

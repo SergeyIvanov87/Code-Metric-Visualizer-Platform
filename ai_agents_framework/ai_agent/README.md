@@ -29,7 +29,7 @@ and `VECTORDB_PORT`. To join an existing stack, add its network in an override.
 The supplied files launch agents only.
 
 NVIDIA hosts need a compatible NVIDIA driver and NVIDIA Container Toolkit
-configured for Docker. The image compiles llama.cpp with CUDA 12.4; the host
+configured for Docker. The image compiles llama.cpp with CUDA 12.6; the host
 must support this CUDA runtime. Intel hosts need a supported Intel Vulkan GPU
 and the Linux i915/xe driver; the image installs Mesa Vulkan drivers. Only the
 selected render node is passed into each container, and its host group ID gives
