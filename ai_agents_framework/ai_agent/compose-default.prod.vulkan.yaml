@@ -12,8 +12,6 @@ services:
       - ${INTEL_RENDER_DEVICE:-/dev/dri/renderD128}:/dev/dri/renderD128
     group_add:
       - "${INTEL_RENDER_GID:?Set INTEL_RENDER_GID to the host render device group ID}"
-    volumes:
-      - ./config:/config:ro
 
 volumes:
   api.pmccabe_collector.restapi.org:

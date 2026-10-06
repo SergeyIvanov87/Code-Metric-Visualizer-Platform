@@ -16,8 +16,6 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    volumes:
-      - ./config:/config:ro
 
 volumes:
   api.pmccabe_collector.restapi.org:

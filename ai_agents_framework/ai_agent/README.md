@@ -12,16 +12,16 @@ Run these commands from `ai_agents_framework/ai_agent`:
 
 ```sh
 # Legacy CPU inference
- docker compose -f compose.cpu.yaml up -d --build --scale ai_agent=2
+ docker compose -f compose-default.prod.yaml up -d --build --scale ai_agent=2
 # NVIDIA CUDA inference
- docker compose -f compose.nvidia.yaml up -d --build --scale ai_agent=2
+ docker compose -f compose-default.prod.nvidia.yaml up -d --build --scale ai_agent=2
 # Intel integrated graphics through Vulkan (Linux)
  export INTEL_RENDER_DEVICE=/dev/dri/renderD128
  export INTEL_RENDER_GID=$(stat -c '%g' "$INTEL_RENDER_DEVICE")
- docker compose -f compose.intel.yaml up -d --build --scale ai_agent=2
+ docker compose -f compose-default.prod.vulkan.yaml up -d --build --scale ai_agent=2
 ```
 
-These files extend the production agent service, preserve its API/model volumes,
+The GPU variants extend the CPU production agent service, preserve its API/model volumes,
 and allow multiple replicas without fixed container names or ports. They require
 an accessible `rag-db:8000` and the existing API dispatcher setup on the same
 Compose network. To use an external database, add an override for `VECTORDB_HOST`
