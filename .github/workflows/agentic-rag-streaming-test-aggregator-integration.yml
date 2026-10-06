@@ -100,7 +100,9 @@ jobs:
         docker compose -f common/images/compose-test-aggregator-subsystem.yaml down --volumes --remove-orphans || true
         docker compose -f common/images/compose-logger-subsystem.yaml down --volumes --remove-orphans || true
         docker network rm api.pmccabe_collector.network 2>/dev/null || true
-        rm -rf "${GITHUB_WORKSPACE}/log"
+        # The logger container can leave files inaccessible to the runner user.
+        sudo -n rm -rf -- "${GITHUB_WORKSPACE}/log" || \
+          echo "::warning::Could not remove the streaming logger directory during cleanup"
     - name: Upload Agentic RAG streaming diagnostics
       if: always()
       uses: actions/upload-artifact@v4
