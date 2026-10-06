@@ -21,7 +21,6 @@ WORKDIR /package
 ENV PYTHONNOUSERSITE=1
 
 RUN <<EOF
-<<<<<<< HEAD
     set -e
     pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain-text-splitters tiktoken sentence-transformers
     case "$LLM_BACKEND" in
