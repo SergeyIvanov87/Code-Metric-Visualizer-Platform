@@ -12,6 +12,9 @@ import multiprocessing
 import os
 import sys
 
+import llama_cpp
+from inference_config import load_inference_config, model_options
+
 import chromadb
 
 from langchain.agents import create_agent
@@ -78,19 +81,18 @@ def load_null_safe_qwen_model(
 ) -> ChatLlamaCpp:
     """Load a Qwen GGUF with the standalone null-safe chat template."""
 
+    options = model_options(load_inference_config(), llama_cpp)
     chat_handler = create_null_safe_qwen_chat_handler(chat_template_path)
 
+    backend_options = options.pop("model_kwargs")
     return ChatLlamaCpp(
         model_path=str(model_path.as_posix()),
         temperature=0,
         max_tokens=1024,
         top_p=0.9,
         repeat_penalty=1.1,
-        n_ctx=8192,
-        n_batch=512,
-        n_threads=max(1, multiprocessing.cpu_count() - 1),
-        n_gpu_layers=-1,
-        model_kwargs={"chat_handler": chat_handler},
+        **options,
+        model_kwargs={**backend_options, "chat_handler": chat_handler},
         verbose=True,
     )
 

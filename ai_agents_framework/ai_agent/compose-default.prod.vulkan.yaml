@@ -1,0 +1,18 @@
+services:
+  ai_agent:
+    extends:
+      file: compose-default.prod.yaml
+      service: ai_agent
+    build:
+      args:
+        LLM_BACKEND: intel
+    environment:
+      AI_AGENT_INFERENCE_CONFIG: /config/inference.intel.json
+    devices:
+      - ${INTEL_RENDER_DEVICE:-/dev/dri/renderD128}:/dev/dri/renderD128
+    group_add:
+      - "${INTEL_RENDER_GID:?Set INTEL_RENDER_GID to the host render device group ID}"
+
+volumes:
+  api.pmccabe_collector.restapi.org:
+  api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:

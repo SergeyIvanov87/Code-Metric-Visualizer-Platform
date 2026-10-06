@@ -27,12 +27,9 @@ services:
       driver: "json-file"
 
   rag-agent:
-    build:
-      context: ../
-      dockerfile: ./ai_agents_framework/ai_agent/Dockerfile
-    environment:
-      - VECTORDB_HOST=rag-db
-      - VECTORDB_PORT=8000
+    extends:
+      file: ./ai_agent/compose-default.prod.yaml
+      service: ai_agent
     depends_on:
       - syslog-ng
     hostname: rag-agent
@@ -45,7 +42,6 @@ services:
       - api.pmccabe_collector.network
     volumes:
       - api.pmccabe_collector.restapi.org:/api
-      - api.pmccabe_collector.project.ai-agents-framework.src:/package
 
   rag-db:
     extends:
@@ -99,7 +95,6 @@ volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
-  api.pmccabe_collector.project.ai-agents-framework.src:
-    name: api.pmccabe_collector.ai_agent.src
-    external: true
+  api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:
   api.pmccabe_collector.project.ai-agents-framework.rag.db:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage:

@@ -3,10 +3,14 @@ services:
     build:
       context: ../..
       dockerfile: ai_agents_framework/ai_agent/Dockerfile
+      args:
+        LLM_BACKEND: cpu
     environment:
       VECTORDB_HOST: rag-db
       VECTORDB_PORT: 8000
+      AI_AGENT_INFERENCE_CONFIG: /config/inference.cpu.json
     volumes:
+      - ./config:/config:ro
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:/assets/models
 
