@@ -1,8 +1,5 @@
 # Agentic RAG and its AI-agent functional test connected to the streaming logger.
 # Start the logger and test-aggregator subsystems before launching this project.
-include:
-  - ../common/images/test_pseudo_fs/compose.yaml
-
 services:
   rag-agent:
     extends:
@@ -69,6 +66,9 @@ services:
       - rag-document-storage:/mnt/file_storage
 
   test_pseudo_fs:
+    extends:
+      file: ../common/images/test_pseudo_fs/compose.yaml
+      service: test_pseudo_fs
     logging: *streaming-logging
     networks:
       - api.pmccabe_collector.network
