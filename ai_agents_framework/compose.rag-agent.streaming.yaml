@@ -1,5 +1,5 @@
-# Agentic RAG and its AI-agent functional test connected to the streaming logger.
-# Start the logger and test-aggregator subsystems before launching this project.
+# Agentic RAG services connected to the streaming logger.
+# Start the streaming logger subsystem before launching this project.
 services:
   rag-agent:
     extends:
@@ -36,9 +36,6 @@ services:
     extends:
       file: ./docs_dispatcher/compose-default.prod.yaml
       service: docs_dispatcher
-    depends_on:
-      rag-document-storage-permissions:
-        condition: service_healthy
     logging: *streaming-logging
     networks:
       - api.pmccabe_collector.network
@@ -47,50 +44,6 @@ services:
       - rag-dispatcher-config:/etc/dispatcher
       - rag-document-storage:/mnt/file_storage
 
-  rag-document-storage-permissions:
-    image: alpine:3.20.6
-    command: >
-      sh -ec "mkdir -p /mnt/file_storage;
-      chmod -R 0777 /mnt/file_storage;
-      touch /tmp/ready;
-      exec tail -f /dev/null"
-    healthcheck:
-      test: ["CMD", "test", "-f", "/tmp/ready"]
-      interval: 1s
-      timeout: 1s
-      retries: 10
-    logging: *streaming-logging
-    networks:
-      - api.pmccabe_collector.network
-    volumes:
-      - rag-document-storage:/mnt/file_storage
-
-  test_pseudo_fs:
-    extends:
-      file: ../common/images/test_pseudo_fs/compose.yaml
-      service: test_pseudo_fs
-    logging: *streaming-logging
-    networks:
-      - api.pmccabe_collector.network
-
-  ai-agent-rag-functional-tester:
-    build:
-      context: ..
-      dockerfile: ai_agents_framework/ai_agent/test/Dockerfile
-      additional_contexts:
-        test_pseudo_fs: service:test_pseudo_fs
-    environment:
-      EXIT_ONCE_DONE: "true"
-    depends_on:
-      rag-agent:
-        condition: service_started
-      test_pseudo_fs:
-        condition: service_started
-    logging: *streaming-logging
-    networks:
-      - api.pmccabe_collector.network
-    volumes:
-      - rag-agent-api:/api
 
 networks:
   api.pmccabe_collector.network:

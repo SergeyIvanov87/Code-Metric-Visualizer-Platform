@@ -31,11 +31,12 @@ jobs:
     - name: Validate Compose configurations
       run: |
         docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml config --quiet
+        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml config --quiet
         docker compose -f common/images/compose-logger-subsystem.yaml config --quiet
         docker compose -f common/images/compose-test-aggregator-subsystem.yaml config --quiet
     - name: Build Agentic RAG, logger, and aggregator services
       run: |
-        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml build
+        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml build
         docker compose -f common/images/compose-logger-subsystem.yaml build
         docker compose -f common/images/compose-test-aggregator-subsystem.yaml build
     - name: Launch streaming logger subsystem
@@ -48,12 +49,12 @@ jobs:
         kafka proxy-ready log_event_aggregator tap_subscriber
     - name: Launch Agentic RAG services
       run: >-
-        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml up --detach
+        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml up --detach
         rag-db rag-document-storage-permissions rag-doc-storage-dispatcher
         test_pseudo_fs rag-agent
     - name: Test AI agent RAG filesystem API
       run: >-
-        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml up
+        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml up
         --no-deps --abort-on-container-exit
         --exit-code-from ai-agent-rag-functional-tester
         ai-agent-rag-functional-tester
@@ -87,11 +88,15 @@ jobs:
           common/images/compose-logger-subsystem.yaml \
           common/images/compose-test-aggregator-subsystem.yaml; do
           slug=$(echo "${compose_file}" | tr '/.' '--')
-          docker compose -f "${compose_file}" ps --all > "${diagnostics}/${slug}-ps.txt" 2>&1
-          docker compose -f "${compose_file}" logs --no-color > "${diagnostics}/${slug}-logs.txt" 2>&1
-          docker compose -f "${compose_file}" config > "${diagnostics}/${slug}-config.yaml" 2>&1
+          compose_args=(-f "${compose_file}")
+          if [[ "${compose_file}" == "ai_agents_framework/compose.rag-agent.streaming.yaml" ]]; then
+            compose_args+=(-f ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml)
+          fi
+          docker compose "${compose_args[@]}" ps --all > "${diagnostics}/${slug}-ps.txt" 2>&1
+          docker compose "${compose_args[@]}" logs --no-color > "${diagnostics}/${slug}-logs.txt" 2>&1
+          docker compose "${compose_args[@]}" config > "${diagnostics}/${slug}-config.yaml" 2>&1
         done
-        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml down --volumes --remove-orphans || true
+        docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml down --volumes --remove-orphans || true
         docker compose -f common/images/compose-test-aggregator-subsystem.yaml down --volumes --remove-orphans || true
         docker compose -f common/images/compose-logger-subsystem.yaml down --volumes --remove-orphans || true
         docker network rm api.pmccabe_collector.network 2>/dev/null || true
