@@ -13,6 +13,8 @@ services:
         condition: service_started
       rag-doc-storage-dispatcher:
         condition: service_started
+      file-uploader:
+        condition: service_started
     logging: &streaming-logging
       driver: syslog
       options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
@@ -21,6 +23,18 @@ services:
     volumes:
       - rag-agent-api:/api
       - rag-agent-models:/assets/models
+      - rag-agent-staging:/staging
+
+  file-uploader:
+    extends:
+      file: ./ai_agent/compose-default.prod.yaml
+      service: file-uploader
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-agent-api:/api
+      - rag-agent-staging:/staging
 
   rag-db:
     build:
@@ -53,6 +67,7 @@ networks:
 volumes:
   rag-agent-api:
   rag-agent-models:
+  rag-agent-staging:
   rag-data:
   rag-dispatcher-config:
   rag-document-storage:
