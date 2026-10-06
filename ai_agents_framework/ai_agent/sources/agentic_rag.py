@@ -18,7 +18,6 @@ from inference_config import load_inference_config, model_options
 import chromadb
 
 from langchain.agents import create_agent
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain.tools import tool
 from langchain_community.chat_models import ChatLlamaCpp
 from llama_cpp.llama_chat_format import Jinja2ChatFormatter
@@ -275,12 +274,6 @@ if __name__ == "__main__":
 
     #model_name = "llama-2-7b-chat.Q2_K.gguf"#"llama-2-7b-chat.Q4_K_M.gguf"#"Hermes-2-Pro-Llama-3-8B-GGUF"
     model_name = "Qwen3-4B-Q4_K_M.gguf"
-    '''
-    model = ChatOpenAI(
-        model=model_name,
-        temperature=0,
-    )
-    '''
 
     model_path = Path(args.assets_models) / model_name
 
