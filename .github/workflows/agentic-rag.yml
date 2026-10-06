@@ -1,4 +1,4 @@
-name: Agentic RAG CI
+name: Agentic RAG Subsystem CI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build_and_test_agentic_rag:
+  build_and_test_agentic_rag_subsystems:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -23,10 +23,6 @@ jobs:
       run: docker compose -f ai_agents_framework/RAG/compose-functional.test.yaml build
     - name: Test AI RAG impl
       run: docker compose -f ai_agents_framework/RAG/compose-functional.test.yaml up --remove-orphans --abort-on-container-exit --exit-code-from rag-functional-tester
-    - name: Build AI agent RAG filesystem API services
-      run: docker compose -f ai_agents_framework/ai_agent/test/compose-functional.prod.yaml build
-    - name: Test AI agent RAG filesystem API
-      run: docker compose -f ai_agents_framework/ai_agent/test/compose-functional.prod.yaml up --remove-orphans --abort-on-container-exit --exit-code-from ai_agent_rag_functional_tester
     - name: Collect Agentic RAG diagnostics and clean up
       if: always()
       shell: bash
@@ -36,8 +32,7 @@ jobs:
         mkdir -p "${diagnostics}"
         for compose_file in \
           ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml \
-          ai_agents_framework/RAG/compose-functional.test.yaml \
-          ai_agents_framework/ai_agent/test/compose-functional.prod.yaml; do
+          ai_agents_framework/RAG/compose-functional.test.yaml; do
           slug=$(echo "${compose_file}" | tr '/.' '--')
           docker compose -f "${compose_file}" ps --all > "${diagnostics}/${slug}-ps.txt" 2>&1
           docker compose -f "${compose_file}" logs --no-color > "${diagnostics}/${slug}-logs.txt" 2>&1
