@@ -50,7 +50,7 @@ def model_options(config, llama_cpp):
     options = {key: config[key] for key in
                ("n_gpu_layers", "main_gpu", "n_ctx", "n_batch", "n_threads")}
     # Keep all offloaded layers on the selected GPU rather than splitting them.
-    options["model_kwargs"] = {"split_mode": 0}
+    options["model_kwargs"] = {"split_mode": 0} if accelerator != "cpu" else {}
     return options
 
 

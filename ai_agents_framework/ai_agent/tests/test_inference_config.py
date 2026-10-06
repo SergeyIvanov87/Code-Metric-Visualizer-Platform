@@ -14,7 +14,11 @@ def profile(mode):
 
 
 def test_cpu_does_not_probe_gpu():
-    assert inference.model_options(profile('cpu'), object())['n_gpu_layers'] == 0
+    options = inference.model_options(profile('cpu'), object())
+    assert options['n_gpu_layers'] == 0
+    # NONE split mode selects main_gpu even with zero offloaded layers.
+    # Keep llama.cpp's default split mode on machines without GPU devices.
+    assert 'split_mode' not in options['model_kwargs']
 
 
 @pytest.mark.parametrize('mode,backend,description', [
