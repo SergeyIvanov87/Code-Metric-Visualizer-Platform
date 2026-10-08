@@ -119,12 +119,16 @@ def main(argv=None):
     session_token = encoded_session(transport["session_id"])
     session_lock = api_directory / f".deferred-session-{session_token}"
     try:
-        session_lock.mkdir(mode=0o700)
+        session_lock.mkdir(mode=0o777)
+        # Host users may have different UID/GID mappings from the container.
+        # Explicit chmod also overrides a restrictive inherited umask.
+        session_lock.chmod(0o777)
     except FileExistsError:
         parser.error(f"SESSION_ID is already active: {transport['session_id']}")
     request_directory = Path(tempfile.mkdtemp(
         prefix=f"deferred-{session_token}-", dir=api_directory
     ))
+    request_directory.chmod(0o777)
     # mkdtemp creates the directory atomically. Verify its location before any
     # FIFO path can be published; this also makes a bad/missing API mount fail
     # synchronously instead of looking like a disappearing deferred request.
