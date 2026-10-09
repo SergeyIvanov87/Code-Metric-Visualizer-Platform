@@ -85,6 +85,6 @@ def test_add_file_invokes_regular_rag_add_query(monkeypatch, tmp_path):
     )
     assert result["status"] == "added"
     assert result["doc_id"] == "doc-123"
-    assert "-URI=" + str(tmp_path / "src/main.rs") in calls[0][1]
+    assert "-URI=" + json.dumps(str(tmp_path / "src/main.rs")) in calls[0][1]
     assert "-doc_type=txt,code" in calls[0][1]
     assert "origin=test src main.rs" in calls[0][1]

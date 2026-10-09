@@ -71,7 +71,7 @@ def check_launcher_directories(tmp_path):
 
 class DeferredQueryRegressionTests(unittest.TestCase):
     def test_empty_metadata(self):
-        for contents, override in [("", ""), ("\n", ""), ("default", '-metadata=""')]:
+        for contents, override in [("", ""), ("\n", ""), ('""', ""), (" ", ""), ("default", '-metadata=""')]:
             with self.subTest(contents=contents, override=override), tempfile.TemporaryDirectory() as directory:
                 check_generated_reader_preserves_empty_metadata(Path(directory), contents, override)
 

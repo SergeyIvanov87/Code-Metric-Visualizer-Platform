@@ -26,6 +26,20 @@ def test_result_fifo_is_host_readable_under_restrictive_umask(monkeypatch, tmp_p
     assert ownership == [(fifo, -1, 0)]
 
 
+def test_executor_assigns_client_group_to_processor_events(monkeypatch, tmp_path):
+    events = tmp_path / "events"
+    os.mkfifo(events, 0o600)
+    monkeypatch.setenv("FS_API_CLIENT_GID", "0")
+    ownership = []
+    monkeypatch.setattr(executor.os, "chown", lambda *args: ownership.append(args))
+    monkeypatch.setattr(executor.subprocess, "run", lambda *_a, **_k:
+                        SimpleNamespace(returncode=0, stdout=json.dumps({
+                            "events": str(events), "events_type": "FIFO"}), stderr=""))
+    _, fifo = executor.prepare_api_channel("processor", tmp_path, [])
+    assert ownership == [(fifo, -1, 0), (events, -1, 0)]
+    assert events.stat().st_mode & 0o777 == 0o640
+
+
 def test_run_processor_captures_result_larger_than_pipe_buf():
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
