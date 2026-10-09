@@ -1,0 +1,8 @@
+{
+  "accelerator": "nvidia",
+  "n_gpu_layers": -1,
+  "main_gpu": 0,
+  "n_ctx": 8192,
+  "n_batch": 256,
+  "n_threads": null
+}

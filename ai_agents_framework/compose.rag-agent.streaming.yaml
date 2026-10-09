@@ -35,9 +35,9 @@ services:
       - rag-agent-api:/api
 
   rag-db:
-    build:
-      context: ..
-      dockerfile: ai_agents_framework/RAG/Dockerfile
+    extends:
+      file: ./RAG/compose.yaml
+      service: rag-db
     logging: *streaming-logging
     networks:
       - api.pmccabe_collector.network

@@ -1,13 +1,18 @@
-FROM ubuntu@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
+ARG BASE_IMAGE=ubuntu@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
+FROM ${BASE_IMAGE}
+ARG LLM_BACKEND=cpu
 
 SHELL ["/bin/bash", "-c"]
 
 RUN <<EOF
+    set -e
     apt-get update
-    apt-get install -y --no-install-recommends coreutils python3 python3-pip python-is-python3 dos2unix inotify-tools bash doas git cmake clang libgomp1 gcc g++
+    apt-get install -y --no-install-recommends coreutils python3 python3-pip python-is-python3 dos2unix inotify-tools bash doas cmake libgomp1 gcc g++
 EOF
 
-# gcc g++ are both required for installion of llama-cpp-python
+# Keep CMake, GCC/G++, and libgomp1 for llama-cpp-python source builds, including
+# the GCC host compiler/runtime used by NVIDIA CUDA. Intel's Vulkan dependencies
+# are installed conditionally in the backend selection below.
 
 WORKDIR /package
 
@@ -17,14 +22,22 @@ WORKDIR /package
 ENV PYTHONNOUSERSITE=1
 
 RUN <<EOF
-    pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain_openai langchain-text-splitters tiktoken sentence-transformers
-    pip install --break-system-packages llama-cpp-python
-    pip install --break-system-packages chromadb chromadb-client sentence_transformers pypdf requests pydantic tqdm
+    set -e
+    pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain-text-splitters tiktoken sentence-transformers
+    case "$LLM_BACKEND" in
+      cpu) export CMAKE_ARGS="-DGGML_CUDA=OFF -DGGML_VULKAN=OFF" ;;
+      nvidia) export CMAKE_ARGS="-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=all-major" ;;
+      intel)
+        apt-get install -y --no-install-recommends libvulkan-dev mesa-vulkan-drivers vulkan-tools glslc
+        export CMAKE_ARGS="-DGGML_VULKAN=ON" ;;
+      *) echo "Unsupported LLM_BACKEND: $LLM_BACKEND" >&2; exit 1 ;;
+    esac
+    FORCE_CMAKE=1 pip install --break-system-packages --no-cache-dir --no-binary=llama-cpp-python llama-cpp-python==0.3.16
+    pip install --break-system-packages chromadb pypdf requests pydantic tqdm
 EOF
 
 RUN <<EOF
-    mkdir /opt
-    mkdir /package
+    mkdir -p /opt /package
     mkdir -p /assets/rag
     mkdir -p /assets/models
 EOF
@@ -39,6 +52,8 @@ RUN <<EOF
 EOF
 
 #TODO COPY ["ai_agent/*.sh", "ai_agent/*.py", "/package/"]
+COPY ai_agents_framework/ai_agent/config /config
+ENV AI_AGENT_INFERENCE_CONFIG=/config/inference.cpu.json
 COPY ai_agents_framework/ai_agent/API /API
 COPY ai_agents_framework/ai_agent/sources /package
 RUN dos2unix /package/*
