@@ -1,5 +1,6 @@
 FROM alpine:3.20.6
 WORKDIR /package
+ENV STAGING_ROOT=/api/.staging
 
 RUN apk add --no-cache bash coreutils inotify-tools python3
 RUN mkdir -p /opt /uploads

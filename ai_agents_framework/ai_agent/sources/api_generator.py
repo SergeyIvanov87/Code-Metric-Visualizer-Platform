@@ -3,41 +3,80 @@
 import api_fs_exec_utils
 import api_fs_bash_utils
 
+
+def generate_rag_parameter_reader():
+    """Resolve named RAG parameters as scalars without the shared legacy reader."""
+    return [
+        'for entry in "${API_NODE}"/[0-9]*.*; do',
+        '  [[ -f "$entry" ]] || continue',
+        '  file_basename="${entry##*/}"',
+        '  param_name="${file_basename#*.}"',
+        '  case "$param_name" in',
+        '    -URI|-metadata|-doc_type|doc_data|SESSION_ID|WaitInitialQueryTimeoutSec|WaitQueryUpdateTimeoutSec|WaitResultConsumptionTimeoutSec) ;;',
+        '    *) continue ;;',
+        '  esac',
+        "  IFS= read -r -d '' value < \"$entry\" || true",
+        "  value=\"${value%$'\\n'}\"",
+        '  [[ "$value" == *[![:space:]]* ]] || value=""',
+        r'  if [[ "$value" == \"* ]]; then',
+        '    declare -a decoded=()',
+        '    split_quoted_arguments "$value" decoded || exit 1',
+        '    (( ${#decoded[@]} == 1 )) || { echo "Expected one RAG parameter value" >&2; exit 1; }',
+        '    value="${decoded[0]}"',
+        '  fi',
+        '  for arg in "${IN_SERVER_REQUEST_ARGS[@]}"; do',
+        '    if [[ "$arg" == "$param_name="* ]]; then',
+        '      value="${arg#*=}"',
+        '      break',
+        '    fi',
+        '  done',
+        '  OVERRIDEN_CMD_ARGS+=("$param_name" "$value")',
+        'done',
+    ]
+
+
+def make_script_rag_bulk_add(script, desired_file_ext=""):
+    extension = "." + desired_file_ext if desired_file_ext else ""
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), "",
+        *api_fs_exec_utils.generate_get_result_type(extension), "",
+        *api_fs_exec_utils.generate_api_node_env_init(), "",
+        *generate_rag_parameter_reader(), "",
+        'exec "${OPT_DIR}/deferred_query_launcher.py" --api-directory "${API_NODE}/POST" '
+        '--processor "${WORK_DIR}/rag_bulk_add.py" -- "${OVERRIDEN_CMD_ARGS[@]}"',
+    )
+    script.writelines(line + "\n" for line in body)
+
 """
 Provides a functions set which manages to generate API executor scripts
 """
 
 def make_script_rag_add(script, desired_file_ext=""):
-    if len(desired_file_ext) == 0:
-        file_extension = ""
-    else:
-        file_extension = "." + desired_file_ext
-
+    extension = "." + desired_file_ext if desired_file_ext else ""
     body = (
-        *api_fs_exec_utils.generate_exec_header(), r"",
-        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
-        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
-        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
-        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
-        *api_fs_exec_utils.generate_api_node_env_init(), r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
-        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"-URI\" \"${2}\" \"\" '=' URI_VALUE", r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"-metadata\" \"${2}\" \"\" '=' METADATA_VALUE", r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"doc_data\" \"${2}\" \"\" '=' DOC_DATA_VALUE", r"",
-        r'if [ -z "${URI_VALUE}" ]; then',
-        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/-URI}" )',
-        r'fi',
-        r'if [ -z "${METADATA_VALUE}" ]; then',
-        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/-metadata}" )',
-        r'fi',
-        r'document_data="${DOC_DATA_VALUE}"',
-        r'OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/doc_data}" )',
-        r'if [ ! -z "${document_data}" ]; then',
-        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/$document_data}" )',
-        r'fi',
-        "echo \"${OVERRIDEN_CMD_ARGS[@]}\" | xargs -I% -- sh -c \"echo '${document_data}' | ${WORK_DIR}/rag_add.py --session_id='${SESSION_ID_VALUE}' -db_host=${VECTOR_DB_HOST} -db_port=${VECTOR_DB_PORT} % ${SHARED_API_DIR} ${MAIN_SERVICE_NAME}\""
-        #r'echo "${OVERRIDEN_CMD_ARGS[@]}" | ${WORK_DIR}/rag_add.py --session_id="${SESSION_ID_VALUE} -db_host=${VECTOR_DB_HOST} -db_port=${VECTOR_DB_PORT}"'
+        *api_fs_exec_utils.generate_exec_header(), "",
+        *api_fs_exec_utils.generate_get_result_type(extension), "",
+        *api_fs_exec_utils.generate_api_node_env_init(), "",
+        *generate_rag_parameter_reader(), "",
+        'SESSION_ID_VALUE="default"',
+        'for arg in "${IN_SERVER_REQUEST_ARGS[@]}"; do',
+        '  [[ "$arg" == SESSION_ID=* ]] && SESSION_ID_VALUE="${arg#SESSION_ID=}"',
+        'done',
+        'declare -a RAG_ARGS=()',
+        'document_data=""',
+        'for ((i=0; i<${#OVERRIDEN_CMD_ARGS[@]}; i+=2)); do',
+        '  name="${OVERRIDEN_CMD_ARGS[i]}"',
+        '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
+        '  case "$name" in',
+        '    doc_data) document_data="$value" ;;',
+        '    -URI) [[ -z "$value" ]] || RAG_ARGS+=("$name" "$value") ;;',
+        '    -metadata|-doc_type) RAG_ARGS+=("$name" "$value") ;;',
+        '  esac',
+        'done',
+        'printf "%s" "$document_data" | "${WORK_DIR}/rag_add.py" '
+        '--session_id="${SESSION_ID_VALUE}" -db_host="${VECTOR_DB_HOST}" '
+        '-db_port="${VECTOR_DB_PORT}" "${RAG_ARGS[@]}" '
+        '"${SHARED_API_DIR}" "${MAIN_SERVICE_NAME}"',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -143,6 +182,7 @@ def make_script_chat_help():
 def get():
     scripts_generator = {
         "rag_add": make_script_rag_add,
+        "rag_bulk_add": make_script_rag_bulk_add,
         "rag_delete": make_script_rag_delete,
         "rag_get_docs": make_script_rag_get_docs,
         "rag_sync": make_script_rag_sync,

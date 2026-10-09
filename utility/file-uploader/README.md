@@ -14,8 +14,10 @@ The file-uploader service exposes three deferred pseudo-filesystem queries:
 
 ## Shared-staging directory events
 
-`streaming_directory_events` keeps staging in a hidden `.staging` directory
-beside the deferred request directories on the shared API volume. Its handshake
+`streaming_directory_events` keeps staging in `/api/.staging` in the service
+image, inside the shared API volume. Without `STAGING_ROOT`, the standalone
+processor uses `.staging` beside the deferred request directories. Any custom
+`STAGING_ROOT` used with host-facing symlinks must also stay inside that volume. Its handshake
 returns an `input` directory on the familiar deferred API path, the canonical
 `staging` directory, live `events` and `seal` FIFOs, and the ordinary final
 `result` FIFO.
@@ -47,7 +49,7 @@ storage, or report that a consumer has processed a file. After the event
 session idle timeout, `result` returns a final summary and the common deferred
 executor cleans up the request-local FIFOs and journal.
 Cleanup unlinks the request-local `input` link but does not traverse it or
-remove the sibling `.staging` content. Consumers that need files after request
+remove the shared `.staging` content. Consumers that need files after request
 cleanup must retain the corresponding path in the shared API volume.
 
 After the producer has finished copying and renaming files, write a non-empty
@@ -138,3 +140,36 @@ and protect a long-lived service from an unbounded staging tree.
 With the default, it preserves the existing behavior of synchronizing file data
 before reporting success. `need_flush=false` is intended only for a coordinator
 that provides its own safe durability barrier.
+
+## RAG bulk input from a host mount
+
+The RAG bulk-add `input` link and the uploader staging directory must be on
+the same API volume. A relative link to a separate container `/staging` mount
+does not resolve from the host's Docker volume `_data` directory. The service
+image now uses `/api/.staging`, and both services share `/api`. New staging
+directories permit writes by API clients with different rootless UID mappings.
+
+After upgrading, rebuild and recreate the ai-agent and file-uploader services
+using your Compose project, then start a new bulk-add request. Existing deferred
+requests still contain their old links and are not migrated. Previously staged
+data on a separate staging volume is not deleted or moved by this change.
+Copy files into `POST/deferred-.../input` while the new request is active;
+configure its initial and update timeouts to allow enough time for the upload.
+
+## Host access to deferred FIFOs in rootless Docker
+
+The ai-agent Compose services join container group `0` and set
+`FS_API_CLIENT_GID=0`. In rootless Docker this group maps to the invoking host
+user's group. The deferred executor and RAG bulk processor assign their result
+and event FIFOs to that group, preserving mode `0640` (owner write, client group
+read). Explicit chmod preserves group access even under a restrictive umask.
+The uploader runs as container root and uses that mapped group naturally; its
+seal FIFO remains mode `0620` for group writes.
+
+Rebuild and recreate the services, then start a new request. For an existing
+active request, its owner or an administrator can change the host-side group:
+`chgrp "$(id -gn)" <request>/async_result <request>/events`.
+For other UID mapping arrangements set `FS_API_CLIENT_GID` to the intended
+container client group and add that group to the service's `group_add` list.
+A readable FIFO can still block until a producer connects; consume events while
+uploading and read the final async result afterward.

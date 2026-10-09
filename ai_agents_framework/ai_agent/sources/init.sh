@@ -53,7 +53,7 @@ termination_handler(){
 trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
 
 # TODO consider use launch_inner_api_services!
-${OPT_DIR}/build_api_executors.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_DIR_TMP}
+${OPT_DIR}/build_api_executors.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_DIR_TMP} --overwrite
 ${OPT_DIR}/build_api_services.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR_TMP} -o ${WORK_DIR_TMP}/services
 doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${SHARED_API_DIR} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/build_api_pseudo_fs.py ${INNER_API_SCHEMA_DIR} ${SHARED_API_DIR}
 doas -u root chown -R $USER:$GROUPNAME ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/ai_agent

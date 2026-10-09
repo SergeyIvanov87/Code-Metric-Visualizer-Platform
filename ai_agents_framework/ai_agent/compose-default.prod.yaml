@@ -1,5 +1,6 @@
 services:
   ai_agent:
+    group_add: ["0"]
     build:
       context: ../..
       dockerfile: ai_agents_framework/ai_agent/Dockerfile
@@ -8,11 +9,19 @@ services:
     environment:
       VECTORDB_HOST: rag-db
       VECTORDB_PORT: 8000
+      FS_API_CLIENT_GID: "0"
       AI_AGENT_INFERENCE_CONFIG: /config/inference.cpu.json
     volumes:
       - ./config:/config:ro
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:/assets/models
+
+  file-uploader:
+    build:
+      context: ../..
+      dockerfile: utility/file-uploader/Dockerfile
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
 
 volumes:
   api.pmccabe_collector.restapi.org:

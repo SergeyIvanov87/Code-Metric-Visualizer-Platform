@@ -12,6 +12,8 @@ import threading
 import time
 from types import SimpleNamespace
 
+import pytest
+
 
 if Path("/package/streaming_directory_events_processor.py").exists():
     PROCESSOR = Path("/package/streaming_directory_events_processor.py")
@@ -31,6 +33,14 @@ protocol_spec = importlib.util.spec_from_file_location(
 protocol_module = importlib.util.module_from_spec(protocol_spec)
 protocol_spec.loader.exec_module(protocol_module)
 parse_directory_event_stream = protocol_module.parse_directory_event_stream
+
+
+@pytest.fixture(autouse=True)
+def isolate_processor_staging(monkeypatch):
+    # The tester inherits STAGING_ROOT from the service image. Local processor
+    # tests own temporary requests and must not leave data in the service volume.
+    # The running service retains its configured environment in its own process.
+    monkeypatch.delenv("STAGING_ROOT", raising=False)
 
 
 def arguments(session="events-test"):
@@ -110,6 +120,19 @@ def test_schema_declares_distinct_shared_staging_query():
     assert "workers" not in schema["Params"]
 
 
+def test_host_channel_permissions_ignore_process_umask(tmp_path):
+    processor = load_processor_module()
+    request = tmp_path / "request"
+    request.mkdir()
+    previous = os.umask(0o077)
+    try:
+        report = processor.prepare(request, arguments())
+    finally:
+        os.umask(previous)
+    assert Path(report["events"]).stat().st_mode & 0o777 == 0o640
+    assert Path(report["seal"]).stat().st_mode & 0o777 == 0o620
+
+
 def test_preflight_rejects_unknown_and_unpaired_query_parameters():
     with tempfile.TemporaryDirectory() as temporary:
         request = Path(temporary)
@@ -126,12 +149,18 @@ def test_preflight_rejects_unknown_and_unpaired_query_parameters():
         assert "name/value pairs" in unpaired.stdout
 
 
-def test_preflight_creates_portable_input_link_on_shared_api_volume():
+@pytest.mark.parametrize("configured_staging", [False, True])
+def test_preflight_creates_portable_input_link_on_shared_api_volume(
+        monkeypatch, configured_staging):
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
         api = root / "container-api"
         request = api / "POST" / "request"
         request.mkdir(parents=True)
+        expected_root = request.parent / ".staging"
+        if configured_staging:
+            expected_root = root / "shared-staging"
+            monkeypatch.setenv("STAGING_ROOT", str(expected_root))
         checked = invoke(request, "--check-arguments")
         assert checked.returncode == 0, checked.stdout + checked.stderr
         prepared = invoke(request, "--prepare-api-channel")
@@ -147,11 +176,13 @@ def test_preflight_creates_portable_input_link_on_shared_api_volume():
         assert not Path(os.readlink(input_path)).is_absolute()
         assert input_path.parent == request
         assert input_path.resolve() == staging_path
-        assert staging_path.parent == request.parent / ".staging"
+        assert staging_path.parent == expected_root
         assert report["events_type"] == "FIFO"
         assert stat.S_ISFIFO(Path(report["events"]).stat().st_mode)
+        assert Path(report["events"]).stat().st_mode & 0o777 == 0o640
         assert report["seal_type"] == "FIFO"
         assert stat.S_ISFIFO(Path(report["seal"]).stat().st_mode)
+        assert Path(report["seal"]).stat().st_mode & 0o777 == 0o620
 
         host_api = root / "host-api-mount"
         host_api.symlink_to(api, target_is_directory=True)
@@ -365,7 +396,7 @@ def test_running_container_delivers_forty_events_without_copying_to_uploads():
     assert input_path.is_symlink()
     assert input_path.resolve() == staging
     assert input_path.is_relative_to(api)
-    assert staging.parent == api / ".staging"
+    assert staging.parent == Path("/api/.staging")
     assert not Path(os.readlink(input_path)).is_absolute()
     try:
         for number in range(40):
