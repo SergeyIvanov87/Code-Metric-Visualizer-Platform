@@ -1,11 +1,13 @@
 services:
   ai_agent:
+    group_add: ["0"]
     build:
       context: ../..
       dockerfile: ai_agents_framework/ai_agent/Dockerfile.dev
     environment:
       VECTORDB_HOST: rag-db
       VECTORDB_PORT: 8000
+      FS_API_CLIENT_GID: "0"
     volumes:
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.project.ai-agents-framework.ai-agent.src:/package

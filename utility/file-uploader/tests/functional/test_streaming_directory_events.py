@@ -120,6 +120,19 @@ def test_schema_declares_distinct_shared_staging_query():
     assert "workers" not in schema["Params"]
 
 
+def test_host_channel_permissions_ignore_process_umask(tmp_path):
+    processor = load_processor_module()
+    request = tmp_path / "request"
+    request.mkdir()
+    previous = os.umask(0o077)
+    try:
+        report = processor.prepare(request, arguments())
+    finally:
+        os.umask(previous)
+    assert Path(report["events"]).stat().st_mode & 0o777 == 0o640
+    assert Path(report["seal"]).stat().st_mode & 0o777 == 0o620
+
+
 def test_preflight_rejects_unknown_and_unpaired_query_parameters():
     with tempfile.TemporaryDirectory() as temporary:
         request = Path(temporary)
@@ -166,8 +179,10 @@ def test_preflight_creates_portable_input_link_on_shared_api_volume(
         assert staging_path.parent == expected_root
         assert report["events_type"] == "FIFO"
         assert stat.S_ISFIFO(Path(report["events"]).stat().st_mode)
+        assert Path(report["events"]).stat().st_mode & 0o777 == 0o640
         assert report["seal_type"] == "FIFO"
         assert stat.S_ISFIFO(Path(report["seal"]).stat().st_mode)
+        assert Path(report["seal"]).stat().st_mode & 0o777 == 0o620
 
         host_api = root / "host-api-mount"
         host_api.symlink_to(api, target_is_directory=True)

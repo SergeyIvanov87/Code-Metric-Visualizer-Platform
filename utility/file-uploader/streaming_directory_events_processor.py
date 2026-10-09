@@ -109,8 +109,14 @@ def prepare(request, arguments):
         raise ValueError("input link does not resolve to shared staging")
     events_fifo = request / "events"
     os.mkfifo(events_fifo, 0o640)
+    events_fifo.chmod(0o640)
     seal_fifo = request / "seal"
     os.mkfifo(seal_fifo, 0o620)
+    seal_fifo.chmod(0o620)
+    client_gid = os.environ.get("FS_API_CLIENT_GID")
+    if client_gid is not None:
+        os.chown(events_fifo, -1, int(client_gid))
+        os.chown(seal_fifo, -1, int(client_gid))
     return {
         "input": str(input_path), "input_type": "DIRECTORY",
         "staging": str(stage), "staging_type": "DIRECTORY",
