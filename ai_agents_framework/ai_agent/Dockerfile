@@ -43,7 +43,7 @@ COPY ai_agents_framework/ai_agent/API /API
 COPY ai_agents_framework/ai_agent/sources /package
 RUN dos2unix /package/*
 
-VOLUME ["/api", "/mnt", "/staging", "/assets/rag", "/assets/models", "/package"]
+VOLUME ["/api", "/mnt", "/assets/rag", "/assets/models", "/package"]
 
 # user creation
 ARG UID=1501 GID=23456 USER=ai_agent
@@ -60,11 +60,10 @@ EOF
 
 RUN <<EOF
 echo "permit nopass :${GROUPNAME}" >> /etc/doas.conf
-mkdir -p -m 777 /mnt && mkdir -p -m 777 /api && mkdir -p -m 2770 /staging
+mkdir -p -m 777 /mnt && mkdir -p -m 777 /api
 chown -R ${USER}:${GROUPNAME} /mnt && chown -R ${USER}:${GROUPNAME} /api && chown -R ${USER}:${GROUPNAME} /assets && chown -R ${USER}:${GROUPNAME} /api
 chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
 chown -R ${USER}:${GROUPNAME} /API
-chown -R ${USER}:${GROUPNAME} /staging
 EOF
 
 

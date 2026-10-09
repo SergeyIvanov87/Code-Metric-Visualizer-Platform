@@ -23,7 +23,6 @@ services:
     volumes:
       - rag-agent-api:/api
       - rag-agent-models:/assets/models
-      - rag-agent-staging:/staging
 
   file-uploader:
     extends:
@@ -34,7 +33,6 @@ services:
       - api.pmccabe_collector.network
     volumes:
       - rag-agent-api:/api
-      - rag-agent-staging:/staging
 
   rag-db:
     build:
@@ -67,7 +65,6 @@ networks:
 volumes:
   rag-agent-api:
   rag-agent-models:
-  rag-agent-staging:
   rag-data:
   rag-dispatcher-config:
   rag-document-storage:

@@ -1,6 +1,8 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
+import shutil
 import sys
 
 
@@ -9,6 +11,34 @@ sys.path.insert(0, str(Path(__file__).parents[3] / "common/modules"))
 spec = importlib.util.spec_from_file_location("rag_bulk_add", MODULE_PATH)
 rag_bulk_add = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(rag_bulk_add)
+
+
+def test_bulk_input_survives_api_volume_mount_relocation(monkeypatch, tmp_path):
+    api = tmp_path / "container" / "api"
+    request = api / "api.pmccabe_collector.restapi.org/ai_agent/rag/bulk_add/v1/POST/deferred-bulk"
+    request.mkdir(parents=True)
+    uploader_request = api / "api.pmccabe_collector.restapi.org/file-uploader/streaming_directory_events/POST/deferred-upload"
+    uploader_request.mkdir(parents=True)
+    uploader_path = Path(__file__).parents[3] / "utility/file-uploader/streaming_directory_events_processor.py"
+    uploader_spec = importlib.util.spec_from_file_location("uploader", uploader_path)
+    uploader = importlib.util.module_from_spec(uploader_spec)
+    uploader_spec.loader.exec_module(uploader)
+    monkeypatch.setenv("STAGING_ROOT", str(api / ".staging"))
+    report = uploader.prepare(uploader_request, ["SESSION_ID", "bulk"])
+    monkeypatch.setattr(rag_bulk_add, "start_uploader", lambda *_: report)
+    prepared = rag_bulk_add.prepare(request, [])
+    assert not Path(os.readlink(prepared["input"])).is_absolute()
+    assert Path(prepared["staging"]).is_relative_to(api)
+    assert Path(prepared["staging"]).stat().st_mode & 0o777 == 0o777
+
+    # A separate filesystem view catches links escaping the API mount boundary.
+    host_api = tmp_path / "docker/volumes/api/_data"
+    shutil.copytree(api, host_api, symlinks=True,
+                    ignore=lambda _, names: [n for n in names if n in {"events", "seal"}])
+    host_input = host_api / request.relative_to(api) / "input"
+    assert host_input.resolve().is_relative_to(host_api)
+    (host_input / "example.py").write_text("print('host upload')")
+    assert (host_api / Path(prepared["staging"]).relative_to(api) / "example.py").read_text() == "print('host upload')"
 
 
 def test_document_type_groups_code_and_semantic_text_types():

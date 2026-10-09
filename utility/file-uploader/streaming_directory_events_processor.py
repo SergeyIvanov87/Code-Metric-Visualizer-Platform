@@ -80,7 +80,11 @@ def staging_root(request):
     """Return the staging volume shared with consumers such as RAG bulk add."""
     configured = os.environ.get("STAGING_ROOT")
     root = Path(configured) if configured else request.parent / ".staging"
-    root.mkdir(mode=0o2770, exist_ok=True)
+    created = not root.exists()
+    root.mkdir(mode=0o2777, exist_ok=True)
+    if created:
+        # API clients and consumers can have different rootless UID mappings.
+        root.chmod(0o2777)
     root = root.resolve(strict=True)
     if not root.is_dir():
         raise ValueError("shared staging root is not a directory")
@@ -92,7 +96,8 @@ def prepare(request, arguments):
     request = request.resolve(strict=True)
     root = staging_root(request)
     stage = root / f"events-{session}-{request.name}"
-    stage.mkdir(mode=0o2770)
+    stage.mkdir(mode=0o2777)
+    stage.chmod(0o2777)
     if stage.resolve(strict=True).parent != root:
         raise ValueError("shared staging directory escaped its configured root")
     input_path = request / "input"

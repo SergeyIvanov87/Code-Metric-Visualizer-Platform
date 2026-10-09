@@ -12,7 +12,6 @@ services:
     volumes:
       - ai_agent_api:/api
       - ai_agent_models:/assets/models
-      - ai_agent_staging:/staging
     depends_on:
       ai_agent_rag_db:
         condition: service_started
@@ -27,7 +26,6 @@ services:
       service: file-uploader
     volumes:
       - ai_agent_api:/api
-      - ai_agent_staging:/staging
 
   ai_agent_rag_db:
     build:
@@ -85,7 +83,6 @@ volumes:
   ai_agent_rag_data:
   ai_agent_dispatcher_config:
   ai_agent_document_storage:
-  ai_agent_staging:
 
 secrets:
   backend_mysql_db_login:
