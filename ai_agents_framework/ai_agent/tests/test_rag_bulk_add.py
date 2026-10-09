@@ -61,7 +61,9 @@ def test_document_type_groups_code_and_semantic_text_types():
 def test_augmented_metadata_contains_every_path_component():
     assert rag_bulk_add.augmented_metadata(
         "project=demo", "source/tools/build.py"
-    ) == "project=demo source tools build.py"
+    ) == "project=demo,source,tools,build.py"
+    assert rag_bulk_add.augmented_metadata("", "test/file.txt") == "test,file.txt"
+    assert rag_bulk_add.augmented_metadata("1", "test/compose-functional.dev.yaml") == "1,test,compose-functional.dev.yaml"
 
 
 def test_values_accepts_only_bulk_query_parameters():
@@ -87,4 +89,4 @@ def test_add_file_invokes_regular_rag_add_query(monkeypatch, tmp_path):
     assert result["doc_id"] == "doc-123"
     assert "-URI=" + json.dumps(str(tmp_path / "src/main.rs")) in calls[0][1]
     assert "-doc_type=txt,code" in calls[0][1]
-    assert "origin=test src main.rs" in calls[0][1]
+    assert "origin=test,src,main.rs" in calls[0][1]
