@@ -16,7 +16,7 @@ spec.loader.exec_module(generator)
 
 
 @pytest.mark.parametrize('metadata', ['', '""', 'team docs', '"team docs"'])
-@pytest.mark.parametrize('override', [None, 'test compose-functional.dev.yaml', '\\"\\" test compose-functional.dev.yaml'])
+@pytest.mark.parametrize('override', [None, 'test compose-functional.dev.yaml', '\\"\\" test compose-functional.dev.yaml', '"aaa" test data poem_02.txt'])
 def test_generated_add_executor_preserves_argv(tmp_path, metadata, override):
     api = tmp_path / 'api'
     api.mkdir()

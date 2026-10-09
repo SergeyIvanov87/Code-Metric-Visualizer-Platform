@@ -32,7 +32,7 @@ def make_default_script(script):
         f"#!/bin/bash\n\nRESULT_FILE=${1}_result\n\n{EMPTY_DEV_SCRIPT_MARK}"
     )
 
-def build_api_executors(api_schema_path, api_exec_generator_path, output_dir):
+def build_api_executors(api_schema_path, api_exec_generator_path, output_dir, overwrite=False):
     # Load api generator module: put particular `api_exec_generator_path` at beginning
     # to prevent loading `api_generator` from main image dir
     sys.path.insert(0, api_exec_generator_path)
@@ -64,7 +64,7 @@ def build_api_executors(api_schema_path, api_exec_generator_path, output_dir):
             script_name_generated = compose_api_exec_script_name(req_name)
             script_generated_path = os.path.join(generated_api_server_scripts_path, script_name_generated)
 
-            with open(script_generated_path, "x") as script:
+            with open(script_generated_path, "w" if overwrite else "x") as script:
                 filesystem_utils.make_file_executable(script_generated_path)
                 if req_name in scripts_generator.keys():
                     scripts_generator[req_name](script, content_file_extension)
@@ -102,7 +102,9 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output_dir",
                         help='Output directory where the generated scripts will be placed. Default=\"./{}\"'.format(get_generated_scripts_path()),
                         default=get_generated_scripts_path())
+    parser.add_argument("--overwrite", action="store_true",
+                        help="Regenerate existing executors from current source")
     args = parser.parse_args()
 
 
-    build_api_executors(args.api_root_dir, args.api_exec_generator, args.output_dir)
+    build_api_executors(args.api_root_dir, args.api_exec_generator, args.output_dir, args.overwrite)
