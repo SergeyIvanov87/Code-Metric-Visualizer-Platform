@@ -1,0 +1,39 @@
+# Paths are relative to the repository-root build context.
+# This file takes precedence over the root .dockerignore for this Dockerfile.
+# Allow only local COPY/ADD inputs; update when those instructions change.
+**
+
+# SCRIPT_GEN_LOC defaults to services; allowlist any custom location too.
+!common/
+common/**
+!common/modules/
+!common/modules/**
+!common/shell_utils/
+!common/shell_utils/**
+!common/api_management.py
+!common/build_api_executors.py
+!common/build_api_services.py
+!common/build_api_pseudo_fs.py
+!common/build_common_api_services.py
+!common/make_api_readme.py
+!common/renew_pseudo_fs_pipes.py
+!cyclomatic_complexity/
+cyclomatic_complexity/**
+!cyclomatic_complexity/*.sh
+!cyclomatic_complexity/*.py
+!cyclomatic_complexity/services/
+cyclomatic_complexity/services/**
+!cyclomatic_complexity/services/*.sh
+!cyclomatic_complexity/API/
+!cyclomatic_complexity/API/**
+
+# Exclude local secrets and generated files within allowed directories.
+**/.env
+**/.env.*
+**/.git
+**/__pycache__
+**/*.pyc
+**/.cache
+**/.config
+**/.chroma
+**/.local
