@@ -34,6 +34,10 @@ def prepare_api_channel(processor_path, request_directory, arguments):
     report = json.loads(prepared.stdout)
     result_fifo = request_directory / "async_result"
     os.mkfifo(result_fifo, 0o640)
+    result_fifo.chmod(0o640)
+    client_gid = os.environ.get("FS_API_CLIENT_GID")
+    if client_gid is not None:
+        os.chown(result_fifo, -1, int(client_gid))
     report["result"] = str(result_fifo)
     report["result_type"] = "FIFO"
     return report, result_fifo

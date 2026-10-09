@@ -26,7 +26,16 @@ def test_bulk_input_survives_api_volume_mount_relocation(monkeypatch, tmp_path):
     monkeypatch.setenv("STAGING_ROOT", str(api / ".staging"))
     report = uploader.prepare(uploader_request, ["SESSION_ID", "bulk"])
     monkeypatch.setattr(rag_bulk_add, "start_uploader", lambda *_: report)
-    prepared = rag_bulk_add.prepare(request, [])
+    monkeypatch.setenv("FS_API_CLIENT_GID", "0")
+    ownership = []
+    monkeypatch.setattr(rag_bulk_add.os, "chown", lambda *args: ownership.append(args))
+    previous = os.umask(0o077)
+    try:
+        prepared = rag_bulk_add.prepare(request, [])
+    finally:
+        os.umask(previous)
+    assert Path(prepared["events"]).stat().st_mode & 0o777 == 0o640
+    assert ownership == [(Path(prepared["events"]), -1, 0)]
     assert not Path(os.readlink(prepared["input"])).is_absolute()
     assert Path(prepared["staging"]).is_relative_to(api)
     assert Path(prepared["staging"]).stat().st_mode & 0o777 == 0o777

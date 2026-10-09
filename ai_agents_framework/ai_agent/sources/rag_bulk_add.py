@@ -127,6 +127,10 @@ def prepare(request, arguments):
     input_path.symlink_to(os.path.relpath(stage, request), target_is_directory=True)
     events = request / "events"
     os.mkfifo(events, 0o640)
+    events.chmod(0o640)
+    client_gid = os.environ.get("FS_API_CLIENT_GID")
+    if client_gid is not None:
+        os.chown(events, -1, int(client_gid))
     return {
         "input": str(input_path), "input_type": "DIRECTORY", "staging": str(stage),
         "events": str(events), "events_type": "FIFO",
