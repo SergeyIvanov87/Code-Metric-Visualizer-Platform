@@ -64,8 +64,8 @@ def document_type(path):
 
 
 def augmented_metadata(original, relative):
-    tokens = " ".join(PurePosixPath(relative).parts)
-    return " ".join(value for value in (original.strip(), tokens) if value)
+    tokens = ",".join(PurePosixPath(relative).parts)
+    return ",".join(value for value in (original.strip(), tokens) if value)
 
 
 def fifo_request(exec_fifo, arguments, session, timeout=10):
