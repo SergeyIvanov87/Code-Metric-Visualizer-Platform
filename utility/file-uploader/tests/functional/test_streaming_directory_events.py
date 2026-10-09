@@ -381,7 +381,7 @@ def test_running_container_delivers_forty_events_without_copying_to_uploads():
     assert input_path.is_symlink()
     assert input_path.resolve() == staging
     assert input_path.is_relative_to(api)
-    assert staging.parent == Path("/staging")
+    assert staging.parent == Path("/api/.staging")
     assert not Path(os.readlink(input_path)).is_absolute()
     try:
         for number in range(40):

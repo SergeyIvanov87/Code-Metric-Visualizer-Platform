@@ -6,9 +6,7 @@ services:
     volumes:
       - file-uploader-api:/api
       - file-uploads:/uploads
-      - ai-agent-staging:/staging
 
 volumes:
   file-uploader-api:
   file-uploads:
-  ai-agent-staging:
