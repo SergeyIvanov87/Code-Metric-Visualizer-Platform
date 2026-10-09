@@ -44,7 +44,7 @@ EOF
 
 COPY common/modules /opt/modules
 COPY common/shell_utils /opt/shell_utils
-COPY ["common/api_management.py", "common/build_api_executors.py", "common/build_api_services.py", "common/build_api_pseudo_fs.py", "common/build_common_api_services.py", "common/make_api_readme.py", "common/renew_pseudo_fs_pipes.py", "/opt/"]
+COPY ["common/api_management.py", "common/build_api_executors.py", "common/build_api_services.py", "common/build_api_pseudo_fs.py", "common/build_common_api_services.py", "common/make_api_readme.py", "common/renew_pseudo_fs_pipes.py", "common/deferred_query_launcher.py", "common/deferred_query_executor.py", "/opt/"]
 
 RUN <<EOF
     dos2unix /opt/* && \

@@ -38,6 +38,18 @@ def prepare_api_channel(processor_path, request_directory, arguments):
     client_gid = os.environ.get("FS_API_CLIENT_GID")
     if client_gid is not None:
         os.chown(result_fifo, -1, int(client_gid))
+        # Channel ownership belongs to the executor, including channels made by
+        # a processor from a mounted source tree or an older processor version.
+        for field in ("events", "seal"):
+            if report.get(field + "_type", "").upper() != "FIFO":
+                continue
+            channel = Path(report[field])
+            if channel.parent.resolve() != request_directory.resolve() or channel.is_symlink():
+                raise ValueError("processor FIFO must be inside its request directory")
+            if not channel.is_fifo():
+                raise ValueError("processor channel is not a FIFO")
+            os.chown(channel, -1, int(client_gid))
+            channel.chmod(0o640 if field == "events" else 0o620)
     report["result"] = str(result_fifo)
     report["result_type"] = "FIFO"
     return report, result_fifo

@@ -162,7 +162,7 @@ def add_file(config, stage, relative, sequence):
     session = f"rag-bulk-add-{config['SESSION_ID']}-{uuid4().hex}"
     uri = stage / relative
     metadata = augmented_metadata(config["metadata"], relative)
-    arguments = " ".join((f"SESSION_ID={session}", f"-URI={uri}",
+    arguments = " ".join((f"SESSION_ID={session}", f"-URI={json.dumps(str(uri))}",
                           f"-metadata={json.dumps(metadata)}",
                           f"-doc_type={document_type(relative)}"))
     result = json.loads(fifo_request(rag_exec, arguments, session, timeout=300))
