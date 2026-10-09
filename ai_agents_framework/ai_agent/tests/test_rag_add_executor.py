@@ -16,12 +16,14 @@ spec.loader.exec_module(generator)
 
 
 @pytest.mark.parametrize('metadata', ['', '""', 'team docs', '"team docs"'])
-@pytest.mark.parametrize('override', [None, 'test compose-functional.dev.yaml', '\\"\\" test compose-functional.dev.yaml', '"aaa" test data poem_02.txt'])
+@pytest.mark.parametrize('override', [None, 'test compose-functional.dev.yaml', '\\"\\" test compose-functional.dev.yaml', '"aaa" test data poem_02.txt', '"aaa" test compose-functional.dev.yaml'])
 def test_generated_add_executor_preserves_argv(tmp_path, metadata, override):
     api = tmp_path / 'api'
     api.mkdir()
     for name, value in [('0.-URI', ''), ('1.-metadata', metadata), ('2.-doc_type', 'txt'), ('3.doc_data', '')]:
         (api / name).write_text(value)
+    (api / 'result.old.json').write_text('not an API parameter')
+    (api / '4.unrelated').write_text('must not become argv')
     stub = tmp_path / 'rag_add.py'
     stub.write_text('#!' + sys.executable + '\nimport argparse,json,sys\np=argparse.ArgumentParser()\np.add_argument("--session_id")\np.add_argument("-db_host")\np.add_argument("-db_port")\np.add_argument("-URI")\np.add_argument("-metadata")\np.add_argument("-doc_type")\np.add_argument("shared_api_dir")\np.add_argument("main_service_name")\na=p.parse_args(); print(json.dumps(vars(a)))\n')
     stub.chmod(0o755)

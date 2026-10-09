@@ -1,4 +1,5 @@
 import json
+import importlib.util
 import os
 from pathlib import Path
 import subprocess
@@ -13,6 +14,10 @@ from common import deferred_query_launcher as launcher
 sys.path.insert(0, str(Path(__file__).parent / "modules"))
 import api_fs_exec_utils
 
+_spec = importlib.util.spec_from_file_location("rag_generator", Path(__file__).parents[1] / "ai_agents_framework/ai_agent/sources/api_generator.py")
+rag_generator = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(rag_generator)
+
 
 def check_generated_reader_preserves_empty_metadata(tmp_path, contents, override):
     (tmp_path / "0.-metadata").write_text(contents)
@@ -20,7 +25,7 @@ def check_generated_reader_preserves_empty_metadata(tmp_path, contents, override
     script = "\n".join([
         *api_fs_exec_utils.generate_exec_header(),
         *api_fs_exec_utils.generate_api_node_env_init(),
-        *api_fs_exec_utils.generate_read_api_fs_args(),
+        *rag_generator.generate_rag_parameter_reader(),
         'printf "%s\\0" "${OVERRIDEN_CMD_ARGS[@]}"',
     ])
     completed = subprocess.run(

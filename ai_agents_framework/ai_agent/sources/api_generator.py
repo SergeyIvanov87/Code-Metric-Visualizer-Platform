@@ -4,13 +4,44 @@ import api_fs_exec_utils
 import api_fs_bash_utils
 
 
+def generate_rag_parameter_reader():
+    """Resolve named RAG parameters as scalars without the shared legacy reader."""
+    return [
+        'for entry in "${API_NODE}"/[0-9]*.*; do',
+        '  [[ -f "$entry" ]] || continue',
+        '  file_basename="${entry##*/}"',
+        '  param_name="${file_basename#*.}"',
+        '  case "$param_name" in',
+        '    -URI|-metadata|-doc_type|doc_data|SESSION_ID|WaitInitialQueryTimeoutSec|WaitQueryUpdateTimeoutSec|WaitResultConsumptionTimeoutSec) ;;',
+        '    *) continue ;;',
+        '  esac',
+        "  IFS= read -r -d '' value < \"$entry\" || true",
+        "  value=\"${value%$'\\n'}\"",
+        '  [[ "$value" == *[![:space:]]* ]] || value=""',
+        r'  if [[ "$value" == \"* ]]; then',
+        '    declare -a decoded=()',
+        '    split_quoted_arguments "$value" decoded || exit 1',
+        '    (( ${#decoded[@]} == 1 )) || { echo "Expected one RAG parameter value" >&2; exit 1; }',
+        '    value="${decoded[0]}"',
+        '  fi',
+        '  for arg in "${IN_SERVER_REQUEST_ARGS[@]}"; do',
+        '    if [[ "$arg" == "$param_name="* ]]; then',
+        '      value="${arg#*=}"',
+        '      break',
+        '    fi',
+        '  done',
+        '  OVERRIDEN_CMD_ARGS+=("$param_name" "$value")',
+        'done',
+    ]
+
+
 def make_script_rag_bulk_add(script, desired_file_ext=""):
     extension = "." + desired_file_ext if desired_file_ext else ""
     body = (
         *api_fs_exec_utils.generate_exec_header(), "",
         *api_fs_exec_utils.generate_get_result_type(extension), "",
         *api_fs_exec_utils.generate_api_node_env_init(), "",
-        *api_fs_exec_utils.generate_read_api_fs_args(), "",
+        *generate_rag_parameter_reader(), "",
         'exec "${OPT_DIR}/deferred_query_launcher.py" --api-directory "${API_NODE}/POST" '
         '--processor "${WORK_DIR}/rag_bulk_add.py" -- "${OVERRIDEN_CMD_ARGS[@]}"',
     )
@@ -26,7 +57,7 @@ def make_script_rag_add(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_exec_header(), "",
         *api_fs_exec_utils.generate_get_result_type(extension), "",
         *api_fs_exec_utils.generate_api_node_env_init(), "",
-        *api_fs_exec_utils.generate_read_api_fs_args(), "",
+        *generate_rag_parameter_reader(), "",
         'SESSION_ID_VALUE="default"',
         'for arg in "${IN_SERVER_REQUEST_ARGS[@]}"; do',
         '  [[ "$arg" == SESSION_ID=* ]] && SESSION_ID_VALUE="${arg#SESSION_ID=}"',
