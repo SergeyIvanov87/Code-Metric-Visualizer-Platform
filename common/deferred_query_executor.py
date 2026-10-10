@@ -32,9 +32,11 @@ def prepare_api_channel(processor_path, request_directory, arguments):
         detail = prepared.stderr.strip() or prepared.stdout.strip()
         raise RuntimeError(f"processor API-channel preparation failed: {detail}")
     report = json.loads(prepared.stdout)
+    read_mode = 0o644
+    write_mode = 0o622
     result_fifo = request_directory / "async_result"
-    os.mkfifo(result_fifo, 0o640)
-    result_fifo.chmod(0o640)
+    os.mkfifo(result_fifo, read_mode)
+    result_fifo.chmod(read_mode)
     client_gid = os.environ.get("FS_API_CLIENT_GID")
     if client_gid is not None:
         os.chown(result_fifo, -1, int(client_gid))
@@ -49,7 +51,7 @@ def prepare_api_channel(processor_path, request_directory, arguments):
             if not channel.is_fifo():
                 raise ValueError("processor channel is not a FIFO")
             os.chown(channel, -1, int(client_gid))
-            channel.chmod(0o640 if field == "events" else 0o620)
+            channel.chmod(read_mode if field == "events" else write_mode)
     report["result"] = str(result_fifo)
     report["result_type"] = "FIFO"
     return report, result_fifo

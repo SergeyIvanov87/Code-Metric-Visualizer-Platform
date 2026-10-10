@@ -58,7 +58,7 @@ COPY ai_agents_framework/ai_agent/API /API
 COPY ai_agents_framework/ai_agent/sources /package
 RUN dos2unix /package/*
 
-VOLUME ["/api", "/mnt", "/assets/rag", "/assets/models", "/package"]
+VOLUME ["/api", "/mnt", "/assets/rag", "/assets/models"]
 
 # user creation
 ARG UID=1501 GID=23456 USER=ai_agent
