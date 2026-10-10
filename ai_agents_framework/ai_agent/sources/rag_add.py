@@ -60,6 +60,7 @@ def main(
     doc_metadata: str,
     doc_type: str,
     doc_data: str,
+    timeout: int,
 ):
     # Break down a doc onto chunks
     embedding_model = get_embedding_model()
@@ -101,7 +102,7 @@ def main(
     )
 
     # insert the main doc
-    timeout_elapsed = 10
+    timeout_elapsed = timeout
     doc_data_bytes = doc_data.encode("utf-8")
     encoded_doc_data = base64.b64encode(doc_data_bytes).decode("ascii")
     put_doc_result = execute_put_doc_query(
@@ -235,6 +236,7 @@ if __name__ == "__main__":
     parser.add_argument("-URI", "--uri", type=str, help="The URi of a document")
     parser.add_argument("-metadata", "--metadata", type=str, default=None, help="document metadata")
     parser.add_argument("-doc_type", "--doc_type", type=str, default="txt", help="document type")
+    parser.add_argument("-timeout", "--timeout", type=int, default=20, help="dispatcher timeout in seconds")
 
     args = parser.parse_args()
     doc_type = args.doc_type
@@ -260,6 +262,7 @@ if __name__ == "__main__":
             args.metadata,
             doc_type,
             document_data,
+            args.timeout,
         )
         return_data["doc_id"] = doc_id
         return_data["chunk_ids"] = chunk_ids

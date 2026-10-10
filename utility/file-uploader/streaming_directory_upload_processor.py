@@ -153,7 +153,8 @@ def prepare_channels(request_directory, arguments):
             raise ValueError("input directory escaped request directory")
         for worker_id in range(1, workers + 1):
             status_path = request / f"status-{worker_id}"
-            os.mkfifo(status_path, 0o660)
+            os.mkfifo(status_path, 0o666)
+            status_path.chmod(0o666)
             if not stat.S_ISFIFO(status_path.lstat().st_mode):
                 raise ValueError(f"status channel is not a FIFO: {status_path}")
             statuses.append(str(status_path))

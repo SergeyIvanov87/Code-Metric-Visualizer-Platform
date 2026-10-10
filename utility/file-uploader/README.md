@@ -161,10 +161,11 @@ configure its initial and update timeouts to allow enough time for the upload.
 The ai-agent Compose services join container group `0` and set
 `FS_API_CLIENT_GID=0`. In rootless Docker this group maps to the invoking host
 user's group. The deferred executor and RAG bulk processor assign their result
-and event FIFOs to that group, preserving mode `0640` (owner write, client group
-read). Explicit chmod preserves group access even under a restrictive umask.
-The uploader runs as container root and uses that mapped group naturally; its
-seal FIFO remains mode `0620` for group writes.
+and event FIFOs to that group. All deferred result and event FIFOs use mode
+`0644` (owner write; owner, client group, and others read). Client-writable
+upload and seal FIFOs use mode `0622`, allowing the owner, client group, and
+others to write. Directory-upload status FIFOs retain mode `0666`. Explicit
+chmod preserves this access even under a restrictive umask.
 
 Rebuild and recreate the services, then start a new request. For an existing
 active request, its owner or an administrator can change the host-side group:

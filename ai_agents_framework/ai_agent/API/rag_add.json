@@ -6,6 +6,7 @@
         "-URI": "",
         "-metadata": "",
         "-doc_type": "txt",
+        "-timeout": "20",
         "doc_data": ""
     },
     "Description": {

@@ -218,11 +218,15 @@ def test_expected_bytes_mismatch_never_installs_file():
 def test_processor_prepares_only_its_input_fifo():
     with tempfile.TemporaryDirectory() as temporary:
         request_directory = Path(temporary)
-        result = subprocess.run(
-            [sys.executable, str(PROCESSOR), "--request-directory", temporary,
-             "--prepare-api-channel"],
-            text=True, capture_output=True, timeout=3,
-        )
+        previous = os.umask(0o077)
+        try:
+            result = subprocess.run(
+                [sys.executable, str(PROCESSOR), "--request-directory", temporary,
+                 "--prepare-api-channel"],
+                text=True, capture_output=True, timeout=3,
+            )
+        finally:
+            os.umask(previous)
         assert result.returncode == 0, result.stdout + result.stderr
         report = json.loads(result.stdout)
         assert report == {
@@ -230,6 +234,7 @@ def test_processor_prepares_only_its_input_fifo():
             "input_type": "FIFO",
         }
         assert wait_for_fifo(Path(report["input"]))
+        assert Path(report["input"]).stat().st_mode & 0o777 == 0o622
         assert not (request_directory / "async_result").exists()
 
 

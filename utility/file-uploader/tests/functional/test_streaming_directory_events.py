@@ -129,8 +129,8 @@ def test_host_channel_permissions_ignore_process_umask(tmp_path):
         report = processor.prepare(request, arguments())
     finally:
         os.umask(previous)
-    assert Path(report["events"]).stat().st_mode & 0o777 == 0o640
-    assert Path(report["seal"]).stat().st_mode & 0o777 == 0o620
+    assert Path(report["events"]).stat().st_mode & 0o777 == 0o644
+    assert Path(report["seal"]).stat().st_mode & 0o777 == 0o622
 
 
 def test_preflight_rejects_unknown_and_unpaired_query_parameters():
@@ -179,10 +179,10 @@ def test_preflight_creates_portable_input_link_on_shared_api_volume(
         assert staging_path.parent == expected_root
         assert report["events_type"] == "FIFO"
         assert stat.S_ISFIFO(Path(report["events"]).stat().st_mode)
-        assert Path(report["events"]).stat().st_mode & 0o777 == 0o640
+        assert Path(report["events"]).stat().st_mode & 0o777 == 0o644
         assert report["seal_type"] == "FIFO"
         assert stat.S_ISFIFO(Path(report["seal"]).stat().st_mode)
-        assert Path(report["seal"]).stat().st_mode & 0o777 == 0o620
+        assert Path(report["seal"]).stat().st_mode & 0o777 == 0o622
 
         host_api = root / "host-api-mount"
         host_api.symlink_to(api, target_is_directory=True)

@@ -34,7 +34,7 @@ def test_bulk_input_survives_api_volume_mount_relocation(monkeypatch, tmp_path):
         prepared = rag_bulk_add.prepare(request, [])
     finally:
         os.umask(previous)
-    assert Path(prepared["events"]).stat().st_mode & 0o777 == 0o640
+    assert Path(prepared["events"]).stat().st_mode & 0o777 == 0o644
     assert ownership == [(Path(prepared["events"]), -1, 0)]
     assert not Path(os.readlink(prepared["input"])).is_absolute()
     assert Path(prepared["staging"]).is_relative_to(api)
