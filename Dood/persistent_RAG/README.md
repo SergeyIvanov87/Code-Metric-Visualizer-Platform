@@ -47,3 +47,5 @@ docker compose down --volumes
 ```
 
 These cleanup commands delete test storage. Use a dedicated daemon or fresh volumes for tests: the grounded-chat assertions assume an empty knowledge base. Tests use real embedding/inference models, including first-use downloads, rather than mocks. CI collects controller and sibling logs even on failures. The controller's health check reports readiness after the internal `compose up --wait` succeeds.
+
+CPU/Intel production agent builds select PyTorch from the CPU wheel index before installing sentence-transformers, constrain that wheel during dependency resolution, and disable pip caching. NVIDIA builds retain their existing PyTorch selection. CI verifies the DooD agent contains CPU-only PyTorch, no NVIDIA Python packages, and no root pip cache before exporting the controller.

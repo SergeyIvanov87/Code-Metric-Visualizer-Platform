@@ -29,6 +29,19 @@ jobs:
           docker compose -f Dood/persistent_RAG/tests/functional/compose-test-functional.yml config --quiet
       - name: Build application images and controller
         run: ./Dood/persistent_RAG/launch.sh build
+      - name: Verify CPU dependency selection and cache cleanup
+        run: |
+          docker run --rm --user 0 --entrypoint python persistent-rag/agent:local -c '
+          from importlib.metadata import distributions, version
+          from pathlib import Path
+          import torch
+          assert "+cpu" in version("torch"), version("torch")
+          assert torch.version.cuda is None, torch.version.cuda
+          cuda_packages = [d.metadata["Name"] for d in distributions() if d.metadata["Name"].lower().startswith("nvidia-")]
+          assert not cuda_packages, cuda_packages
+          assert not Path("/root/.cache/pip").exists(), "pip download cache remains"
+          print("CPU-only PyTorch verified; no NVIDIA packages or pip download cache")
+          '
       - name: Export the built controller
         shell: bash
         run: |
