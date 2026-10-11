@@ -1,0 +1,5 @@
+*
+!Dockerfile
+!images.tar
+!stack.yaml
+!entrypoint.sh

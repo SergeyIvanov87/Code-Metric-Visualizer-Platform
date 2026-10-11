@@ -1,0 +1,71 @@
+name: persistent-rag
+services:
+  api-init:
+    image: persistent-rag/dispatcher:local
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["chgrp 23456 /api; chmod g+rwx /api"]
+    volumes: ["fs-api:/api"]
+    network_mode: none
+    restart: "no"
+  rag-db:
+    image: persistent-rag/rag:local
+    volumes: ["rag-db:/mnt"]
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v2/heartbeat', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 30
+      start_period: 30s
+  docs-dispatcher:
+    image: persistent-rag/dispatcher:local
+    depends_on:
+      api-init: {condition: service_completed_successfully}
+    volumes:
+      - fs-api:/api
+      - documents:/mnt/file_storage
+      - dispatcher-config:/etc/dispatcher
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /api/api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/README-API-DOCS-DISPATCHER.md"]
+      interval: 10s
+      retries: 30
+      start_period: 30s
+  ai-agent:
+    image: persistent-rag/agent:local
+    environment:
+      VECTORDB_HOST: rag-db
+      VECTORDB_PORT: 8000
+      AI_AGENT_INFERENCE_CONFIG: /config/inference.cpu.json
+    depends_on:
+      api-init: {condition: service_completed_successfully}
+      rag-db: {condition: service_healthy}
+      docs-dispatcher: {condition: service_healthy}
+    volumes:
+      - fs-api:/api
+      - models:/assets/models
+      - agent-work:/mnt
+      - agent-rag:/assets/rag
+      - agent-package:/package
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /api/api.pmccabe_collector.restapi.org/ai_agent/README-API-STATISTIC.md"]
+      interval: 10s
+      retries: 30
+      start_period: 30s
+networks:
+  backend: {}
+volumes:
+  fs-api:
+    name: ${FS_API_VOLUME:-persistent-rag-api}
+  rag-db: {}
+  documents: {}
+  dispatcher-config: {}
+  models: {}
+  agent-work: {}
+  agent-rag: {}
+  agent-package: {}
