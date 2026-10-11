@@ -38,6 +38,12 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     stop_grace_period: 90s
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 5s
+      timeout: 2s
+      start_period: 10m
+      retries: 6
 networks:
   control:
     internal: true

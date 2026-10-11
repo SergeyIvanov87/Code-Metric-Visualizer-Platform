@@ -1,0 +1,93 @@
+name: DooD Persistent RAG CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dood-persistent-rag-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build packaged DooD image
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free runner disk space for inference images
+        run: sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet
+      - name: Validate Compose definitions
+        run: |
+          docker compose -f Dood/persistent_RAG/compose.yaml config --quiet
+          docker compose -f Dood/persistent_RAG/tests/functional/compose-test-functional.yml config --quiet
+      - name: Build application images and controller
+        run: ./Dood/persistent_RAG/launch.sh build
+      - name: Export the built controller
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker save persistent-rag/controller:local | gzip -1 > "${RUNNER_TEMP}/persistent-rag-controller.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: persistent-rag-controller
+          path: ${{ runner.temp }}/persistent-rag-controller.tar.gz
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+  functional:
+    name: Test packaged DooD filesystem API
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      FS_API_VOLUME: dood-functional-api-${{ github.run_id }}-${{ github.run_attempt }}
+      COMPOSE_FILE: Dood/persistent_RAG/tests/functional/compose-test-functional.yml
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free runner disk space for inference images
+        run: sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet
+      - uses: actions/download-artifact@v4
+        with:
+          name: persistent-rag-controller
+          path: ${{ runner.temp }}
+      - name: Load the exact controller from the build job
+        shell: bash
+        run: |
+          set -euo pipefail
+          gzip -dc "${RUNNER_TEMP}/persistent-rag-controller.tar.gz" | docker load
+          rm "${RUNNER_TEMP}/persistent-rag-controller.tar.gz"
+      - name: Build the existing black-box functional tester
+        run: docker compose build ai_agent_rag_functional_tester
+      - name: Start DooD and wait for the internal application stack
+        run: docker compose up -d --no-build --wait --wait-timeout 900 rag
+      - name: Run RAG functional tests through the filesystem API
+        # Tests cover long document ingestion and grounded chat after indexing.
+        # No socket, controller network, or implementation sources reach the tester.
+        run: docker compose run --rm --no-deps ai_agent_rag_functional_tester
+      - name: Collect diagnostics and clean up both Compose projects
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "${RUNNER_TEMP}/dood-diagnostics"
+          docker compose ps --all > "${RUNNER_TEMP}/dood-diagnostics/controller-ps.txt" 2>&1 || true
+          docker compose logs --no-color > "${RUNNER_TEMP}/dood-diagnostics/controller-logs.txt" 2>&1 || true
+          docker compose -f Dood/persistent_RAG/stack.yaml ps --all > "${RUNNER_TEMP}/dood-diagnostics/stack-ps.txt" 2>&1 || true
+          docker compose -f Dood/persistent_RAG/stack.yaml logs --no-color > "${RUNNER_TEMP}/dood-diagnostics/stack-logs.txt" 2>&1 || true
+          docker compose stop rag || true
+          docker compose -f Dood/persistent_RAG/stack.yaml down --volumes --remove-orphans || true
+          docker compose down --volumes --remove-orphans || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dood-functional-diagnostics-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/dood-diagnostics
+          retention-days: 14
+          if-no-files-found: warn
