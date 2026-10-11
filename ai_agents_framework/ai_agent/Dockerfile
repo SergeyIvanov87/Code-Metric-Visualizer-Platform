@@ -19,10 +19,20 @@ WORKDIR /package
 # /package is also the runtime user's home and is replaced by a source-code
 # volume. Do not let stale packages under /package/.local shadow the coherent
 # dependency set installed into /usr/local below.
-ENV PYTHONNOUSERSITE=1
+ENV PYTHONNOUSERSITE=1 PIP_NO_CACHE_DIR=1
 
 RUN <<EOF
     set -e
+    # sentence-transformers otherwise resolves the CUDA-enabled PyPI torch wheel,
+    # even when llama.cpp is configured for CPU inference.
+    case "$LLM_BACKEND" in
+      cpu|intel)
+        pip install --break-system-packages --index-url https://download.pytorch.org/whl/cpu torch
+        # Keep the selected CPU wheel throughout transitive dependency resolution.
+        python -c 'from importlib.metadata import version; print("torch==" + version("torch"))' > /tmp/torch-constraints.txt
+        export PIP_CONSTRAINT=/tmp/torch-constraints.txt
+        ;;
+    esac
     pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain-text-splitters tiktoken sentence-transformers
     case "$LLM_BACKEND" in
       cpu) export CMAKE_ARGS="-DGGML_CUDA=OFF -DGGML_VULKAN=OFF" ;;
@@ -34,6 +44,8 @@ RUN <<EOF
     esac
     FORCE_CMAKE=1 pip install --break-system-packages --no-cache-dir --no-binary=llama-cpp-python llama-cpp-python==0.3.16
     pip install --break-system-packages chromadb pypdf requests pydantic tqdm
+    pip check
+    rm -f /tmp/torch-constraints.txt
 EOF
 
 RUN <<EOF
