@@ -39,7 +39,7 @@ After building the controller, run locally:
 ```sh
 export COMPOSE_FILE=Dood/persistent_RAG/tests/functional/compose-test-functional.yml
 docker compose build ai_agent_rag_functional_tester
-docker compose up -d --no-build --wait --wait-timeout 900 rag
+./Dood/persistent_RAG/tests/functional/wait-ready.sh
 docker compose run --rm --no-deps ai_agent_rag_functional_tester
 docker compose stop rag
 docker compose -f Dood/persistent_RAG/stack.yaml down --volumes

@@ -42,6 +42,15 @@ jobs:
           assert not Path("/root/.cache/pip").exists(), "pip download cache remains"
           print("CPU-only PyTorch verified; no NVIDIA packages or pip download cache")
           '
+      - name: Verify the production Chroma heartbeat probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'docker compose -p dood-build-health -f Dood/persistent_RAG/stack.yaml down --volumes || true' EXIT
+          docker compose -p dood-build-health -f Dood/persistent_RAG/stack.yaml up -d --no-deps --no-build --wait --wait-timeout 60 rag-db
+          container=$(docker compose -p dood-build-health -f Dood/persistent_RAG/stack.yaml ps --quiet rag-db)
+          docker inspect --format '{{json .State}}' "$container"
+          test "$(docker inspect --format '{{.State.Health.Status}}' "$container")" = healthy
       - name: Export the built controller
         shell: bash
         run: |
@@ -80,7 +89,7 @@ jobs:
       - name: Build the existing black-box functional tester
         run: docker compose build ai_agent_rag_functional_tester
       - name: Start DooD and wait for the internal application stack
-        run: docker compose up -d --no-build --wait --wait-timeout 900 rag
+        run: ./Dood/persistent_RAG/tests/functional/wait-ready.sh
       - name: Run RAG functional tests through the filesystem API
         # Tests cover long document ingestion and grounded chat after indexing.
         # No socket, controller network, or implementation sources reach the tester.
@@ -94,6 +103,10 @@ jobs:
           docker compose logs --no-color > "${RUNNER_TEMP}/dood-diagnostics/controller-logs.txt" 2>&1 || true
           docker compose -f Dood/persistent_RAG/stack.yaml ps --all > "${RUNNER_TEMP}/dood-diagnostics/stack-ps.txt" 2>&1 || true
           docker compose -f Dood/persistent_RAG/stack.yaml logs --no-color > "${RUNNER_TEMP}/dood-diagnostics/stack-logs.txt" 2>&1 || true
+          # Preserve health-probe exit codes/output before teardown removes siblings.
+          for container in $(docker compose -f Dood/persistent_RAG/stack.yaml ps --all --quiet); do
+            docker inspect --format '{{.Name}} {{json .State}}' "$container" >> "${RUNNER_TEMP}/dood-diagnostics/stack-health.txt" 2>&1 || true
+          done
           docker compose stop rag || true
           docker compose -f Dood/persistent_RAG/stack.yaml down --volumes --remove-orphans || true
           docker compose down --volumes --remove-orphans || true

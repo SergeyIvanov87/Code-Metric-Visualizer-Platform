@@ -14,7 +14,7 @@ services:
     networks: [backend]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v2/heartbeat', timeout=5)"]
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "--noproxy", "*", "http://127.0.0.1:8000/api/v2/heartbeat"]
       interval: 10s
       timeout: 6s
       retries: 30
