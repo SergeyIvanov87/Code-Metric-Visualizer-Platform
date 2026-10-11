@@ -5,6 +5,7 @@ mkdir -p "$DOCKER_CONFIG"
 # Only this endpoint is available to the controller; no raw socket is mounted.
 compose() { docker compose -f /opt/persistent-rag/stack.yaml "$@"; }
 cleanup() {
+    rm -f /tmp/ready
     trap - TERM INT EXIT
     compose down --timeout 30 || true
 }
@@ -19,6 +20,7 @@ done
 docker load -i /opt/persistent-rag/images.tar
 compose up -d --wait --wait-timeout 600 &
 wait $!
+touch /tmp/ready
 echo 'Persistent RAG is ready; filesystem API volume:' "$FS_API_VOLUME"
 while :; do
     sleep 15 & wait $!

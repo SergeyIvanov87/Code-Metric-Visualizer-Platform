@@ -12,3 +12,5 @@ Passed in the managed Docker environment:
 - Validation containers, networks, and volumes cleaned up.
 
 The complete framework image build and end-to-end application/API behavior were not run. Existing model provisioning remains required for inference. Chroma persistence and application health checks require end-to-end confirmation with the built application images.
+
+CI additions: the functional Compose configuration resolves with only the controller, proxy, tester, and tester build context provider. Shared API volume, controller health dependency, repository build contexts, and isolated tester networking were checked. The workflow passes actionlint (including shellcheck), and CI shell blocks pass syntax checks. Full build and model-backed functional execution remain to be verified by the new GitHub Actions jobs.
