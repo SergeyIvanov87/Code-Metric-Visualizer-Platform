@@ -1,0 +1,21 @@
+# Paths are relative to the repository-root build context.
+# This file takes precedence over the root .dockerignore for this Dockerfile.
+# Allow only local COPY/ADD inputs; update when those instructions change.
+**
+
+!ai_agents_framework/
+ai_agents_framework/**
+!ai_agents_framework/RAG/
+ai_agents_framework/RAG/**
+!ai_agents_framework/RAG/bootstrap.sh
+
+# Exclude local secrets and generated files within allowed directories.
+**/.env
+**/.env.*
+**/.git
+**/__pycache__
+**/*.pyc
+**/.cache
+**/.config
+**/.chroma
+**/.local
