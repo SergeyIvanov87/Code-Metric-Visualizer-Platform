@@ -1,0 +1,35 @@
+# Paths are relative to the repository-root build context.
+# This file takes precedence over the root .dockerignore for this Dockerfile.
+# Allow only local COPY/ADD inputs; update when those instructions change.
+**
+
+!rest_api/
+rest_api/**
+!rest_api/rest_api_server/
+!rest_api/rest_api_server/**
+!rest_api/*.sh
+!rest_api/*.py
+!rest_api/API/
+!rest_api/API/**
+!common/
+common/**
+!common/modules/
+!common/modules/**
+!common/shell_utils/
+!common/shell_utils/**
+!common/build_api_executors.py
+!common/build_api_services.py
+!common/build_api_pseudo_fs.py
+!common/make_api_readme.py
+!common/restore_api_from_pseudo_fs.py
+
+# Exclude local secrets and generated files within allowed directories.
+**/.env
+**/.env.*
+**/.git
+**/__pycache__
+**/*.pyc
+**/.cache
+**/.config
+**/.chroma
+**/.local
