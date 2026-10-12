@@ -4,8 +4,10 @@ include:
 services:
   file-uploader:
     build:
-      context: ../..
-      dockerfile: utility/file-uploader/Dockerfile
+      context: .
+      dockerfile: Dockerfile
+      additional_contexts:
+        common: ../../common
     environment:
       - MICROSERVICE_NAME=file-uploader
     volumes:

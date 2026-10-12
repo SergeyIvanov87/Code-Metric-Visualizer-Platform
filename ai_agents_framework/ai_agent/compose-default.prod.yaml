@@ -18,8 +18,10 @@ services:
 
   file-uploader:
     build:
-      context: ../..
-      dockerfile: utility/file-uploader/Dockerfile
+      context: ../../utility/file-uploader
+      dockerfile: Dockerfile
+      additional_contexts:
+        common: ../../common
     volumes:
       - api.pmccabe_collector.restapi.org:/api
 

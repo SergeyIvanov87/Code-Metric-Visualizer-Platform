@@ -16,12 +16,15 @@ common/**
 !common/build_common_api_services.py
 !common/make_api_readme.py
 !common/renew_pseudo_fs_pipes.py
+!common/deferred_query_launcher.py
+!common/deferred_query_executor.py
 !ai_agents_framework/
 ai_agents_framework/**
 !ai_agents_framework/ai_agent/
 ai_agents_framework/ai_agent/**
 !ai_agents_framework/ai_agent/config/
 !ai_agents_framework/ai_agent/config/**
+ai_agents_framework/ai_agent/sources/.*
 !ai_agents_framework/ai_agent/API/
 !ai_agents_framework/ai_agent/API/**
 
