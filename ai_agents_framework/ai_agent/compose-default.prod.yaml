@@ -11,7 +11,6 @@ services:
       VECTORDB_PORT: 8000
       FS_API_CLIENT_GID: "0"
       AI_AGENT_INFERENCE_CONFIG: /config/inference.cpu.json
-      FS_API_CLIENT_GID: "0"
     volumes:
       - ./config:/config:ro
       - api.pmccabe_collector.restapi.org:/api
