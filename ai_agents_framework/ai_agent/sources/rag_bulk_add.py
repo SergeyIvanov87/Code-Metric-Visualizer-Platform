@@ -2,12 +2,15 @@
 """Bridge streaming-directory upload events to the regular RAG add query."""
 
 import argparse
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path, PurePosixPath
+from queue import Queue
 import re
 import signal
 import stat
+from threading import Lock, Thread
 import time
 from uuid import uuid4
 
@@ -17,7 +20,7 @@ from directory_event_protocol import parse_directory_event_stream
 DEFAULTS = {
     "metadata": "", "WaitInitialQueryTimeoutSec": "60",
     "WaitQueryUpdateTimeoutSec": "10", "WaitResultConsumptionTimeoutSec": "60",
-    "SESSION_ID": "default",
+    "SESSION_ID": "default", "workers": "4",
 }
 CODE_EXTENSIONS = {
     "c", "cc", "cpp", "cxx", "h", "hpp", "cs", "go", "java", "js", "jsx",
@@ -31,6 +34,8 @@ TEXT_GROUPS = {
     "document": {"log", "text", "txt"},
 }
 stopping = False
+TERMINATE_WORKER = object()
+TERMINATE_COLLECTOR = object()
 
 
 def stop(_signal, _frame):
@@ -49,6 +54,12 @@ def values(arguments):
         result[name] = arguments[index + 1]
     if not re.fullmatch(r"[A-Za-z0-9_.:@+-]{1,128}", result["SESSION_ID"]):
         raise ValueError("SESSION_ID must contain 1-128 safe characters")
+    try:
+        workers = int(result["workers"])
+    except (TypeError, ValueError) as error:
+        raise ValueError("workers must be a positive integer") from error
+    if workers <= 0:
+        raise ValueError("workers must be a positive integer")
     return result
 
 
@@ -66,6 +77,13 @@ def document_type(path):
 def augmented_metadata(original, relative):
     tokens = ",".join(PurePosixPath(relative).parts)
     return ",".join(value for value in (original.strip(), tokens) if value)
+
+
+def completion_timestamp():
+    """Return the current UTC time in an ISO 8601 JSON-friendly form."""
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace(
+        "+00:00", "Z"
+    )
 
 
 def fifo_request(exec_fifo, arguments, session, timeout=10):
@@ -159,7 +177,10 @@ def publish_event(descriptor, event, timeout=1):
 def add_file(config, stage, relative, sequence):
     root = os.environ.get("SHARED_API_DIR", "/api")
     rag_exec = api_exec(root, "ai_agent/rag/add_doc/v1/PUT/exec")
-    session = f"rag-bulk-add-{config['SESSION_ID']}-{uuid4().hex}"
+    session = (
+        f"rag-bulk-add-{config['SESSION_ID']}-"
+        f"{config['RUN_ID']}-task-{sequence}"
+    )
     uri = stage / relative
     metadata = augmented_metadata(config["metadata"], relative)
     arguments = " ".join((f"SESSION_ID={session}", f"-URI={json.dumps(str(uri))}",
@@ -171,37 +192,112 @@ def add_file(config, stage, relative, sequence):
         "sequence": sequence, "status": "added" if succeeded else "failed",
         "path": relative, "doc_type": document_type(relative),
         "doc_id": result.get("doc_id", ""), "rag_result": result,
+        "timestamp": completion_timestamp(),
     }
+
+
+def add_file_worker(config, stage, input_queue, outcome_queue):
+    """Process queued files until this worker receives its termination marker."""
+    while True:
+        task = input_queue.get()
+        try:
+            if task is TERMINATE_WORKER:
+                return
+            event, sequence = task
+            try:
+                outcome = add_file(config, stage, event["path"], sequence)
+            except Exception as error:
+                outcome = {
+                    "sequence": sequence, "status": "failed",
+                    "path": event.get("path", ""), "doc_id": "",
+                    "error": str(error), "timestamp": completion_timestamp(),
+                }
+            if "timestamp" not in outcome:
+                outcome["timestamp"] = completion_timestamp()
+            outcome_queue.put(outcome)
+        finally:
+            input_queue.task_done()
+
+
+def collect_outcomes(outcome_queue, added, failed, writer):
+    """Publish worker results in input sequence order."""
+    pending = {}
+    next_sequence = 1
+    while True:
+        outcome = outcome_queue.get()
+        try:
+            if outcome is TERMINATE_COLLECTOR:
+                return
+            pending[outcome["sequence"]] = outcome
+            while next_sequence in pending:
+                completed = pending.pop(next_sequence)
+                (added if completed["status"] == "added" else failed).append(completed)
+                publish_event(writer, completed)
+                next_sequence += 1
+        finally:
+            outcome_queue.task_done()
 
 
 def run(options, arguments):
     config = values(arguments)
+    config["RUN_ID"] = uuid4().hex
     report = json.loads((options.request_directory / "stage.json").read_text())
     uploader = json.loads((options.request_directory / "uploader.json").read_text())
     stage = Path(report["staging"])
     writer = [None, Path(report["events"])]
     added, failed = [], []
+    worker_count = int(config["workers"])
+    input_queues = [Queue() for _ in range(worker_count)]
+    outcome_queue = Queue()
+    worker_threads = [
+        Thread(
+            target=add_file_worker,
+            args=(config, stage, input_queue, outcome_queue),
+            name=f"rag-bulk-add-{index + 1}",
+        )
+        for index, input_queue in enumerate(input_queues)
+    ]
+    collector = Thread(
+        target=collect_outcomes,
+        args=(outcome_queue, added, failed, writer),
+        name="rag-bulk-add-collector",
+    )
+    for worker in worker_threads:
+        worker.start()
+    collector.start()
     sequence = 0
-    with Path(uploader["events"]).open() as stream:
-        for event in parse_directory_event_stream(stream):
-            if event.get("status") != "ready":
-                continue
-            sequence += 1
-            try:
-                outcome = add_file(config, stage, event["path"], sequence)
-            except Exception as error:
-                outcome = {"sequence": sequence, "status": "failed",
-                           "path": event.get("path", ""), "doc_id": "",
-                           "error": str(error)}
-            (added if outcome["status"] == "added" else failed).append(outcome)
-            publish_event(writer, outcome)
+    sequence_lock = Lock()
+    try:
+        with Path(uploader["events"]).open() as stream:
+            for event in parse_directory_event_stream(stream):
+                if event.get("status") != "ready":
+                    continue
+                with sequence_lock:
+                    sequence += 1
+                    task_sequence = sequence
+                input_queues[(task_sequence - 1) % worker_count].put(
+                    (event, task_sequence)
+                )
+    finally:
+        for input_queue in input_queues:
+            input_queue.put(TERMINATE_WORKER)
+        for input_queue in input_queues:
+            input_queue.join()
+        for worker in worker_threads:
+            worker.join()
+        outcome_queue.put(TERMINATE_COLLECTOR)
+        outcome_queue.join()
+        collector.join()
+    timestamp = completion_timestamp()
     terminal = {"sequence": sequence + 1, "status": "terminated",
-                "added_count": len(added), "failed_count": len(failed)}
+                "added_count": len(added), "failed_count": len(failed),
+                "timestamp": timestamp}
     publish_event(writer, terminal)
     if writer[0] is not None:
         os.close(writer[0])
     print(json.dumps({"error_code": "0" if not failed else "1",
-                      "added": added, "failed": failed}, separators=(",", ":")))
+                      "timestamp": timestamp, "added": added, "failed": failed},
+                     separators=(",", ":")))
     return 0
 
 
@@ -228,7 +324,10 @@ def main(argv=None):
             return 0
         return run(options, arguments)
     except Exception as error:
-        print(json.dumps({"error_code": "1", "error_description": str(error)}))
+        print(json.dumps({
+            "error_code": "1", "error_description": str(error),
+            "timestamp": completion_timestamp(),
+        }))
         return 1
 
 

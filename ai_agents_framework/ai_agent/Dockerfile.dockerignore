@@ -28,6 +28,7 @@ ai_agents_framework/ai_agent/**
 !ai_agents_framework/ai_agent/API/**
 !ai_agents_framework/ai_agent/sources/
 !ai_agents_framework/ai_agent/sources/**
+ai_agents_framework/ai_agent/sources/assets_model/
 ai_agents_framework/ai_agent/sources/.*
 
 # Exclude local secrets and generated files within allowed directories.

@@ -1,9 +1,11 @@
 import importlib.util
+from datetime import datetime
 import json
 import os
 from pathlib import Path
 import shutil
 import sys
+import threading
 
 
 MODULE_PATH = Path(__file__).parents[1] / "sources/rag_bulk_add.py"
@@ -67,9 +69,23 @@ def test_augmented_metadata_contains_every_path_component():
 
 
 def test_values_accepts_only_bulk_query_parameters():
-    parsed = rag_bulk_add.values(["-metadata", "team=docs", "SESSION_ID", "bulk-1"])
+    parsed = rag_bulk_add.values([
+        "-metadata", "team=docs", "SESSION_ID", "bulk-1", "workers", "8",
+    ])
     assert parsed["metadata"] == "team=docs"
     assert parsed["SESSION_ID"] == "bulk-1"
+    assert parsed["workers"] == "8"
+    assert rag_bulk_add.values([])["workers"] == "4"
+
+
+def test_values_rejects_invalid_worker_count():
+    for workers in ("0", "-1", "many"):
+        try:
+            rag_bulk_add.values(["workers", workers])
+        except ValueError as error:
+            assert str(error) == "workers must be a positive integer"
+        else:
+            raise AssertionError(f"accepted invalid worker count: {workers}")
 
 
 def test_add_file_invokes_regular_rag_add_query(monkeypatch, tmp_path):
@@ -82,7 +98,7 @@ def test_add_file_invokes_regular_rag_add_query(monkeypatch, tmp_path):
 
     monkeypatch.setattr(rag_bulk_add, "fifo_request", request)
     result = rag_bulk_add.add_file(
-        {"metadata": "origin=test", "SESSION_ID": "bulk"},
+        {"metadata": "origin=test", "SESSION_ID": "bulk", "RUN_ID": "run-456"},
         tmp_path, "src/main.rs", 7,
     )
     assert result["status"] == "added"
@@ -90,3 +106,88 @@ def test_add_file_invokes_regular_rag_add_query(monkeypatch, tmp_path):
     assert "-URI=" + json.dumps(str(tmp_path / "src/main.rs")) in calls[0][1]
     assert "-doc_type=txt,code" in calls[0][1]
     assert "origin=test,src,main.rs" in calls[0][1]
+    assert calls[0][2] == "rag-bulk-add-bulk-run-456-task-7"
+    assert_utc_timestamp(result["timestamp"])
+
+
+def assert_utc_timestamp(value):
+    assert value.endswith("Z")
+    datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+
+
+def test_run_processes_files_in_parallel_and_publishes_in_sequence(
+    monkeypatch, tmp_path, capsys,
+):
+    request = tmp_path / "request"
+    request.mkdir()
+    source_events = tmp_path / "source-events"
+    source_events.write_text("")
+    (request / "stage.json").write_text(json.dumps({
+        "staging": str(tmp_path / "stage"),
+        "events": str(tmp_path / "result-events"),
+    }))
+    (request / "uploader.json").write_text(json.dumps({
+        "events": str(source_events),
+    }))
+    events = [
+        {"status": "ready", "path": f"document-{index}.txt"}
+        for index in range(4)
+    ]
+    monkeypatch.setattr(
+        rag_bulk_add, "parse_directory_event_stream", lambda _stream: iter(events)
+    )
+    barrier = threading.Barrier(4)
+    thread_names = set()
+    run_ids = set()
+
+    def add_file(_config, _stage, path, sequence):
+        thread_names.add(threading.current_thread().name)
+        run_ids.add(_config["RUN_ID"])
+        barrier.wait(timeout=5)
+        return {
+            "sequence": sequence, "status": "added", "path": path,
+            "doc_id": f"doc-{sequence}",
+        }
+
+    monkeypatch.setattr(rag_bulk_add, "add_file", add_file)
+    published = []
+    monkeypatch.setattr(
+        rag_bulk_add, "publish_event", lambda _writer, event: published.append(event)
+    )
+    options = type("Options", (), {"request_directory": request})()
+
+    assert rag_bulk_add.run(options, ["workers", "4"]) == 0
+
+    result = json.loads(capsys.readouterr().out)
+    assert len(thread_names) == 4
+    assert len(run_ids) == 1
+    assert [event["sequence"] for event in published] == [1, 2, 3, 4, 5]
+    assert published[-1]["sequence"] == 5
+    assert published[-1]["status"] == "terminated"
+    assert published[-1]["added_count"] == 4
+    assert published[-1]["failed_count"] == 0
+    assert_utc_timestamp(published[-1]["timestamp"])
+    assert result["timestamp"] == published[-1]["timestamp"]
+    for outcome in result["added"]:
+        assert_utc_timestamp(outcome["timestamp"])
+    assert [outcome["sequence"] for outcome in result["added"]] == [1, 2, 3, 4]
+    assert result["failed"] == []
+
+
+def test_worker_failure_outcome_has_completion_timestamp(monkeypatch):
+    input_queue = rag_bulk_add.Queue()
+    outcome_queue = rag_bulk_add.Queue()
+    input_queue.put(({"path": "broken.txt"}, 3))
+    input_queue.put(rag_bulk_add.TERMINATE_WORKER)
+
+    def fail(*_args):
+        raise RuntimeError("add failed")
+
+    monkeypatch.setattr(rag_bulk_add, "add_file", fail)
+    rag_bulk_add.add_file_worker({}, Path("/stage"), input_queue, outcome_queue)
+
+    outcome = outcome_queue.get_nowait()
+    assert outcome["sequence"] == 3
+    assert outcome["status"] == "failed"
+    assert outcome["error"] == "add failed"
+    assert_utc_timestamp(outcome["timestamp"])

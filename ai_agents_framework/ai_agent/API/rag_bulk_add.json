@@ -4,6 +4,7 @@
     "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/bulk_add/v1",
     "Params": {
         "-metadata": "",
+        "workers": "4",
         "WaitInitialQueryTimeoutSec": "60",
         "WaitQueryUpdateTimeoutSec": "10",
         "WaitResultConsumptionTimeoutSec": "60",
