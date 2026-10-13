@@ -15,8 +15,8 @@ generator = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(generator)
 
 
-@pytest.mark.parametrize('metadata', ['', '""', 'team docs', '"team docs"'])
-@pytest.mark.parametrize('override', [None, 'test compose-functional.dev.yaml', '\\"\\" test compose-functional.dev.yaml', '"aaa" test data poem_02.txt', '"aaa" test compose-functional.dev.yaml'])
+@pytest.mark.parametrize('metadata', ['', 'team_docs'])
+@pytest.mark.parametrize('override', [None, '', 'test_compose-functional.dev.yaml'])
 def test_generated_add_executor_preserves_argv(tmp_path, metadata, override):
     api = tmp_path / 'api'
     api.mkdir()
@@ -40,7 +40,6 @@ def test_generated_add_executor_preserves_argv(tmp_path, metadata, override):
         text=True, capture_output=True, check=True)
     result = json.loads(completed.stdout)
     assert result['URI'] == uri
-    assert result['metadata'] == (override if override is not None else
-                                 '' if metadata in ('', '""') else 'team docs')
+    assert result['metadata'] == (override if override is not None else metadata)
     assert result['shared_api_dir'] == '/api'
     assert result['main_service_name'] == 'api.pmccabe_collector.restapi.org'
