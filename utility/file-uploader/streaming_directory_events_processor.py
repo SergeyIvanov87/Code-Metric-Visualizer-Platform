@@ -113,10 +113,6 @@ def prepare(request, arguments):
     seal_fifo = request / "seal"
     os.mkfifo(seal_fifo, 0o622)
     seal_fifo.chmod(0o622)
-    client_gid = os.environ.get("FS_API_CLIENT_GID")
-    if client_gid is not None:
-        os.chown(events_fifo, -1, int(client_gid))
-        os.chown(seal_fifo, -1, int(client_gid))
     return {
         "input": str(input_path), "input_type": "DIRECTORY",
         "staging": str(stage), "staging_type": "DIRECTORY",

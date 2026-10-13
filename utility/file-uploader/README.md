@@ -158,19 +158,13 @@ configure its initial and update timeouts to allow enough time for the upload.
 
 ## Host access to deferred FIFOs in rootless Docker
 
-The ai-agent Compose services join container group `0` and set
-`FS_API_CLIENT_GID=0`. In rootless Docker this group maps to the invoking host
-user's group. The deferred executor and RAG bulk processor assign their result
-and event FIFOs to that group. All deferred result and event FIFOs use mode
-`0644` (owner write; owner, client group, and others read). Client-writable
-upload and seal FIFOs use mode `0622`, allowing the owner, client group, and
-others to write. Directory-upload status FIFOs retain mode `0666`. Explicit
-chmod preserves this access even under a restrictive umask.
+Deferred result and event FIFOs use mode `0644` (owner write; everyone read).
+Client-writable upload and seal FIFOs use mode `0622` (owner read; everyone
+write). Directory-upload status FIFOs use mode `0666`. Explicit chmod preserves
+these access masks even under a restrictive umask, so FIFO ownership does not
+need to change for clients with different rootless UID/GID mappings.
 
-Rebuild and recreate the services, then start a new request. For an existing
-active request, its owner or an administrator can change the host-side group:
-`chgrp "$(id -gn)" <request>/async_result <request>/events`.
-For other UID mapping arrangements set `FS_API_CLIENT_GID` to the intended
-container client group and add that group to the service's `group_add` list.
-A readable FIFO can still block until a producer connects; consume events while
-uploading and read the final async result afterward.
+Rebuild and recreate the services, then start a new request. Existing active
+requests retain their current FIFO permissions. A readable FIFO can still block
+until a producer connects; consume events while uploading and read the final
+async result afterward.
