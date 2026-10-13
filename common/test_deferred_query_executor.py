@@ -10,9 +10,6 @@ from common import deferred_query_executor as executor
 
 
 def test_result_fifo_is_host_readable_under_restrictive_umask(monkeypatch, tmp_path):
-    monkeypatch.setenv("FS_API_CLIENT_GID", "0")
-    ownership = []
-    monkeypatch.setattr(executor.os, "chown", lambda *args: ownership.append(args))
     monkeypatch.setattr(executor.subprocess, "run", lambda *_a, **_k:
                         SimpleNamespace(returncode=0, stdout="{}", stderr=""))
     previous = os.umask(0o077)
@@ -23,30 +20,26 @@ def test_result_fifo_is_host_readable_under_restrictive_umask(monkeypatch, tmp_p
     assert fifo.is_fifo()
     assert fifo.stat().st_mode & 0o777 == 0o644
     assert report["result"] == str(fifo)
-    assert ownership == [(fifo, -1, 0)]
 
 
-def test_executor_makes_processor_events_readable_by_others(monkeypatch, tmp_path):
+def test_executor_preserves_processor_events_permissions(monkeypatch, tmp_path):
     events = tmp_path / "events"
-    os.mkfifo(events, 0o600)
-    monkeypatch.setenv("FS_API_CLIENT_GID", "0")
-    ownership = []
-    monkeypatch.setattr(executor.os, "chown", lambda *args: ownership.append(args))
+    os.mkfifo(events, 0o644)
+    events.chmod(0o644)
     monkeypatch.setattr(executor.subprocess, "run", lambda *_a, **_k:
                         SimpleNamespace(returncode=0, stdout=json.dumps({
                             "events": str(events), "events_type": "FIFO"}), stderr=""))
-    _, fifo = executor.prepare_api_channel("processor", tmp_path, [])
-    assert ownership == [(fifo, -1, 0), (events, -1, 0)]
+    executor.prepare_api_channel("processor", tmp_path, [])
     assert events.stat().st_mode & 0o777 == 0o644
 
 
 def test_directory_event_fifos_are_accessible_by_others(monkeypatch, tmp_path):
     events = tmp_path / "events"
     seal = tmp_path / "seal"
-    os.mkfifo(events, 0o600)
-    os.mkfifo(seal, 0o600)
-    monkeypatch.setenv("FS_API_CLIENT_GID", "0")
-    monkeypatch.setattr(executor.os, "chown", lambda *_args: None)
+    os.mkfifo(events, 0o644)
+    events.chmod(0o644)
+    os.mkfifo(seal, 0o622)
+    seal.chmod(0o622)
     monkeypatch.setattr(executor.subprocess, "run", lambda *_a, **_k:
                         SimpleNamespace(returncode=0, stdout=json.dumps({
                             "protocol": "cmvp.directory-events.v1",

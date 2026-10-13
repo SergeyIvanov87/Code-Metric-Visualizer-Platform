@@ -146,9 +146,6 @@ def prepare(request, arguments):
     events = request / "events"
     os.mkfifo(events, 0o644)
     events.chmod(0o644)
-    client_gid = os.environ.get("FS_API_CLIENT_GID")
-    if client_gid is not None:
-        os.chown(events, -1, int(client_gid))
     return {
         "input": str(input_path), "input_type": "DIRECTORY", "staging": str(stage),
         "events": str(events), "events_type": "FIFO",
