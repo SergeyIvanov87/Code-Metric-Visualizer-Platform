@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI agent chat</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script defer src="{{ url_for('static', filename='chat.js') }}"></script>
+</head>
+<body>
+  <main>
+    <nav><a href="{{ upload_path }}">Add a document to the knowledge base</a></nav>
+    <h1>AI agent chat</h1>
+    <label for="history">Chat history</label>
+    <textarea id="history" rows="16" readonly aria-live="polite"></textarea>
+    <form id="chat-form">
+      <label for="message">Your message</label>
+      <textarea id="message" rows="5" required></textarea>
+      <details>
+        <summary>Override system prompt</summary>
+        <label for="system-prompt">System prompt</label>
+        <textarea id="system-prompt" rows="12">{{ system_prompt }}</textarea>
+      </details>
+      <button id="submit" type="submit">Submit</button>
+    </form>
+    <p id="status" role="status"></p>
+  </main>
+</body>
+</html>

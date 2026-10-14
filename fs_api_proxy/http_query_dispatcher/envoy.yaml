@@ -1,0 +1,70 @@
+# Ordered query forwarding table. Paths retain the domain-as-path convention.
+# Match all methods so GET pages, POST/PUT actions, and method errors reach the
+# same dedicated server. Query strings are excluded by Envoy from path matching.
+static_resources:
+  listeners:
+    - name: http_query_dispatcher
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 8080 }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: http_dispatcher
+                normalize_path: true
+                merge_slashes: true
+                path_with_escaped_slashes_action: REJECT_REQUEST
+                stream_idle_timeout: 920s
+                request_timeout: 910s
+                route_config:
+                  name: filesystem_api_routes
+                  virtual_hosts:
+                    - name: filesystem_api
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            safe_regex:
+                              regex: '^/api\.pmccabe_collector\.restapi\.org/ai_agent/chat/v1/?$'
+                          route: { cluster: ai_agent_http, timeout: 910s }
+                        - match:
+                            safe_regex:
+                              regex: '^/api\.pmccabe_collector\.restapi\.org/ai_agent/rag/add_doc/v1/?$'
+                          route: { cluster: ai_agent_http, timeout: 910s }
+                        - match: { prefix: "/ai-agent-ui/" }
+                          route: { cluster: ai_agent_http, timeout: 30s }
+                        # The generic auto-generated server receives everything
+                        # else unchanged. Keep this catch-all last.
+                        - match: { prefix: "/" }
+                          route: { cluster: generic_rest_api, timeout: 60s }
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                access_log:
+                  - name: envoy.access_loggers.stdout
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+  clusters:
+    - name: generic_rest_api
+      connect_timeout: 5s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: generic_rest_api
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: rest-api, port_value: 5000 }
+    - name: ai_agent_http
+      connect_timeout: 5s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: ai_agent_http
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: ai-agent-http-ambassador, port_value: 8081 }
