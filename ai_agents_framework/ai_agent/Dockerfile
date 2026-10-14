@@ -54,6 +54,7 @@ EOF
 #TODO COPY ["ai_agent/*.sh", "ai_agent/*.py", "/package/"]
 COPY ai_agents_framework/ai_agent/config /config
 ENV AI_AGENT_INFERENCE_CONFIG=/config/inference.cpu.json
+ENV MAX_WORKERS=32
 COPY ai_agents_framework/ai_agent/API /API
 COPY ai_agents_framework/ai_agent/sources /package
 RUN dos2unix /package/*

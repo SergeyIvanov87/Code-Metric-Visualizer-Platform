@@ -7,6 +7,8 @@ import shutil
 import sys
 import threading
 
+import pytest
+
 
 MODULE_PATH = Path(__file__).parents[1] / "sources/rag_bulk_add.py"
 sys.path.insert(0, str(Path(__file__).parents[3] / "common/modules"))
@@ -64,7 +66,8 @@ def test_augmented_metadata_contains_every_path_component():
     assert rag_bulk_add.augmented_metadata("1", "test/compose-functional.dev.yaml") == "1,test,compose-functional.dev.yaml"
 
 
-def test_values_accepts_only_bulk_query_parameters():
+def test_values_accepts_only_bulk_query_parameters(monkeypatch):
+    monkeypatch.delenv("MAX_WORKERS", raising=False)
     parsed = rag_bulk_add.values([
         "-metadata", "team=docs", "SESSION_ID", "bulk-1", "workers", "8",
     ])
@@ -74,14 +77,21 @@ def test_values_accepts_only_bulk_query_parameters():
     assert rag_bulk_add.values([])["workers"] == "4"
 
 
-def test_values_rejects_invalid_worker_count():
-    for workers in ("0", "-1", "many"):
-        try:
+def test_values_enforces_configured_worker_limit(monkeypatch):
+    monkeypatch.setenv("MAX_WORKERS", "8")
+    assert rag_bulk_add.values(["workers", "8"])["workers"] == "8"
+    for workers in ("0", "-1", "9"):
+        with pytest.raises(ValueError, match="workers must be between 1 and 8"):
             rag_bulk_add.values(["workers", workers])
-        except ValueError as error:
-            assert str(error) == "workers must be a positive integer"
-        else:
-            raise AssertionError(f"accepted invalid worker count: {workers}")
+    with pytest.raises(ValueError, match="workers must be an integer"):
+        rag_bulk_add.values(["workers", "many"])
+
+
+def test_values_rejects_invalid_max_workers(monkeypatch):
+    for max_workers in ("0", "-1", "many"):
+        monkeypatch.setenv("MAX_WORKERS", max_workers)
+        with pytest.raises(ValueError, match="MAX_WORKERS must be a positive integer"):
+            rag_bulk_add.values([])
 
 
 def test_add_file_invokes_regular_rag_add_query(monkeypatch, tmp_path):
@@ -106,12 +116,36 @@ def test_add_file_invokes_regular_rag_add_query(monkeypatch, tmp_path):
     assert_utc_timestamp(result["timestamp"])
 
 
+def test_add_file_preserves_unicode_path_and_metadata(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(rag_bulk_add, "api_exec", lambda *_: Path("/rag/exec"))
+
+    def request(_exec_fifo, arguments, _session, timeout):
+        calls.append(arguments)
+        return json.dumps({"error_code": 0, "doc_id": "unicode-doc"})
+
+    monkeypatch.setattr(rag_bulk_add, "fifo_request", request)
+    relative = "données/résumé-数据.txt"
+    metadata = "équipe=δοκιμή"
+    rag_bulk_add.add_file(
+        {"metadata": metadata, "SESSION_ID": "bulk", "RUN_ID": "run-456"},
+        tmp_path, relative, 1,
+    )
+
+    arguments = calls[0]
+    assert json.dumps(str(tmp_path / relative), ensure_ascii=False) in arguments
+    assert json.dumps(
+        rag_bulk_add.augmented_metadata(metadata, relative), ensure_ascii=False
+    ) in arguments
+    assert "\\u" not in arguments
+
+
 def assert_utc_timestamp(value):
     assert value.endswith("Z")
     datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
 
 
-def test_run_processes_files_in_parallel_and_publishes_in_sequence(
+def test_run_processes_files_in_parallel_and_publishes_as_completed(
     monkeypatch, tmp_path, capsys,
 ):
     request = tmp_path / "request"
@@ -130,7 +164,7 @@ def test_run_processes_files_in_parallel_and_publishes_in_sequence(
         for index in range(4)
     ]
     monkeypatch.setattr(
-        rag_bulk_add, "parse_directory_event_stream", lambda _stream: iter(events)
+        rag_bulk_add, "iter_directory_event_stream", lambda _stream: iter(events)
     )
     barrier = threading.Barrier(4)
     thread_names = set()
@@ -148,7 +182,8 @@ def test_run_processes_files_in_parallel_and_publishes_in_sequence(
     monkeypatch.setattr(rag_bulk_add, "add_file", add_file)
     published = []
     monkeypatch.setattr(
-        rag_bulk_add, "publish_event", lambda _writer, event: published.append(event)
+        rag_bulk_add, "publish_event",
+        lambda _writer, event, **_kwargs: published.append(event) or True,
     )
     options = type("Options", (), {"request_directory": request})()
 
@@ -157,7 +192,7 @@ def test_run_processes_files_in_parallel_and_publishes_in_sequence(
     result = json.loads(capsys.readouterr().out)
     assert len(thread_names) == 4
     assert len(run_ids) == 1
-    assert [event["sequence"] for event in published] == [1, 2, 3, 4, 5]
+    assert sorted(event["sequence"] for event in published[:-1]) == [1, 2, 3, 4]
     assert published[-1]["sequence"] == 5
     assert published[-1]["status"] == "terminated"
     assert published[-1]["added_count"] == 4
@@ -166,8 +201,42 @@ def test_run_processes_files_in_parallel_and_publishes_in_sequence(
     assert result["timestamp"] == published[-1]["timestamp"]
     for outcome in result["added"]:
         assert_utc_timestamp(outcome["timestamp"])
-    assert [outcome["sequence"] for outcome in result["added"]] == [1, 2, 3, 4]
+    assert sorted(outcome["sequence"] for outcome in result["added"]) == [1, 2, 3, 4]
     assert result["failed"] == []
+
+
+def test_collect_outcomes_retries_current_event_before_advancing(monkeypatch):
+    outcome_queue = rag_bulk_add.Queue()
+    outcomes = [
+        {"sequence": 2, "status": "added"},
+        {"sequence": 1, "status": "failed"},
+    ]
+    for outcome in outcomes:
+        outcome_queue.put(outcome)
+    outcome_queue.put(rag_bulk_add.TERMINATE_COLLECTOR)
+    attempts = []
+    published = []
+    delays = []
+
+    def publish(_writer, event, **_kwargs):
+        attempts.append(event["sequence"])
+        if event["sequence"] == 2 and attempts.count(2) < 3:
+            return False
+        published.append(event["sequence"])
+        return True
+
+    monkeypatch.setattr(rag_bulk_add, "publish_event", publish)
+    monkeypatch.setattr(rag_bulk_add.time, "sleep", delays.append)
+
+    added, failed = [], []
+    rag_bulk_add.collect_outcomes(outcome_queue, added, failed, object())
+    outcome_queue.join()
+
+    assert attempts == [2, 2, 2, 1]
+    assert published == [2, 1]
+    assert delays == [rag_bulk_add.EVENT_RETRY_INTERVAL] * 2
+    assert added == [outcomes[0]]
+    assert failed == [outcomes[1]]
 
 
 def test_worker_failure_outcome_has_completion_timestamp(monkeypatch):
@@ -187,3 +256,40 @@ def test_worker_failure_outcome_has_completion_timestamp(monkeypatch):
     assert outcome["status"] == "failed"
     assert outcome["error"] == "add failed"
     assert_utc_timestamp(outcome["timestamp"])
+
+
+def test_start_workers_cleans_up_started_threads_after_partial_failure():
+    class FakeQueue:
+        def __init__(self):
+            self.items = []
+            self.joined = False
+
+        def put(self, item):
+            self.items.append(item)
+
+        def join(self):
+            self.joined = True
+
+    class FakeThread:
+        def __init__(self, fails=False):
+            self.fails = fails
+            self.joined = False
+
+        def start(self):
+            if self.fails:
+                raise RuntimeError("thread unavailable")
+
+        def join(self):
+            self.joined = True
+
+    queues = [FakeQueue(), FakeQueue()]
+    workers = [FakeThread(), FakeThread(fails=True)]
+
+    with pytest.raises(RuntimeError, match="thread unavailable"):
+        rag_bulk_add.start_workers(workers, queues)
+
+    assert queues[0].items == [rag_bulk_add.TERMINATE_WORKER]
+    assert queues[0].joined
+    assert workers[0].joined
+    assert queues[1].items == []
+    assert not workers[1].joined

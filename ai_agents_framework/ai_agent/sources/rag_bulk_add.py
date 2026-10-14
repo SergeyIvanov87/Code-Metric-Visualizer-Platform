@@ -14,7 +14,7 @@ from threading import Lock, Thread
 import time
 from uuid import uuid4
 
-from directory_event_protocol import parse_directory_event_stream
+from directory_event_protocol import iter_directory_event_stream
 
 
 DEFAULTS = {
@@ -22,6 +22,8 @@ DEFAULTS = {
     "WaitQueryUpdateTimeoutSec": "10", "WaitResultConsumptionTimeoutSec": "60",
     "SESSION_ID": "default", "workers": "4",
 }
+MAX_WORKERS = 32
+EVENT_RETRY_INTERVAL = 0.05
 CODE_EXTENSIONS = {
     "c", "cc", "cpp", "cxx", "h", "hpp", "cs", "go", "java", "js", "jsx",
     "kt", "kts", "lua", "php", "pl", "py", "r", "rb", "rs", "scala", "sh",
@@ -56,10 +58,16 @@ def values(arguments):
         raise ValueError("SESSION_ID must contain 1-128 safe characters")
     try:
         workers = int(result["workers"])
-    except (TypeError, ValueError) as error:
-        raise ValueError("workers must be a positive integer") from error
-    if workers <= 0:
-        raise ValueError("workers must be a positive integer")
+    except (TypeError, ValueError):
+        raise ValueError("workers must be an integer") from None
+    try:
+        max_workers = int(os.environ.get("MAX_WORKERS", str(MAX_WORKERS)))
+    except ValueError:
+        raise ValueError("MAX_WORKERS must be a positive integer") from None
+    if max_workers <= 0:
+        raise ValueError(f"MAX_WORKERS must be a positive integer, got: {max_workers}")
+    if not 1 <= workers <= max_workers:
+        raise ValueError(f"workers must be between 1 and {max_workers}, got: {workers}")
     return result
 
 
@@ -180,8 +188,9 @@ def add_file(config, stage, relative, sequence):
     )
     uri = stage / relative
     metadata = augmented_metadata(config["metadata"], relative)
-    arguments = " ".join((f"SESSION_ID={session}", f"-URI={json.dumps(str(uri))}",
-                          f"-metadata={json.dumps(metadata)}",
+    arguments = " ".join((f"SESSION_ID={session}",
+                          f"-URI={json.dumps(str(uri), ensure_ascii=False)}",
+                          f"-metadata={json.dumps(metadata, ensure_ascii=False)}",
                           f"-doc_type={document_type(relative)}"))
     result = json.loads(fifo_request(rag_exec, arguments, session, timeout=300))
     succeeded = result.get("error_code") in (0, "0")
@@ -217,22 +226,40 @@ def add_file_worker(config, stage, input_queue, outcome_queue):
 
 
 def collect_outcomes(outcome_queue, added, failed, writer):
-    """Publish worker results in input sequence order."""
-    pending = {}
-    next_sequence = 1
+    """Publish worker results as they arrive, retrying the current result."""
     while True:
         outcome = outcome_queue.get()
-        try:
-            if outcome is TERMINATE_COLLECTOR:
-                return
-            pending[outcome["sequence"]] = outcome
-            while next_sequence in pending:
-                completed = pending.pop(next_sequence)
-                (added if completed["status"] == "added" else failed).append(completed)
-                publish_event(writer, completed)
-                next_sequence += 1
-        finally:
+        if outcome is TERMINATE_COLLECTOR:
             outcome_queue.task_done()
+            return
+        while not publish_event(writer, outcome, timeout=EVENT_RETRY_INTERVAL):
+            time.sleep(EVENT_RETRY_INTERVAL)
+        (added if outcome["status"] == "added" else failed).append(outcome)
+        outcome_queue.task_done()
+
+
+def stop_workers(worker_threads, input_queues):
+    """Stop and join the queues and worker threads that successfully started."""
+    active_queues = input_queues[:len(worker_threads)]
+    for input_queue in active_queues:
+        input_queue.put(TERMINATE_WORKER)
+    for input_queue in active_queues:
+        input_queue.join()
+    for worker in worker_threads:
+        worker.join()
+
+
+def start_workers(worker_threads, input_queues):
+    """Start workers and clean up the started prefix if startup fails."""
+    started = []
+    try:
+        for worker in worker_threads:
+            worker.start()
+            started.append(worker)
+    except Exception:
+        stop_workers(started, input_queues)
+        raise
+    return started
 
 
 def run(options, arguments):
@@ -259,14 +286,15 @@ def run(options, arguments):
         args=(outcome_queue, added, failed, writer),
         name="rag-bulk-add-collector",
     )
-    for worker in worker_threads:
-        worker.start()
-    collector.start()
+    started_workers = start_workers(worker_threads, input_queues)
+    collector_started = False
     sequence = 0
     sequence_lock = Lock()
     try:
+        collector.start()
+        collector_started = True
         with Path(uploader["events"]).open() as stream:
-            for event in parse_directory_event_stream(stream):
+            for event in iter_directory_event_stream(stream):
                 if event.get("status") != "ready":
                     continue
                 with sequence_lock:
@@ -276,15 +304,11 @@ def run(options, arguments):
                     (event, task_sequence)
                 )
     finally:
-        for input_queue in input_queues:
-            input_queue.put(TERMINATE_WORKER)
-        for input_queue in input_queues:
-            input_queue.join()
-        for worker in worker_threads:
-            worker.join()
-        outcome_queue.put(TERMINATE_COLLECTOR)
-        outcome_queue.join()
-        collector.join()
+        stop_workers(started_workers, input_queues)
+        if collector_started:
+            outcome_queue.put(TERMINATE_COLLECTOR)
+            outcome_queue.join()
+            collector.join()
     timestamp = completion_timestamp()
     terminal = {"sequence": sequence + 1, "status": "terminated",
                 "added_count": len(added), "failed_count": len(failed),
