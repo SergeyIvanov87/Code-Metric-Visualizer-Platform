@@ -1,0 +1,9 @@
+{
+  "api_mount": "/api",
+  "agent_api_mount": "/api",
+  "schema_dir": "/app/API",
+  "timeout_seconds": 900,
+  "max_upload_bytes": 16777216,
+  "max_prompt_bytes": 65536,
+  "max_result_bytes": 4194304
+}
