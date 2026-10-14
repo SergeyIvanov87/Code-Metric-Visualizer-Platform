@@ -1,0 +1,10 @@
+**
+!ai_agents_framework/
+!ai_agents_framework/ai_agent/
+!ai_agents_framework/ai_agent/API/
+!ai_agents_framework/ai_agent/API/chat.json
+!ai_agents_framework/ai_agent/API/rag_add.json
+!ai_agents_framework/ai_agent/ai_agent_http_embassador/
+!ai_agents_framework/ai_agent/ai_agent_http_embassador/**
+ai_agents_framework/ai_agent/ai_agent_http_embassador/tests/
+**/__pycache__/
