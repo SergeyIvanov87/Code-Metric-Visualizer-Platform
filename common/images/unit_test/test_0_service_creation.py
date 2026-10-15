@@ -35,7 +35,8 @@ def test_filesystem_api_nodes_main_session(name, query, run_around_tests):
     # check API transaction
     print(f"Check API transaction: {name}", file=sys.stdout, flush=True)
     with open(communication_pipes[0], "w") as pin:
-        pin.write("0")
+        # Requests are newline-delimited so persistent FIFO readers can frame them.
+        pin.write("0" + os.linesep)
     with open(communication_pipes[1], "r") as pout:
         out = pout.read()
         print(f"Transaction result: {out}", file=sys.stdout, flush=True)
