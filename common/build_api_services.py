@@ -213,7 +213,123 @@ def generate_gui_server_content(req_name, req_type, api_req_directory, api_exec_
 
     return api_gui_schema_concrete
 
-def generate_cli_server_content(req_name, req_api, req_type, content_type, req_exec_script_root_dir= "${WORK_DIR}"):
+def generate_parallel_session_functions(
+    req_exec_script_root_dir, req_executor_name, api_req_directory
+):
+    """Generate helpers for concurrent requests serialized by SESSION_ID."""
+    return [
+        'parallel_request_executor="{}"\n'.format(
+            os.path.join(req_exec_script_root_dir, req_executor_name)
+        ),
+        'parallel_api_request_directory="{}"\n'.format(api_req_directory),
+        "parallel_remove_request_state() {\n",
+        '    local request_state="${1}"\n',
+        '    rm -f -- "${request_state}/handler.pid" "${request_state}/result_writer.pid" \\\n',
+        '        "${request_state}/result_ready" "${request_state}/done"\n',
+        '    rmdir -- "${request_state}" 2>/dev/null || true\n',
+        "}\n",
+        "parallel_prune_finished_requests() {\n",
+        '    local session_id=""\n',
+        '    local request_state=""\n',
+        '    for session_id in "${!PARALLEL_REQUEST_STATE[@]}"; do\n',
+        '        request_state="${PARALLEL_REQUEST_STATE[${session_id}]}"\n',
+        '        if [[ ! -d "${request_state}" || -e "${request_state}/done" ]]; then\n',
+        '            parallel_remove_request_state "${request_state}"\n',
+        '            unset "PARALLEL_REQUEST_STATE[${session_id}]"\n',
+        "        fi\n",
+        "    done\n",
+        "}\n",
+        "parallel_wait_for_previous_request() {\n",
+        '    local previous_state="${1}"\n',
+        '    local result_fifo="${2}"\n',
+        '    local previous_handler_pid=""\n',
+        '    local writer_pid=""\n',
+        '    local drain_pid=""\n',
+        '    local attempts=0\n',
+        '    if [[ -z "${previous_state}" || ! -d "${previous_state}" ]]; then\n',
+        "        return\n",
+        "    fi\n",
+        '    while [[ -d "${previous_state}" && ! -e "${previous_state}/done" ]]; do\n',
+        '        if [[ -r "${previous_state}/handler.pid" ]]; then\n',
+        '            IFS= read -r previous_handler_pid < "${previous_state}/handler.pid"\n',
+        '            if [[ -n "${previous_handler_pid}" ]] && ! kill -0 "${previous_handler_pid}" 2>/dev/null; then\n',
+        '                touch "${previous_state}/done"\n',
+        "                continue\n",
+        "            fi\n",
+        "        fi\n",
+        '        if [[ -e "${previous_state}/result_ready" && -r "${previous_state}/result_writer.pid" ]]; then\n',
+        '            IFS= read -r writer_pid < "${previous_state}/result_writer.pid"\n',
+        '            if [[ -n "${writer_pid}" ]] && kill -0 "${writer_pid}" 2>/dev/null; then\n',
+        "                timeout 2 /bin/bash -c 'cat \"$1\" >/dev/null 2>&1' _ \"${result_fifo}\" &\n",
+        '                drain_pid=$!\n',
+        '                attempts=0\n',
+        '                while kill -0 "${writer_pid}" 2>/dev/null && (( attempts < 40 )); do\n',
+        "                    sleep 0.05\n",
+        '                    ((attempts += 1))\n',
+        "                done\n",
+        '                if kill -0 "${writer_pid}" 2>/dev/null; then\n',
+        '                    kill "${writer_pid}" 2>/dev/null || true\n',
+        '                    attempts=0\n',
+        '                    while kill -0 "${writer_pid}" 2>/dev/null && (( attempts < 20 )); do\n',
+        "                        sleep 0.05\n",
+        '                        ((attempts += 1))\n',
+        "                    done\n",
+        '                    if kill -0 "${writer_pid}" 2>/dev/null; then\n',
+        '                        kill -KILL "${writer_pid}" 2>/dev/null || true\n',
+        "                    fi\n",
+        "                fi\n",
+        '                wait "${drain_pid}" 2>/dev/null || true\n',
+        "            fi\n",
+        "        fi\n",
+        "        sleep 0.05\n",
+        "    done\n",
+        '    parallel_remove_request_state "${previous_state}"\n',
+        "}\n",
+        "parallel_session_request() {\n",
+        '    local command="${1}"\n',
+        '    local request_num="${2}"\n',
+        '    local session_id="${3}"\n',
+        '    local keep_alive_value="${4}"\n',
+        '    local result_fifo="${5}"\n',
+        '    local previous_state="${6}"\n',
+        '    local request_state="${7}"\n',
+        '    local result_out=""\n',
+        '    local result_writer_pid=""\n',
+        # The dispatcher owns these descriptors. Close the copies inherited by
+        # this background subshell so it cannot keep accepting FIFO writers
+        # after the dispatcher exits.
+        '    exec {PARALLEL_REQUEST_KEEPALIVE_FD}>&-\n',
+        '    exec {PARALLEL_REQUEST_READ_FD}<&-\n',
+        '    trap \'touch "${request_state}/done"\' EXIT\n',
+        '    parallel_wait_for_previous_request "${previous_state}" "${result_fifo}"\n',
+        '    echo "`date +%H:%M:%S:%3N`\\t${ME}\\t`hostname`\\tSTART    [${session_id}]: ${api_exec_node_directory}\\targs:\\t${command}\\treqNum:\\t${request_num}"\n',
+        '    if [[ -n "${keep_alive_value}" && "${keep_alive_value}" != "@@@@@" ]]; then\n',
+        '        result_out=$(printf \'%s\' "${keep_alive_value}" | base64)\n',
+        "    else\n",
+        '        result_out=$("${parallel_request_executor}" "${parallel_api_request_directory}" "${command}" | base64)\n',
+        "    fi\n",
+        '    echo "`date +%H:%M:%S:%3N`\\t${ME}\\t`hostname`\\tFINISH    [${session_id}]: ${api_exec_node_directory}\\targs:\\t${command}\\treqNum:\\t${request_num}"\n',
+        '    printf \'%s\\n\' "${result_out}" | base64 -d > "${result_fifo}" &\n',
+        '    result_writer_pid=$!\n',
+        '    printf \'%s\\n\' "${result_writer_pid}" > "${request_state}/result_writer.pid"\n',
+        '    touch "${request_state}/result_ready"\n',
+        '    if wait "${result_writer_pid}"; then\n',
+        '        echo "`date +%H:%M:%S:%3N`\\t${ME}\\t`hostname`\\tCONSUMED [${session_id}]: ${api_exec_node_directory} <--- ${result_fifo}"\n',
+        "    else\n",
+        '        echo "`date +%H:%M:%S:%3N`\\t${ME}\\t`hostname`\\tRESET    [${session_id}]: ${api_exec_node_directory} <--- ${result_fifo}"\n',
+        "    fi\n",
+        "}\n",
+    ]
+
+
+def generate_cli_server_content(
+    req_name,
+    req_api,
+    req_type,
+    content_type,
+    req_exec_script_root_dir="${WORK_DIR}",
+    parallel_by_session=False,
+):
 
     api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
             "${SHARED_API_DIR}", req_api, req_type
@@ -246,6 +362,65 @@ def generate_cli_server_content(req_name, req_api, req_type, content_type, req_e
         api_req_directory
     )
     api_cli_schema_concrete[-1] = api_cli_schema_concrete[-1].format(req_name)
+
+    if parallel_by_session:
+        helper_index = len(generate_exec_watchdog_function())
+        helper_index += len(generate_extract_attr_value_from_string())
+        helper_index += len(generate_unblock_query_pipe_writers_by_owner())
+        helper_index += len(generate_unblock_result_pipe_reader_by_owner())
+        helper_index += len(generate_unblock_readers_of_result_pipe_array_by_owner())
+        api_cli_schema_concrete[helper_index:helper_index] = generate_parallel_session_functions(
+            req_exec_script_root_dir, req_executor_name, api_req_directory
+        )
+
+        while_index = api_cli_schema_concrete.index("while true\n")
+        api_cli_schema_concrete[while_index:while_index + 4] = [
+            'parallel_session_state_root=$(mktemp -d "${TMPDIR:-/tmp}/${ME}.parallel-session-state.XXXXXX")\n',
+            "declare -A PARALLEL_REQUEST_STATE\n",
+            "PARALLEL_REQUEST_COUNTER=0\n",
+            # Keep one reader open for the dispatcher lifetime. The private
+            # write descriptor prevents EOF between external FIFO writers.
+            # Separate descriptors avoid relying on Linux-specific FIFO O_RDWR
+            # behavior.
+            'exec {PARALLEL_REQUEST_READ_FD}<"${pipe_request}"\n',
+            'exec {PARALLEL_REQUEST_KEEPALIVE_FD}>"${pipe_request}"\n',
+            "REQUEST_NUM=0\n",
+            'while IFS= read -r -u "${PARALLEL_REQUEST_READ_FD}" CMD_READ\n',
+        ]
+
+        batch_end_line = (
+            "    done <<< `cat $pipe_request || if [ $? != 0 ]; "
+            "then mkfifo -m 622 ${pipe_request}; fi`\n"
+        )
+        batch_end_index = api_cli_schema_concrete.index(batch_end_line)
+        api_cli_schema_concrete[batch_end_index:batch_end_index + 2] = [
+            "done\n",
+            'exec {PARALLEL_REQUEST_KEEPALIVE_FD}>&-\n',
+            'exec {PARALLEL_REQUEST_READ_FD}<&-\n',
+        ]
+
+        watchdog_line = (
+            "        "
+            + exec_watchdog_function()
+            + " ${WATCH_PID_ARRAY[${SESSION_ID_VALUE}]} ${pipe_result_consumer}\n"
+        )
+        watchdog_index = api_cli_schema_concrete.index(watchdog_line)
+        api_cli_schema_concrete[watchdog_index:watchdog_index] = [
+            '        ((PARALLEL_REQUEST_COUNTER += 1))\n',
+            '        if (( PARALLEL_REQUEST_COUNTER % 64 == 0 )); then\n',
+            '            parallel_prune_finished_requests\n',
+            "        fi\n",
+            '        parallel_request_state=$(mktemp -d "${parallel_session_state_root}/request.XXXXXX")\n',
+            '        parallel_previous_state=${PARALLEL_REQUEST_STATE[${SESSION_ID_VALUE}]-}\n',
+            '        PARALLEL_REQUEST_STATE[${SESSION_ID_VALUE}]="${parallel_request_state}"\n',
+            '        parallel_session_request "${CMD_READ}" "${REQUEST_NUM}" "${SESSION_ID_VALUE}" \\\n',
+            '            "${API_KEEP_ALIVE_VALUE}" "${pipe_result_consumer}" \\\n',
+            '            "${parallel_previous_state}" "${parallel_request_state}" &\n',
+            '        printf \'%s\\n\' "$!" > "${parallel_request_state}/handler.pid"\n',
+            '        ((REQUEST_NUM += 1))\n',
+            "        continue\n",
+        ]
+
     return api_cli_schema_concrete
 
 def create_gui_server_content_from_schema(req_name, req_schema, req_exec_script_root_dir = "${WORK_DIR}"):
@@ -273,7 +448,18 @@ def create_cli_server_content_from_schema(req_name, req_schema, req_exec_script_
     if "Content-Type" in req_schema:
         content_type = req_schema["Content-Type"]
 
-    return generate_cli_server_content(req_name, req_api, req_type, content_type, req_exec_script_root_dir)
+    parallel_by_session = req_schema.get("ParallelBySession", False)
+    if not isinstance(parallel_by_session, bool):
+        raise ValueError("ParallelBySession must be a boolean")
+
+    return generate_cli_server_content(
+        req_name,
+        req_api,
+        req_type,
+        content_type,
+        req_exec_script_root_dir,
+        parallel_by_session,
+    )
 
 
 def build_api_services(api_schema_path, executor_generated_scripts_path, output_services_path):

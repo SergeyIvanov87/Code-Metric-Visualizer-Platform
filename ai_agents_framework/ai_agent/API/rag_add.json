@@ -1,4 +1,5 @@
 {
+    "ParallelBySession": true,
     "Content-Type" : "application/json",
     "Method" : "PUT",
     "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1",
