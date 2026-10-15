@@ -137,8 +137,9 @@ def test_concurrent_nested_allocations_are_individually_framed():
         def server():
             for _ in range(2):
                 request = exec_fifo.read_text()
+                assert request.endswith(os.linesep)
                 requests.append(request)
-                session = request.removeprefix("SESSION_ID=")
+                session = request.removeprefix("SESSION_ID=").removesuffix(os.linesep)
                 handshake = api / f"result.json_{session}"
                 os.mkfifo(handshake)
                 handshake.write_text(json.dumps({"session": session}))
@@ -161,7 +162,10 @@ def test_concurrent_nested_allocations_are_individually_framed():
             assert not worker.is_alive()
         server_thread.join(timeout=3)
         assert not server_thread.is_alive()
-        assert sorted(requests) == ["SESSION_ID=one", "SESSION_ID=two"]
+        assert sorted(requests) == [
+            "SESSION_ID=one" + os.linesep,
+            "SESSION_ID=two" + os.linesep,
+        ]
         assert reports == {"one": {"session": "one"}, "two": {"session": "two"}}
 
 
@@ -187,7 +191,7 @@ def test_nested_worker_session_reuses_persistent_result_fifo():
         ) for _ in range(2)]
         server_thread.join(timeout=3)
         assert not server_thread.is_alive()
-        assert requests == ["SESSION_ID=parent.worker-1"] * 2
+        assert requests == ["SESSION_ID=parent.worker-1" + os.linesep] * 2
         assert reports == [{"sequence": 1}, {"sequence": 2}]
 
 
@@ -599,6 +603,7 @@ def test_running_container_uploads_more_files_than_workers_and_reports_status():
         "tolerate_errors=true "
         "WaitInitialQueryTimeoutSec=5 WaitQueryUpdateTimeoutSec=0.2 "
         "WaitResultConsumptionTimeoutSec=5 StatusHeartbeatIntervalSec=0.05"
+        + os.linesep
     )
     report = json.loads(wait_for_fifo(api / f"result.json_{session}").read_text())
     statuses = {path: [] for path in report["status"]}
@@ -693,6 +698,7 @@ def test_running_container_copies_near_limit_tree_exactly():
             "WaitInitialQueryTimeoutSec=60 WaitQueryUpdateTimeoutSec=1 "
             "WaitResultConsumptionTimeoutSec=900 "
             "StatusHeartbeatIntervalSec=0.1"
+            + os.linesep
         )
         report = json.loads(
             wait_for_fifo(api / f"result.json_{session}").read_text()

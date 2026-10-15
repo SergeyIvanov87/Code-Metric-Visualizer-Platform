@@ -353,6 +353,7 @@ def test_running_container_delivers_forty_events_without_copying_to_uploads():
         f"SESSION_ID={session} WaitInitialQueryTimeoutSec=5 "
         "WaitQueryUpdateTimeoutSec=5 "
         "WaitResultConsumptionTimeoutSec=2"
+        + os.linesep
     )
     report = json.loads(
         wait_for_fifo(api / f"result.json_{session}").read_text()
@@ -428,6 +429,7 @@ def test_running_container_streams_every_file_from_near_limit_tree():
             f"SESSION_ID={session} WaitInitialQueryTimeoutSec=60 "
             "WaitQueryUpdateTimeoutSec=10 "
             "WaitResultConsumptionTimeoutSec=900"
+            + os.linesep
         )
         report = json.loads(
             wait_for_fifo(api / f"result.json_{session}").read_text()
