@@ -340,6 +340,7 @@ def test_running_container_filesystem_api():
         f'SESSION_ID={session} metadata="" preferred_filename=functional.bin '
         "WaitInitialQueryTimeoutSec=5 WaitQueryUpdateTimeoutSec=0.1 "
         "WaitResultConsumptionTimeoutSec=5"
+        + os.linesep
     )
     handshake_fifo = wait_for_fifo(api_node / f"result.json_{session}")
     report = json.loads(handshake_fifo.read_text())
@@ -362,6 +363,7 @@ def test_running_container_filesystem_api():
     shutdown_session = f"shutdown-cleanup-{os.getpid()}"
     (api_node / "exec").write_text(
         f"SESSION_ID={shutdown_session} WaitInitialQueryTimeoutSec=60"
+        + os.linesep
     )
     shutdown_handshake = wait_for_fifo(api_node / f"result.json_{shutdown_session}")
     shutdown_report = json.loads(shutdown_handshake.read_text())

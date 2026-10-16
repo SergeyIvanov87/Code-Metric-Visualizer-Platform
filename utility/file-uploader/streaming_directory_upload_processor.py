@@ -29,11 +29,11 @@ DEFAULT_DIR_SKIP_REGEX = (
     r"(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)"
 )
 stop_event = threading.Event()
-# The generated pseudo-filesystem API uses one shared exec FIFO. A request is
-# framed by its writer closing that FIFO, so two writers must never overlap:
-# otherwise the server reads both argument strings as one request. Keep the
+# The generated pseudo-filesystem API uses one shared exec FIFO with
+# newline-delimited requests, so two writers must never overlap: otherwise the
+# server can read both argument strings as one request. Keep the
 # lock until the server has published and we have consumed the handshake;
-# publication proves it observed EOF for this request.
+# publication proves it consumed this newline-delimited request.
 nested_allocation_lock = threading.Lock()
 
 
@@ -246,7 +246,7 @@ def allocate_nested_upload(api_directory, result_fifo, request):
         # server also waits for its previous response writer before accepting
         # another request for the same derived session.
         exec_fifo = wait_for_path(api_directory / "exec", 5, fifo=True)
-        exec_fifo.write_text(request)
+        exec_fifo.write_text(request.rstrip("\r\n") + os.linesep)
         return json.loads(wait_for_path(result_fifo, 5, fifo=True).read_text())
 
 
