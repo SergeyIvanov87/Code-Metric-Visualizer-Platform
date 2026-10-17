@@ -5,17 +5,23 @@ import argparse
 from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from queue import Queue
 import re
 import signal
-import stat
 from threading import Lock, Thread
 import time
 from uuid import uuid4
 
 from directory_event_protocol import iter_directory_event_stream
-
+from doc_type_association import document_type
+from fs_api_wrappers import (
+    augmented_metadata,
+    create_api_query_interruptible,
+    get_normalized_api_queries,
+    rag_add_file,
+    start_uploader,
+)
 
 DEFAULTS = {
     "metadata": "", "WaitInitialQueryTimeoutSec": "60",
@@ -24,17 +30,14 @@ DEFAULTS = {
 }
 MAX_WORKERS = 32
 EVENT_RETRY_INTERVAL = 0.05
-CODE_EXTENSIONS = {
-    "c", "cc", "cpp", "cxx", "h", "hpp", "cs", "go", "java", "js", "jsx",
-    "kt", "kts", "lua", "php", "pl", "py", "r", "rb", "rs", "scala", "sh",
-    "sql", "swift", "ts", "tsx", "vue", "zig",
+API_SERVICE_NAME = "api.pmccabe_collector.restapi.org"
+API_QUERY_PATTERNS = {
+    "streaming_directory_events": re.compile(
+        r".*file-uploader_streaming_directory_events.*"
+    ),
+    "rag_add": re.compile(r".*ai_agent_rag_add_doc.*"),
 }
-TEXT_GROUPS = {
-    "markdown": {"md", "markdown", "rst", "adoc"},
-    "data": {"csv", "json", "jsonl", "toml", "tsv", "xml", "yaml", "yml"},
-    "web": {"css", "htm", "html", "scss", "svg"},
-    "document": {"log", "text", "txt"},
-}
+
 stopping = False
 TERMINATE_WORKER = object()
 TERMINATE_COLLECTOR = object()
@@ -71,22 +74,6 @@ def values(arguments):
     return result
 
 
-def document_type(path):
-    """Return a text-compatible semantic document type for a filename."""
-    extension = Path(path).suffix.lower().lstrip(".")
-    if extension in CODE_EXTENSIONS:
-        return "txt,code"
-    for group, extensions in TEXT_GROUPS.items():
-        if extension in extensions:
-            return f"txt,{group}"
-    return f"txt,{extension or 'document'}"
-
-
-def augmented_metadata(original, relative):
-    tokens = ",".join(PurePosixPath(relative).parts)
-    return ",".join(value for value in (original.strip(), tokens) if value)
-
-
 def completion_timestamp():
     """Return the current UTC time in an ISO 8601 JSON-friendly form."""
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace(
@@ -94,60 +81,10 @@ def completion_timestamp():
     )
 
 
-def fifo_request(exec_fifo, arguments, session, timeout=10):
-    """Execute a filesystem API query and return its session result."""
-    exec_fifo = Path(exec_fifo)
-    suffix = f"_{session}"
-    candidates = [path for path in exec_fifo.parent.glob("result*") if "_" not in path.name]
-    if not candidates:
-        raise RuntimeError(f"no result FIFO beside {exec_fifo}")
-    result_fifo = Path(str(sorted(candidates)[0]) + suffix)
-    deadline = time.monotonic() + timeout
-    descriptor = None
-    while descriptor is None and time.monotonic() < deadline:
-        try:
-            descriptor = os.open(exec_fifo, os.O_WRONLY | os.O_NONBLOCK)
-        except OSError:
-            time.sleep(0.05)
-    if descriptor is None:
-        raise TimeoutError(f"query is not accepting requests: {exec_fifo}")
-    try:
-        os.write(descriptor, (arguments.rstrip() + "\n").encode())
-    finally:
-        os.close(descriptor)
-    while time.monotonic() < deadline:
-        if result_fifo.exists() and stat.S_ISFIFO(result_fifo.stat().st_mode):
-            with result_fifo.open() as stream:
-                return stream.read()
-        time.sleep(0.05)
-    raise TimeoutError(f"query result was not created: {result_fifo}")
-
-
-def api_exec(root, relative):
-    path = Path(root) / "api.pmccabe_collector.restapi.org" / relative
-    if not path.is_fifo():
-        raise ValueError(f"required filesystem API query is unavailable: {path}")
-    return path
-
-
-def start_uploader(request, config):
-    root = os.environ.get("SHARED_API_DIR", "/api")
-    uploader_exec = api_exec(root, "file-uploader/streaming_directory_events/POST/exec")
-    session = f"rag-bulk-{config['SESSION_ID']}-{uuid4().hex}"
-    arguments = " ".join((
-        f"SESSION_ID={session}",
-        f"WaitInitialQueryTimeoutSec={config['WaitInitialQueryTimeoutSec']}",
-        f"WaitQueryUpdateTimeoutSec={config['WaitQueryUpdateTimeoutSec']}",
-        f"WaitResultConsumptionTimeoutSec={config['WaitResultConsumptionTimeoutSec']}",
-    ))
-    report = json.loads(fifo_request(uploader_exec, arguments, session))
-    (request / "uploader.json").write_text(json.dumps(report))
-    return report
-
-
-def prepare(request, arguments):
-    config = values(arguments)
-    report = start_uploader(request, config)
+def prepare(request, config, uploader_query, uploader_session_id):
+    report = start_uploader(
+        uploader_query, request, config, uploader_session_id
+    )
     stage = Path(report["staging"]).resolve(strict=True)
     input_path = request / "input"
     input_path.symlink_to(os.path.relpath(stage, request), target_is_directory=True)
@@ -155,7 +92,8 @@ def prepare(request, arguments):
     os.mkfifo(events, 0o644)
     events.chmod(0o644)
     return {
-        "input": str(input_path), "input_type": "DIRECTORY", "staging": str(stage),
+        "input": str(input_path), "input_type": "DIRECTORY",
+        "staging": str(stage),
         "events": str(events), "events_type": "FIFO",
         "protocol": "cmvp.rag-bulk-events.v1",
         "uploader_request": str(Path(report["events"]).parent),
@@ -179,30 +117,9 @@ def publish_event(descriptor, event, timeout=1):
     return False
 
 
-def add_file(config, stage, relative, sequence):
-    root = os.environ.get("SHARED_API_DIR", "/api")
-    rag_exec = api_exec(root, "ai_agent/rag/add_doc/v1/PUT/exec")
-    session = (
-        f"rag-bulk-add-{config['SESSION_ID']}-"
-        f"{config['RUN_ID']}-task-{sequence}"
-    )
-    uri = stage / relative
-    metadata = augmented_metadata(config["metadata"], relative)
-    arguments = " ".join((f"SESSION_ID={session}",
-                          f"-URI={json.dumps(str(uri), ensure_ascii=False)}",
-                          f"-metadata={json.dumps(metadata, ensure_ascii=False)}",
-                          f"-doc_type={document_type(relative)}"))
-    result = json.loads(fifo_request(rag_exec, arguments, session, timeout=300))
-    succeeded = result.get("error_code") in (0, "0")
-    return {
-        "sequence": sequence, "status": "added" if succeeded else "failed",
-        "path": relative, "doc_type": document_type(relative),
-        "doc_id": result.get("doc_id", ""), "rag_result": result,
-        "timestamp": completion_timestamp(),
-    }
-
-
-def add_file_worker(config, stage, input_queue, outcome_queue):
+def add_file_worker(
+    rag_add_query, session_id, config, stage, input_queue, outcome_queue
+):
     """Process queued files until this worker receives its termination marker."""
     while True:
         task = input_queue.get()
@@ -211,7 +128,14 @@ def add_file_worker(config, stage, input_queue, outcome_queue):
                 return
             event, sequence = task
             try:
-                outcome = add_file(config, stage, event["path"], sequence)
+                outcome = rag_add_file(
+                    rag_add_query,
+                    session_id,
+                    config,
+                    stage,
+                    event["path"],
+                    sequence,
+                )
             except Exception as error:
                 outcome = {
                     "sequence": sequence, "status": "failed",
@@ -262,9 +186,7 @@ def start_workers(worker_threads, input_queues):
     return started
 
 
-def run(options, arguments):
-    config = values(arguments)
-    config["RUN_ID"] = uuid4().hex
+def run(options, config, rag_add_queries):
     report = json.loads((options.request_directory / "stage.json").read_text())
     uploader = json.loads((options.request_directory / "uploader.json").read_text())
     stage = Path(report["staging"])
@@ -276,7 +198,14 @@ def run(options, arguments):
     worker_threads = [
         Thread(
             target=add_file_worker,
-            args=(config, stage, input_queue, outcome_queue),
+            args=(
+                rag_add_queries[index][0],
+                rag_add_queries[index][1],
+                config,
+                stage,
+                input_queue,
+                outcome_queue,
+            ),
             name=f"rag-bulk-add-{index + 1}",
         )
         for index, input_queue in enumerate(input_queues)
@@ -334,16 +263,48 @@ def main(argv=None):
     options = parser.parse_args(argv)
     arguments = options.arguments[1:] if options.arguments[:1] == ["--"] else options.arguments
     try:
-        values(arguments)
+        config = values(arguments)
         if options.check_arguments:
             print('{"error_code":"0","error_description":""}')
             return 0
+        shared_api_dir = os.environ.get("SHARED_API_DIR", "/api")
+        normalized_api_queries = get_normalized_api_queries(
+            shared_api_dir,
+            API_SERVICE_NAME,
+            API_QUERY_PATTERNS,
+        )
         if options.prepare_api_channel:
-            report = prepare(options.request_directory.resolve(strict=True), arguments)
+            uploader_session_id = (
+                f"rag-bulk-{config['SESSION_ID']}-{uuid4().hex}"
+            )
+            uploader_query = create_api_query_interruptible(
+                shared_api_dir,
+                normalized_api_queries["streaming_directory_events"],
+                uploader_session_id,
+            )
+            report = prepare(
+                options.request_directory.resolve(strict=True),
+                config,
+                uploader_query,
+                uploader_session_id,
+            )
             (options.request_directory / "stage.json").write_text(json.dumps(report))
             print(json.dumps(report))
             return 0
-        return run(options, arguments)
+        config["RUN_ID"] = uuid4().hex
+        rag_add_queries = []
+        for worker_index in range(int(config["workers"])):
+            session_id = (
+                f"rag-bulk-add-{config['SESSION_ID']}-{config['RUN_ID']}-"
+                f"worker-{worker_index + 1}"
+            )
+            query = create_api_query_interruptible(
+                shared_api_dir,
+                normalized_api_queries["rag_add"],
+                session_id,
+            )
+            rag_add_queries.append((query, session_id))
+        return run(options, config, rag_add_queries)
     except Exception as error:
         print(json.dumps({
             "error_code": "1", "error_description": str(error),

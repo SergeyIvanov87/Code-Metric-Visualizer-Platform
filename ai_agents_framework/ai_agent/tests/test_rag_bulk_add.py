@@ -11,6 +11,7 @@ import pytest
 
 
 MODULE_PATH = Path(__file__).parents[1] / "sources/rag_bulk_add.py"
+sys.path.insert(0, str(MODULE_PATH.parent))
 sys.path.insert(0, str(Path(__file__).parents[3] / "common/modules"))
 spec = importlib.util.spec_from_file_location("rag_bulk_add", MODULE_PATH)
 rag_bulk_add = importlib.util.module_from_spec(spec)
@@ -32,7 +33,9 @@ def test_bulk_input_survives_api_volume_mount_relocation(monkeypatch, tmp_path):
     monkeypatch.setattr(rag_bulk_add, "start_uploader", lambda *_: report)
     previous = os.umask(0o077)
     try:
-        prepared = rag_bulk_add.prepare(request, [])
+        prepared = rag_bulk_add.prepare(
+            request, rag_bulk_add.values([]), object(), "uploader-session"
+        )
     finally:
         os.umask(previous)
     assert Path(prepared["events"]).stat().st_mode & 0o777 == 0o644
@@ -94,52 +97,6 @@ def test_values_rejects_invalid_max_workers(monkeypatch):
             rag_bulk_add.values([])
 
 
-def test_add_file_invokes_regular_rag_add_query(monkeypatch, tmp_path):
-    calls = []
-    monkeypatch.setattr(rag_bulk_add, "api_exec", lambda root, path: Path("/rag/exec"))
-
-    def request(exec_fifo, arguments, session, timeout):
-        calls.append((exec_fifo, arguments, session, timeout))
-        return json.dumps({"error_code": 0, "doc_id": "doc-123"})
-
-    monkeypatch.setattr(rag_bulk_add, "fifo_request", request)
-    result = rag_bulk_add.add_file(
-        {"metadata": "origin=test", "SESSION_ID": "bulk", "RUN_ID": "run-456"},
-        tmp_path, "src/main.rs", 7,
-    )
-    assert result["status"] == "added"
-    assert result["doc_id"] == "doc-123"
-    assert "-URI=" + json.dumps(str(tmp_path / "src/main.rs")) in calls[0][1]
-    assert "-doc_type=txt,code" in calls[0][1]
-    assert "origin=test,src,main.rs" in calls[0][1]
-    assert calls[0][2] == "rag-bulk-add-bulk-run-456-task-7"
-    assert_utc_timestamp(result["timestamp"])
-
-
-def test_add_file_preserves_unicode_path_and_metadata(monkeypatch, tmp_path):
-    calls = []
-    monkeypatch.setattr(rag_bulk_add, "api_exec", lambda *_: Path("/rag/exec"))
-
-    def request(_exec_fifo, arguments, _session, timeout):
-        calls.append(arguments)
-        return json.dumps({"error_code": 0, "doc_id": "unicode-doc"})
-
-    monkeypatch.setattr(rag_bulk_add, "fifo_request", request)
-    relative = "données/résumé-数据.txt"
-    metadata = "équipe=δοκιμή"
-    rag_bulk_add.add_file(
-        {"metadata": metadata, "SESSION_ID": "bulk", "RUN_ID": "run-456"},
-        tmp_path, relative, 1,
-    )
-
-    arguments = calls[0]
-    assert json.dumps(str(tmp_path / relative), ensure_ascii=False) in arguments
-    assert json.dumps(
-        rag_bulk_add.augmented_metadata(metadata, relative), ensure_ascii=False
-    ) in arguments
-    assert "\\u" not in arguments
-
-
 def assert_utc_timestamp(value):
     assert value.endswith("Z")
     datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
@@ -170,16 +127,17 @@ def test_run_processes_files_in_parallel_and_publishes_as_completed(
     thread_names = set()
     run_ids = set()
 
-    def add_file(_config, _stage, path, sequence):
+    def add_file(_query, session_id, _config, _stage, path, sequence):
         thread_names.add(threading.current_thread().name)
         run_ids.add(_config["RUN_ID"])
+        assert session_id.startswith("worker-session-")
         barrier.wait(timeout=5)
         return {
             "sequence": sequence, "status": "added", "path": path,
             "doc_id": f"doc-{sequence}",
         }
 
-    monkeypatch.setattr(rag_bulk_add, "add_file", add_file)
+    monkeypatch.setattr(rag_bulk_add, "rag_add_file", add_file)
     published = []
     monkeypatch.setattr(
         rag_bulk_add, "publish_event",
@@ -187,7 +145,12 @@ def test_run_processes_files_in_parallel_and_publishes_as_completed(
     )
     options = type("Options", (), {"request_directory": request})()
 
-    assert rag_bulk_add.run(options, ["workers", "4"]) == 0
+    config = rag_bulk_add.values(["workers", "4"])
+    config["RUN_ID"] = "run-id"
+    rag_queries = [
+        (object(), f"worker-session-{index}") for index in range(4)
+    ]
+    assert rag_bulk_add.run(options, config, rag_queries) == 0
 
     result = json.loads(capsys.readouterr().out)
     assert len(thread_names) == 4
@@ -248,8 +211,10 @@ def test_worker_failure_outcome_has_completion_timestamp(monkeypatch):
     def fail(*_args):
         raise RuntimeError("add failed")
 
-    monkeypatch.setattr(rag_bulk_add, "add_file", fail)
-    rag_bulk_add.add_file_worker({}, Path("/stage"), input_queue, outcome_queue)
+    monkeypatch.setattr(rag_bulk_add, "rag_add_file", fail)
+    rag_bulk_add.add_file_worker(
+        object(), "worker-session", {}, Path("/stage"), input_queue, outcome_queue
+    )
 
     outcome = outcome_queue.get_nowait()
     assert outcome["sequence"] == 3
