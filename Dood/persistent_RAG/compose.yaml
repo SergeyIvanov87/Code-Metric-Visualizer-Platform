@@ -1,0 +1,49 @@
+name: persistent-rag-dood
+services:
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      NETWORKS: 1
+      VOLUMES: 1
+      INFO: 1
+      PING: 1
+      VERSION: 1
+      POST: 1
+      BUILD: 0
+      EXEC: 0
+      AUTH: 0
+      SECRETS: 0
+      SERVICES: 0
+      SWARM: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [control]
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+  rag:
+    image: persistent-rag/controller:local
+    build: .
+    environment:
+      DOCKER_HOST: tcp://socket-proxy:2375
+      NO_PROXY: socket-proxy,localhost,127.0.0.1
+      no_proxy: socket-proxy,localhost,127.0.0.1
+      FS_API_VOLUME: ${FS_API_VOLUME:-persistent-rag-api}
+    depends_on: [socket-proxy]
+    networks: [control]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 90s
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 5s
+      timeout: 2s
+      start_period: 10m
+      retries: 6
+networks:
+  control:
+    internal: true
