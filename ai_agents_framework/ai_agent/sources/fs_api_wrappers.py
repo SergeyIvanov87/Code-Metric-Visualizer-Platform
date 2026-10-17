@@ -3,7 +3,7 @@ import re
 import socket
 
 from distutils.version import StrictVersion
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 from api_schema_utils import (
@@ -11,6 +11,7 @@ from api_schema_utils import (
     compose_api_queries_pipe_names,
 )
 from api_fs_query import APIQueryInterruptible
+from doc_type_association import document_type
 
 
 def get_doc_dispatcher_queries(
@@ -67,6 +68,91 @@ def create_api_query_interruptible(shared_api_dir, query_json_description, sessi
     if not query.is_valid():
         raise RuntimeError(f"The API query: {query_json_description} isn't ready")
     return query
+
+
+def _execute_json_query(query, session_id, timeout, exec_args, description):
+    """Execute an interruptible filesystem API query and decode its JSON result."""
+    status, timeout_elapsed = query.execute(timeout, exec_args)
+    if not status:
+        raise RuntimeError(
+            f"Cannot execute {description}, status: {status}, "
+            f"elapsed timeout: {timeout_elapsed}, session: {session_id}"
+        )
+
+    status, result, timeout_elapsed = query.wait_result(
+        timeout_elapsed,
+        session_id,
+        0.1,
+        max(1, timeout_elapsed / 0.1),
+        False,
+    )
+    if not status:
+        raise RuntimeError(
+            f"Cannot execute {description}: waiting for result failed, "
+            f"status: {status}, result: {result}, "
+            f"elapsed timeout: {timeout_elapsed}, session: {session_id}"
+        )
+    try:
+        return json.loads(result)
+    except (TypeError, json.JSONDecodeError) as ex:
+        raise RuntimeError(
+            f"Cannot execute {description}: invalid JSON result for session "
+            f"{session_id}: {result}"
+        ) from ex
+
+
+def start_uploader(query, request, config, session_id, timeout=10):
+    """Start the streaming-directory uploader through a prepared API handle."""
+    arguments = " ".join((
+        f"SESSION_ID={session_id}",
+        f"WaitInitialQueryTimeoutSec={config['WaitInitialQueryTimeoutSec']}",
+        f"WaitQueryUpdateTimeoutSec={config['WaitQueryUpdateTimeoutSec']}",
+        f"WaitResultConsumptionTimeoutSec={config['WaitResultConsumptionTimeoutSec']}",
+    ))
+    report = _execute_json_query(
+        query,
+        session_id,
+        timeout,
+        arguments,
+        "streaming_directory_events",
+    )
+    (request / "uploader.json").write_text(json.dumps(report))
+    return report
+
+
+def augmented_metadata(original, relative):
+    """Append each POSIX path component to the caller-provided metadata."""
+    tokens = ",".join(PurePosixPath(relative).parts)
+    return ",".join(value for value in (original.strip(), tokens) if value)
+
+
+def rag_add_file(query, session_id, config, stage, relative, sequence, timeout=300):
+    """Add one staged file to RAG through a prepared API handle."""
+    uri = stage / relative
+    metadata = augmented_metadata(config["metadata"], relative)
+    resolved_doc_type = document_type(relative)
+    arguments = " ".join((
+        f"SESSION_ID={session_id}",
+        f"-URI={json.dumps(str(uri), ensure_ascii=False)}",
+        f"-metadata={json.dumps(metadata, ensure_ascii=False)}",
+        f"-doc_type={resolved_doc_type}",
+    ))
+    result = _execute_json_query(
+        query,
+        session_id,
+        timeout,
+        arguments,
+        "rag_add",
+    )
+    succeeded = result.get("error_code") in (0, "0")
+    return {
+        "sequence": sequence,
+        "status": "added" if succeeded else "failed",
+        "path": relative,
+        "doc_type": resolved_doc_type,
+        "doc_id": result.get("doc_id", ""),
+        "rag_result": result,
+    }
 
 
 def execute_put_doc_query(

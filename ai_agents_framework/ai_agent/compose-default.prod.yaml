@@ -14,6 +14,15 @@ services:
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:/assets/models
 
+  file-uploader:
+    build:
+      context: ../../utility/file-uploader
+      dockerfile: Dockerfile
+      additional_contexts:
+        common: ../../common
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+
 volumes:
   api.pmccabe_collector.restapi.org:
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:

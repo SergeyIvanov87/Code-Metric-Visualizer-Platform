@@ -1,8 +1,10 @@
 services:
   file-uploader:
     build:
-      context: ../..
-      dockerfile: utility/file-uploader/Dockerfile
+      context: .
+      dockerfile: Dockerfile
+      additional_contexts:
+        common: ../../common
     volumes:
       - file-uploader-api:/api
       - file-uploads:/uploads

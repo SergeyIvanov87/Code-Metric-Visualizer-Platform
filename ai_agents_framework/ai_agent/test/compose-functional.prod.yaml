@@ -17,6 +17,15 @@ services:
         condition: service_started
       ai_agent_docs_dispatcher:
         condition: service_started
+      file-uploader:
+        condition: service_started
+
+  file-uploader:
+    extends:
+      file: ../compose-default.prod.yaml
+      service: file-uploader
+    volumes:
+      - ai_agent_api:/api
 
   ai_agent_rag_db:
     build:

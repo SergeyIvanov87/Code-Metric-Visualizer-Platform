@@ -40,7 +40,14 @@ def generate_api_node_env_init():
              r''
     ]
 
-def generate_read_api_fs_args():
+def generate_read_api_fs_args(preserve_empty_named_values=False):
+    empty_named_value = [
+        r'    if [[ "${special_kind_param_name}" != "NO_NAME_PARAM" ]] && (( ${#arr[@]} == 0 )); then',
+        r'        arr=("")',
+        r'    fi',
+    ] if preserve_empty_named_values else []
+    preserve_empty_value = ' || [[ -z "${a}" ]]' if preserve_empty_named_values else ""
+
     return [ r'for entry in "${API_NODE}"/*.*',
              r"do",
              r'    [[ "${entry}" == *.md ]] && continue',
@@ -78,9 +85,10 @@ def generate_read_api_fs_args():
              r"            fi",
              r"        done",
              r"    fi",
+             *empty_named_value,
              r'    for a in "${arr[@]}"',
              r"    do",
-             "        if ((value_from_input)) || [[ \"${a}\" == \\\"* || \"${a}\" == *$'\\n'* ]];",
+             "        if ((value_from_input))" + preserve_empty_value + " || [[ \"${a}\" == \\\"* || \"${a}\" == *$'\\n'* ]];",
              r"        then",
              r'            OVERRIDEN_CMD_ARGS+=("${a}")',
              r"        else",

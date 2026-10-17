@@ -1,4 +1,8 @@
+.git/
 assets
+ai_agents_framework/ai_agent/sources/assets_model/
+ai_agents_framework/ai_agent/sources/.*
+tmp*/
 **/.cache
 **/.config
 **/.chroma
@@ -6,4 +10,3 @@ assets
 diagrams
 HowTo
 *.yaml
-
