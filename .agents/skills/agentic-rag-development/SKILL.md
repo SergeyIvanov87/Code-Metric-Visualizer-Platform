@@ -11,13 +11,14 @@ Use the [RAG source map](../../../HowTo/Agent-Repository-Map.md#agentic-rag) to 
 2. For backend changes, read `dispatcher_backend_config.py` and [backend configuration](../../../ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/README.md). The dispatcher routes to same-named command modules using the configured backend name. The package named `mysql` defaults to a SQLite URI: verify configuration rather than inferring the engine from the directory name. Refer to secret paths without printing their contents.
 3. For reconciliation, read `rag_sync.py` and `tests/test_rag_sync.py`. Validate source pages and duplicate chunk IDs, preserve stable chunk metadata, and delay deletion of stale Chroma IDs until source enumeration succeeds. A failed or incomplete page must not be interpreted as an empty authoritative source. Preserve partial-progress error reporting.
 4. For add/delete behavior, trace `rag_add.py`, `rag_delete.py`, and dispatcher storage operations. Preserve wrapper distinctions between inline textual document data and URI input. Verify both document storage and embeddings; deleting one does not prove deletion of the other.
-5. For inference changes, read `inference_config.py`, configuration tests, and [agent runtime guidance](../../../ai_agents_framework/ai_agent/README.md). CPU, NVIDIA, and Intel Vulkan use different build/runtime requirements. GPU profiles must validate device/backend availability; do not silently fall back to CPU. Each replica loads its own model and cache.
-6. Run focused tests, then the relevant dispatcher, RAG store, or full agent functional scope from [test diagnostics](../container-test-diagnostics/SKILL.md). Mocked reconciliation tests do not establish live database, model, or GPU readiness.
+5. For direct retrieval, trace `rag_search.py`, its filesystem schema, and `tests/test_rag_search.py`. Preserve raw Chroma distance semantics, global ranking across selected collections, and dispatcher-based content resolution; direct search must not load the chat model or agent pipeline.
+6. For inference changes, read `inference_config.py`, configuration tests, and [agent runtime guidance](../../../ai_agents_framework/ai_agent/README.md). CPU, NVIDIA, and Intel Vulkan use different build/runtime requirements. GPU profiles must validate device/backend availability; do not silently fall back to CPU. Each replica loads its own model and cache.
+7. Run focused tests, then the relevant dispatcher, RAG store, or full agent functional scope from [test diagnostics](../container-test-diagnostics/SKILL.md). Mocked reconciliation and retrieval tests do not establish live database, model, or GPU readiness.
 
 ## Focused checks
 
 ```sh
-python -m pytest -q ai_agents_framework/ai_agent/tests/test_fs_api_wrappers.py ai_agents_framework/ai_agent/tests/test_rag_sync.py ai_agents_framework/ai_agent/tests/test_rag_delete.py ai_agents_framework/ai_agent/tests/test_inference_config.py
+python -m pytest -q ai_agents_framework/ai_agent/tests/test_fs_api_wrappers.py ai_agents_framework/ai_agent/tests/test_rag_search.py ai_agents_framework/ai_agent/tests/test_rag_sync.py ai_agents_framework/ai_agent/tests/test_rag_delete.py ai_agents_framework/ai_agent/tests/test_inference_config.py
 ```
 
 ## Architecture references
