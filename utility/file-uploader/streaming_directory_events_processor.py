@@ -77,9 +77,14 @@ def validate(arguments):
 
 
 def staging_root(request):
-    """Return staging beside deferred requests on their shared API volume."""
-    root = request.parent / ".staging"
-    root.mkdir(mode=0o2770, exist_ok=True)
+    """Return the staging volume shared with consumers such as RAG bulk add."""
+    configured = os.environ.get("STAGING_ROOT")
+    root = Path(configured) if configured else request.parent / ".staging"
+    created = not root.exists()
+    root.mkdir(mode=0o2777, exist_ok=True)
+    if created:
+        # API clients and consumers can have different rootless UID mappings.
+        root.chmod(0o2777)
     root = root.resolve(strict=True)
     if not root.is_dir():
         raise ValueError("shared staging root is not a directory")
@@ -91,7 +96,8 @@ def prepare(request, arguments):
     request = request.resolve(strict=True)
     root = staging_root(request)
     stage = root / f"events-{session}-{request.name}"
-    stage.mkdir(mode=0o2770)
+    stage.mkdir(mode=0o2777)
+    stage.chmod(0o2777)
     if stage.resolve(strict=True).parent != root:
         raise ValueError("shared staging directory escaped its configured root")
     input_path = request / "input"
@@ -102,9 +108,11 @@ def prepare(request, arguments):
             or input_path.resolve(strict=True) != stage.resolve(strict=True)):
         raise ValueError("input link does not resolve to shared staging")
     events_fifo = request / "events"
-    os.mkfifo(events_fifo, 0o640)
+    os.mkfifo(events_fifo, 0o644)
+    events_fifo.chmod(0o644)
     seal_fifo = request / "seal"
-    os.mkfifo(seal_fifo, 0o620)
+    os.mkfifo(seal_fifo, 0o622)
+    seal_fifo.chmod(0o622)
     return {
         "input": str(input_path), "input_type": "DIRECTORY",
         "staging": str(stage), "staging_type": "DIRECTORY",

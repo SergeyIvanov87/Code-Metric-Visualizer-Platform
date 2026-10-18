@@ -31,7 +31,8 @@ def prepare_api_channel(request_directory):
     """Create and describe the input FIFO owned by this processor."""
     validate_request_dir(request_directory)
     input_path = request_directory / "input"
-    os.mkfifo(input_path, 0o620)
+    os.mkfifo(input_path, 0o622)
+    input_path.chmod(0o622)
     return {"input": str(input_path), "input_type": "FIFO"}
 
 

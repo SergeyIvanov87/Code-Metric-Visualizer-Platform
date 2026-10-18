@@ -3,9 +3,8 @@
 import json
 
 
-def parse_directory_event_stream(stream):
-    """Read JSON-Line batch envelopes through EOF and return their events."""
-    events = []
+def iter_directory_event_stream(stream):
+    """Validate JSON-Line batch envelopes and yield events as they arrive."""
     previous_sequence = None
     for raw_line in stream:
         if isinstance(raw_line, bytes):
@@ -32,5 +31,9 @@ def parse_directory_event_stream(stream):
                     and event["sequence"] <= previous_sequence):
                 raise ValueError("directory event sequence is not increasing")
             previous_sequence = event["sequence"]
-            events.append(event)
-    return events
+            yield event
+
+
+def parse_directory_event_stream(stream):
+    """Read JSON-Line batch envelopes through EOF and return their events."""
+    return list(iter_directory_event_stream(stream))

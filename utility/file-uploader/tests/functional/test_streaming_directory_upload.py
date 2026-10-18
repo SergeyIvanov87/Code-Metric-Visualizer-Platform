@@ -78,11 +78,15 @@ def test_preflight_and_channel_preparation():
             text=True, capture_output=True, timeout=3,
         )
         assert checked.returncode == 0, checked.stdout + checked.stderr
-        prepared = subprocess.run(
-            [sys.executable, str(PROCESSOR), "--request-directory", str(request),
-             "--prepare-api-channel", "--", *arguments(destination)],
-            text=True, capture_output=True, timeout=3,
-        )
+        previous = os.umask(0o077)
+        try:
+            prepared = subprocess.run(
+                [sys.executable, str(PROCESSOR), "--request-directory", str(request),
+                 "--prepare-api-channel", "--", *arguments(destination)],
+                text=True, capture_output=True, timeout=3,
+            )
+        finally:
+            os.umask(previous)
         assert prepared.returncode == 0, prepared.stdout + prepared.stderr
         report = json.loads(prepared.stdout)
         assert report["input_type"] == "DIRECTORY"
@@ -99,6 +103,10 @@ def test_preflight_and_channel_preparation():
         assert (input_path / source.name / "host-visible.txt").read_text() == "host copy"
         assert len(report["status"]) == 2
         assert all(stat.S_ISFIFO(Path(path).stat().st_mode) for path in report["status"])
+        assert all(
+            Path(path).stat().st_mode & 0o777 == 0o666
+            for path in report["status"]
+        )
 
 
 def test_preflight_rejects_invalid_worker_regex_and_session():

@@ -4,8 +4,54 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+from types import SimpleNamespace
 
 from common import deferred_query_executor as executor
+
+
+def test_result_fifo_is_host_readable_under_restrictive_umask(monkeypatch, tmp_path):
+    monkeypatch.setattr(executor.subprocess, "run", lambda *_a, **_k:
+                        SimpleNamespace(returncode=0, stdout="{}", stderr=""))
+    previous = os.umask(0o077)
+    try:
+        report, fifo = executor.prepare_api_channel("processor", tmp_path, [])
+    finally:
+        os.umask(previous)
+    assert fifo.is_fifo()
+    assert fifo.stat().st_mode & 0o777 == 0o644
+    assert report["result"] == str(fifo)
+
+
+def test_executor_preserves_processor_events_permissions(monkeypatch, tmp_path):
+    events = tmp_path / "events"
+    os.mkfifo(events, 0o644)
+    events.chmod(0o644)
+    monkeypatch.setattr(executor.subprocess, "run", lambda *_a, **_k:
+                        SimpleNamespace(returncode=0, stdout=json.dumps({
+                            "events": str(events), "events_type": "FIFO"}), stderr=""))
+    executor.prepare_api_channel("processor", tmp_path, [])
+    assert events.stat().st_mode & 0o777 == 0o644
+
+
+def test_directory_event_fifos_are_accessible_by_others(monkeypatch, tmp_path):
+    events = tmp_path / "events"
+    seal = tmp_path / "seal"
+    os.mkfifo(events, 0o644)
+    events.chmod(0o644)
+    os.mkfifo(seal, 0o622)
+    seal.chmod(0o622)
+    monkeypatch.setattr(executor.subprocess, "run", lambda *_a, **_k:
+                        SimpleNamespace(returncode=0, stdout=json.dumps({
+                            "protocol": "cmvp.directory-events.v1",
+                            "events": str(events), "events_type": "FIFO",
+                            "seal": str(seal), "seal_type": "FIFO",
+                        }), stderr=""))
+
+    _, fifo = executor.prepare_api_channel("processor", tmp_path, [])
+
+    assert fifo.stat().st_mode & 0o777 == 0o644
+    assert events.stat().st_mode & 0o777 == 0o644
+    assert seal.stat().st_mode & 0o777 == 0o622
 
 
 def test_run_processor_captures_result_larger_than_pipe_buf():

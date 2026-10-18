@@ -187,7 +187,7 @@ jobs:
       if: ${{ always() }}
       run: |
         docker rm -f rest-api 2>/dev/null || true
-        docker volume rm api project
+        docker volume rm api project 2>/dev/null || true
         rm -rf ${GITHUB_WORKSPACE}/api
 
   build_and_test_http_fs_api_proxy:

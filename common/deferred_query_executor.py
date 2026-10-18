@@ -32,8 +32,10 @@ def prepare_api_channel(processor_path, request_directory, arguments):
         detail = prepared.stderr.strip() or prepared.stdout.strip()
         raise RuntimeError(f"processor API-channel preparation failed: {detail}")
     report = json.loads(prepared.stdout)
+    read_mode = 0o644
     result_fifo = request_directory / "async_result"
-    os.mkfifo(result_fifo, 0o640)
+    os.mkfifo(result_fifo, read_mode)
+    result_fifo.chmod(read_mode)
     report["result"] = str(result_fifo)
     report["result_type"] = "FIFO"
     return report, result_fifo

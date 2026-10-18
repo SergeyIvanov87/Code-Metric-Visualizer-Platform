@@ -1,4 +1,5 @@
 {
+    "ParallelBySession": true,
     "Content-Type" : "text/plain",
     "Method" : "GET",
     "Query": "api.pmccabe_collector.restapi.org/req_1",
