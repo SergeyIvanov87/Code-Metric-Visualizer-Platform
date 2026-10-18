@@ -96,6 +96,24 @@ def ask_rrd_question() -> str:
     )
 
 
+def search_rrd_documents() -> dict:
+    return json.loads(
+        execute_api(
+            os.environ["SHARED_API_DIR"],
+            API_SCHEMAS["rag_search"],
+            {
+                "search": "round-robin metric database",
+                "score_min": "0",
+                "score_max": "4",
+                "count": "5",
+                "collection_use_regex": ".*",
+                "collection_avoid_regex": "",
+            },
+            timeout=300,
+        )
+    )
+
+
 def test_put_doc_accepts_long_inline_data():
     """Exercise the long doc_data forwarding path before chat functionality."""
     document_data = ("Unrelated transport regression fixture ÿ.\n" * 400).encode()
@@ -120,6 +138,14 @@ def test_chat_becomes_grounded_after_readme_is_added():
     ), ungrounded_answer
 
     add_document(DATA_DIR / "README.md")
+    search_result = search_rrd_documents()
+    assert search_result["error_code"] == 0, search_result
+    assert search_result["documents"], search_result
+    retrieved_content = "\n".join(
+        document["content"] for document in search_result["documents"]
+    ).lower()
+    assert "round-robin" in retrieved_content or "round robin" in retrieved_content
+
     grounded_answer = ask_rrd_question().lower()
     assert "round-robin" in grounded_answer or "round robin" in grounded_answer
     assert "metric" in grounded_answer

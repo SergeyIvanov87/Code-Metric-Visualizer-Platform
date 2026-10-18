@@ -103,6 +103,30 @@ def make_script_rag_get_docs_help():
     return "make_script_rag_get_docs_help"
 
 
+def make_script_rag_search(script, desired_file_ext=""):
+    extension = "." + desired_file_ext if desired_file_ext else ".json"
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), "",
+        *api_fs_exec_utils.generate_get_result_type(extension), "",
+        *api_fs_exec_utils.generate_api_node_env_init(), "",
+        *api_fs_exec_utils.generate_read_api_fs_args(
+            preserve_empty_named_values=True
+        ), "",
+        'SESSION_ID_VALUE="default"',
+        'for arg in "${IN_SERVER_REQUEST_ARGS[@]}"; do',
+        '  [[ "$arg" == SESSION_ID=* ]] && SESSION_ID_VALUE="${arg#SESSION_ID=}"',
+        'done',
+        '"${WORK_DIR}/rag_search.py" --session_id="${SESSION_ID_VALUE}" '
+        '-db_host="${VECTOR_DB_HOST}" -db_port="${VECTOR_DB_PORT}" '
+        '"${SHARED_API_DIR}" "${MAIN_SERVICE_NAME}" "${OVERRIDEN_CMD_ARGS[@]}"',
+    )
+    script.writelines(line + "\n" for line in body)
+
+
+def make_script_rag_search_help():
+    return "make_script_rag_search_help"
+
+
 def make_script_rag_sync(script, desired_file_ext=""):
     if len(desired_file_ext) == 0:
         file_extension = ".json"
@@ -157,6 +181,7 @@ def get():
         "rag_bulk_add": make_script_rag_bulk_add,
         "rag_delete": make_script_rag_delete,
         "rag_get_docs": make_script_rag_get_docs,
+        "rag_search": make_script_rag_search,
         "rag_sync": make_script_rag_sync,
         "chat": make_script_chat
     }
@@ -165,6 +190,7 @@ def get():
         "rag_add": make_script_rag_add_help,
         "rag_delete": make_script_rag_delete_help,
         "rag_get_docs": make_script_rag_get_docs_help,
+        "rag_search": make_script_rag_search_help,
         "rag_sync": make_script_rag_sync_help,
         "chat": make_script_chat_help
     }
