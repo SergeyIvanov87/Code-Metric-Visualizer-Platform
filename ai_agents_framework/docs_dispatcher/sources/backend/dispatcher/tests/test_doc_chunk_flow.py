@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+from contextlib import nullcontext
+from mysql_persistent.access.mysql import MysqlAccessRecordEntry
 import json
 from types import SimpleNamespace
 from pathlib import Path
@@ -9,11 +11,11 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from mysql_persistent.app.database import Base
-from mysql_persistent.app.crud import create_file_record, get_all_records, get_file_record, update_file_record_ext
-from mysql_persistent.doc_storage.operations import add_abstract_document, get_record, get_all_records as get_all_storage_records
-from mysql_persistent.attach_doc_chunk import main as attach_chunk_main
-from mysql_persistent.delete_doc import main as delete_doc_main
+from mysql_persistent.access.database import Base
+from mysql_persistent.access.crud import create_file_record, get_all_records, get_file_record, update_file_record_ext
+from interfaces.store.operations import add_abstract_document, get_record, get_all_records as get_all_storage_records
+from dispatcher.commands.attach_doc_chunk import main as attach_chunk_main
+from dispatcher.commands.delete_doc import main as delete_doc_main
 
 
 @pytest.fixture()
@@ -98,8 +100,8 @@ def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_sess
             str(metadata_path),
         ],
     )
-    monkeypatch.setattr("mysql_persistent.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("mysql_persistent.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
+    monkeypatch.setattr("dispatcher.commands.attach_doc_chunk.load_runtime_config", lambda: _mysql_backend_config(tmp_path, storage_root))
+    monkeypatch.setattr("mysql_persistent.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
 
     assert attach_chunk_main() == 0
     capsys.readouterr()
@@ -141,8 +143,8 @@ def test_attach_chunk_rejects_missing_offset(monkeypatch, tmp_path, db_session, 
             str(metadata_path),
         ],
     )
-    monkeypatch.setattr("mysql_persistent.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("mysql_persistent.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
+    monkeypatch.setattr("dispatcher.commands.attach_doc_chunk.load_runtime_config", lambda: _mysql_backend_config(tmp_path, storage_root))
+    monkeypatch.setattr("mysql_persistent.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
 
     assert attach_chunk_main() == -1
 
@@ -176,8 +178,8 @@ def test_delete_doc_removes_multiple_documents_and_chunks(
                 str(metadata_path),
             ],
         )
-        monkeypatch.setattr("mysql_persistent.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-        monkeypatch.setattr("mysql_persistent.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
+        monkeypatch.setattr("dispatcher.commands.attach_doc_chunk.load_runtime_config", lambda: _mysql_backend_config(tmp_path, storage_root))
+        monkeypatch.setattr("mysql_persistent.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
         assert attach_chunk_main() == 0
 
     second_parent = _create_parent_document(
@@ -197,8 +199,8 @@ def test_delete_doc_removes_multiple_documents_and_chunks(
         "-ids",
         f"{parent.id},{first_chunk.id},{second_parent.id},{parent.id}",
     ])
-    monkeypatch.setattr("mysql_persistent.delete_doc.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("mysql_persistent.delete_doc.create_engine", lambda *args, **kwargs: db_engine)
+    monkeypatch.setattr("dispatcher.commands.delete_doc.load_runtime_config", lambda: _mysql_backend_config(tmp_path, storage_root))
+    monkeypatch.setattr("mysql_persistent.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
 
     assert delete_doc_main() == 0
     result = json.loads(capsys.readouterr().out)
@@ -228,12 +230,12 @@ def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
         ["delete_doc.py", "-ids", f"{parent.id},999"],
     )
     monkeypatch.setattr(
-        "mysql_persistent.delete_doc.load_mysql_backend_config",
+        "dispatcher.commands.delete_doc.load_runtime_config",
         lambda: _mysql_backend_config(tmp_path, storage_root),
     )
     monkeypatch.setattr(
-        "mysql_persistent.delete_doc.create_engine",
-        lambda *args, **kwargs: db_engine,
+        "mysql_persistent.access.mysql.MysqlAccessRecordEntry.open",
+        lambda config: nullcontext(MysqlAccessRecordEntry(db_session)),
     )
 
     assert delete_doc_main() == 1
