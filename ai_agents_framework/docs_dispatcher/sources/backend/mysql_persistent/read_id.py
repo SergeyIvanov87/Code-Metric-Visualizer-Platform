@@ -9,11 +9,11 @@ from typing import Iterable
 
 from sqlalchemy.orm import Session
 
-from mysql.app.database import create_engine, create_session, initialize_schema
-from mysql.app.models import FileRecord
-from mysql.config import load_mysql_backend_config
-from mysql.doc_storage import operations as doc_storage_operations
-from mysql.doc_storage.models import StorageRecord
+from mysql_persistent.app.database import create_engine, create_session, initialize_schema
+from mysql_persistent.app.models import FileRecord
+from mysql_persistent.config import load_mysql_backend_config
+from mysql_persistent.doc_storage import operations as doc_storage_operations
+from mysql_persistent.doc_storage.models import StorageRecord
 
 
 @dataclass(frozen=True)
@@ -96,13 +96,6 @@ def _resolve_records(
     return resolved, errors
 
 
-def _payload_path(storage_uri: Path, document: StorageRecord) -> Path:
-    return StorageRecord.canonize_file_uri(
-        storage_uri / str(document.unique_id),
-        Path(document.file_uri),
-    )
-
-
 def _read_document_payloads(
     storage_uri: Path,
     storage_records: dict[int, StorageRecord],
@@ -124,9 +117,8 @@ def _read_document_payloads(
             )
             continue
 
-        payload_path = _payload_path(storage_uri, document)
         try:
-            payloads[document_id] = payload_path.read_bytes()
+            payloads[document_id] = document.entry(storage_uri).read_document(document.file_uri)
         except OSError as exc:
             errors[document_id] = (
                 f"Cannot read parent document id={document_id} from file storage: {exc}"

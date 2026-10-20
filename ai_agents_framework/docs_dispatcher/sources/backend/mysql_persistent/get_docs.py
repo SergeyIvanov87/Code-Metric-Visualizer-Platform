@@ -4,10 +4,10 @@ import argparse
 import json
 import sys
 
-from mysql.app import crud
-from mysql.app.database import create_engine, create_session, initialize_schema
-from mysql.config import load_mysql_backend_config
-from mysql.utils import decanonize_file_uri
+from mysql_persistent.app import crud
+from mysql_persistent.app.database import create_engine, create_session, initialize_schema
+from mysql_persistent.config import load_mysql_backend_config
+from mysql_persistent.utils import decanonize_file_uri
 
 
 _UNLIMITED_ROW_COUNT = 9223372036854775807
