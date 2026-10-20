@@ -16,6 +16,7 @@ Load only the skills and references needed for the task.
 | Change HTTP discovery, gateway precedence, or add an HTTP ambassador | [http-api-customization](.agents/skills/http-api-customization/SKILL.md) |
 | Change streaming uploads, shared staging, directory events, sealing, or cleanup | [streaming-ingestion](.agents/skills/streaming-ingestion/SKILL.md) |
 | Change document storage, chunk/vector consistency, retrieval, or inference configuration | [agentic-rag-development](.agents/skills/agentic-rag-development/SKILL.md) |
+| Change dispatcher backend selection or filesystem storage entries | [docs-dispatcher](.agents/skills/docs-dispatcher/SKILL.md) |
 | Select tests or diagnose Compose, readiness, capture, or test aggregation | [container-test-diagnostics](.agents/skills/container-test-diagnostics/SKILL.md) |
 
 For cross-cutting work, combine the owning subsystem skill with the test skill.
