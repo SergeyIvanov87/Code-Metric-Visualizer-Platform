@@ -3,6 +3,8 @@ services:
     build:
       context: ../../
       dockerfile: ./ai_agents_framework/docs_dispatcher/Dockerfile
+    environment:
+      DISPATCHER_BACKEND: ${DISPATCHER_BACKEND:-mysql_persistent}
     volumes:
       - api.pmccabe_collector.project.ai-agents-framework.docs-dispatcher.cfg:/etc/dispatcher
       - api.pmccabe_collector.restapi.org:/api

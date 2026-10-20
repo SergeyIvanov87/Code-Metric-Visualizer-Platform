@@ -1,11 +1,12 @@
+from mysql_persistent.access.mysql import MysqlAccessRecordEntry
 from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from mysql.app.crud import create_file_record, update_file_record
-from mysql.app.database import Base
-from mysql.read_id import read_ids
+from mysql_persistent.access.crud import create_file_record, update_file_record
+from mysql_persistent.access.database import Base
+from dispatcher.commands.read_id import read_ids
 
 
 def _db_document(session, content: bytes):
@@ -93,7 +94,7 @@ def test_read_ids_reads_document_once_for_document_and_multiple_chunks(tmp_path,
     monkeypatch.setattr(Path, "read_bytes", counted_read_bytes)
 
     assert read_ids(
-        session,
+        MysqlAccessRecordEntry(session),
         tmp_path,
         [document.id, db_only_chunk.id, storage_only_chunk_id, document.id],
     ) == {
@@ -160,7 +161,7 @@ def test_read_ids_reports_missing_inconsistent_and_out_of_bounds_records(tmp_pat
         1,
     )
 
-    result = read_ids(session, tmp_path, [999, inconsistent_chunk.id, out_of_bounds_id])
+    result = read_ids(MysqlAccessRecordEntry(session), tmp_path, [999, inconsistent_chunk.id, out_of_bounds_id])
 
     assert result[999] == {
         "id": 999,

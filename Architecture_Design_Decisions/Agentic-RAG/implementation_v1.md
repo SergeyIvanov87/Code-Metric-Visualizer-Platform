@@ -303,8 +303,8 @@ these properties:
 | Vector lookup, thresholding, context assembly | `ai_agents_framework/ai_agent/sources/rag_answer_question.py` |
 | Chunk reads through the dispatcher | `ai_agents_framework/ai_agent/sources/docs_retriever.py` |
 | Dispatcher backend selection | `ai_agents_framework/docs_dispatcher/sources/dispatcher_backend_config.py` and `sources/backend/dispatcher/current` |
-| Filesystem record model | `ai_agents_framework/docs_dispatcher/sources/backend/mysql/doc_storage/` |
-| MySQL metadata model and ID generation | `ai_agents_framework/docs_dispatcher/sources/backend/mysql/app/models.py` |
-| Filesystem-to-MySQL synchronization | `ai_agents_framework/docs_dispatcher/sources/backend/mysql/sync.py` |
+| Filesystem record model | `ai_agents_framework/docs_dispatcher/sources/backend/interfaces/store/` |
+| MySQL metadata model and ID generation | `ai_agents_framework/docs_dispatcher/sources/backend/mysql_persistent/access/models.py` |
+| Filesystem-to-MySQL synchronization | `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/commands/sync.py` |
 
 <!-- markdownlint-enable MD013 -->

@@ -7,13 +7,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from sqlalchemy.orm import Session
 
-from mysql.app.database import create_engine, create_session, initialize_schema
-from mysql.app.models import FileRecord
-from mysql.config import load_mysql_backend_config
-from mysql.doc_storage import operations as doc_storage_operations
-from mysql.doc_storage.models import StorageRecord
+from dispatcher.runtime import get_backend
+from dispatcher.runtime_config import load_runtime_config
+from interfaces.access import AccessRecord, AccessRecordEntryInterface
+from interfaces.store import operations as doc_storage_operations
+from interfaces.store.models import StorageRecord
 
 
 @dataclass(frozen=True)
@@ -36,22 +35,17 @@ def _unique_ids(record_ids: Iterable[int]) -> list[int]:
     return list(dict.fromkeys(record_ids))
 
 
-def _record_fields(record: FileRecord | StorageRecord) -> tuple[int, int, int]:
+def _record_fields(record: AccessRecord | StorageRecord) -> tuple[int, int, int]:
     return int(record.parent_id), int(record.offset), int(record.size)
 
 
 def _resolve_records(
-    session: Session,
+    access: AccessRecordEntryInterface,
     storage_records: dict[int, StorageRecord],
     record_ids: Iterable[int],
 ) -> tuple[dict[int, ResolvedRecord], dict[int, str]]:
     requested_ids = _unique_ids(record_ids)
-    db_records = {
-        int(record.id): record
-        for record in session.query(FileRecord)
-        .filter(FileRecord.id.in_(requested_ids))
-        .all()
-    }
+    db_records = {int(record.id): record for record in access.get_records(requested_ids)}
     resolved: dict[int, ResolvedRecord] = {}
     errors: dict[int, str] = {}
 
@@ -96,13 +90,6 @@ def _resolve_records(
     return resolved, errors
 
 
-def _payload_path(storage_uri: Path, document: StorageRecord) -> Path:
-    return StorageRecord.canonize_file_uri(
-        storage_uri / str(document.unique_id),
-        Path(document.file_uri),
-    )
-
-
 def _read_document_payloads(
     storage_uri: Path,
     storage_records: dict[int, StorageRecord],
@@ -124,9 +111,8 @@ def _read_document_payloads(
             )
             continue
 
-        payload_path = _payload_path(storage_uri, document)
         try:
-            payloads[document_id] = payload_path.read_bytes()
+            payloads[document_id] = document.entry(storage_uri).read_document(document.file_uri)
         except OSError as exc:
             errors[document_id] = (
                 f"Cannot read parent document id={document_id} from file storage: {exc}"
@@ -206,14 +192,14 @@ def _extract_contexts(
 
 
 def read_ids(
-    session: Session,
+    access: AccessRecordEntryInterface,
     storage_uri: Path,
     record_ids: Iterable[int],
 ) -> dict[int, dict[str, object]]:
     requested_ids = _unique_ids(record_ids)
     storage_records = doc_storage_operations.get_all_records(storage_uri)
     resolved, resolution_errors = _resolve_records(
-        session,
+        access,
         storage_records,
         requested_ids,
     )
@@ -236,24 +222,14 @@ def read_ids(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(prog="Read an ID using MYSQL backend")
+    parser = argparse.ArgumentParser(prog="Read an ID using selected backend")
     parser.add_argument("--id", required=True, type=int)
     args = parser.parse_args()
 
     try:
-        backend_config = load_mysql_backend_config()
-        if "sqlite:///" in backend_config.db_uri:
-            engine = create_engine(backend_config.db_uri)
-        else:
-            engine = create_engine(
-                backend_config.db_login_secret_path,
-                backend_config.db_pwd_secret_path,
-                backend_config.db_uri,
-            )
-
-        initialize_schema(engine)
-        with create_session(engine) as session:
-            result = read_ids(session, backend_config.storage_uri, [args.id])[args.id]
+        backend_config = load_runtime_config()
+        with get_backend().access.open(backend_config) as access:
+            result = read_ids(access, backend_config.storage_uri, [args.id])[args.id]
         return_code = 0 if result["error_code"] == 0 else -1
     except Exception as exc:
         result = {

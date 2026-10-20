@@ -3,7 +3,7 @@ from typing import Any, Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ..utils import decanonize_file_uri
+from interfaces.access.utils import decanonize_file_uri
 from .models import FileRecord
 
 _SYNC_FIELDS = ("file_path", "offset", "size", "parent_id", "doc_type")

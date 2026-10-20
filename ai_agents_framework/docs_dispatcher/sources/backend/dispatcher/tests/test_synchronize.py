@@ -1,3 +1,4 @@
+from mysql_persistent.access.mysql import MysqlAccessRecordEntry
 from pathlib import Path
 
 import json
@@ -6,9 +7,9 @@ import sys
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from mysql.app.database import Base
-from mysql.app.models import FileRecord
-from mysql.app.crud import (
+from mysql_persistent.access.database import Base
+from mysql_persistent.access.models import FileRecord
+from mysql_persistent.access.crud import (
     create_file_record,
     create_file_record_ext,
     get_file_record,
@@ -17,8 +18,8 @@ from mysql.app.crud import (
     delete_file_record
 )
 
-from mysql.sync import apply_storage_fields_to_db_record, synchronize_records
-from mysql.doc_storage.models import StorageRecord
+from dispatcher.commands.sync import apply_storage_fields_to_db_record, synchronize_records
+from interfaces.store.models import StorageRecord
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
@@ -71,7 +72,7 @@ def test_amend_db_records(db_session):
     new_added_id = 9999
     all_storage_records[new_added_id] = StorageRecord(file_uri=f"file_id_{new_added_id}", unique_id = new_added_id, offset = 0, size=new_added_id, parent_id = new_added_id, metadata={"comment": "new"}, doc_type="pdf")
     all_db_records = get_all_records(db_session)
-    synchronize_records(db_session, all_db_records, all_storage_records)
+    synchronize_records(MysqlAccessRecordEntry(db_session), all_db_records, all_storage_records)
 
     updated_db_records = get_all_records(db_session)
     sorted_updated_db_records = sorted(updated_db_records, key = lambda x : x.id)

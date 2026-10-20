@@ -13,6 +13,7 @@ Load only the skills and references needed for the task.
 | Change schemas, generated executors, FIFO sessions, deferred requests, or REST exposure | [filesystem-api-development](.agents/skills/filesystem-api-development/SKILL.md) |
 | Change streaming uploads, shared staging, directory events, sealing, or cleanup | [streaming-ingestion](.agents/skills/streaming-ingestion/SKILL.md) |
 | Change document storage, chunk/vector consistency, retrieval, or inference configuration | [agentic-rag-development](.agents/skills/agentic-rag-development/SKILL.md) |
+| Change dispatcher backend compositions, access/store schemas, or storage entries | [docs-dispatcher](.agents/skills/docs-dispatcher/SKILL.md) |
 | Select tests or diagnose Compose, readiness, capture, or test aggregation | [container-test-diagnostics](.agents/skills/container-test-diagnostics/SKILL.md) |
 
 For cross-cutting work, combine the owning subsystem skill with the test skill.

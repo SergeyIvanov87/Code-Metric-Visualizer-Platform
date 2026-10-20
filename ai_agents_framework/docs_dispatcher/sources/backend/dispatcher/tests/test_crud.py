@@ -5,15 +5,15 @@ import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
-from mysql.app.database import Base, initialize_schema
-from mysql.app.models import FileRecord
-from mysql.app.crud import (
+from mysql_persistent.access.database import Base, initialize_schema
+from mysql_persistent.access.models import FileRecord
+from mysql_persistent.access.crud import (
     create_file_record,
     get_file_record,
     update_file_record,
     delete_file_record
 )
-from mysql.app.rebuild import rebuild_table_from_directory
+from mysql_persistent.access.rebuild import rebuild_table_from_directory
 
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
