@@ -251,3 +251,10 @@ Anytime afther that invoke the command to launch the integrational test scope:
 
 This testing flow of this integrational test scope can be represented on the following picture:
 ![alt text](assets/all_integrational_tests_in_parallel.png)
+
+## AI agent skills
+
+Repository-specific skills cover architecture navigation, filesystem API changes,
+streaming ingestion, agentic RAG, and container test diagnostics. See the
+[skills guide](HowTo/Agent-Skills.md) for usage and authoring instructions and the
+[repository knowledge map](HowTo/Agent-Repository-Map.md) for source references.
