@@ -12,7 +12,7 @@ Each skill here lives in `.agents/skills/<name>/SKILL.md`. The YAML frontmatter 
 | [filesystem-api-development](../.agents/skills/filesystem-api-development/SKILL.md) | Schema/generator changes, FIFO sessions, deferred lifecycle and REST exposure |
 | [streaming-ingestion](../.agents/skills/streaming-ingestion/SKILL.md) | File/directory transfers, shared-staging events, sealing, backpressure and cleanup |
 | [agentic-rag-development](../.agents/skills/agentic-rag-development/SKILL.md) | Dispatcher backends, chunk/vector consistency, retrieval and inference configuration |
-| [docs-dispatcher](../.agents/skills/docs-dispatcher/SKILL.md) | Backend selection, persistent document payloads, and shared filesystem metadata |
+| [docs-dispatcher](../.agents/skills/docs-dispatcher/SKILL.md) | Backend compositions, access/store schemas, and concrete implementations |
 | [container-test-diagnostics](../.agents/skills/container-test-diagnostics/SKILL.md) | Choosing tests, Compose builds, readiness, aggregation and diagnostics |
 
 The [repository map](Agent-Repository-Map.md) provides shared architecture knowledge and source references. These skills were authored against `origin/main` at `2569e2c`; verify current code when behavior changes.

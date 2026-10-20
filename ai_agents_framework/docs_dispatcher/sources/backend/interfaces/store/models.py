@@ -1,36 +1,33 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Union
 
-from .fs_entity import PersistentStorageRecordEntry
+from .entry import StorageRecordEntryInterface, StorageRecordSchema
+
+
+def _entry(directory: Path) -> StorageRecordEntryInterface:
+    # Resolve through the composition; common storage code knows no implementation.
+    from dispatcher.runtime import get_backend
+    return get_backend().store(directory)
 
 
 @dataclass
-class StorageRecord:
-    file_uri: Union[str, Path]
-    unique_id: int
-    offset: int = -1
-    size: int = -1
-    parent_id: int = 0
-    metadata: dict[str, Any] = field(default_factory=dict)
-    doc_type: str = ""
-
+class StorageRecord(StorageRecordSchema):
     @staticmethod
     def canonize_file_uri(doc_dir_uri: Path, file_uri: Path):
-        return PersistentStorageRecordEntry(doc_dir_uri).document_path(file_uri)
+        return _entry(doc_dir_uri).document_path(file_uri)
 
     @staticmethod
     def decanonize_file_uri(uri: Path):
         return uri
 
-    def entry(self, storage_uri: Path) -> PersistentStorageRecordEntry:
-        return PersistentStorageRecordEntry(
-            PersistentStorageRecordEntry.record_path(storage_uri, self.unique_id)
+    def entry(self, storage_uri: Path) -> StorageRecordEntryInterface:
+        return _entry(
+            StorageRecordEntryInterface.record_path(storage_uri, self.unique_id)
         )
 
     @classmethod
     def from_directory(cls, directory: Path) -> "StorageRecord":
-        return cls(**PersistentStorageRecordEntry(directory).read_fields())
+        return cls(**_entry(directory).read_fields())
 
     @classmethod
     def create_from_path(cls, path: Path) -> "StorageRecord":

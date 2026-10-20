@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from .models import StorageRecord
-from .fs_entity import PersistentStorageRecordEntry, StorageRecordEntryInterface
+from .entry import StorageRecordEntryInterface
+from .models import StorageRecord, _entry
 
 
 def get_record_path(storage_uri: Path, unique_id: int) -> Path:
@@ -17,14 +17,14 @@ def get_all_records(uri: Path) -> dict[int, StorageRecord]:
 
 
 def get_record(storage_uri: Path, unique_id: int) -> StorageRecord | None:
-    entry = PersistentStorageRecordEntry(get_record_path(storage_uri, unique_id))
+    entry = _entry(get_record_path(storage_uri, unique_id))
     if not entry.exists():
         return None
     return StorageRecord.from_directory(entry.directory)
 
 
 def delete_record(storage_uri: Path, unique_id: int) -> bool:
-    return StorageRecordEntryInterface(get_record_path(storage_uri, unique_id)).delete()
+    return _entry(get_record_path(storage_uri, unique_id)).delete()
 
 
 def get_records_by_parent_id(storage_uri: Path, parent_id: int) -> dict[int, StorageRecord]:
@@ -33,7 +33,7 @@ def get_records_by_parent_id(storage_uri: Path, parent_id: int) -> dict[int, Sto
 
 
 def add_abstract_document(storage_uri: Path, file_uri: Path, unique_id: int, doc_data: bytearray) -> StorageRecord:
-    if not StorageRecordEntryInterface(storage_uri).exists():
+    if not _entry(storage_uri).exists():
         raise RuntimeError(f"Cannot add the main document: {file_uri}, the storage path doesn't exist: {storage_uri}")
     record = StorageRecord(file_uri=file_uri, unique_id=unique_id)
     entry = record.entry(storage_uri)
@@ -49,7 +49,7 @@ def add_abstract_chunk(
     unique_id: int,
     metadata_text: str,
 ) -> StorageRecord:
-    if not StorageRecordEntryInterface(storage_uri).exists():
+    if not _entry(storage_uri).exists():
         raise RuntimeError(f"Cannot add a chunk: {file_uri}, the storage path doesn't exist: {storage_uri}")
     record = StorageRecord(file_uri=file_uri, unique_id=unique_id)
     entry = record.entry(storage_uri)

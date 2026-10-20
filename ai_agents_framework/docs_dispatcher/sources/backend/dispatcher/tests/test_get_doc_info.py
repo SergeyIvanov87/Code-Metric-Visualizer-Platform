@@ -1,11 +1,12 @@
+from mysql_persistent.access.mysql import MysqlAccessRecordEntry
 from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from mysql_persistent.app.crud import create_file_record, update_file_record
-from mysql_persistent.app.database import Base
-from mysql_persistent.get_doc_info import get_document_info
+from mysql_persistent.access.crud import create_file_record, update_file_record
+from mysql_persistent.access.database import Base
+from dispatcher.commands.get_doc_info import get_document_info
 
 
 def _db_document(session, doc_id: int, file_uri: str, doc_type: str = "txt"):
@@ -49,7 +50,7 @@ def test_get_document_info_reports_complete_partial_and_absent_documents(tmp_pat
     _storage_record(tmp_path, 5, 5, "%slash%docs%slash%storage-only.txt", "pdf")
     _storage_record(tmp_path, 6, 5, "%slash%docs%slash%storage-only.txt")
 
-    assert get_document_info(session, tmp_path, [1, 3, 5, 99, 1]) == {
+    assert get_document_info(MysqlAccessRecordEntry(session), tmp_path, [1, 3, 5, 99, 1]) == {
         "found": [1],
         "inconsistent": [3, 5],
         "not_found": [99],
@@ -98,7 +99,7 @@ def test_chunk_id_is_not_mistaken_for_a_document(tmp_path):
     chunk = _db_chunk(session, document.id, document.file_path)
     _storage_record(tmp_path, chunk.id, document.id, "chunk.txt")
 
-    assert get_document_info(session, tmp_path, [chunk.id]) == {
+    assert get_document_info(MysqlAccessRecordEntry(session), tmp_path, [chunk.id]) == {
         "found": [],
         "inconsistent": [],
         "not_found": [chunk.id],

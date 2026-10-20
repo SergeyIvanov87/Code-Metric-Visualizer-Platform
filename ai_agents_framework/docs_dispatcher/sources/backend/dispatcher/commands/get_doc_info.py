@@ -5,15 +5,13 @@ import json
 import sys
 from pathlib import Path
 
-from sqlalchemy.orm import Session
 
-from mysql_persistent.app import crud
-from mysql_persistent.app.database import create_engine, create_session, initialize_schema
-from mysql_persistent.app.models import FileRecord
-from mysql_persistent.config import load_mysql_backend_config
-from mysql_persistent.doc_storage import operations as doc_storage_operations
-from mysql_persistent.doc_storage.models import StorageRecord
-from mysql_persistent.utils import decanonize_file_uri
+from dispatcher.runtime import get_backend
+from dispatcher.runtime_config import load_runtime_config
+from interfaces.access import AccessRecord, AccessRecordEntryInterface
+from interfaces.store import operations as doc_storage_operations
+from interfaces.store.models import StorageRecord
+from interfaces.access.utils import decanonize_file_uri
 
 
 SUCCESS = "success"
@@ -26,7 +24,7 @@ def _unique_ids(doc_ids: list[int]) -> list[int]:
     return list(dict.fromkeys(doc_ids))
 
 
-def _is_db_document(record: FileRecord | None, doc_id: int) -> bool:
+def _is_db_document(record: AccessRecord | None, doc_id: int) -> bool:
     return record is not None and int(record.parent_id) == doc_id
 
 
@@ -35,19 +33,14 @@ def _is_storage_document(record: StorageRecord | None, doc_id: int) -> bool:
 
 
 def _db_info(
-    session: Session,
-    document: FileRecord,
+    access: AccessRecordEntryInterface,
+    document: AccessRecord,
 ) -> dict[str, object]:
-    chunks = (
-        session.query(FileRecord.id)
-        .filter(FileRecord.parent_id == document.id, FileRecord.id != document.id)
-        .order_by(FileRecord.id)
-        .all()
-    )
+    chunks = access.get_chunk_ids(document.id)
     return {
         "file_uri": decanonize_file_uri(document.file_path),
         "type": document.doc_type,
-        "chunks": [int(chunk_id) for (chunk_id,) in chunks],
+        "chunks": chunks,
     }
 
 
@@ -68,7 +61,7 @@ def _storage_info(
 
 
 def get_document_info(
-    session: Session,
+    access: AccessRecordEntryInterface,
     storage_uri: Path,
     doc_ids: list[int],
 ) -> dict[str, object]:
@@ -84,7 +77,7 @@ def get_document_info(
     }
 
     for doc_id in requested_ids:
-        db_record = crud.get_file_record(session, doc_id)
+        db_record = access.get_file_record(doc_id)
         storage_record = storage_records.get(doc_id)
         in_database = _is_db_document(db_record, doc_id)
         in_file_storage = _is_storage_document(storage_record, doc_id)
@@ -94,7 +87,7 @@ def get_document_info(
             result[str(doc_id)] = {
                 "error_code": 0,
                 "status": SUCCESS,
-                "info": _db_info(session, db_record),
+                "info": _db_info(access, db_record),
             }
             continue
 
@@ -103,7 +96,7 @@ def get_document_info(
             result[str(doc_id)] = {
                 "error_code": 1,
                 "status": MISSING_FILE_STORAGE,
-                "info": _db_info(session, db_record),
+                "info": _db_info(access, db_record),
             }
         elif in_file_storage:
             inconsistent.append(doc_id)
@@ -135,24 +128,14 @@ def _parse_doc_ids(value: str) -> list[int]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(prog="Get document information using MYSQL backend")
+    parser = argparse.ArgumentParser(prog="Get document information using selected backend")
     parser.add_argument("--doc-ids", required=True, type=_parse_doc_ids)
     args = parser.parse_args()
 
     try:
-        backend_config = load_mysql_backend_config()
-        if "sqlite:///" in backend_config.db_uri:
-            engine = create_engine(backend_config.db_uri)
-        else:
-            engine = create_engine(
-                backend_config.db_login_secret_path,
-                backend_config.db_pwd_secret_path,
-                backend_config.db_uri,
-            )
-
-        initialize_schema(engine)
-        with create_session(engine) as session:
-            result = get_document_info(session, backend_config.storage_uri, args.doc_ids)
+        backend_config = load_runtime_config()
+        with get_backend().access.open(backend_config) as access:
+            result = get_document_info(access, backend_config.storage_uri, args.doc_ids)
         return_code = 0
     except Exception as exc:
         result = {"error_code": -1, "error_msg": str(exc)}

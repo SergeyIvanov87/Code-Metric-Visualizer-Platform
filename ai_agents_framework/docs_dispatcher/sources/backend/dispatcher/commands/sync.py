@@ -1,22 +1,19 @@
 #!/usr/bin/env python
 
 import argparse
+from contextlib import ExitStack
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any, TypedDict
 
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session
 
-from mysql_persistent.app import crud
-from mysql_persistent.app.database import create_engine, create_session, initialize_schema
-from mysql_persistent.app.models import FileRecord
-from mysql_persistent.config import load_mysql_backend_config
-from mysql_persistent.doc_storage import operations as doc_storage_operations
-from mysql_persistent.doc_storage.models import StorageRecord
-from mysql_persistent.utils import decanonize_file_uri, file_uris_equal
+from dispatcher.runtime import get_backend
+from dispatcher.runtime_config import load_runtime_config
+from interfaces.access import AccessRecord, AccessRecordEntryInterface
+from interfaces.store import operations as doc_storage_operations
+from interfaces.store.models import StorageRecord
+from interfaces.access.utils import decanonize_file_uri, file_uris_equal
 
 
 class SyncResult(TypedDict):
@@ -28,14 +25,14 @@ class SyncResult(TypedDict):
 
 def _storage_file_uri(storage_record: StorageRecord) -> str:
     # Records read from storage contain the filesystem-safe filename. Decode it
-    # only at the DB boundary so FileRecord always retains the original URI.
+    # only at the DB boundary so AccessRecord always retains the original URI.
     return decanonize_file_uri(str(storage_record.file_uri))
 
 
 def apply_storage_fields_to_db_record(
-    db_record: FileRecord,
+    db_record: AccessRecord,
     storage_record: StorageRecord,
-) -> tuple[bool, FileRecord]:
+) -> tuple[bool, AccessRecord]:
     changed = False
 
     storage_path = _storage_file_uri(storage_record)
@@ -59,8 +56,8 @@ def apply_storage_fields_to_db_record(
 
 
 def synchronize_records(
-    session: Session,
-    all_db_records: list[FileRecord],
+    access: AccessRecordEntryInterface,
+    all_db_records: list[AccessRecord],
     storage_records: dict[int, StorageRecord],
 ) -> SyncResult:
     remaining_storage = dict(storage_records)
@@ -69,10 +66,10 @@ def synchronize_records(
     updated = 0
     untouched = len(remaining_storage)
 
-    db_records_to_update: list[FileRecord] = []
+    db_records_to_update: list[AccessRecord] = []
     for db_record in all_db_records:
         if db_record.id not in remaining_storage:
-            crud.delete_file_record(session, db_record.id)
+            access.delete_file_record(db_record.id)
             deleted += 1
             continue
         db_records_to_update.append(db_record)
@@ -84,7 +81,7 @@ def synchronize_records(
             storage_record,
         )
         if is_updated:
-            crud.update_file_record_ext(session, db_record.id, db_record)
+            access.update_file_record_ext(db_record.id, db_record)
             updated += 1
 
         remaining_storage.pop(db_record.id)
@@ -93,9 +90,7 @@ def synchronize_records(
     untouched = untouched - updated - created
 
     for storage_record in remaining_storage.values():
-        crud.create_file_record_with_uid(
-            session,
-            storage_record.unique_id,
+        access.create_file_record_with_uid(storage_record.unique_id,
             _storage_file_uri(storage_record),
             storage_record.offset,
             storage_record.size,
@@ -113,17 +108,12 @@ def synchronize_records(
 
 
 def synchronize_from_file_storage(
-    engine: Engine,
+    access: AccessRecordEntryInterface,
     storage_uri: Path,
 ) -> dict[str, Any]:
-    with create_session(engine) as session:
-        all_db_records = crud.get_all_records(session)
-        all_storage_records = doc_storage_operations.get_all_records(storage_uri)
-        sync_result = synchronize_records(
-            session,
-            all_db_records,
-            all_storage_records,
-        )
+    all_db_records = access.get_all_records()
+    all_storage_records = doc_storage_operations.get_all_records(storage_uri)
+    sync_result = synchronize_records(access, all_db_records, all_storage_records)
 
     return {
         **sync_result,
@@ -133,35 +123,26 @@ def synchronize_from_file_storage(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="MYSQL backend interaction")
+    parser = argparse.ArgumentParser(prog="Dispatcher backend interaction")
 
     parser.parse_args(argv)
-    backend_config = load_mysql_backend_config()
+    backend_config = load_runtime_config()
 
-    engine = None
-    try:
-        if backend_config.db_uri.find("sqlite:///") == -1:
-            engine = create_engine(
-                backend_config.db_login_secret_path,
-                backend_config.db_pwd_secret_path,
-                backend_config.db_uri,
-            )
-        else:
-            engine = create_engine(backend_config.db_uri)
+    with ExitStack() as stack:
+        try:
+            access = stack.enter_context(get_backend().access.open(backend_config))
+        except Exception as ex:
+            print(str(ex), file=sys.stderr, flush=True)
+            return -1
 
-        initialize_schema(engine)
-    except Exception as ex:
-        print(f"{str(ex)}", file=sys.stderr, flush=True)
-        return -1
-
-    os.makedirs(backend_config.storage_uri, mode=0o777, exist_ok=True)
-    result = {}
-    try:
-        result = result | synchronize_from_file_storage(engine, backend_config.storage_uri)
-    except Exception as ex:
-        result["error_code"] = -1
-        result["error_msg"] = str(ex)
-    print(json.dumps(result))
+        get_backend().store(backend_config.storage_uri).ensure_root()
+        result = {}
+        try:
+            result = synchronize_from_file_storage(access, backend_config.storage_uri)
+        except Exception as ex:
+            result["error_code"] = -1
+            result["error_msg"] = str(ex)
+        print(json.dumps(result))
     return 0
 
 

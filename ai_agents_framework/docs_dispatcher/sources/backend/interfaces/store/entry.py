@@ -1,13 +1,30 @@
 """Filesystem entries shared by storage backends and persistent payload handling."""
 
+from dataclasses import dataclass, field
+from typing import Any, ClassVar
 import shutil
 from pathlib import Path
 
-from ..utils import canonize_file_uri
+from abc import ABC, abstractmethod
 
 
-class StorageRecordEntryInterface:
+@dataclass
+class StorageRecordSchema:
+    """Logical storage schema, independent of payload persistence policy."""
+
+    file_uri: str | Path
+    unique_id: int
+    offset: int = -1
+    size: int = -1
+    parent_id: int = 0
+    metadata: dict[str, Any] = field(default_factory=dict)
+    doc_type: str = ""
+
+
+class StorageRecordEntryInterface(ABC):
     """Manage record directories and fields independently of document payloads."""
+
+    record_schema: ClassVar[type[StorageRecordSchema]] = StorageRecordSchema
 
     parent_id = "parentId"
     offset = "offset"
@@ -28,6 +45,9 @@ class StorageRecordEntryInterface:
 
     def exists(self) -> bool:
         return self.directory.is_dir()
+
+    def ensure_root(self) -> None:
+        self.directory.mkdir(mode=0o777, parents=True, exist_ok=True)
 
     def create(self) -> None:
         self.directory.mkdir(mode=0o777, parents=True, exist_ok=False)
@@ -62,32 +82,22 @@ class StorageRecordEntryInterface:
         for name, value in fields.items():
             (self.directory / getattr(self, name)).write_text(str(value), encoding="utf-8")
 
-
-class PersistentStorageRecordEntry(StorageRecordEntryInterface):
-    """Own the naming, creation, reading and sizing of stored document data."""
-
-    doc_suffix = ".storage_bin"
-
+    @abstractmethod
     def document_path(self, file_uri: str | Path) -> Path:
-        uri = self.directory / canonize_file_uri(str(file_uri))
-        return uri.with_name(f"{uri.name}{self.doc_suffix}")
+        """Return the backend-specific document location."""
 
-    def read_fields(self) -> dict:
-        fields = super().read_fields()
-        fields["file_uri"] = ""
-        for entry in self.directory.iterdir():
-            if entry.suffix == self.doc_suffix:
-                fields["file_uri"] = entry.stem
-        return fields
-
+    @abstractmethod
     def write_document(self, file_uri: str | Path, data: bytes | bytearray) -> None:
-        self.document_path(file_uri).write_bytes(data)
+        """Store document content according to the selected persistence policy."""
 
+    @abstractmethod
     def create_chunk(self, file_uri: str | Path) -> None:
-        self.document_path(file_uri).touch(exist_ok=False)
+        """Create the backend-specific chunk entry."""
 
+    @abstractmethod
     def read_document(self, file_uri: str | Path) -> bytes:
-        return self.document_path(file_uri).read_bytes()
+        """Read document content using the selected persistence policy."""
 
+    @abstractmethod
     def document_size(self, file_uri: str | Path) -> int:
-        return self.document_path(file_uri).stat().st_size
+        """Return the document size in bytes."""

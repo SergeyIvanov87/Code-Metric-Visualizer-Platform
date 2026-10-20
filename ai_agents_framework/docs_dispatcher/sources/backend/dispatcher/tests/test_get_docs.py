@@ -1,9 +1,10 @@
+from mysql_persistent.access.mysql import MysqlAccessRecordEntry
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from mysql_persistent.app.crud import create_file_record, update_file_record
-from mysql_persistent.app.database import Base
-from mysql_persistent.get_docs import get_documents
+from mysql_persistent.access.crud import create_file_record, update_file_record
+from mysql_persistent.access.database import Base
+from dispatcher.commands.get_docs import get_documents
 
 
 def _document(session, file_uri: str, doc_type: str = "txt"):
@@ -33,7 +34,7 @@ def test_get_documents_returns_decanonized_uris_and_chunk_ids_with_limit_paginat
     second_chunk_1 = _chunk(session, second.id, second.file_path)
     second_chunk_2 = _chunk(session, second.id, second.file_path)
 
-    assert get_documents(session, offset=1, limit=1) == {
+    assert get_documents(MysqlAccessRecordEntry(session), offset=1, limit=1) == {
         "offset": 1,
         "limit": 1,
         "remaining": 0,
@@ -56,7 +57,7 @@ def test_get_documents_limit_zero_returns_empty_docs_array():
     session = sessionmaker(bind=engine)()
     _document(session, "/docs/first.txt")
 
-    assert get_documents(session, offset=0, limit=0) == {
+    assert get_documents(MysqlAccessRecordEntry(session), offset=0, limit=0) == {
         "offset": 0,
         "limit": 0,
         "remaining": 1,
@@ -72,7 +73,7 @@ def test_get_documents_remaining_never_becomes_negative():
     session = sessionmaker(bind=engine)()
     _document(session, "/docs/first.txt")
 
-    assert get_documents(session, offset=5, limit=1) == {
+    assert get_documents(MysqlAccessRecordEntry(session), offset=5, limit=1) == {
         "offset": 5,
         "limit": 0,
         "remaining": 0,

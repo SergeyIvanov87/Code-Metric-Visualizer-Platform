@@ -134,8 +134,8 @@ currently guaranteed.
 
 Relevant implementation:
 
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql_persistent/sync.py`
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql_persistent/doc_storage/models.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/commands/sync.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/interfaces/store/models.py`
 
 **Impact:** metadata search can return stale values even after a successful
 sync, and the effective metadata authority becomes ambiguous.
@@ -161,7 +161,7 @@ Relevant configuration and implementation:
 
 - `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/current`
 - `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/backends/mysql_persistent.yaml`
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql_persistent/app/database.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/mysql_persistent/access/database.py`
 
 **Impact:** the configured SQL index and document storage do not have
 independent failure domains, and the MySQL-centered operational description can
@@ -190,8 +190,8 @@ that is recovery rather than atomicity.
 
 Relevant implementation:
 
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql_persistent/put_doc.py`
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql_persistent/app/crud.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/commands/put_doc.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/mysql_persistent/access/crud.py`
 - `ai_agents_framework/ai_agent/sources/rag_add.py`
 
 **Recommended direction:** use explicit ingestion states, idempotent steps, and
@@ -224,7 +224,7 @@ occurrence.
 
 Relevant implementation:
 
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql_persistent/attach_doc_chunk.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/commands/attach_doc_chunk.py`
 
 The retrieved text may still look correct because the repeated passages are
 identical, but provenance, ordering, citations, and surrounding-context
