@@ -9,11 +9,11 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from mysql.app.database import Base
-from mysql.app.crud import create_file_record, get_all_records, get_file_record, update_file_record_ext
-from mysql.doc_storage.operations import add_abstract_document, get_record, get_all_records as get_all_storage_records
-from mysql.attach_doc_chunk import main as attach_chunk_main
-from mysql.delete_doc import main as delete_doc_main
+from mysql_persistent.app.database import Base
+from mysql_persistent.app.crud import create_file_record, get_all_records, get_file_record, update_file_record_ext
+from mysql_persistent.doc_storage.operations import add_abstract_document, get_record, get_all_records as get_all_storage_records
+from mysql_persistent.attach_doc_chunk import main as attach_chunk_main
+from mysql_persistent.delete_doc import main as delete_doc_main
 
 
 @pytest.fixture()
@@ -98,8 +98,8 @@ def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_sess
             str(metadata_path),
         ],
     )
-    monkeypatch.setattr("mysql.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("mysql.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
+    monkeypatch.setattr("mysql_persistent.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
+    monkeypatch.setattr("mysql_persistent.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
 
     assert attach_chunk_main() == 0
     capsys.readouterr()
@@ -141,8 +141,8 @@ def test_attach_chunk_rejects_missing_offset(monkeypatch, tmp_path, db_session, 
             str(metadata_path),
         ],
     )
-    monkeypatch.setattr("mysql.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("mysql.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
+    monkeypatch.setattr("mysql_persistent.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
+    monkeypatch.setattr("mysql_persistent.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
 
     assert attach_chunk_main() == -1
 
@@ -176,8 +176,8 @@ def test_delete_doc_removes_multiple_documents_and_chunks(
                 str(metadata_path),
             ],
         )
-        monkeypatch.setattr("mysql.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-        monkeypatch.setattr("mysql.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
+        monkeypatch.setattr("mysql_persistent.attach_doc_chunk.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
+        monkeypatch.setattr("mysql_persistent.attach_doc_chunk.create_engine", lambda *args, **kwargs: db_engine)
         assert attach_chunk_main() == 0
 
     second_parent = _create_parent_document(
@@ -197,8 +197,8 @@ def test_delete_doc_removes_multiple_documents_and_chunks(
         "-ids",
         f"{parent.id},{first_chunk.id},{second_parent.id},{parent.id}",
     ])
-    monkeypatch.setattr("mysql.delete_doc.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("mysql.delete_doc.create_engine", lambda *args, **kwargs: db_engine)
+    monkeypatch.setattr("mysql_persistent.delete_doc.load_mysql_backend_config", lambda: _mysql_backend_config(tmp_path, storage_root))
+    monkeypatch.setattr("mysql_persistent.delete_doc.create_engine", lambda *args, **kwargs: db_engine)
 
     assert delete_doc_main() == 0
     result = json.loads(capsys.readouterr().out)
@@ -228,11 +228,11 @@ def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
         ["delete_doc.py", "-ids", f"{parent.id},999"],
     )
     monkeypatch.setattr(
-        "mysql.delete_doc.load_mysql_backend_config",
+        "mysql_persistent.delete_doc.load_mysql_backend_config",
         lambda: _mysql_backend_config(tmp_path, storage_root),
     )
     monkeypatch.setattr(
-        "mysql.delete_doc.create_engine",
+        "mysql_persistent.delete_doc.create_engine",
         lambda *args, **kwargs: db_engine,
     )
 
