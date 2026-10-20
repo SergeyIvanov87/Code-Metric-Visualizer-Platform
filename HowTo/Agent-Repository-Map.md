@@ -43,7 +43,7 @@ Directory events and directory uploads have deliberately different data ownershi
 
 ## Agentic RAG
 
-Start with [wrappers](../ai_agents_framework/ai_agent/sources/fs_api_wrappers.py), then the matching dispatcher entrypoint and backend command. The dispatcher selects its backend through [configuration code](../ai_agents_framework/docs_dispatcher/sources/dispatcher_backend_config.py) and [backend specs](../ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/README.md). The `mysql` package name does not imply a live MySQL server: its default URI is SQLite.
+Start with [wrappers](../ai_agents_framework/ai_agent/sources/fs_api_wrappers.py), then the matching dispatcher entrypoint and backend command. The dispatcher selects its backend through [configuration code](../ai_agents_framework/docs_dispatcher/sources/dispatcher_backend_config.py) and [backend specs](../ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/README.md). The `mysql_persistent` package name does not imply a live MySQL server: its default URI is SQLite.
 
 [Reconciliation](../ai_agents_framework/ai_agent/sources/rag_sync.py) maps dispatcher chunk records to Chroma IDs and metadata. Keep stale-ID deletion after successful source enumeration, including all pages. Focused tests exercise fake collections; service tests are still needed for live storage integration.
 
