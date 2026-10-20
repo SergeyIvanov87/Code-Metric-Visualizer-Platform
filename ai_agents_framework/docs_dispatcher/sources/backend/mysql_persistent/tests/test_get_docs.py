@@ -1,9 +1,9 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from mysql.app.crud import create_file_record, update_file_record
-from mysql.app.database import Base
-from mysql.get_docs import get_documents
+from mysql_persistent.app.crud import create_file_record, update_file_record
+from mysql_persistent.app.database import Base
+from mysql_persistent.get_docs import get_documents
 
 
 def _document(session, file_uri: str, doc_type: str = "txt"):

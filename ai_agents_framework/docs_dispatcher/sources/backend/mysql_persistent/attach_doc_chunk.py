@@ -6,13 +6,12 @@ import json
 import sys
 from pathlib import Path
 
-from mysql.app import crud
-from mysql.app.database import create_engine, create_session, initialize_schema
-from mysql.config import load_mysql_backend_config
-from mysql.doc_storage import operations as doc_storage_operations
-from mysql.doc_storage.fs_entity import StorageRecordEntry
-from mysql.doc_storage.models import StorageRecord
-from mysql.utils import prepare_doc_data
+from mysql_persistent.app import crud
+from mysql_persistent.app.database import create_engine, create_session, initialize_schema
+from mysql_persistent.config import load_mysql_backend_config
+from mysql_persistent.doc_storage import operations as doc_storage_operations
+from mysql_persistent.doc_storage.models import StorageRecord
+from mysql_persistent.utils import prepare_doc_data
 
 parent_id_for_orphans = 0
 
@@ -32,8 +31,7 @@ def _extract_chunk_bounds(
     parent_storage_record: StorageRecord,
     chunk_data: bytes,
 ) -> tuple[int, int]:
-    parent_doc_path = StorageRecord.canonize_file_uri(storage_uri / str(parent_storage_record.unique_id), parent_storage_record.file_uri)
-    parent_data = parent_doc_path.read_bytes()
+    parent_data = parent_storage_record.entry(storage_uri).read_document(parent_storage_record.file_uri)
     offset = parent_data.find(chunk_data)
     if offset < 0:
         raise ValueError("chunk does not belong to the parent document")

@@ -37,12 +37,19 @@ def load_backend_config() -> BackendConfig:
 def _select_settings_dir() -> Path:
     configured_dir = Path(os.environ.get("DISPATCHER_SETTINGS_DIR", DEFAULT_SETTINGS_DIR))
     current_path = configured_dir / "current"
+    if configured_dir.is_dir() and os.environ.get("DISPATCHER_BACKEND"):
+        return configured_dir
     if current_path.exists() or current_path.is_symlink():
         return configured_dir
     return BUNDLED_SETTINGS_DIR
 
 
 def _current_backend_spec_path(settings_dir: Path) -> Path:
+    selected_backend = os.environ.get("DISPATCHER_BACKEND")
+    if selected_backend:
+        if not selected_backend.isidentifier():
+            raise ValueError(f"Invalid dispatcher backend name: {selected_backend}")
+        return settings_dir / "backends" / f"{selected_backend}.yaml"
     current_path = settings_dir / "current"
     if current_path.is_symlink():
         return current_path.resolve()

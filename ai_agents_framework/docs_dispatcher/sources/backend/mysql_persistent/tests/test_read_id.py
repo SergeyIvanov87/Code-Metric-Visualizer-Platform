@@ -3,9 +3,9 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from mysql.app.crud import create_file_record, update_file_record
-from mysql.app.database import Base
-from mysql.read_id import read_ids
+from mysql_persistent.app.crud import create_file_record, update_file_record
+from mysql_persistent.app.database import Base
+from mysql_persistent.read_id import read_ids
 
 
 def _db_document(session, content: bytes):

@@ -3,9 +3,9 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from mysql.app.crud import create_file_record, update_file_record
-from mysql.app.database import Base
-from mysql.get_doc_info import get_document_info
+from mysql_persistent.app.crud import create_file_record, update_file_record
+from mysql_persistent.app.database import Base
+from mysql_persistent.get_doc_info import get_document_info
 
 
 def _db_document(session, doc_id: int, file_uri: str, doc_type: str = "txt"):

@@ -10,13 +10,13 @@ from typing import Any, TypedDict
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from mysql.app import crud
-from mysql.app.database import create_engine, create_session, initialize_schema
-from mysql.app.models import FileRecord
-from mysql.config import load_mysql_backend_config
-from mysql.doc_storage import operations as doc_storage_operations
-from mysql.doc_storage.models import StorageRecord
-from mysql.utils import decanonize_file_uri, file_uris_equal
+from mysql_persistent.app import crud
+from mysql_persistent.app.database import create_engine, create_session, initialize_schema
+from mysql_persistent.app.models import FileRecord
+from mysql_persistent.config import load_mysql_backend_config
+from mysql_persistent.doc_storage import operations as doc_storage_operations
+from mysql_persistent.doc_storage.models import StorageRecord
+from mysql_persistent.utils import decanonize_file_uri, file_uris_equal
 
 
 class SyncResult(TypedDict):

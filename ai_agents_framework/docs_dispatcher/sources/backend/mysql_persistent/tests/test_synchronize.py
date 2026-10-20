@@ -6,9 +6,9 @@ import sys
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from mysql.app.database import Base
-from mysql.app.models import FileRecord
-from mysql.app.crud import (
+from mysql_persistent.app.database import Base
+from mysql_persistent.app.models import FileRecord
+from mysql_persistent.app.crud import (
     create_file_record,
     create_file_record_ext,
     get_file_record,
@@ -17,8 +17,8 @@ from mysql.app.crud import (
     delete_file_record
 )
 
-from mysql.sync import apply_storage_fields_to_db_record, synchronize_records
-from mysql.doc_storage.models import StorageRecord
+from mysql_persistent.sync import apply_storage_fields_to_db_record, synchronize_records
+from mysql_persistent.doc_storage.models import StorageRecord
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 

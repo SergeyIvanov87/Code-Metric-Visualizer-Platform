@@ -8,10 +8,10 @@ from typing import Iterable
 
 from sqlalchemy.orm import Session
 
-from mysql.app import crud
-from mysql.app.database import create_engine, create_session, initialize_schema
-from mysql.config import load_mysql_backend_config
-from mysql.doc_storage import operations as doc_storage_operations
+from mysql_persistent.app import crud
+from mysql_persistent.app.database import create_engine, create_session, initialize_schema
+from mysql_persistent.config import load_mysql_backend_config
+from mysql_persistent.doc_storage import operations as doc_storage_operations
 
 
 def _load_metadata_text(metadata_arg: str | None) -> str:
