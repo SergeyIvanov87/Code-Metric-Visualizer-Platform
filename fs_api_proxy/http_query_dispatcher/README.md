@@ -58,7 +58,7 @@ servers must join the existing `api.pmccabe_collector.network` network.
 From the repository root:
 
 ```sh
-docker compose -f ai_agents_framework/ai_agent/ai_agent_http_embassador/compose.yaml up -d --build
+docker compose -f ai_agents_framework/ai_agent_http_embassador/compose.yaml up -d --build
 docker compose -f fs_api_proxy/http_query_dispatcher/compose.yaml up -d
 ```
 
@@ -101,7 +101,7 @@ configuration at `/etc/envoy/envoy.yaml` when running the image directly.
 
 ## Integration verification
 
-See the ambassador's [test instructions](../../ai_agents_framework/ai_agent/ai_agent_http_embassador/README.md#tests).
+See the ambassador's [test instructions](../../ai_agents_framework/ai_agent_http_embassador/README.md#tests).
 The opt-in Envoy tests run real HTTP requests through the pinned configuration,
 using the actual generated filesystem API dispatcher and lightweight replacements
 for the ML programs. They check GET pages, POST chat, PUT uploads, static assets,
