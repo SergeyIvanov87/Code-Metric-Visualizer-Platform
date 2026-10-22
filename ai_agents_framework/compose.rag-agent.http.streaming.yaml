@@ -44,6 +44,23 @@ services:
       - rag-dispatcher-config:/etc/dispatcher
       - rag-document-storage:/mnt/file_storage
 
+  rest-api:
+    build:
+      context: ../rest_api
+      dockerfile: Dockerfile.isolated
+      additional_contexts:
+        common: ../common
+    environment:
+      - FLASK_RUN_PORT=${FLASK_RUN_PORT:-5000}
+      - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}
+    hostname: rest-api
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+    ports:
+      - 5000:5000
 
   ai-agent-http-ambassador:
     extends:

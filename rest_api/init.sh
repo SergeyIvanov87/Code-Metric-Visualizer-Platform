@@ -33,6 +33,17 @@ populate_host_ip_file(){
     ln -sf ${HOSTNAME_IP_FILE} ${POPULATED_HOSTNAME_IP_FILE}
 }
 
+count_files_by_name_excluding_paths(){
+    local START_DIR="$1"
+    local EXCLUDE_PATHS="$2"
+    local NAME_TO_FIND="$3"
+
+    find "${START_DIR}" \
+        -type d -name "${EXCLUDE_PATHS}" -prune -o \
+        -type f -name "${NAME_TO_FIND}" -print \
+        | wc -l
+}
+
 termination_handler(){
    echo -e "${BRed}***Stopping${Color_Off}"
    remove_populated_host_ip_file
@@ -96,7 +107,7 @@ while [ $RETURN_STATUS -eq 0 ]; do
             # In this case this safeguard introduced: we keep counting an amount of README files so that we are still able to detect API changing
             if [ ${HAS_GOT_API_UPDATE_EVENT} == 0 ];
             then
-                md_files_new_count=`ls -laR ${SHARED_API_DIR} | grep md | wc -l`
+                md_files_new_count=$(count_files_by_name_excluding_paths "${SHARED_API_DIR}" ".staging" "*.md")
                 if [ ${LAST_TIME_README_FILES_DETECTED_COUNT} != ${md_files_new_count} ];
                 then
                     echo -e "${BBlue} README files mount has been changed, was: ${LAST_TIME_README_FILES_DETECTED_COUNT}, become: ${md_files_new_count}. Generate event manually${Color_Off}"
@@ -135,7 +146,7 @@ while [ $RETURN_STATUS -eq 0 ]; do
         if [ ${HAS_GOT_API_UPDATE_EVENT} -gt 0 ]; then
             echo -e "Got ${HAS_GOT_API_UPDATE_EVENT} API events. ${BBlue}Restart REST_API service will be scheduled...${Color_Off}"
             # remember last count of README files
-            LAST_TIME_README_FILES_DETECTED_COUNT=`ls -laR ${SHARED_API_DIR} | grep md | wc -l`
+            LAST_TIME_README_FILES_DETECTED_COUNT=$(count_files_by_name_excluding_paths "${SHARED_API_DIR}" ".staging" "*.md")
             # kill an old instance
             remove_populated_host_ip_file
             REST_API_INSTANCE_PIDFILE_PID=`cat ${REST_API_INSTANCE_PIDFILE}`
