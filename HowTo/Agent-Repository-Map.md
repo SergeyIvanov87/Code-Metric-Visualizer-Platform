@@ -84,6 +84,7 @@ For image-only changes, inspect Dockerfile `COPY` sources and Compose `build.con
 
 - [Main Docker CI](../.github/workflows/docker-image.yml): common lifecycle, service functional, combined and use-case tests.
 - [Agentic RAG CI](../.github/workflows/agentic-rag-subsystem.yml): dispatcher/vector-store builds and tests.
+- GPU agent image builds: independent [NVIDIA](../.github/workflows/ai-agent-nvidia-image.yml) and [Vulkan](../.github/workflows/ai-agent-vulkan-image.yml) workflows compile production/development images in parallel, with cached builds and manual dispatch. These checks do not validate GPU runtime behavior.
 - [Streaming pipeline CI](../.github/workflows/streaming-test-aggregator.yml): detached launch, aggregator status, final checks, diagnostic export.
 - [Streaming integration CI](../.github/workflows/streaming-test-aggregator-integration.yml) and [agent streaming CI](../.github/workflows/agentic-rag-streaming-test-aggregator-integration.yml).
 - [Streaming lifecycle](../common/images/streaming_test_aggregator/README.md): permanent logger, on-demand capture IDs and one active subscriber constraint.

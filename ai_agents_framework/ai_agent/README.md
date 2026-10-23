@@ -59,3 +59,18 @@ logs show layer offloading; verify these on the target host.
 
 The llama-cpp-python version is pinned to 0.3.16 because backend device checks
 use its bundled ggml C API. Upgrading it requires rechecking that API.
+
+NVIDIA image builds use the CUDA development image's `libcuda.so` stub to
+resolve the `libcuda.so.1` dependency while linking llama.cpp executables.
+Both Dockerfiles create a temporary SONAME symlink and pass its directory via
+`-rpath-link`, then remove it after installing llama-cpp-python. This adds no
+runtime driver search path; NVIDIA Container Toolkit must supply the real host
+driver library when the container runs.
+
+GPU image compilation is checked by the independent `AI Agent NVIDIA Image Build`
+and `AI Agent VULKAN Image Build` GitHub Actions workflows. Each builds production
+and development images in parallel jobs, uses a separate BuildKit cache per
+backend and variant, and supports manual dispatch. Automatic runs cover pull
+requests to `main` and pushes to `main` affecting agent sources, shared `common`
+files, or the corresponding workflow. These checks require no GPU and do not
+validate hardware access or model offloading.
