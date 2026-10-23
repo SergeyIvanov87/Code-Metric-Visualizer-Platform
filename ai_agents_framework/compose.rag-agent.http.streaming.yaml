@@ -1,0 +1,108 @@
+# Agentic RAG and HTTP gateway services connected to the streaming logger.
+# Start the streaming logger subsystem before launching this project.
+services:
+  rag-agent:
+    extends:
+      file: ./ai_agent/compose-default.prod.yaml
+      service: ai_agent
+    environment:
+      VECTORDB_HOST: rag-db
+      VECTORDB_PORT: 8000
+    depends_on:
+      rag-db:
+        condition: service_started
+      rag-doc-storage-dispatcher:
+        condition: service_started
+    logging: &streaming-logging
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - rag-agent-models:/assets/models
+
+  rag-db:
+    extends:
+      file: ./RAG/compose.yaml
+      service: rag-db
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-data:/mnt
+
+  rag-doc-storage-dispatcher:
+    extends:
+      file: ./docs_dispatcher/compose-default.prod.yaml
+      service: docs_dispatcher
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - rag-dispatcher-config:/etc/dispatcher
+      - rag-document-storage:/mnt/file_storage
+
+  rest-api:
+    build:
+      context: ../rest_api
+      dockerfile: Dockerfile.isolated
+      additional_contexts:
+        common: ../common
+    environment:
+      - FLASK_RUN_PORT=${FLASK_RUN_PORT:-5000}
+      - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}
+    hostname: rest-api
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+    ports:
+      - 5000:5000
+
+  ai-agent-http-ambassador:
+    extends:
+      file: ./ai_agent_http_embassador/compose.yaml
+      service: ai-agent-http-ambassador
+    build:
+      context: ..
+      dockerfile: ai_agents_framework/ai_agent_http_embassador/Dockerfile
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - ./ai_agent_http_embassador/config.json:/app/config.json:ro
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+
+  http-query-dispatcher:
+    extends:
+      file: ../fs_api_proxy/http_query_dispatcher/compose.yaml
+      service: http-query-dispatcher
+    volumes:
+      - ../fs_api_proxy/http_query_dispatcher/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
+
+volumes:
+  rag-agent-models:
+  rag-data:
+  rag-dispatcher-config:
+  rag-document-storage:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true
+
+secrets:
+  backend_mysql_db_login:
+    file: ./docs_dispatcher/tests/backend_mysql_default_user.txt
+  backend_mysql_db_password:
+    file: ./docs_dispatcher/tests/backend_mysql_default_pwd.txt
