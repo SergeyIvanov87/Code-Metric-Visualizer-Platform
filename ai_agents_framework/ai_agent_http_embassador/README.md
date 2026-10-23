@@ -38,6 +38,9 @@ is inside a collapsed-by-default `<details>` panel. Submitting uses POST.
 The existing chat API has no persistent conversational memory: this page keeps
 successful turns in the browser tab and sends them as context in `user_prompt`.
 Refreshing starts a new history, and history counts against the prompt limit.
+Both pages put a **Return to the main menu** link first in their navigation. Its
+root-relative `/api.pmccabe_collector.restapi.org` target keeps the current HTTP
+host and port and returns to the generic REST API menu through the dispatcher.
 
 The file input opens the browser's standard selection dialog. Selection sends a
 PUT immediately. The current agent reads UTF-8 text and supports `txt` chunking;

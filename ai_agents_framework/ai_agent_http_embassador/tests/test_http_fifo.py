@@ -40,11 +40,17 @@ def test_default_prompt_comes_from_schema_and_pages_load(app, filesystem_api):
     client = app.test_client()
     page = client.get(path(filesystem_api, "chat") + "/")
     assert page.status_code == 200
+    main_menu_link = b'<a href="/api.pmccabe_collector.restapi.org">Return to the main menu</a>'
+    upload_link = f'<a href="{path(filesystem_api, "rag_add")}">Add a document to the knowledge base</a>'.encode()
+    assert page.data.index(main_menu_link) < page.data.index(upload_link)
     assert b"You are a knowledge-base assistant." in page.data
     assert b"<details>" in page.data and b"<details open" not in page.data
     assert b"/ai-agent-ui/static/chat.js" in page.data
     assert client.get("/ai-agent-ui/static/chat.js").status_code == 200
-    assert client.get(path(filesystem_api, "rag_add")).status_code == 200
+    upload_page = client.get(path(filesystem_api, "rag_add"))
+    assert upload_page.status_code == 200
+    chat_link = f'<a href="{path(filesystem_api, "chat")}">Chat with the knowledge base</a>'.encode()
+    assert upload_page.data.index(main_menu_link) < upload_page.data.index(chat_link)
     response = client.post(path(filesystem_api, "chat"), json={"user_prompt": "Hello"})
     assert response.status_code == 200
     assert response.json["system_prompt"].startswith("You are a knowledge-base assistant.")

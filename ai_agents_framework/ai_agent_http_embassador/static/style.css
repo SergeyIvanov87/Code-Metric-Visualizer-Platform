@@ -10,4 +10,6 @@ button { padding: .65rem 1.5rem; border: 0; border-radius: .35rem; background: #
 button:disabled { opacity: .6; cursor: wait; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 a { color: #234ad1; }
+nav a { display: block; width: fit-content; }
+nav a + a { margin-top: .5rem; }
 @media (max-width: 600px) { main { margin: 0; padding: 1rem; } }

@@ -14,6 +14,9 @@ from werkzeug.exceptions import HTTPException
 from fifo_client import FifoClient, InvalidResult, QueryTimeout, Unavailable
 
 
+MAIN_MENU_PATH = "/api.pmccabe_collector.restapi.org"
+
+
 def create_app(config_path=None, client=None):
     config_path = config_path or os.environ.get("AI_AGENT_HTTP_CONFIG", str(Path(__file__).with_name("config.json")))
     settings = json.loads(Path(config_path).read_text())
@@ -96,7 +99,12 @@ def create_app(config_path=None, client=None):
     @app.route(paths["chat"], methods=["GET", "POST"], strict_slashes=False)
     def chat():
         if request.method == "GET":
-            return render_template("chat.html", system_prompt=prompt, upload_path=paths["rag_add"])
+            return render_template(
+                "chat.html",
+                main_menu_path=MAIN_MENU_PATH,
+                system_prompt=prompt,
+                upload_path=paths["rag_add"],
+            )
         data = request.get_json()
         if not isinstance(data, dict) or set(data) - {"user_prompt", "system_prompt"}:
             return jsonify(error="Expected user_prompt and optional system_prompt"), 400
@@ -120,7 +128,11 @@ def create_app(config_path=None, client=None):
     @app.route(paths["rag_add"], methods=["GET", "PUT"], strict_slashes=False)
     def rag_add():
         if request.method == "GET":
-            return render_template("rag_add.html", chat_path=paths["chat"])
+            return render_template(
+                "rag_add.html",
+                chat_path=paths["chat"],
+                main_menu_path=MAIN_MENU_PATH,
+            )
         if request.mimetype != "application/octet-stream":
             return jsonify(error="Send the file bytes as application/octet-stream"), 415
         token = uuid4().hex
