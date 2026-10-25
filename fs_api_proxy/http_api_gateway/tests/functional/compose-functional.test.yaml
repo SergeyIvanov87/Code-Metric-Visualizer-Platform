@@ -1,0 +1,71 @@
+services:
+  provider-first:
+    build:
+      context: ../../../..
+      dockerfile: fs_api_proxy/http_api_gateway/tests/functional/stub_provider/Dockerfile
+    environment:
+      BACKEND_NAME: first
+      ROUTES_JSON: >-
+        [{"path":"/first-only","timeout_seconds":60},{"path":"/shared","timeout_seconds":60}]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/.well-known/http-api-routes/v1')"]
+      interval: 2s
+      timeout: 1s
+      retries: 20
+
+  provider-second:
+    build:
+      context: ../../../..
+      dockerfile: fs_api_proxy/http_api_gateway/tests/functional/stub_provider/Dockerfile
+    environment:
+      BACKEND_NAME: second
+      ROUTES_JSON: >-
+        [{"path":"/second-only","timeout_seconds":30},{"path":"/shared","timeout_seconds":30}]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/.well-known/http-api-routes/v1')"]
+      interval: 2s
+      timeout: 1s
+      retries: 20
+
+  http-api-gateway-controller:
+    build:
+      context: ../../../..
+      dockerfile: fs_api_proxy/http_api_gateway/Dockerfile.controller
+    environment:
+      BACKENDS_FOR_FRONTENDS: http://provider-first:8080,http://provider-second:8080
+      HTTP_API_DISCOVERY_POLL_INTERVAL_SECONDS: 0.25
+      HTTP_API_DISCOVERY_TIMEOUT_SECONDS: 2
+      HTTP_API_GATEWAY_LISTEN_PORT: 8080
+    volumes:
+      - gateway-config:/var/lib/http-api-gateway
+    depends_on:
+      provider-first:
+        condition: service_healthy
+      provider-second:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from pathlib import Path; assert Path('/var/lib/http-api-gateway/ready').is_file()"]
+      interval: 2s
+      timeout: 1s
+      retries: 20
+
+  http-api-gateway:
+    image: envoyproxy/envoy:v1.36.0
+    command: ["envoy", "-c", "/var/lib/http-api-gateway/bootstrap.json", "--log-level", "warning"]
+    volumes:
+      - gateway-config:/var/lib/http-api-gateway:ro
+    depends_on:
+      http-api-gateway-controller:
+        condition: service_healthy
+
+  http-api-gateway-functional-tester:
+    build:
+      context: ../../../..
+      dockerfile: fs_api_proxy/http_api_gateway/tests/functional/tester/Dockerfile
+    volumes:
+      - gateway-config:/gateway-config:ro
+    depends_on:
+      - http-api-gateway
+
+volumes:
+  gateway-config:

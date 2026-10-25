@@ -76,12 +76,27 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-  http-query-dispatcher:
+  http-api-gateway-controller:
     extends:
-      file: ../fs_api_proxy/http_query_dispatcher/compose.yaml
-      service: http-query-dispatcher
+      file: ../fs_api_proxy/http_api_gateway/compose.yaml
+      service: http-api-gateway-controller
+    build:
+      context: ..
+      dockerfile: fs_api_proxy/http_api_gateway/Dockerfile.controller
+    environment:
+      BACKENDS_FOR_FRONTENDS: http://rest-api:5000,http://ai-agent-http-ambassador:8081
     volumes:
-      - ../fs_api_proxy/http_query_dispatcher/envoy.yaml:/etc/envoy/envoy.yaml:ro
+      - http-api-gateway-config:/var/lib/http-api-gateway
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+
+  http-api-gateway:
+    extends:
+      file: ../fs_api_proxy/http_api_gateway/compose.yaml
+      service: http-api-gateway
+    volumes:
+      - http-api-gateway-config:/var/lib/http-api-gateway:ro
     logging: *streaming-logging
     networks:
       - api.pmccabe_collector.network
@@ -96,6 +111,7 @@ volumes:
   rag-agent-models:
   rag-data:
   rag-dispatcher-config:
+  http-api-gateway-config:
   rag-document-storage:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
