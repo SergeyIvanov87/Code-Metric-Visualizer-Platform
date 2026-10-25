@@ -1,0 +1,45 @@
+services:
+  http-api-gateway-controller:
+    build:
+      context: ../..
+      dockerfile: fs_api_proxy/http_api_gateway/Dockerfile.controller
+    environment:
+      BACKENDS_FOR_FRONTENDS: ${BACKENDS_FOR_FRONTENDS:-}
+      HTTP_API_CONNECT_TIMEOUT_SECONDS: ${HTTP_API_CONNECT_TIMEOUT_SECONDS:-5}
+      HTTP_API_DEFAULT_ROUTE_TIMEOUT_SECONDS: ${HTTP_API_DEFAULT_ROUTE_TIMEOUT_SECONDS:-60}
+      HTTP_API_DISCOVERY_POLL_INTERVAL_SECONDS: ${HTTP_API_DISCOVERY_POLL_INTERVAL_SECONDS:-15}
+      HTTP_API_DISCOVERY_TIMEOUT_SECONDS: ${HTTP_API_DISCOVERY_TIMEOUT_SECONDS:-5}
+      HTTP_API_FALLBACK_TIMEOUT_SECONDS: ${HTTP_API_FALLBACK_TIMEOUT_SECONDS:-60}
+      HTTP_API_GATEWAY_LISTEN_PORT: 8080
+    volumes:
+      - http_api_gateway.config:/var/lib/http-api-gateway
+    networks:
+      - api.pmccabe_collector.network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "from pathlib import Path; assert Path('/var/lib/http-api-gateway/ready').is_file()"]
+      interval: 5s
+      timeout: 2s
+      retries: 30
+
+  http-api-gateway:
+    image: envoyproxy/envoy:v1.36.0
+    command: ["envoy", "-c", "/var/lib/http-api-gateway/bootstrap.json", "--log-level", "info"]
+    volumes:
+      - http_api_gateway.config:/var/lib/http-api-gateway:ro
+    ports:
+      - "${HTTP_API_GATEWAY_PORT:-8080}:8080"
+    networks:
+      - api.pmccabe_collector.network
+    restart: unless-stopped
+    depends_on:
+      http-api-gateway-controller:
+        condition: service_healthy
+
+volumes:
+  http_api_gateway.config:
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true

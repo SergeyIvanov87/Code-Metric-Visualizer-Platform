@@ -15,7 +15,8 @@ or protocol adaptation. The directory retains the requested spelling
 Paths are loaded from the existing `API/chat.json` and `API/rag_add.json` schemas.
 The image copies those two schemas at build time; no default prompt is maintained
 separately. Rebuild the image after changing the schemas, or mount a schema
-directory and point `schema_dir` to it. Keep the Envoy route paths in sync.
+directory and point `schema_dir` to it. The gateway discovers route paths from
+the ambassador; no Envoy-specific path list is maintained here.
 
 | Method | Path | Behavior |
 | --- | --- | --- |
@@ -23,8 +24,8 @@ directory and point `schema_dir` to it. Keep the Envoy route paths in sync.
 | POST | Same chat path | JSON chat request → filesystem chat |
 | GET | `/api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1` | File selection page |
 | PUT | Same upload path | Raw UTF-8 file bytes → staging → filesystem rag_add |
-| GET | `/ai-agent-ui/static/…` | UI scripts and stylesheet |
-| GET | `/ai-agent-ui/healthz` or `/healthz` | Check both queries' exec and result FIFOs |
+| GET | `/.well-known/http-api-routes/v1` | JSON route-discovery document |
+| GET | `/healthz` | Check both queries' exec and result FIFOs |
 
 Trailing slashes are accepted. GET pages can load while the agent is starting;
 actions return 503 when the required FIFOs are unavailable. HEAD follows Flask's
@@ -38,6 +39,8 @@ is inside a collapsed-by-default `<details>` panel. Submitting uses POST.
 The existing chat API has no persistent conversational memory: this page keeps
 successful turns in the browser tab and sends them as context in `user_prompt`.
 Refreshing starts a new history, and history counts against the prompt limit.
+The CSS and JavaScript are embedded in each response under a per-request content
+security policy nonce, so no ambassador-private static path is exposed.
 Both pages put a **Return to the main menu** link first in their navigation. Its
 root-relative `/api.pmccabe_collector.restapi.org` target keeps the current HTTP
 host and port and returns to the generic REST API menu through the dispatcher.
@@ -133,8 +136,8 @@ or ingestion parallel inside the agent.
 
 ## Run
 
-Use the new [dispatcher deployment](../../fs_api_proxy/http_query_dispatcher/README.md)
-to expose both pages alongside the existing generic API. From the repository
+Use the [HTTP API gateway deployment](../../fs_api_proxy/http_api_gateway/README.md)
+to discover and expose both pages alongside the existing generic API. From the repository
 root the ambassador alone can be started with:
 
 ```sh
@@ -178,6 +181,7 @@ ENVOY_BINARY=/absolute/path/to/envoy work/http-venv/bin/python -m pytest -q \
   ai_agents_framework/ai_agent_http_embassador/tests
 ```
 
-These tests start loopback HTTP services, load the dispatcher configuration with
-test destinations, and send real GET/POST/PUT requests through Envoy. They do not
+These tests start loopback HTTP services, generate the same bootstrap and RDS
+resources as the gateway controller, and send real GET/POST/PUT requests through
+Envoy. They do not
 require a model, vector database, or running production services.

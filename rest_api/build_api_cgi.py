@@ -6,6 +6,7 @@ Generates `CGI` script for API request serving
 
 import argparse
 from argparse import RawTextHelpFormatter
+import hashlib
 from math import log10
 
 import json
@@ -34,6 +35,31 @@ parser.add_argument("domain_name_api_entry", help="build API queries processor f
 args = parser.parse_args()
 
 schemas_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, r".*\.json$")
+
+api_requests = []
+for schema_file in schemas_file_list:
+    req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
+    domain_entry_pos = request_data["Query"].find(args.domain_name_api_entry)
+    if domain_entry_pos == -1:
+        continue
+    api_requests.append((req_name, request_data, domain_entry_pos))
+
+discovery_routes = [
+    {
+        "path": "/" + request_data["Query"][domain_entry_pos:].lstrip("/"),
+        "timeout_seconds": 60,
+    }
+    for _, request_data, domain_entry_pos in api_requests
+]
+discovery_routes.sort(key=lambda route: route["path"])
+discovery_revision = hashlib.sha256(
+    json.dumps(discovery_routes, sort_keys=True, separators=(",", ":")).encode("utf-8")
+).hexdigest()
+discovery_document = {
+    "schema_version": 1,
+    "revision": "sha256:" + discovery_revision,
+    "routes": discovery_routes,
+}
 
 
 def canonize_precedure_call(req_api):
@@ -181,17 +207,20 @@ cgi_main = [ r'@app.route("/api.pmccabe_collector.restapi.org", methods=["GET"],
 ]
 print("\n".join(cgi_main))
 print("")
+discovery_endpoint = [
+    r'@app.route("/.well-known/http-api-routes/v1", methods=["GET"], strict_slashes=False)',
+    r'def http_api_routes_discovery():',
+    "    return jsonify({})".format(repr(discovery_document)),
+]
+print("\n".join(discovery_endpoint))
+print("")
 
-for schema_file in schemas_file_list:
-    req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
+
+
+for req_name, request_data, domain_entry_pos in api_requests:
     req_type = request_data["Method"]
     req_api = request_data["Query"]
     req_params = request_data["Params"]
-
-    # filter unrelated API queries
-    domain_entry_pos = req_api.find(args.domain_name_api_entry)
-    if domain_entry_pos == -1:
-        continue
 
     fs_pipes = compose_api_queries_pipe_names(args.filesystem_api_mount_point, request_data)
 

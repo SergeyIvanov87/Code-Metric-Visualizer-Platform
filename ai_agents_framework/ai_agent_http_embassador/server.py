@@ -1,20 +1,40 @@
 """HTTP ambassador: query-specific presentation and filesystem API adaptation."""
 
 import codecs
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+from secrets import token_urlsafe
 from uuid import uuid4
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, g, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
 
 from fifo_client import FifoClient, InvalidResult, QueryTimeout, Unavailable
 
 
 MAIN_MENU_PATH = "/api.pmccabe_collector.restapi.org"
+DISCOVERY_PATH = "/.well-known/http-api-routes/v1"
+
+
+def build_discovery_document(schemas, timeout_seconds):
+    route_timeout = float(timeout_seconds) + 10
+    if route_timeout.is_integer():
+        route_timeout = int(route_timeout)
+    routes = sorted(
+        (
+            {"path": "/" + schema["Query"].lstrip("/"), "timeout_seconds": route_timeout}
+            for schema in schemas.values()
+        ),
+        key=lambda route: route["path"],
+    )
+    revision = hashlib.sha256(
+        json.dumps(routes, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return {"schema_version": 1, "revision": "sha256:" + revision, "routes": routes}
 
 
 def create_app(config_path=None, client=None):
@@ -45,8 +65,19 @@ def create_app(config_path=None, client=None):
     if prompt.startswith('"') and prompt.endswith('"'):
         prompt = prompt[1:-1]
     prompt = prompt.replace('\\"', '"').replace("\\\\", "\\")
-    app = Flask(__name__, static_url_path="/ai-agent-ui/static")
+    service_root = Path(__file__).resolve().parent
+    page_style = (service_root / "static/style.css").read_text()
+    page_scripts = {
+        name: (service_root / f"static/{name}.js").read_text()
+        for name in ("chat", "rag_add")
+    }
+    discovery_document = build_discovery_document(schemas, settings["timeout_seconds"])
+    app = Flask(__name__, static_folder=None)
     app.config["MAX_CONTENT_LENGTH"] = int(settings["max_upload_bytes"])
+
+    @app.before_request
+    def request_nonce():
+        g.csp_nonce = token_urlsafe(18)
 
     @app.errorhandler(HTTPException)
     def http_error(exc):
@@ -56,7 +87,11 @@ def create_app(config_path=None, client=None):
     def response_headers(response):
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            f"script-src 'nonce-{g.csp_nonce}'; "
+            f"style-src 'nonce-{g.csp_nonce}'; frame-ancestors 'none'"
+        )
         return response
 
     def execute(name, args):
@@ -86,7 +121,10 @@ def create_app(config_path=None, client=None):
         app.logger.exception("Filesystem API I/O failed")
         return jsonify(error="Filesystem API I/O failed"), 503
 
-    @app.route("/ai-agent-ui/healthz", methods=["GET"])
+    @app.route(DISCOVERY_PATH, methods=["GET"], strict_slashes=False)
+    def http_api_routes_discovery():
+        return jsonify(discovery_document)
+
     @app.route("/healthz", methods=["GET"])
     def health():
         ready = all(client_path_ready(schema) for schema in schemas.values())
@@ -104,6 +142,9 @@ def create_app(config_path=None, client=None):
                 main_menu_path=MAIN_MENU_PATH,
                 system_prompt=prompt,
                 upload_path=paths["rag_add"],
+                csp_nonce=g.csp_nonce,
+                page_style=page_style,
+                page_script=page_scripts["chat"],
             )
         data = request.get_json()
         if not isinstance(data, dict) or set(data) - {"user_prompt", "system_prompt"}:
@@ -132,6 +173,9 @@ def create_app(config_path=None, client=None):
                 "rag_add.html",
                 chat_path=paths["chat"],
                 main_menu_path=MAIN_MENU_PATH,
+                csp_nonce=g.csp_nonce,
+                page_style=page_style,
+                page_script=page_scripts["rag_add"],
             )
         if request.mimetype != "application/octet-stream":
             return jsonify(error="Send the file bytes as application/octet-stream"), 415

@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Add a RAG document</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <script defer src="{{ url_for('static', filename='rag_add.js') }}"></script>
+  <style nonce="{{ csp_nonce }}">{{ page_style|safe }}</style>
+  <script nonce="{{ csp_nonce }}" defer>{{ page_script|safe }}</script>
 </head>
 <body>
   <main>

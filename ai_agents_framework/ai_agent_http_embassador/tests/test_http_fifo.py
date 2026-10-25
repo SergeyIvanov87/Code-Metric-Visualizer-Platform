@@ -45,8 +45,10 @@ def test_default_prompt_comes_from_schema_and_pages_load(app, filesystem_api):
     assert page.data.index(main_menu_link) < page.data.index(upload_link)
     assert b"You are a knowledge-base assistant." in page.data
     assert b"<details>" in page.data and b"<details open" not in page.data
-    assert b"/ai-agent-ui/static/chat.js" in page.data
-    assert client.get("/ai-agent-ui/static/chat.js").status_code == 200
+    assert b"/ai-agent-ui/" not in page.data
+    assert b'fetch(window.location.pathname' in page.data
+    assert "Content-Security-Policy" in page.headers
+    assert client.get("/ai-agent-ui/static/chat.js").status_code == 404
     upload_page = client.get(path(filesystem_api, "rag_add"))
     assert upload_page.status_code == 200
     chat_link = f'<a href="{path(filesystem_api, "chat")}">Chat with the knowledge base</a>'.encode()
@@ -56,6 +58,23 @@ def test_default_prompt_comes_from_schema_and_pages_load(app, filesystem_api):
     assert response.json["system_prompt"].startswith("You are a knowledge-base assistant.")
     assert not response.json["system_prompt"].startswith('"')
     assert client.get("/healthz").json == {"ready": True}
+
+
+def test_discovery_endpoint_lists_ambassador_paths(app, filesystem_api):
+    response = app.test_client().get("/.well-known/http-api-routes/v1")
+    assert response.status_code == 200
+    assert response.json["schema_version"] == 1
+    assert response.json["revision"].startswith("sha256:")
+    assert response.json["routes"] == sorted(
+        [
+            {
+                "path": path(filesystem_api, name),
+                "timeout_seconds": 40,
+            }
+            for name in ("chat", "rag_add")
+        ],
+        key=lambda route: route["path"],
+    )
 
 
 def test_upload_stages_file_for_agent_and_cleans_it_after_result(app, filesystem_api):

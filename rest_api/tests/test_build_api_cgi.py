@@ -219,3 +219,22 @@ def test_head_probe_releases_active_count_when_result_wait_fails(tmp_path):
         raise AssertionError("HEAD result failure must propagate")
 
     assert namespace["queries_in_progress"] == 0
+
+
+def test_discovery_endpoint_is_generated_from_api_schemas(tmp_path):
+    generated_cgi = generate_cgi(tmp_path)
+    namespace = {
+        "app": FakeApplication(),
+        "jsonify": lambda document: document,
+    }
+    exec(compile(generated_cgi, "<generated-cgi>", "exec"), namespace)
+
+    document = namespace["http_api_routes_discovery"]()
+    assert document["schema_version"] == 1
+    assert document["revision"].startswith("sha256:")
+    assert document["routes"] == [
+        {
+            "path": "/api.pmccabe_collector.restapi.org/probe",
+            "timeout_seconds": 60,
+        }
+    ]
