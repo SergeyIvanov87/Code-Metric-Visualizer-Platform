@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Add a RAG document</title>
+  <style nonce="{{ csp_nonce }}">{{ page_style|safe }}</style>
+</head>
+<body>
+  <main>
+    <nav>
+      <a href="{{ main_menu_path }}">Return to the main menu</a>
+      <a href="{{ chat_path }}">Chat with the knowledge base</a>
+    </nav>
+    <h1>Add a document</h1>
+    <p>Select a UTF-8 text file to add it to the knowledge base.</p>
+    <label for="file">Browse file</label>
+    <input id="file" type="file" accept=".txt,.md,.csv,.json,.log,text/*">
+    <p id="status" role="status"></p>
+    <pre id="result"></pre>
+  </main>
+  <script nonce="{{ csp_nonce }}">{{ page_script|safe }}</script>
+</body>
+</html>

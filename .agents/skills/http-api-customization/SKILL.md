@@ -22,6 +22,16 @@ system implements the conventional Backend for Frontend pattern:
 - A provider owns behavior and route declarations; the gateway owns validation,
   precedence, clusters, and forwarding.
 
+Use generic architecture terminology:
+
+- **HTTP ambassador** means an HTTP provider that supplies presentation,
+  validation, aggregation, or protocol adaptation for another service.
+- **Represented Service** means the service whose operations or private protocol
+  the HTTP ambassador exposes or adapts.
+- Use a service-specific ambassador name only for a clearly labeled
+  implementation example or when an exact source path, service name, or command
+  is required.
+
 Preserve these routing rules:
 
 1. Poll every provider at `GET /.well-known/http-api-routes/v1`.
@@ -71,8 +81,9 @@ discovery response.
   endpoint itself.
 - Keep paths unique within one provider.
 - Use a positive timeout no greater than 3600 seconds. Make it long enough for
-  the provider to return its own timeout response; the existing ambassador adds
-  ten seconds to its filesystem operation deadline.
+  the provider to return its own timeout response. For example, the current
+  AI-agent HTTP ambassador adds ten seconds to its Represented Service's
+  filesystem operation deadline.
 - Omit `timeout_seconds` only when the gateway's configured default is suitable
   for that action.
 - Advertise an action path once even when GET renders its page and POST or PUT
@@ -87,31 +98,34 @@ as a signaling mechanism.
 Use these producers as examples:
 
 - [REST discovery generation](../../../rest_api/build_api_cgi.py)
-- [AI agent ambassador](../../../ai_agents_framework/ai_agent_http_ambassador/server.py)
+- Example: [AI-agent HTTP ambassador](../../../ai_agents_framework/ai_agent_http_ambassador/server.py)
 
 ## Create an HTTP ambassador
 
-1. **Choose the boundary.** Identify the frontend actions and the owning
-   downstream API. Use an ambassador only when HTTP presentation, validation,
+1. **Choose the boundary.** Identify the frontend actions and the Represented
+   Service. Use an ambassador only when HTTP presentation, validation,
    aggregation, or protocol adaptation is needed. A service that merely owns an
    HTTP endpoint can be a route provider without an ambassador.
-2. **Inspect the source contract.** Read the owning schemas and implementation.
-   Preserve methods, content types, parameters, timeouts, error semantics, and
+2. **Inspect the source contract.** Read the Represented Service's schemas and
+   implementation. Preserve methods, content types, parameters, timeouts, error
+   semantics, and
    session behavior. When adapting filesystem APIs, also use
    [filesystem-api-development](../filesystem-api-development/SKILL.md). Use
    [agentic-rag-development](../agentic-rag-development/SKILL.md) if document,
    retrieval, or inference behavior changes.
-3. **Create a self-contained service.** Use `<owner>_http_ambassador` for new
+3. **Create a self-contained service.** Use
+   `<represented_service>_http_ambassador` for new
    directories. Add the server, templates/static sources when needed, runtime
    configuration, requirements, Dockerfile, Compose fragment, and focused
    tests.
-4. **Derive public paths.** Load route paths from the owning schemas or another
-   single source of truth. Validate supported schema methods and content types
+4. **Derive public paths.** Load route paths from the Represented Service's
+   schemas or another single source of truth. Validate supported schema methods
+   and content types
    during application startup.
 5. **Adapt requests safely.** Validate JSON fields, media types, Unicode, and
    size limits before calling downstream code. Reuse the existing FIFO client
    and session framing for filesystem APIs. Never pass caller-controlled paths
-   or metadata into shell-based executors without the owning subsystem's
+   or metadata into shell-based executors without the Represented Service's
    validation rules.
 6. **Handle long operations honestly.** Map unavailable dependencies, invalid
    downstream results, and timeouts to distinct HTTP statuses. Do not retry an
@@ -135,8 +149,12 @@ Use these producers as examples:
     first and specialized ambassadors later when they must replace generic
     routes. Do not customize Envoy configuration for the new service.
 
-The existing integration is in
+The current AI-agent HTTP ambassador example is integrated in
 [compose.rag-agent.http.streaming.yaml](../../../ai_agents_framework/compose.rag-agent.http.streaming.yaml).
+
+The implemented boundaries, discovery lifecycle, precedence rules, failure
+behavior, and deployment topology are recorded in [REST API customization
+implementation v1](../../../Architecture_Design_Decisions/Rest-API-Customization/implementation_v1.md).
 
 ## Test the change
 
@@ -145,6 +163,11 @@ Start with the smallest owning checks, then cover the routing boundary:
 ```sh
 python3 -m pytest -q fs_api_proxy/http_api_gateway/tests/test_controller.py
 python3 -m pytest -q rest_api/tests/test_build_api_cgi.py
+```
+
+For the AI-agent HTTP ambassador example:
+
+```sh
 python3 -m pytest -q ai_agents_framework/ai_agent_http_ambassador/tests
 ```
 
@@ -169,6 +192,17 @@ docker compose \
   -f fs_api_proxy/http_api_gateway/tests/functional/compose-functional.test.yaml \
   up --build --abort-on-container-exit \
   --exit-code-from http-api-gateway-functional-tester
+```
+
+The AI-agent HTTP ambassador example uses a dedicated Agentic RAG streaming
+overlay whose tester mounts the same external filesystem API volume as the HTTP
+providers:
+
+```sh
+docker compose \
+  -f ai_agents_framework/compose.rag-agent.http.streaming.yaml \
+  -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml \
+  config --quiet
 ```
 
 Use [container-test-diagnostics](../container-test-diagnostics/SKILL.md) when
