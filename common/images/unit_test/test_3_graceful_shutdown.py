@@ -209,26 +209,35 @@ def test_filesystem_api_graceful_shutdown_pipes_client_server(name, query, run_a
         query_waiting_timeout_cycles += 1
     current_query_counter_value = new_query_counter_value
 
-    print(f"[TEST] Server must be blocked on a 'result' pipe... Construct a new query, which must be blocked too", file=sys.stdout, flush=True)
+    parallel_by_session = query.get("ParallelBySession", False)
+    second_request_started = threading.Event()
+    second_result_ready = threading.Event()
+
+    def before_second_request(executor, arguments, additional_params):
+        second_request_started.set()
+        return onQueryPreExecute(executor, arguments, additional_params)
+
+    def after_second_request(executor, arguments, additional_params):
+        # APIExecutor calls this only after the session result FIFO exists.
+        second_result_ready.set()
+
     session_id += 1
-    # this query must stuck on a 'exec' pipe, as a corresponding console server is busy by processing the previous query
-    # which is also stuck on reading 'result' pipe
-    blocked_cliend_executor = ut_utils.APIExecutor(global_settings.api_dir, query, session_id, None, onQueryPreExecute, None)
-    blocked_cliend_executor.run(1)
-    executors.append(blocked_cliend_executor)
+    second_executor = ut_utils.APIExecutor(
+        global_settings.api_dir, query, session_id,
+        None, before_second_request, after_second_request,
+    )
+    second_executor.run(1)
+    executors.append(second_executor)
 
-    # wait for query executed to prove the fact that blocked client have started and trying to execute the query
-    new_query_counter_value = current_query_counter_value
-    query_waiting_timeout_cycles = 0
-    while new_query_counter_value == current_query_counter_value:
-        time.sleep(0.1)
-        new_query_counter_value = get_query_counter()
-        print(f"[TEST] waiting for blocking in client before query execution[{query_waiting_timeout_cycles}]", file=sys.stdout, flush=True)
-        assert query_waiting_timeout_cycles <= 30
-        query_waiting_timeout_cycles += 1
-    current_query_counter_value = new_query_counter_value
-
-    #time.sleep(15)
+    assert second_request_started.wait(3), "Second client did not start"
+    if parallel_by_session:
+        # Different sessions must both be accepted while the first executor
+        # remains blocked. Cleanup will deliver cancellation to both readers.
+        assert second_result_ready.wait(3), "Parallel session was not accepted"
+    else:
+        # Legacy endpoints cannot accept the second request while busy. The
+        # result FIFO must remain absent until the server is killed below.
+        assert not second_result_ready.wait(0.2), "Serial endpoint accepted a second request"
 
     print(f"[TEST] Kill server {name}_server.sh", file=sys.stdout, flush=True)
     pids = list(ut_utils.get_pids(f"{name}_server.sh"))
@@ -280,13 +289,22 @@ def test_filesystem_api_graceful_shutdown_pipes_client_server(name, query, run_a
     #print(f"[TEST] client pipes have been releases {deleted_files}", file=sys.stdout, flush=True)
 
     print("[TEST] waiting threads must be unblocked", file=sys.stdout, flush=True)
-    executors[0].join()
+    for executor in executors:
+        executor.async_executor.join(timeout=20)
+        assert not executor.async_executor.is_alive(), "Client remained blocked after cleanup"
     assert not len(executors[0].error_message)
     print(f"[TEST] Thread 0 has been unblocked and must be gracefully returned from a result pipe waiting", file=sys.stdout, flush=True)
-    executors[1].join()
-    assert len(executors[1].error_message)
-    print(f"[TEST] Thread 1 has been unblocked and must not reach out a result pipe", file=sys.stdout, flush=True)
+    if parallel_by_session:
+        assert not executors[1].error_message
+        assert second_result_ready.is_set()
+    else:
+        assert executors[1].error_message
+        assert not second_result_ready.is_set()
+    print("[TEST] Both clients unblocked according to the endpoint execution mode", file=sys.stdout, flush=True)
 
     # pipes do not exist anymore
     for p in communication_pipes:
         assert not os.path.exists(p)
+
+    # Include session-specific result FIFOs, not just the two base pipes.
+    assert not list(pathlib.Path(communication_pipes[0]).parent.glob("result*"))
