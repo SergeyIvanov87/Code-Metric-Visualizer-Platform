@@ -20,8 +20,9 @@ from server import create_app
 
 
 @pytest.fixture
-def filesystem_api(tmp_path):
+def filesystem_api(tmp_path, monkeypatch):
     """Real generated CLI servers/executors; replace only the heavy ML programs."""
+    monkeypatch.setenv("MAIN_MENU_PATH", "/api.pmccabe_collector.restapi.org")
     api = tmp_path / "api"
     api.mkdir()
     spec = importlib.util.spec_from_file_location("agent_api_generator", REPO / "ai_agents_framework/ai_agent/sources/api_generator.py")
@@ -71,8 +72,13 @@ else:
         while not all((api / schema["Query"] / schema["Method"] / "result.json").exists() for schema in schemas.values()):
             assert time.monotonic() < deadline, "Generated filesystem APIs did not start"
             time.sleep(0.01)
+        schema_dir = tmp_path / "API"
+        schema_dir.mkdir()
+        for name in ("chat", "rag_add"):
+            source = REPO / f"ai_agents_framework/ai_agent/API/{name}.json"
+            (schema_dir / f"{name}.json").write_text(source.read_text())
         config = tmp_path / "http.json"
-        config.write_text(json.dumps({"api_mount": str(api), "schema_dir": str(REPO / "ai_agents_framework/ai_agent/API"), "timeout_seconds": 30, "max_upload_bytes": 1024 * 1024, "max_prompt_bytes": 65536, "max_result_bytes": 1024 * 1024}))
+        config.write_text(json.dumps({"api_mount": str(api), "schema_dir": str(schema_dir), "timeout_seconds": 30, "max_upload_bytes": 1024 * 1024, "max_prompt_bytes": 65536, "max_result_bytes": 1024 * 1024}))
         yield api, schemas, config
     finally:
         for process in processes:

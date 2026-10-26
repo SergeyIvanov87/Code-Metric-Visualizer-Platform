@@ -6,6 +6,7 @@ services:
     environment:
       AI_AGENT_HTTP_CONFIG: /app/config.json
       HTTP_BIND: 0.0.0.0:8081
+      MAIN_MENU_PATH: ${MAIN_MENU_PATH:-/api.pmccabe_collector.restapi.org}
     volumes:
       - api.pmccabe_collector.restapi.org:/api
       - ./config.json:/app/config.json:ro

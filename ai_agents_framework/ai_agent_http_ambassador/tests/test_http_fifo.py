@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
+from pathlib import Path
 import re
 import threading
 import time
@@ -8,7 +9,7 @@ import time
 import pytest
 
 from fifo_client import FifoClient, InvalidResult, QueryTimeout, Unavailable
-from server import create_app
+from server import create_app, load_schemas
 
 
 def path(filesystem_api, name):
@@ -72,6 +73,14 @@ def test_default_prompt_comes_from_schema_and_pages_load(app, filesystem_api):
     assert client.get("/healthz").json == {"ready": True}
 
 
+def test_main_menu_path_comes_from_environment(filesystem_api, monkeypatch):
+    monkeypatch.setenv("MAIN_MENU_PATH", "/custom/main-menu")
+    app = create_app(filesystem_api[2])
+    page = app.test_client().get(path(filesystem_api, "chat"))
+    assert page.status_code == 200
+    assert b'<a href="/custom/main-menu">Return to the main menu</a>' in page.data
+
+
 def test_discovery_endpoint_lists_ambassador_paths(app, filesystem_api):
     response = app.test_client().get("/.well-known/http-api-routes/v1")
     assert response.status_code == 200
@@ -87,6 +96,35 @@ def test_discovery_endpoint_lists_ambassador_paths(app, filesystem_api):
         ],
         key=lambda route: route["path"],
     )
+
+
+def test_loads_every_configured_schema_and_advertises_supported_routes(app, filesystem_api):
+    schema_dir = Path(json.loads(filesystem_api[2].read_text())["schema_dir"])
+    assert set(load_schemas(schema_dir)) == {"chat", "rag_add"}
+    advertised = {
+        route["path"]
+        for route in app.test_client().get("/.well-known/http-api-routes/v1").json["routes"]
+    }
+    assert advertised == {path(filesystem_api, "chat"), path(filesystem_api, "rag_add")}
+
+
+def test_ignores_json_file_without_query(filesystem_api):
+    schema_dir = Path(json.loads(filesystem_api[2].read_text())["schema_dir"])
+    (schema_dir / "metadata.json").write_text(json.dumps({"description": "not a query"}))
+    assert create_app(filesystem_api[2]) is not None
+
+
+def test_rejects_query_not_supported_by_server(filesystem_api):
+    schema_dir = Path(json.loads(filesystem_api[2].read_text())["schema_dir"])
+    unsupported_query = "api.pmccabe_collector.restapi.org/ai_agent/rag/sync/v1"
+    (schema_dir / "rag_sync.json").write_text(json.dumps({
+        "Content-Type": "application/json",
+        "Method": "PUT",
+        "Query": unsupported_query,
+        "Params": {},
+    }))
+    with pytest.raises(ValueError, match=unsupported_query):
+        create_app(filesystem_api[2])
 
 
 def test_upload_stages_file_for_agent_and_cleans_it_after_result(app, filesystem_api):
@@ -158,6 +196,23 @@ def test_timeout_keeps_staging_file_and_does_not_retry(filesystem_api):
     assert response.json["completion_unknown"] is True
     assert backend.calls == 1
     assert os.path.exists(backend.uri)
+
+
+def test_completed_invalid_upload_result_cleans_staging_file(filesystem_api):
+    class InvalidClient:
+        def execute(self, schema, args):
+            self.uri = args["-URI"]
+            return b"not JSON"
+
+    backend = InvalidClient()
+    app = create_app(filesystem_api[2], backend)
+    response = app.test_client().put(
+        path(filesystem_api, "rag_add"),
+        data=b"Clean me",
+        content_type="application/octet-stream",
+    )
+    assert response.status_code == 502
+    assert not os.path.exists(backend.uri)
 
 
 @pytest.mark.parametrize("raw,status", [(b"not JSON", 502), (b"[]", 502), (b'{}', 502), (b'{"error_code":-1,"error_msg":"failed"}', 502)])

@@ -9,6 +9,8 @@ import threading
 import time
 from uuid import uuid4
 
+from api_fs_query import APIQueryInterruptible, canonize_args
+
 
 class Unavailable(Exception):
     pass
@@ -47,6 +49,13 @@ class FifoClient:
             raise ValueError("API node escapes its mount")
         return node
 
+    def query(self, schema):
+        node = self.node(schema)
+        return APIQueryInterruptible(
+            [str(node / "exec"), str(node / "result.json")],
+            remove_session_pipe_on_result_done=False,
+        )
+
     @staticmethod
     def _fifo(path):
         try:
@@ -62,10 +71,10 @@ class FifoClient:
         time.sleep(min(0.01, remaining))
 
     def execute(self, schema, arguments):
+        query = self.query(schema)
         node = self.node(schema)
         exec_path = node / "exec"
-        result_base = node / "result.json"
-        if not self._fifo(exec_path) or not self._fifo(result_base):
+        if not query.is_valid():
             raise Unavailable(f"Filesystem API: {node} is not ready")
         # Reuse a completed session on each worker thread so the unmodified
         # agent does not accumulate a new result FIFO and Bash map entry for
@@ -73,9 +82,9 @@ class FifoClient:
         session_id = getattr(self._sessions, "completed", None) or "http_" + uuid4().hex
         self._sessions.completed = None
         result_path = node / ("result.json_" + session_id)
-        command = " ".join([f"SESSION_ID={session_id}", *(
+        command = canonize_args(" ".join([f"SESSION_ID={session_id}", *(
             f"{key}={quote_value(value)}" for key, value in arguments.items()
-        )]).encode("utf-8") + b"\n"
+        )])).encode("utf-8")
         deadline = time.monotonic() + self.timeout
 
         # Serialize writes between threads/processes/replicas sharing this mount.

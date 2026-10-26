@@ -396,6 +396,17 @@ def positive_number(name, default):
     return value
 
 
+def nonnegative_number(name, default):
+    raw = os.environ.get(name, str(default))
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise DiscoveryError(f"{name} must be numeric") from exc
+    if value < 0:
+        raise DiscoveryError(f"{name} must not be negative")
+    return value
+
+
 def positive_integer(name, default):
     value = positive_number(name, default)
     if not value.is_integer():
@@ -411,7 +422,9 @@ def run():
     poll_interval = positive_number("HTTP_API_DISCOVERY_POLL_INTERVAL_SECONDS", 15)
     request_timeout = positive_number("HTTP_API_DISCOVERY_TIMEOUT_SECONDS", 5)
     default_route_timeout = positive_number("HTTP_API_DEFAULT_ROUTE_TIMEOUT_SECONDS", 60)
-    fallback_timeout = positive_number("HTTP_API_FALLBACK_TIMEOUT_SECONDS", 60)
+    # Envoy interprets a route timeout of zero as disabled. Preserve the
+    # generic REST provider's pre-gateway behavior for unadvertised operations.
+    fallback_timeout = nonnegative_number("HTTP_API_FALLBACK_TIMEOUT_SECONDS", 0)
     connect_timeout = positive_number("HTTP_API_CONNECT_TIMEOUT_SECONDS", 5)
 
     CONFIG_DIRECTORY.mkdir(parents=True, exist_ok=True)

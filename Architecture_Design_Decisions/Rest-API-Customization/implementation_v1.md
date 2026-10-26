@@ -197,8 +197,10 @@ connection details, and generated Envoy cluster name are not public API.
 
 ### Example: AI-agent HTTP ambassador
 
-This concrete HTTP ambassador loads `chat.json` and `rag_add.json` from the
-AI-agent Represented Service and advertises exactly those public action paths.
+This concrete HTTP ambassador image copies exactly `chat.json` and
+`rag_add.json` from the AI-agent Represented Service. At startup it reads every
+JSON file in its configured schema directory, rejects query paths the server
+does not support, and advertises the two supported action paths.
 It provides:
 
 - a chat page and JSON `POST` adapter;

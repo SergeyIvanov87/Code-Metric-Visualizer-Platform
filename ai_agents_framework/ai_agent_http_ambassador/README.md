@@ -15,11 +15,13 @@ directory is `ai_agent_http_ambassador` and the container service is
 
 ## Endpoints
 
-Paths are loaded from the existing `API/chat.json` and `API/rag_add.json` schemas.
-The image copies those two schemas at build time; no default prompt is maintained
-separately. Rebuild the image after changing the schemas, or mount a schema
-directory and point `schema_dir` to it. The gateway discovers route paths from
-the ambassador; no Envoy-specific path list is maintained here.
+The image copies exactly `chat.json` and `rag_add.json` from the represented
+service. At startup, the ambassador reads every JSON file that exists in the
+configured `schema_dir` and reports an error if any file declares a query that
+the server does not support. No default prompt is maintained separately.
+Rebuild the image after changing either supported schema, or mount a schema
+directory containing only supported query files. The gateway discovers route
+paths from the ambassador; no Envoy-specific path list is maintained here.
 
 | Method | Path | Behavior |
 | --- | --- | --- |
@@ -77,7 +79,10 @@ errors use 400/413/415. Requests are not retried automatically.
 
 ## Configuration and filesystem sharing
 
-Mount `config.json` and set `AI_AGENT_HTTP_CONFIG` to its path. Settings:
+Mount `config.json` and set `AI_AGENT_HTTP_CONFIG` to its path. Set
+`MAIN_MENU_PATH` to the exact root-relative generic REST menu path; the Docker
+image and Compose model default it to `/api.pmccabe_collector.restapi.org`.
+Settings:
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
