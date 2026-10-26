@@ -54,16 +54,18 @@ jobs:
         docker compose -f "${compose_logger_test_aggregator_subsystem_file}" config --quiet
         docker compose -f "${compose_tests_file}" config --quiet
 
+        # Complete every build before starting the one-shot capture. The test
+        # model includes the capture services and can rebuild their image tags.
         docker compose -f "${compose_logger_subsystem_file}" build
+        docker compose -f "${compose_tests_file}" build
         docker compose -f "${compose_logger_subsystem_file}" up --detach --remove-orphans \
           syslog-ng-streaming envoy envoy-ready
 
-        docker compose -f "${compose_logger_test_aggregator_subsystem_file}" build
         docker compose -f "${compose_logger_test_aggregator_subsystem_file}" up --detach --remove-orphans \
           kafka proxy-ready log_event_aggregator tap_subscriber
 
-        docker compose -f "${compose_tests_file}" build
-        docker compose -f "${compose_tests_file}" up --detach --remove-orphans \
+        # Preserve the active subscriber and consumer when adding testers.
+        docker compose -f "${compose_tests_file}" up --detach --no-recreate --remove-orphans \
           passed-tester skipped-tester mixed-tester
 
         aggregator_id=$(docker compose -f "${compose_logger_test_aggregator_subsystem_file}" ps --all --quiet log_event_aggregator)
