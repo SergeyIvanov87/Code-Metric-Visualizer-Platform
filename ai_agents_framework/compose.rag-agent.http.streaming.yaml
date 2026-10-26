@@ -44,6 +44,22 @@ services:
       - rag-dispatcher-config:/etc/dispatcher
       - rag-document-storage:/mnt/file_storage
 
+  file-uploader:
+    extends:
+      file: ../utility/file-uploader/compose.yaml
+      service: file-uploader
+    build:
+      context: ../utility/file-uploader
+      dockerfile: Dockerfile
+      additional_contexts:
+        common: ../common
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - file-uploads:/uploads
+
   rest-api:
     build:
       context: ../rest_api
@@ -112,6 +128,7 @@ volumes:
   rag-data:
   rag-dispatcher-config:
   http-api-gateway-config:
+  file-uploads:
   rag-document-storage:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org

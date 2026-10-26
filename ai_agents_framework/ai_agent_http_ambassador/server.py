@@ -16,8 +16,15 @@ from werkzeug.exceptions import HTTPException
 from fifo_client import FifoClient, InvalidResult, QueryTimeout, Unavailable
 
 
-MAIN_MENU_PATH = "/api.pmccabe_collector.restapi.org"
 DISCOVERY_PATH = "/.well-known/http-api-routes/v1"
+SUPPORTED_SCHEMAS = {"chat": "POST", "rag_add": "PUT"}
+
+
+def load_schemas(schema_dir):
+    return {
+        path.stem: json.loads(path.read_text())
+        for path in sorted(Path(schema_dir).glob("*.json"))
+    }
 
 
 def build_discovery_document(schemas, timeout_seconds):
@@ -40,6 +47,9 @@ def build_discovery_document(schemas, timeout_seconds):
 def create_app(config_path=None, client=None):
     config_path = config_path or os.environ.get("AI_AGENT_HTTP_CONFIG", str(Path(__file__).with_name("config.json")))
     settings = json.loads(Path(config_path).read_text())
+    main_menu_path = os.environ["MAIN_MENU_PATH"]
+    if not main_menu_path.startswith("/") or main_menu_path.startswith("//"):
+        raise ValueError("MAIN_MENU_PATH must be a root-relative path")
     api_mount = Path(settings["api_mount"]).resolve()
     agent_mount = Path(settings.get("agent_api_mount", settings["api_mount"]))
     # rag_add's existing executor uses xargs + sh -c. Only generated, shell-safe
@@ -48,9 +58,28 @@ def create_app(config_path=None, client=None):
         if not mount.is_absolute() or not re.fullmatch(r"/[A-Za-z0-9_./-]+", str(mount)) or ".." in mount.parts:
             raise ValueError("API mount paths must be absolute, shell-safe paths")
     schema_dir = Path(settings["schema_dir"])
-    schemas = {name: json.loads((schema_dir / f"{name}.json").read_text()) for name in ("chat", "rag_add")}
-    for name, method in (("chat", "POST"), ("rag_add", "PUT")):
-        if schemas[name]["Method"] != method or schemas[name].get("Content-Type") != "application/json":
+    available_schemas = load_schemas(schema_dir)
+    missing_schemas = SUPPORTED_SCHEMAS.keys() - available_schemas.keys()
+    if missing_schemas:
+        raise ValueError(
+            "Missing filesystem API schemas: " + ", ".join(sorted(missing_schemas))
+        )
+    schemas = {name: available_schemas[name] for name in SUPPORTED_SCHEMAS}
+    supported_queries = {schema["Query"] for schema in schemas.values()}
+    unsupported_queries = sorted(
+        str(schema["Query"])
+        for schema in available_schemas.values()
+        if "Query" in schema and schema["Query"] not in supported_queries
+    )
+    if unsupported_queries:
+        raise ValueError(
+            "Unsupported filesystem API queries: " + ", ".join(unsupported_queries)
+        )
+    for name, schema in schemas.items():
+        if (
+            schema.get("Content-Type") != "application/json"
+            or schema.get("Method") != SUPPORTED_SCHEMAS[name]
+        ):
             raise ValueError(f"Unsupported {name} filesystem API schema")
     for key in ("timeout_seconds", "max_upload_bytes", "max_prompt_bytes", "max_result_bytes"):
         if not isinstance(settings[key], (int, float)) or settings[key] <= 0:
@@ -139,7 +168,7 @@ def create_app(config_path=None, client=None):
         if request.method == "GET":
             return render_template(
                 "chat.html",
-                main_menu_path=MAIN_MENU_PATH,
+                main_menu_path=main_menu_path,
                 system_prompt=prompt,
                 upload_path=paths["rag_add"],
                 csp_nonce=g.csp_nonce,
@@ -172,7 +201,7 @@ def create_app(config_path=None, client=None):
             return render_template(
                 "rag_add.html",
                 chat_path=paths["chat"],
-                main_menu_path=MAIN_MENU_PATH,
+                main_menu_path=main_menu_path,
                 csp_nonce=g.csp_nonce,
                 page_style=page_style,
                 page_script=page_scripts["rag_add"],
@@ -211,7 +240,7 @@ def create_app(config_path=None, client=None):
                     "-doc_type": "txt",
                     "-metadata": "http_upload_" + token,
                 })
-            except (QueryTimeout, InvalidResult, OSError):
+            except (QueryTimeout, OSError):
                 retain = True  # The agent may still be using this file.
                 raise
             if "error_code" not in result or (not result["error_code"] and "doc_id" not in result):

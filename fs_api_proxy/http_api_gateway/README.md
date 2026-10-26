@@ -12,6 +12,10 @@ snapshot, and merges routes from left to right. A later backend replaces an
 earlier backend when both advertise the same path. The first backend remains
 the catch-all for paths that are not advertised.
 
+A backend can be a generic provider or an **HTTP ambassador**. An HTTP
+ambassador presents or adapts operations owned by a **Represented Service**;
+neither concept is tied to a particular application.
+
 ## Discovery contract
 
 A backend responds with `application/json`:
@@ -37,7 +41,9 @@ discovery-endpoint claims are rejected.
 
 `BACKENDS_FOR_FRONTENDS` is required runtime configuration. Entries may omit
 the `http://` scheme but must include a port when the service does not listen
-on port 80:
+on port 80.
+
+Example using the concrete AI-agent HTTP ambassador:
 
 ```sh
 BACKENDS_FOR_FRONTENDS=http://rest-api:5000,http://ai-agent-http-ambassador:8081
@@ -55,7 +61,7 @@ Other settings:
 | `HTTP_API_DISCOVERY_POLL_INTERVAL_SECONDS` | `15` | Polling interval |
 | `HTTP_API_DISCOVERY_TIMEOUT_SECONDS` | `5` | Per-backend request timeout |
 | `HTTP_API_DEFAULT_ROUTE_TIMEOUT_SECONDS` | `60` | Missing route timeout |
-| `HTTP_API_FALLBACK_TIMEOUT_SECONDS` | `60` | Catch-all timeout |
+| `HTTP_API_FALLBACK_TIMEOUT_SECONDS` | `0` | Catch-all timeout; zero disables the cap |
 | `HTTP_API_CONNECT_TIMEOUT_SECONDS` | `5` | Envoy upstream connect timeout |
 
 ## Runtime configuration
@@ -76,6 +82,8 @@ updates without restarting or interrupting active requests.
 
 All backends and gateway services must share
 `api.pmccabe_collector.network`.
+
+For example, run the gateway with the concrete AI-agent HTTP ambassador:
 
 ```sh
 BACKENDS_FOR_FRONTENDS=http://rest-api:5000,http://ai-agent-http-ambassador:8081 \

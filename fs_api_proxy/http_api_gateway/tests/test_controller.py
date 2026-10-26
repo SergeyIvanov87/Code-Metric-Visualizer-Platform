@@ -11,6 +11,7 @@ from controller import (
     DiscoveryError,
     build_rds,
     merge_routes,
+    nonnegative_number,
     parse_backends,
     revision_for,
     validate_discovery_document,
@@ -54,6 +55,21 @@ def test_later_backend_owns_duplicate_path():
     assert shared["route"]["cluster"] == "backend_1"
     assert envoy_routes[-1]["match"] == {"prefix": "/"}
     assert envoy_routes[-1]["route"]["cluster"] == "backend_0"
+
+
+def test_zero_fallback_timeout_disables_envoy_cap():
+    first = backend(0, "http://first:8080")
+    response = build_rds([], first, 0, revision_for([]))
+    fallback = response["resources"][0]["virtual_hosts"][0]["routes"][-1]
+    assert fallback["route"]["timeout"] == "0s"
+
+
+def test_fallback_timeout_accepts_zero_but_rejects_negative(monkeypatch):
+    monkeypatch.setenv("TIMEOUT", "0")
+    assert nonnegative_number("TIMEOUT", 60) == 0
+    monkeypatch.setenv("TIMEOUT", "-1")
+    with pytest.raises(DiscoveryError, match="must not be negative"):
+        nonnegative_number("TIMEOUT", 60)
 
 
 def test_backend_endpoints_are_normalized_before_duplicate_detection():
