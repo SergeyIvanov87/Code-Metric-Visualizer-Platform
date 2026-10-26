@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AI agent chat</title>
   <style nonce="{{ csp_nonce }}">{{ page_style|safe }}</style>
-  <script nonce="{{ csp_nonce }}" defer>{{ page_script|safe }}</script>
 </head>
 <body>
   <main>
@@ -28,5 +27,6 @@
     </form>
     <p id="status" role="status"></p>
   </main>
+  <script nonce="{{ csp_nonce }}">{{ page_script|safe }}</script>
 </body>
 </html>
