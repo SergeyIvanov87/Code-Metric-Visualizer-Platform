@@ -95,20 +95,26 @@ they address different Compose projects.
 ```sh
 capture_file=common/images/compose-test-aggregator-subsystem.yaml
 
+# Build the complete model before capture starts; it includes capture images.
+docker compose -f "${tests_file}" build
+
 # Phase 1: establish the Envoy tap subscription and wait until capture is ready.
 docker compose \
   -f "${capture_file}" \
-  up --build --detach --wait --wait-timeout 120
+  up --detach --wait --wait-timeout 120
 
-# Phase 2: reconcile the existing capture services and add the finite test scope.
+# Phase 2: preserve the active capture services and add the finite test scope.
 docker compose \
   -f "${tests_file}" \
-  up --build --detach
+  up --detach --no-recreate
 ```
 
-The phase-2 command does not create duplicate capture services. The matching
-project name and service names cause Compose to reuse the running Kafka,
-subscriber, and aggregator when their configuration is unchanged. The
+The phase-2 command must not rebuild or recreate capture services. Rebuilding
+included images can change their image IDs even when the service configuration
+is unchanged. Recreating the subscriber sends SIGTERM, which finalizes the old
+capture and publishes a terminal event. A replacement consumer using the same
+capture ID can then read that event before the new testers' logs. Build the
+complete model first and use `--no-recreate` when adding testers. The
 `proxy-ready` one-shot probe may run again.
 
 Start phase 2 before `WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC` expires.
