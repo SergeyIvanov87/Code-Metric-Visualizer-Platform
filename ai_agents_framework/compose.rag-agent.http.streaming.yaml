@@ -64,14 +64,14 @@ services:
 
   ai-agent-http-ambassador:
     extends:
-      file: ./ai_agent_http_embassador/compose.yaml
+      file: ./ai_agent_http_ambassador/compose.yaml
       service: ai-agent-http-ambassador
     build:
       context: ..
-      dockerfile: ai_agents_framework/ai_agent_http_embassador/Dockerfile
+      dockerfile: ai_agents_framework/ai_agent_http_ambassador/Dockerfile
     volumes:
       - api.pmccabe_collector.restapi.org:/api
-      - ./ai_agent_http_embassador/config.json:/app/config.json:ro
+      - ./ai_agent_http_ambassador/config.json:/app/config.json:ro
     logging: *streaming-logging
     networks:
       - api.pmccabe_collector.network
