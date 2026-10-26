@@ -25,6 +25,10 @@ This map was derived from the code, API schemas, Compose models, tests, and CI o
 
 Root [README prerequisites](../README.md#prerequisites) describe external API, logger and RRD volumes and shared network requirements. Inspect the chosen Compose model before creating resources. Historical setup examples include broad permissions and daemon changes; these are not necessary for reading code or authoring skills.
 
+The current dynamic provider-discovery, route-precedence, generic Envoy, and
+HTTP ambassador design is described in the [REST API customization implementation
+record](../Architecture_Design_Decisions/Rest-API-Customization/implementation_v1.md).
+
 ## Filesystem API contract
 
 Schemas declare `Method`, `Query`, `Content-Type`, `Params`, and descriptions. Shared code interprets these and service-specific generators provide implementations. Runtime paths and scripts are generated: fix source schemas/generators rather than a disposable generated artifact.
@@ -70,6 +74,7 @@ Commands run from the repository root. CI definitions are the source for setup a
 | Running Analysis/Analytic integration | `compose-analysis.integrational-test.yaml` | `test_aggregator`; start the selected stack first |
 | Streaming event pipeline | `common/images/streaming_test_aggregator/tests/functional/compose-functional.test.yaml` | aggregator, then `functional-tests`; detached orchestration |
 | Agent and RAG with streaming capture | `ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml` | follow the dedicated workflow |
+| Agent, RAG, and discovered HTTP gateway with streaming capture | `ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml` | HTTP smoke checks, filesystem tester, then authoritative aggregator result |
 
 Example finite service suite:
 
@@ -86,6 +91,7 @@ For image-only changes, inspect Dockerfile `COPY` sources and Compose `build.con
 - [Agentic RAG CI](../.github/workflows/agentic-rag-subsystem.yml): dispatcher/vector-store builds and tests.
 - [Streaming pipeline CI](../.github/workflows/streaming-test-aggregator.yml): detached launch, aggregator status, final checks, diagnostic export.
 - [Streaming integration CI](../.github/workflows/streaming-test-aggregator-integration.yml) and [agent streaming CI](../.github/workflows/agentic-rag-streaming-test-aggregator-integration.yml).
+- [Agentic RAG HTTP streaming CI](../.github/workflows/agentic-rag-http-streaming-test-aggregator-integration.yml): builds all stack, logger, and aggregator images before launching and testing the discovered HTTP topology.
 - [Streaming lifecycle](../common/images/streaming_test_aggregator/README.md): permanent logger, on-demand capture IDs and one active subscriber constraint.
 - [Capture event schema](../common/images/streaming_test_aggregator/tap_subscriber/EVENT_SCHEMA.md).
 - [Legacy artifact action](../.github/actions/upload-test-aggregator-artifacts/action.yml).
