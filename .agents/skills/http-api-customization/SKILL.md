@@ -1,6 +1,6 @@
 ---
 name: http-api-customization
-description: Use when changing the pseudo-BFF HTTP API gateway, discovery contract, route precedence, BACKENDS_FOR_FRONTENDS integration, or creating an HTTP ambassador/embassador provider that adapts frontend requests to filesystem APIs or internal services.
+description: Use when changing the pseudo-BFF HTTP API gateway, discovery contract, route precedence, BACKENDS_FOR_FRONTENDS integration, or creating an HTTP ambassador provider that adapts frontend requests to filesystem APIs or internal services.
 ---
 
 # Customize discovered HTTP APIs
@@ -87,7 +87,7 @@ as a signaling mechanism.
 Use these producers as examples:
 
 - [REST discovery generation](../../../rest_api/build_api_cgi.py)
-- [AI agent ambassador](../../../ai_agents_framework/ai_agent_http_embassador/server.py)
+- [AI agent ambassador](../../../ai_agents_framework/ai_agent_http_ambassador/server.py)
 
 ## Create an HTTP ambassador
 
@@ -101,11 +101,10 @@ Use these producers as examples:
    [filesystem-api-development](../filesystem-api-development/SKILL.md). Use
    [agentic-rag-development](../agentic-rag-development/SKILL.md) if document,
    retrieval, or inference behavior changes.
-3. **Create a self-contained service.** Prefer a correctly spelled
-   `<owner>_http_ambassador` for new directories; retain the existing
-   `ai_agent_http_embassador` spelling for compatibility. Add the server,
-   templates/static sources when needed, runtime configuration, requirements,
-   Dockerfile, Compose fragment, and focused tests.
+3. **Create a self-contained service.** Use `<owner>_http_ambassador` for new
+   directories. Add the server, templates/static sources when needed, runtime
+   configuration, requirements, Dockerfile, Compose fragment, and focused
+   tests.
 4. **Derive public paths.** Load route paths from the owning schemas or another
    single source of truth. Validate supported schema methods and content types
    during application startup.
@@ -146,7 +145,7 @@ Start with the smallest owning checks, then cover the routing boundary:
 ```sh
 python3 -m pytest -q fs_api_proxy/http_api_gateway/tests/test_controller.py
 python3 -m pytest -q rest_api/tests/test_build_api_cgi.py
-python3 -m pytest -q ai_agents_framework/ai_agent_http_embassador/tests
+python3 -m pytest -q ai_agents_framework/ai_agent_http_ambassador/tests
 ```
 
 For a new ambassador, add tests that prove:
