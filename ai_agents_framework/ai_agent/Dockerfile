@@ -26,22 +26,16 @@ RUN <<EOF
     pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain-text-splitters tiktoken sentence-transformers
     case "$LLM_BACKEND" in
       cpu) export CMAKE_ARGS="-DGGML_CUDA=OFF -DGGML_VULKAN=OFF" ;;
-      nvidia)
-        # Docker builds have no host driver. Resolve libggml-cuda's transitive
-        # libcuda.so.1 dependency using the CUDA toolkit's link-only stub.
-        cuda_stub_dir=$(mktemp -d)
-        test -f /usr/local/cuda/lib64/stubs/libcuda.so
-        ln -s /usr/local/cuda/lib64/stubs/libcuda.so "$cuda_stub_dir/libcuda.so.1"
-        export CMAKE_ARGS="-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=all-major -DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,$cuda_stub_dir"
-        ;;
+      nvidia) export CMAKE_ARGS="-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=all-major" ;;
       intel)
         apt-get install -y --no-install-recommends libvulkan-dev mesa-vulkan-drivers vulkan-tools glslc
         export CMAKE_ARGS="-DGGML_VULKAN=ON" ;;
       *) echo "Unsupported LLM_BACKEND: $LLM_BACKEND" >&2; exit 1 ;;
     esac
+    # This agent uses text-only inference. In 0.3.16, LLAVA_BUILD also adds
+    # llama-mtmd-cli independently of LLAMA_BUILD_TOOLS.
+    export CMAKE_ARGS="$CMAKE_ARGS -DLLAVA_BUILD=OFF"
     FORCE_CMAKE=1 pip install --break-system-packages --no-cache-dir --no-binary=llama-cpp-python llama-cpp-python==0.3.16
-    # Never expose the driver stub through the runtime loader search path.
-    if [ "$LLM_BACKEND" = nvidia ]; then rm -rf "$cuda_stub_dir"; fi
     pip install --break-system-packages chromadb pypdf requests pydantic tqdm
 EOF
 
