@@ -11,6 +11,7 @@ Load only the skills and references needed for the task.
 | --- | --- |
 | Locate an owner, trace dependencies, or choose a platform stack | [repository-navigation](.agents/skills/repository-navigation/SKILL.md) |
 | Change schemas, generated executors, FIFO sessions, deferred requests, or REST exposure | [filesystem-api-development](.agents/skills/filesystem-api-development/SKILL.md) |
+| Change HTTP discovery, gateway precedence, or add an HTTP ambassador | [http-api-customization](.agents/skills/http-api-customization/SKILL.md) |
 | Change streaming uploads, shared staging, directory events, sealing, or cleanup | [streaming-ingestion](.agents/skills/streaming-ingestion/SKILL.md) |
 | Change document storage, chunk/vector consistency, retrieval, or inference configuration | [agentic-rag-development](.agents/skills/agentic-rag-development/SKILL.md) |
 | Select tests or diagnose Compose, readiness, capture, or test aggregation | [container-test-diagnostics](.agents/skills/container-test-diagnostics/SKILL.md) |

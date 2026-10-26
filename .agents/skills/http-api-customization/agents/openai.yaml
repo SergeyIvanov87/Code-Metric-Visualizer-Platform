@@ -1,0 +1,4 @@
+interface:
+  display_name: "HTTP API Customization"
+  short_description: "Develop route providers and HTTP ambassadors"
+  default_prompt: "Use $http-api-customization to add or modify a discovered HTTP API provider or ambassador."

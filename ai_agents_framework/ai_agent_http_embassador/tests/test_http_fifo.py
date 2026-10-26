@@ -47,12 +47,20 @@ def test_default_prompt_comes_from_schema_and_pages_load(app, filesystem_api):
     assert b"<details>" in page.data and b"<details open" not in page.data
     assert b"/ai-agent-ui/" not in page.data
     assert b'fetch(window.location.pathname' in page.data
+    chat_script = page.data.index(b"<script nonce=")
+    assert page.data.index(b'<form id="chat-form">') < chat_script
+    assert b"defer" not in page.data[chat_script:page.data.index(b">", chat_script)]
     assert "Content-Security-Policy" in page.headers
     assert client.get("/ai-agent-ui/static/chat.js").status_code == 404
     upload_page = client.get(path(filesystem_api, "rag_add"))
     assert upload_page.status_code == 200
     chat_link = f'<a href="{path(filesystem_api, "chat")}">Chat with the knowledge base</a>'.encode()
     assert upload_page.data.index(main_menu_link) < upload_page.data.index(chat_link)
+    upload_script = upload_page.data.index(b"<script nonce=")
+    assert upload_page.data.index(b'<input id="file"') < upload_script
+    assert b"defer" not in upload_page.data[
+        upload_script:upload_page.data.index(b">", upload_script)
+    ]
     response = client.post(path(filesystem_api, "chat"), json={"user_prompt": "Hello"})
     assert response.status_code == 200
     assert response.json["system_prompt"].startswith("You are a knowledge-base assistant.")

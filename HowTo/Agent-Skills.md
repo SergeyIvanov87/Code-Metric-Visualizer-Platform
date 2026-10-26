@@ -10,6 +10,7 @@ Each skill here lives in `.agents/skills/<name>/SKILL.md`. The YAML frontmatter 
 | --- | --- |
 | [repository-navigation](../.agents/skills/repository-navigation/SKILL.md) | Finding the owner and tracing dependencies across platform stacks |
 | [filesystem-api-development](../.agents/skills/filesystem-api-development/SKILL.md) | Schema/generator changes, FIFO sessions, deferred lifecycle and REST exposure |
+| [http-api-customization](../.agents/skills/http-api-customization/SKILL.md) | HTTP route discovery, gateway precedence and ambassador development |
 | [streaming-ingestion](../.agents/skills/streaming-ingestion/SKILL.md) | File/directory transfers, shared-staging events, sealing, backpressure and cleanup |
 | [agentic-rag-development](../.agents/skills/agentic-rag-development/SKILL.md) | Dispatcher backends, chunk/vector consistency, retrieval and inference configuration |
 | [container-test-diagnostics](../.agents/skills/container-test-diagnostics/SKILL.md) | Choosing tests, Compose builds, readiness, aggregation and diagnostics |
