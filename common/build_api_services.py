@@ -124,6 +124,8 @@ api_cli_schema = [
     "    REQUEST_NUM=0\n",
     "    while IFS= read -r CMD_READ\n",
     "    do\n",
+    # Do not execute the empty here-string from an unavailable request node.
+    '        [[ -p "${pipe_request}" ]] || { sleep 0.1; continue; }\n',
     "        pipe_result_consumer=${pipe_result}\n",
     '        SESSION_ID_VALUE="#####"\n',
     '        API_KEEP_ALIVE_VALUE="@@@@@"\n',
@@ -355,7 +357,7 @@ def generate_cli_server_content(
     else:
         api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(req_exec_script_root_dir,req_executor_name)
 
-    template_schema_row_index += 61
+    template_schema_row_index += 62
     api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(
         req_exec_script_root_dir,
         req_executor_name,
