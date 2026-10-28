@@ -10,6 +10,7 @@ Load only the skills and references needed for the task.
 | Task | Skill |
 | --- | --- |
 | Locate an owner, trace dependencies, or choose a platform stack | [repository-navigation](.agents/skills/repository-navigation/SKILL.md) |
+| Declare consumed APIs, manage interservice dependencies, or gate startup/tests on API readiness | [interservice-dependencies](.agents/skills/interservice-dependencies/SKILL.md) |
 | Change schemas, generated executors, FIFO sessions, deferred requests, or REST exposure | [filesystem-api-development](.agents/skills/filesystem-api-development/SKILL.md) |
 | Change streaming uploads, shared staging, directory events, sealing, or cleanup | [streaming-ingestion](.agents/skills/streaming-ingestion/SKILL.md) |
 | Change document storage, chunk/vector consistency, retrieval, or inference configuration | [agentic-rag-development](.agents/skills/agentic-rag-development/SKILL.md) |

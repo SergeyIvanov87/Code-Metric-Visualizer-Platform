@@ -12,7 +12,7 @@ Read the [API source map](../../../HowTo/Agent-Repository-Map.md#filesystem-api-
 3. Preserve both CLI FIFOs and GUI access/modify listeners where applicable. `GET`, `PUT`, and `POST` are filesystem protocol operations as well as HTTP methods.
 4. Write newline-terminated requests to `exec`. Use existing query helpers rather than inventing framing. Match `SESSION_ID` with the corresponding `result.<extension>_<SESSION_ID>` response; use the content type to determine the extension.
 5. For deferred work, trace `common/deferred_query_launcher.py` and `common/deferred_query_executor.py`. Keep the initial handshake distinct from final asynchronous completion. Respect initial-query, update, and result-consumption timeout semantics. Validate arguments before accepting work, retain processor errors, and keep payloads larger than `PIPE_BUF` intact.
-6. Trace affected `API/deps` consumers and the REST adapter in `rest_api/rest_api_server/rest_api_server`. Preserve response content type and error reporting through both transports.
+6. Follow [interservice dependencies](../interservice-dependencies/SKILL.md) when declaring consumed APIs or changing dependency command endpoints and startup/test readiness gates. Trace affected `API/deps` consumers and the REST adapter in `rest_api/rest_api_server/rest_api_server`. Preserve response content type and error reporting through both transports.
 7. Add focused behavior coverage for the changed contract: session isolation, invalid arguments, disconnected readers, timeout, shutdown, or large payloads as relevant. Run the owning functional tests and common lifecycle tests when generation/transport changes.
 
 ## Checks
