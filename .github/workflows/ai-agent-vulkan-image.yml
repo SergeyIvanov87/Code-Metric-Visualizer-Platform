@@ -1,0 +1,57 @@
+name: AI Agent VULKAN Image Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ai_agents_framework/ai_agent/**'
+      - 'common/**'
+      - '.github/workflows/ai-agent-vulkan-image.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ai_agents_framework/ai_agent/**'
+      - 'common/**'
+      - '.github/workflows/ai-agent-vulkan-image.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: VULKAN (${{ matrix.variant }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: production
+            dockerfile: ai_agents_framework/ai_agent/Dockerfile
+          - variant: development
+            dockerfile: ai_agents_framework/ai_agent/Dockerfile.dev
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose profile
+        env:
+          # Configuration validation only; no render device is accessed.
+          INTEL_RENDER_GID: '0'
+        run: docker compose -f ai_agents_framework/ai_agent/compose-default.prod.vulkan.yaml config --quiet
+      - uses: docker/setup-buildx-action@v3
+      # Compilation and linking do not require a GPU or host driver.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: false
+          build-args: |
+            LLM_BACKEND=intel
+          cache-from: type=gha,scope=ai-agent-vulkan-${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=ai-agent-vulkan-${{ matrix.variant }}

@@ -32,6 +32,9 @@ RUN <<EOF
         export CMAKE_ARGS="-DGGML_VULKAN=ON" ;;
       *) echo "Unsupported LLM_BACKEND: $LLM_BACKEND" >&2; exit 1 ;;
     esac
+    # This agent uses text-only inference. In 0.3.16, LLAVA_BUILD also adds
+    # llama-mtmd-cli independently of LLAMA_BUILD_TOOLS.
+    export CMAKE_ARGS="$CMAKE_ARGS -DLLAVA_BUILD=OFF"
     FORCE_CMAKE=1 pip install --break-system-packages --no-cache-dir --no-binary=llama-cpp-python llama-cpp-python==0.3.16
     pip install --break-system-packages chromadb pypdf requests pydantic tqdm
 EOF
