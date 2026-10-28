@@ -21,6 +21,10 @@ document and chat APIs. Both production and development images default to
 dependency-check settings. These settings can be overridden through container
 environment variables. Dependency-report endpoints are included in API cleanup.
 
+Existing functional and streaming testers wait for dependency readiness and the
+agent's own API initialization before running tests. Each wait is bounded by
+`AI_AGENT_READY_TIMEOUT_SEC` (default `120`).
+
 The Chroma HTTP service remains a separate runtime prerequisite configured by
 `VECTORDB_HOST` and `VECTORDB_PORT`; the shared filesystem dependency checker
 checks filesystem APIs.
