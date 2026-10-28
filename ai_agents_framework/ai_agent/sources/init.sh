@@ -17,19 +17,22 @@ export WORK_DIR_TMP=${WORK_DIR}/generated
 mkdir -p ${WORK_DIR_TMP}
 
 export INNER_API_SCHEMA_DIR=${WORK_DIR_TMP}/API
+export DEPEND_ON_SERVICES_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}/deps
 
 README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/ai_agent/README-API-STATISTIC.md
 
 # use source this script as fast way to setup environment for debugging
-echo -e "export WORK_DIR=${WORK_DIR}\nexport WORK_DIR_TMP=${WORK_DIR_TMP}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}\nexport VECTOR_DB_HOST=${VECTOR_DB_HOST}\nexport VECTOR_DB_PORT=${VECTOR_DB_PORT}\nexport ASSET_MODELS=${ASSET_MODELS}" > ${WORK_DIR_TMP}/env.sh
+echo -e "export WORK_DIR=${WORK_DIR}\nexport WORK_DIR_TMP=${WORK_DIR_TMP}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport DEPEND_ON_SERVICES_API_SCHEMA_DIR=${DEPEND_ON_SERVICES_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}\nexport VECTOR_DB_HOST=${VECTOR_DB_HOST}\nexport VECTOR_DB_PORT=${VECTOR_DB_PORT}\nexport ASSET_MODELS=${ASSET_MODELS}" > ${WORK_DIR_TMP}/env.sh
 
 cp -r /API ${WORK_DIR_TMP}
 source ${OPT_DIR}/shell_utils/init_utils.sh
+${OPT_DIR}/canonize_internal_api.py ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} "${MAIN_SERVICE_NAME}/ai_agent"
 
 echo "Premature cleanup..."
 rm -f ${README_FILE_PATH}
-doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${SHARED_API_DIR} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
+doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${SHARED_API_DIR} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}|${DEPEND_ON_SERVICES_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
 doas -u root kill -15 $!
+wait $!
 
 
 # I use standalone python-based process here to listen to SIGNAL and make PIPEs clearance.
@@ -40,17 +43,29 @@ doas -u root kill -15 $!
 # So, to speed up this termination time until being ungracefully killed,
 # I just launch this signal listener in background and then resend any signal being catched in the `trap`-handler
 # It works as expected
-${OPT_DIR}/api_management.py ${INNER_API_SCHEMA_DIR} ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
+${OPT_DIR}/api_management.py "${INNER_API_SCHEMA_DIR}|${DEPEND_ON_SERVICES_API_SCHEMA_DIR}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
 API_MANAGEMENT_PID=$!
 
 declare -A SERVICE_WATCH_PIDS
 termination_handler(){
+    local exit_status=$?
+    trap - SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
     #trap - SIGTERM
     rm -f ${README_FILE_PATH}
     gracefull_shutdown SERVICE_WATCH_PIDS ${API_MANAGEMENT_PID}
-    exit 0
+    exit ${exit_status}
 }
 trap "termination_handler" SIGHUP SIGQUIT SIGABRT SIGKILL SIGALRM SIGTERM EXIT
+
+doas_launch_command_api_services SERVICE_WATCH_PIDS ${DEPEND_ON_SERVICES_API_SCHEMA_DIR} ${WORK_DIR_TMP} ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/ai_agent"
+
+echo -e "${Blue}Skip checking API dependencies${Color_Off}: ${BBlack}${SKIP_API_DEPS_CHECK}${Color_Off}"
+if [ "${SKIP_API_DEPS_CHECK:-false}" = false ]; then
+    if ! wait_for_unavailable_services ${SHARED_API_DIR} "${MAIN_SERVICE_NAME}/ai_agent" ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC}; then
+        echo -e "${BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort${Color_Off}"
+        exit 255
+    fi
+fi
 
 # TODO consider use launch_inner_api_services!
 ${OPT_DIR}/build_api_executors.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_DIR_TMP} --overwrite

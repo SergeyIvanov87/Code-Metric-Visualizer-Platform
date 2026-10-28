@@ -6,6 +6,25 @@
 `docker build -t ai_agent:latest -f ai_agent/Dockerfile .`
 `docker run -it --name ai_agent -v api.pmccabe_collector.restapi.org:/api -v api.pmccabe_collector.ai_agent.asssets.rag:/assets/rag -v api.pmccabe_collector.ai_agent.asssets.models:/assets/models -v api.pmccabe_collector.ai_agent.src:/package ai_agent:latest`
 
+## Service API dependencies
+
+`API/deps` declares the filesystem APIs used by the agent: the document
+dispatcher's `put_doc`, `attach_doc_chunk`, `delete_doc`, `get_docs`, `read_id`,
+and `sync`, plus the file uploader's `streaming_directory_events`.
+
+The agent exposes `ai_agent/all_dependencies/GET` and
+`ai_agent/unmet_dependencies/GET` under `api.pmccabe_collector.restapi.org`.
+Startup waits for the declared APIs to respond before publishing the agent's
+document and chat APIs. Both production and development images default to
+`SKIP_API_DEPS_CHECK=false` and
+`TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30`, following the service broker's
+dependency-check settings. These settings can be overridden through container
+environment variables. Dependency-report endpoints are included in API cleanup.
+
+The Chroma HTTP service remains a separate runtime prerequisite configured by
+`VECTORDB_HOST` and `VECTORDB_PORT`; the shared filesystem dependency checker
+checks filesystem APIs.
+
 ## LLM acceleration
 
 Run these commands from `ai_agents_framework/ai_agent`:
