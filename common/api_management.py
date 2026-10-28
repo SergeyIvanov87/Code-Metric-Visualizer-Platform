@@ -26,6 +26,10 @@ parser = argparse.ArgumentParser(
 parser.add_argument("api_schemas_location", help="An API json location directory")
 parser.add_argument("domain_name_api_entry", help="build API queries processor for that particular domain")
 parser.add_argument("mount_point", help="destination to build file-system nodes")
+parser.add_argument(
+    "--deferred-query-root",
+    help="Limit deferred-executor cleanup to this service-owned API subtree; defaults to mount_point",
+)
 args = parser.parse_args()
 
 schema_files = []
@@ -111,7 +115,7 @@ def unblock_pipes_signal_handler(sig, frame):
     print(f'Signal caught: {sig}', flush=True)
     deleted_pipes = []
     cleanup_errors = []
-    deferred_executors = signal_deferred_executors(args.mount_point)
+    deferred_executors = signal_deferred_executors(args.deferred_query_root or args.mount_point)
     print(f"Signalled deferred executors: {deferred_executors}", flush=True)
     for communication_type in ("server", "client"):
         print(f"unblock {communication_type} pipes", flush=True)

@@ -14,12 +14,19 @@ and `sync`, plus the file uploader's `streaming_directory_events`.
 
 The agent exposes `ai_agent/all_dependencies/GET` and
 `ai_agent/unmet_dependencies/GET` under `api.pmccabe_collector.restapi.org`.
-Startup waits for the declared APIs to respond before publishing the agent's
-document and chat APIs. Both production and development images default to
+When `SKIP_API_DEPS_CHECK=false`, startup waits for the declared APIs to respond
+before publishing the agent's document and chat APIs. Both images and base
+Compose models default to
 `SKIP_API_DEPS_CHECK=false` and
 `TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30`, following the service broker's
-dependency-check settings. These settings can be overridden through container
-environment variables. Dependency-report endpoints are included in API cleanup.
+dependency-check settings. The latter controls a retry count in the shared
+helper, despite its `SEC` suffix; it is not an overall seconds deadline.
+These settings can be overridden through container environment variables or
+Compose environment interpolation. Dependency-report endpoints are included in
+API cleanup. The ready message and README are published only after keep-alive
+probes succeed for the agent's own APIs, including its dependency reports.
+Both API managers use `--deferred-query-root` to restrict deferred-request
+cleanup to the agent's subtree, preserving requests owned by providers.
 
 Existing functional and streaming testers wait for dependency readiness and the
 agent's own API initialization before running tests. Each wait is bounded by
