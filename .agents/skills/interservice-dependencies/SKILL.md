@@ -53,18 +53,6 @@ is insufficient. These checks do not prove successful application processing.
    Compose environment and the shared API volume. Ensure the schemas and common
    utilities are available in the actual runtime image.
 
-For an AI-agent change, start at
-[agent sources](../../../ai_agents_framework/ai_agent/sources),
-[dispatcher schemas](../../../ai_agents_framework/docs_dispatcher/API), and
-[uploader schemas](../../../utility/file-uploader/API). Use direct dependency
-directories such as `API/deps/docs_dispatcher` and `API/deps/file-uploader`,
-rather than nesting repository paths under `deps`. Trace all RAG processors and
-`fs_api_wrappers.py`: bulk-add currently consumes `streaming_directory_events`.
-Verify whether `streaming_file_upload` or additional uploader endpoints are
-actually consumed before adding them; an example filename is not usage evidence.
-Track non-filesystem dependencies, such as a vector-store connection, through
-their own readiness mechanism.
-
 ## Gate service readiness
 
 1. Export `DEPEND_ON_SERVICES_API_SCHEMA_DIR` to the runtime `API/deps`.
@@ -117,9 +105,8 @@ In isolated tests, prepare working mock providers for the declared APIs before
 waiting, following the broker functional tester. Do not mock the tested service's
 own management endpoints. In integration tests, wait on the real service.
 Inspect every functional/integration entrypoint and inherited Compose model;
-do not add the wait only to one test path. For the AI agent, inspect
-[test startup](../../../ai_agents_framework/ai_agent/test/init.sh) and how the
-common tests are copied into its image.
+do not add the wait only to one test path. Check how common tests are copied
+into each tester image.
 
 An empty dependency report does not by itself prove the service's own API
 initialization has finished. Verify required owned FIFOs/listeners are ready
