@@ -27,13 +27,17 @@ API cleanup. The ready message and README are published only after keep-alive
 probes succeed for the agent's own APIs, including its dependency reports.
 Both API managers use `--deferred-query-root` to restrict deferred-request
 cleanup to the agent's subtree, preserving requests owned by providers.
+Startup, API generation, and cleanup run as the service user. Generated files
+are stored in `/mnt/generated`, so startup does not write to development source
+mounts.
 
 Existing functional and streaming testers wait for dependency readiness and the
 agent's own API initialization before running tests. Each wait is bounded by
 `AI_AGENT_READY_TIMEOUT_SEC` (default `120`).
-The shared dependency fault-injection test uses a command-specific `doas` rule
-to mask and restore provider-owned request FIFOs. Other test files run as the
-unprivileged tester user.
+Functional and streaming test deployments build the agent, dispatcher, uploader,
+and tester with the same non-root `AI_AGENT_TEST_UID` (default `1531`). This lets
+the existing outage test mask and restore request FIFOs as their owner. Every
+test runs as the tester user without privilege elevation.
 
 The Chroma HTTP service remains a separate runtime prerequisite configured by
 `VECTORDB_HOST` and `VECTORDB_PORT`; the shared filesystem dependency checker

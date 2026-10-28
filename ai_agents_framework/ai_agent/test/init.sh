@@ -42,11 +42,7 @@ fi
 
 RET=0
 for test_file in "${WORK_DIR}"/test_*.py; do
-    if [ "${test_file}" = "${WORK_DIR}/test_1_inner_api_functionality.py" ]; then
-        doas -n -u root /usr/bin/pytest -s "${test_file}"
-    else
-        pytest -s "${test_file}"
-    fi
+    pytest -s "${test_file}"
     result=$?
     if [ "${result}" -ne 0 ]; then
         RET=${result}
