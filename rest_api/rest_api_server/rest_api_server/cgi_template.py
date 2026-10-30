@@ -15,6 +15,7 @@ import subprocess
 import syslog
 import time
 
+from flask import jsonify
 from flask import redirect
 from flask import request
 from flask import send_file

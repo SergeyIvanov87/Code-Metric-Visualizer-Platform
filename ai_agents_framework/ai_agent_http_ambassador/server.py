@@ -1,0 +1,255 @@
+"""HTTP ambassador: query-specific presentation and filesystem API adaptation."""
+
+import codecs
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+from secrets import token_urlsafe
+from uuid import uuid4
+
+from flask import Flask, g, jsonify, render_template, request
+from werkzeug.exceptions import HTTPException
+
+from fifo_client import FifoClient, InvalidResult, QueryTimeout, Unavailable
+
+
+DISCOVERY_PATH = "/.well-known/http-api-routes/v1"
+SUPPORTED_SCHEMAS = {"chat": "POST", "rag_add": "PUT"}
+
+
+def load_schemas(schema_dir):
+    return {
+        path.stem: json.loads(path.read_text())
+        for path in sorted(Path(schema_dir).glob("*.json"))
+    }
+
+
+def build_discovery_document(schemas, timeout_seconds):
+    route_timeout = float(timeout_seconds) + 10
+    if route_timeout.is_integer():
+        route_timeout = int(route_timeout)
+    routes = sorted(
+        (
+            {"path": "/" + schema["Query"].lstrip("/"), "timeout_seconds": route_timeout}
+            for schema in schemas.values()
+        ),
+        key=lambda route: route["path"],
+    )
+    revision = hashlib.sha256(
+        json.dumps(routes, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return {"schema_version": 1, "revision": "sha256:" + revision, "routes": routes}
+
+
+def create_app(config_path=None, client=None):
+    config_path = config_path or os.environ.get("AI_AGENT_HTTP_CONFIG", str(Path(__file__).with_name("config.json")))
+    settings = json.loads(Path(config_path).read_text())
+    main_menu_path = os.environ["MAIN_MENU_PATH"]
+    if not main_menu_path.startswith("/") or main_menu_path.startswith("//"):
+        raise ValueError("MAIN_MENU_PATH must be a root-relative path")
+    api_mount = Path(settings["api_mount"]).resolve()
+    agent_mount = Path(settings.get("agent_api_mount", settings["api_mount"]))
+    # rag_add's existing executor uses xargs + sh -c. Only generated, shell-safe
+    # paths and metadata are allowed through that executor.
+    for mount in (api_mount, agent_mount):
+        if not mount.is_absolute() or not re.fullmatch(r"/[A-Za-z0-9_./-]+", str(mount)) or ".." in mount.parts:
+            raise ValueError("API mount paths must be absolute, shell-safe paths")
+    schema_dir = Path(settings["schema_dir"])
+    available_schemas = load_schemas(schema_dir)
+    missing_schemas = SUPPORTED_SCHEMAS.keys() - available_schemas.keys()
+    if missing_schemas:
+        raise ValueError(
+            "Missing filesystem API schemas: " + ", ".join(sorted(missing_schemas))
+        )
+    schemas = {name: available_schemas[name] for name in SUPPORTED_SCHEMAS}
+    supported_queries = {schema["Query"] for schema in schemas.values()}
+    unsupported_queries = sorted(
+        str(schema["Query"])
+        for schema in available_schemas.values()
+        if "Query" in schema and schema["Query"] not in supported_queries
+    )
+    if unsupported_queries:
+        raise ValueError(
+            "Unsupported filesystem API queries: " + ", ".join(unsupported_queries)
+        )
+    for name, schema in schemas.items():
+        if (
+            schema.get("Content-Type") != "application/json"
+            or schema.get("Method") != SUPPORTED_SCHEMAS[name]
+        ):
+            raise ValueError(f"Unsupported {name} filesystem API schema")
+    for key in ("timeout_seconds", "max_upload_bytes", "max_prompt_bytes", "max_result_bytes"):
+        if not isinstance(settings[key], (int, float)) or settings[key] <= 0:
+            raise ValueError(f"{key} must be positive")
+    client = client or FifoClient(api_mount, settings["timeout_seconds"], settings["max_result_bytes"])
+    paths = {name: "/" + schema["Query"] for name, schema in schemas.items()}
+    for schema in schemas.values():
+        FifoClient(api_mount).node(schema)  # Validate paths even with a test client.
+    prompt = schemas["chat"]["Params"]["-system_prompt"]
+    prompt = "\n".join(prompt) if isinstance(prompt, list) else prompt
+    # Schema quotes are CLI grouping delimiters, not part of the system prompt.
+    if prompt.startswith('"') and prompt.endswith('"'):
+        prompt = prompt[1:-1]
+    prompt = prompt.replace('\\"', '"').replace("\\\\", "\\")
+    service_root = Path(__file__).resolve().parent
+    page_style = (service_root / "static/style.css").read_text()
+    page_scripts = {
+        name: (service_root / f"static/{name}.js").read_text()
+        for name in ("chat", "rag_add")
+    }
+    discovery_document = build_discovery_document(schemas, settings["timeout_seconds"])
+    app = Flask(__name__, static_folder=None)
+    app.config["MAX_CONTENT_LENGTH"] = int(settings["max_upload_bytes"])
+
+    @app.before_request
+    def request_nonce():
+        g.csp_nonce = token_urlsafe(18)
+
+    @app.errorhandler(HTTPException)
+    def http_error(exc):
+        return jsonify(error=exc.description), exc.code
+
+    @app.after_request
+    def response_headers(response):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            f"script-src 'nonce-{g.csp_nonce}'; "
+            f"style-src 'nonce-{g.csp_nonce}'; frame-ancestors 'none'"
+        )
+        return response
+
+    def execute(name, args):
+        raw = client.execute(schemas[name], args)
+        try:
+            result = json.loads(raw)
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise InvalidResult("Filesystem API returned invalid JSON") from exc
+        if not isinstance(result, dict):
+            raise InvalidResult("Filesystem API returned a non-object result")
+        return result
+
+    @app.errorhandler(Unavailable)
+    def unavailable(exc):
+        return jsonify(error=str(exc)), 503
+
+    @app.errorhandler(QueryTimeout)
+    def timeout(exc):
+        return jsonify(error=str(exc), completion_unknown=True), 504
+
+    @app.errorhandler(InvalidResult)
+    def invalid_result(exc):
+        return jsonify(error=str(exc)), 502
+
+    @app.errorhandler(OSError)
+    def io_error(exc):
+        app.logger.exception("Filesystem API I/O failed")
+        return jsonify(error="Filesystem API I/O failed"), 503
+
+    @app.route(DISCOVERY_PATH, methods=["GET"], strict_slashes=False)
+    def http_api_routes_discovery():
+        return jsonify(discovery_document)
+
+    @app.route("/healthz", methods=["GET"])
+    def health():
+        ready = all(client_path_ready(schema) for schema in schemas.values())
+        return jsonify(ready=ready), 200 if ready else 503
+
+    def client_path_ready(schema):
+        node = FifoClient(api_mount).node(schema)
+        return FifoClient._fifo(node / "exec") and FifoClient._fifo(node / "result.json")
+
+    @app.route(paths["chat"], methods=["GET", "POST"], strict_slashes=False)
+    def chat():
+        if request.method == "GET":
+            return render_template(
+                "chat.html",
+                main_menu_path=main_menu_path,
+                system_prompt=prompt,
+                upload_path=paths["rag_add"],
+                csp_nonce=g.csp_nonce,
+                page_style=page_style,
+                page_script=page_scripts["chat"],
+            )
+        data = request.get_json()
+        if not isinstance(data, dict) or set(data) - {"user_prompt", "system_prompt"}:
+            return jsonify(error="Expected user_prompt and optional system_prompt"), 400
+        user_prompt = data.get("user_prompt")
+        system_prompt = data.get("system_prompt", prompt)
+        if not isinstance(user_prompt, str) or not user_prompt.strip() or not isinstance(system_prompt, str):
+            return jsonify(error="Prompts must be strings; user_prompt must be nonempty"), 400
+        if "\0" in user_prompt + system_prompt:
+            return jsonify(error="Prompts cannot contain NUL"), 400
+        try:
+            prompt_size = len((user_prompt + system_prompt).encode("utf-8"))
+        except UnicodeEncodeError:
+            return jsonify(error="Prompts must contain valid Unicode"), 400
+        if prompt_size > settings["max_prompt_bytes"]:
+            return jsonify(error="Prompts exceed configured size limit"), 413
+        result = execute("chat", {"-user_prompt": user_prompt, "-system_prompt": system_prompt})
+        if "response" not in result and not result.get("error_code"):
+            raise InvalidResult("Chat result has no response")
+        return jsonify(result), 502 if result.get("error_code") else 200
+
+    @app.route(paths["rag_add"], methods=["GET", "PUT"], strict_slashes=False)
+    def rag_add():
+        if request.method == "GET":
+            return render_template(
+                "rag_add.html",
+                chat_path=paths["chat"],
+                main_menu_path=main_menu_path,
+                csp_nonce=g.csp_nonce,
+                page_style=page_style,
+                page_script=page_scripts["rag_add"],
+            )
+        if request.mimetype != "application/octet-stream":
+            return jsonify(error="Send the file bytes as application/octet-stream"), 415
+        token = uuid4().hex
+        relative = Path(".http_ambassador") / "staging" / token
+        # Ensure all new ancestors are traversable by the agent's distinct UID,
+        # including when this server was launched with a restrictive umask.
+        for parent in (api_mount / ".http_ambassador", api_mount / ".http_ambassador/staging"):
+            parent.mkdir(mode=0o755, exist_ok=True)
+            parent.chmod(0o755)
+        directory = api_mount / relative
+        directory.mkdir(parents=True, mode=0o755)
+        directory.chmod(0o755)
+        staged_file = directory / "document.txt"
+        retain = False
+        try:
+            decoder = codecs.getincrementaldecoder("utf-8")()
+            size = 0
+            with staged_file.open("xb") as output:
+                staged_file.chmod(0o644)  # ai_agent has a different container UID.
+                while chunk := request.stream.read(65536):
+                    size += len(chunk)
+                    if size > settings["max_upload_bytes"]:
+                        return jsonify(error="Upload exceeds configured size limit"), 413
+                    decoder.decode(chunk)
+                    output.write(chunk)
+                decoder.decode(b"", final=True)
+            if not size:
+                return jsonify(error="The selected file is empty"), 400
+            try:
+                result = execute("rag_add", {
+                    "-URI": str(agent_mount / relative / staged_file.name),
+                    "-doc_type": "txt",
+                    "-metadata": "http_upload_" + token,
+                })
+            except (QueryTimeout, OSError):
+                retain = True  # The agent may still be using this file.
+                raise
+            if "error_code" not in result or (not result["error_code"] and "doc_id" not in result):
+                raise InvalidResult("rag_add result has no error_code or document ID")
+            return jsonify(result), 502 if result.get("error_code") else 200
+        except UnicodeDecodeError:
+            return jsonify(error="rag_add currently supports UTF-8 text files"), 415
+        finally:
+            if not retain:
+                shutil.rmtree(directory)
+
+    return app

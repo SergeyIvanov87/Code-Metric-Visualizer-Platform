@@ -22,6 +22,8 @@ services:
 
 volumes:
   api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.src:
     driver: local

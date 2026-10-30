@@ -10,7 +10,7 @@ This map was derived from the code, API schemas, Compose models, tests, and CI o
 | Cyclomatic complexity | C/C++ file selection, statistics, text/SVG flamegraphs | [schemas](../cyclomatic_complexity/API), [generator](../cyclomatic_complexity/api_generator.py) |
 | RRD analytics | Metric collection, round-robin persistence, CSV/plots | [schemas](../rrd_analytic/API), [generator](../rrd_analytic/api_generator.py), `build_rrd.py`, `fetch_rrd.py`, `graph_rrd.py` |
 | VCS and scheduling | Repository updates and ordered scheduled calls | [VCS](../observable_project_version_control), [broker scheduler](../service_broker/build_schedule_jobs.py), broker `API/deps` |
-| HTTP transport | HTTP exposure of discovered filesystem API and remote proxying | [REST server](../rest_api/rest_api_server/rest_api_server), [proxy](../fs_api_proxy/http_proxy) |
+| HTTP transport | HTTP exposure, discovered route ownership, dynamic gateway routing and remote proxying | [REST server](../rest_api/rest_api_server/rest_api_server), [HTTP API gateway](../fs_api_proxy/http_api_gateway), [proxy](../fs_api_proxy/http_proxy) |
 | Streaming ingestion | Deferred file transfer, directory transfer, shared-staging readiness | [upload protocol](../utility/file-uploader/README.md), uploader `API` and processor modules |
 | Agentic RAG | Document/chunk storage, embeddings, retrieval and inference | [agent sources](../ai_agents_framework/ai_agent/sources), [dispatcher sources](../ai_agents_framework/docs_dispatcher/sources), [vector store stack](../ai_agents_framework/RAG) |
 | Test observability | Legacy log aggregation and streaming tap/event analysis | [legacy implementation](../common/images/test_aggregator_image), [streaming documentation](../common/images/streaming_test_aggregator/README.md) |
@@ -24,6 +24,10 @@ This map was derived from the code, API schemas, Compose models, tests, and CI o
 - [Agentic RAG](../ai_agents_framework/compose.rag-agent.yaml) and [streaming variant](../ai_agents_framework/compose.rag-agent.streaming.yaml): distinct agent/document/vector-store topology.
 
 Root [README prerequisites](../README.md#prerequisites) describe external API, logger and RRD volumes and shared network requirements. Inspect the chosen Compose model before creating resources. Historical setup examples include broad permissions and daemon changes; these are not necessary for reading code or authoring skills.
+
+The current dynamic provider-discovery, route-precedence, generic Envoy, and
+HTTP ambassador design is described in the [REST API customization implementation
+record](../Architecture_Design_Decisions/Rest-API-Customization/implementation_v1.md).
 
 ## Filesystem API contract
 
@@ -70,6 +74,7 @@ Commands run from the repository root. CI definitions are the source for setup a
 | Running Analysis/Analytic integration | `compose-analysis.integrational-test.yaml` | `test_aggregator`; start the selected stack first |
 | Streaming event pipeline | `common/images/streaming_test_aggregator/tests/functional/compose-functional.test.yaml` | aggregator, then `functional-tests`; detached orchestration |
 | Agent and RAG with streaming capture | `ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml` | follow the dedicated workflow |
+| Agent, RAG, and discovered HTTP gateway with streaming capture | `ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml` | HTTP smoke checks, filesystem tester, then authoritative aggregator result |
 
 Example finite service suite:
 
@@ -87,6 +92,7 @@ For image-only changes, inspect Dockerfile `COPY` sources and Compose `build.con
 - GPU agent image builds: independent [NVIDIA](../.github/workflows/ai-agent-nvidia-image.yml) and [Vulkan](../.github/workflows/ai-agent-vulkan-image.yml) workflows compile production/development images in parallel, with cached builds and manual dispatch. These checks do not validate GPU runtime behavior.
 - [Streaming pipeline CI](../.github/workflows/streaming-test-aggregator.yml): detached launch, aggregator status, final checks, diagnostic export.
 - [Streaming integration CI](../.github/workflows/streaming-test-aggregator-integration.yml) and [agent streaming CI](../.github/workflows/agentic-rag-streaming-test-aggregator-integration.yml).
+- [Agentic RAG HTTP streaming CI](../.github/workflows/agentic-rag-http-streaming-test-aggregator-integration.yml): builds all stack, logger, and aggregator images before launching and testing the discovered HTTP topology.
 - [Streaming lifecycle](../common/images/streaming_test_aggregator/README.md): permanent logger, on-demand capture IDs and one active subscriber constraint.
 - [Capture event schema](../common/images/streaming_test_aggregator/tap_subscriber/EVENT_SCHEMA.md).
 - [Legacy artifact action](../.github/actions/upload-test-aggregator-artifacts/action.yml).

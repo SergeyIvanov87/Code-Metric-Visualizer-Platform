@@ -1,0 +1,191 @@
+name: Agentic RAG HTTP Streaming Test Aggregator Integration CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build_and_test_agentic_rag_http_with_streaming_aggregator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      TEST_EXECUTION_ID: agentic-rag-http-${{ github.run_id }}-${{ github.run_attempt }}
+      WAIT_FOR_FIRST_TAP_BEFORE_FINISH_MSEC: 1800000
+      WAIT_FOR_NEXT_TAP_BEFORE_FINISH_MSEC: 1800000
+      MAX_WAIT_MSEC_UNTIL_FINISH: 2400000
+      MAX_WAIT_SECONDS: 2400
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Prepare shared streaming resources
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p "${GITHUB_WORKSPACE}/log" "${RUNNER_TEMP}/agentic-rag-http-streaming-diagnostics"
+        chmod 777 "${GITHUB_WORKSPACE}/log"
+        docker network create -d bridge api.pmccabe_collector.network
+        docker volume create -d local -o type=none -o device="${GITHUB_WORKSPACE}/log" -o o=bind api.pmccabe_collector.logger.org
+        docker volume create api.pmccabe_collector.restapi.org
+
+    - name: Validate Compose configurations
+      run: |
+        docker compose -f ai_agents_framework/compose.rag-agent.http.streaming.yaml config --quiet
+        docker compose \
+          -f ai_agents_framework/compose.rag-agent.http.streaming.yaml \
+          -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml \
+          config --quiet
+        docker compose -f common/images/compose-logger-subsystem.yaml config --quiet
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml config --quiet
+
+    - name: Build and pull every image before launch
+      shell: bash
+      run: |
+        set -euo pipefail
+        http_stack=(
+          -f ai_agents_framework/compose.rag-agent.http.streaming.yaml
+          -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml
+        )
+        docker compose "${http_stack[@]}" build --pull
+        docker compose "${http_stack[@]}" pull --ignore-buildable
+        docker compose -f common/images/compose-logger-subsystem.yaml build --pull
+        docker compose -f common/images/compose-logger-subsystem.yaml pull --ignore-buildable
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml build --pull
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml pull --ignore-buildable
+
+    - name: Launch streaming logger subsystem
+      run: >-
+        docker compose -f common/images/compose-logger-subsystem.yaml
+        up --detach --no-build
+        syslog-ng-streaming envoy envoy-ready
+
+    - name: Launch streaming test aggregator subsystem
+      run: >-
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml
+        up --detach --no-build
+        kafka proxy-ready log_event_aggregator tap_subscriber
+
+    - name: Launch Agentic RAG HTTP services
+      run: >-
+        docker compose
+        -f ai_agents_framework/compose.rag-agent.http.streaming.yaml
+        -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml
+        up --detach --no-build
+        rag-db rag-document-storage-permissions rag-doc-storage-dispatcher
+        test_pseudo_fs rag-agent rest-api ai-agent-http-ambassador
+        http-api-gateway-controller http-api-gateway
+
+    - name: Verify discovered HTTP routes
+      id: http-smoke
+      continue-on-error: true
+      shell: bash
+      run: |
+        set -euo pipefail
+        gateway=http://http-api-gateway:8080
+        network=api.pmccabe_collector.network
+
+        probe() {
+          local path="$1"
+          local marker="$2"
+          local body=""
+          for attempt in $(seq 1 120); do
+            if body=$(docker run --rm --network "${network}" curlimages/curl:8.16.0 \
+                --fail --silent --show-error --max-time 5 "${gateway}${path}" 2>/dev/null) \
+                && grep -Fq "${marker}" <<< "${body}"; then
+              return 0
+            fi
+            sleep 2
+          done
+          echo "Gateway route ${path} did not return marker: ${marker}" >&2
+          return 1
+        }
+
+        probe "/api.pmccabe_collector.restapi.org" "<body>"
+        probe "/api.pmccabe_collector.restapi.org/ai_agent/chat/v1" "<h1>AI agent chat</h1>"
+        probe "/api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1" "<h1>Add a document</h1>"
+
+    - name: Test AI agent RAG filesystem API
+      id: functional-tests
+      continue-on-error: true
+      run: >-
+        docker compose
+        -f ai_agents_framework/compose.rag-agent.http.streaming.yaml
+        -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml
+        up --no-build --no-deps --abort-on-container-exit
+        --exit-code-from ai-agent-rag-functional-tester
+        ai-agent-rag-functional-tester
+
+    - name: Finish streaming capture
+      if: ${{ !cancelled() }}
+      run: >-
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml
+        stop --timeout 180 tap_subscriber
+
+    - name: Verify aggregated HTTP-stack test logs
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        HTTP_SMOKE_OUTCOME: ${{ steps.http-smoke.outcome }}
+        FUNCTIONAL_TEST_OUTCOME: ${{ steps.functional-tests.outcome }}
+      run: |
+        set -euo pipefail
+        aggregator_id=$(docker compose -f common/images/compose-test-aggregator-subsystem.yaml ps --all --quiet log_event_aggregator)
+        test -n "${aggregator_id}"
+        aggregator_exit_code=$(docker wait "${aggregator_id}")
+        if [[ "${aggregator_exit_code}" != "0" ]]; then
+          docker compose -f common/images/compose-test-aggregator-subsystem.yaml logs --no-color log_event_aggregator
+          exit "${aggregator_exit_code}"
+        fi
+        if [[ "${HTTP_SMOKE_OUTCOME}" != "success" || "${FUNCTIONAL_TEST_OUTCOME}" != "success" ]]; then
+          echo "Direct HTTP smoke outcome: ${HTTP_SMOKE_OUTCOME}" >&2
+          echo "Filesystem functional-test outcome: ${FUNCTIONAL_TEST_OUTCOME}" >&2
+          exit 1
+        fi
+
+    - name: Collect integration diagnostics and clean up
+      if: always()
+      shell: bash
+      run: |
+        set +e
+        diagnostics="${RUNNER_TEMP}/agentic-rag-http-streaming-diagnostics"
+        mkdir -p "${diagnostics}/logger-volume" "${diagnostics}/aggregator"
+        cp -a "${GITHUB_WORKSPACE}/log/." "${diagnostics}/logger-volume/" 2>/dev/null || true
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml cp \
+          log_event_aggregator:/logs/. "${diagnostics}/aggregator/" 2>/dev/null || true
+
+        http_stack=(
+          -f ai_agents_framework/compose.rag-agent.http.streaming.yaml
+          -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml
+        )
+        docker compose "${http_stack[@]}" ps --all > "${diagnostics}/http-stack-ps.txt" 2>&1
+        docker compose "${http_stack[@]}" logs --no-color > "${diagnostics}/http-stack-logs.txt" 2>&1
+        docker compose "${http_stack[@]}" config > "${diagnostics}/http-stack-config.yaml" 2>&1
+
+        for compose_file in \
+          common/images/compose-logger-subsystem.yaml \
+          common/images/compose-test-aggregator-subsystem.yaml; do
+          slug=$(echo "${compose_file}" | tr '/.' '--')
+          docker compose -f "${compose_file}" ps --all > "${diagnostics}/${slug}-ps.txt" 2>&1
+          docker compose -f "${compose_file}" logs --no-color > "${diagnostics}/${slug}-logs.txt" 2>&1
+          docker compose -f "${compose_file}" config > "${diagnostics}/${slug}-config.yaml" 2>&1
+        done
+
+        docker compose "${http_stack[@]}" down --volumes --remove-orphans || true
+        docker compose -f common/images/compose-test-aggregator-subsystem.yaml down --volumes --remove-orphans || true
+        docker compose -f common/images/compose-logger-subsystem.yaml down --volumes --remove-orphans || true
+        docker volume rm api.pmccabe_collector.restapi.org 2>/dev/null || true
+        docker volume rm api.pmccabe_collector.logger.org 2>/dev/null || true
+        docker network rm api.pmccabe_collector.network 2>/dev/null || true
+        sudo -n rm -rf -- "${GITHUB_WORKSPACE}/log" || \
+          echo "::warning::Could not remove the streaming logger directory during cleanup"
+
+    - name: Upload Agentic RAG HTTP streaming diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: agentic-rag-http-streaming-diagnostics-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/agentic-rag-http-streaming-diagnostics
+        if-no-files-found: warn
+        retention-days: 14

@@ -1,0 +1,141 @@
+# Agentic RAG and HTTP gateway services connected to the streaming logger.
+# Start the streaming logger subsystem before launching this project.
+services:
+  rag-agent:
+    extends:
+      file: ./ai_agent/compose-default.prod.yaml
+      service: ai_agent
+    environment:
+      VECTORDB_HOST: rag-db
+      VECTORDB_PORT: 8000
+    depends_on:
+      rag-db:
+        condition: service_started
+      rag-doc-storage-dispatcher:
+        condition: service_started
+    logging: &streaming-logging
+      driver: syslog
+      options: { syslog-address: "tcp://localhost:13601", tag: "{{.Name}}" }
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - rag-agent-models:/assets/models
+
+  rag-db:
+    extends:
+      file: ./RAG/compose.yaml
+      service: rag-db
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - rag-data:/mnt
+
+  rag-doc-storage-dispatcher:
+    extends:
+      file: ./docs_dispatcher/compose-default.prod.yaml
+      service: docs_dispatcher
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - rag-dispatcher-config:/etc/dispatcher
+      - rag-document-storage:/mnt/file_storage
+
+  file-uploader:
+    extends:
+      file: ../utility/file-uploader/compose.yaml
+      service: file-uploader
+    build:
+      context: ../utility/file-uploader
+      dockerfile: Dockerfile
+      additional_contexts:
+        common: ../common
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - file-uploads:/uploads
+
+  rest-api:
+    build:
+      context: ../rest_api
+      dockerfile: Dockerfile.isolated
+      additional_contexts:
+        common: ../common
+    environment:
+      - FLASK_RUN_PORT=${FLASK_RUN_PORT:-5000}
+      - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}
+    hostname: rest-api
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+    ports:
+      - 5000:5000
+
+  ai-agent-http-ambassador:
+    extends:
+      file: ./ai_agent_http_ambassador/compose.yaml
+      service: ai-agent-http-ambassador
+    build:
+      context: ..
+      dockerfile: ai_agents_framework/ai_agent_http_ambassador/Dockerfile
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - ./ai_agent_http_ambassador/config.json:/app/config.json:ro
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+
+  http-api-gateway-controller:
+    extends:
+      file: ../fs_api_proxy/http_api_gateway/compose.yaml
+      service: http-api-gateway-controller
+    build:
+      context: ..
+      dockerfile: fs_api_proxy/http_api_gateway/Dockerfile.controller
+    environment:
+      BACKENDS_FOR_FRONTENDS: http://rest-api:5000,http://ai-agent-http-ambassador:8081
+    volumes:
+      - http-api-gateway-config:/var/lib/http-api-gateway
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+
+  http-api-gateway:
+    extends:
+      file: ../fs_api_proxy/http_api_gateway/compose.yaml
+      service: http-api-gateway
+    volumes:
+      - http-api-gateway-config:/var/lib/http-api-gateway:ro
+    logging: *streaming-logging
+    networks:
+      - api.pmccabe_collector.network
+
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
+
+volumes:
+  rag-agent-models:
+  rag-data:
+  rag-dispatcher-config:
+  http-api-gateway-config:
+  file-uploads:
+  rag-document-storage:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true
+
+secrets:
+  backend_mysql_db_login:
+    file: ./docs_dispatcher/tests/backend_mysql_default_user.txt
+  backend_mysql_db_password:
+    file: ./docs_dispatcher/tests/backend_mysql_default_pwd.txt
