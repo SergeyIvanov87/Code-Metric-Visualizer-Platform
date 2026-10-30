@@ -7,36 +7,11 @@ export MODULES=/tests/utils/modules
 export PYTHONPATH=/tests:/tests/utils:/tests/utils/modules
 export OPT_DIR=/tests/utils
 
-${OPT_DIR}/canonize_internal_api.py /API/deps "${MAIN_SERVICE_NAME}/ai_agent" || exit 255
-
-# The same entrypoint serves production, development, and streaming testers.
-if ! timeout "${AI_AGENT_READY_TIMEOUT_SEC:-120}" bash -c '
-    source "${OPT_DIR}/shell_utils/init_utils.sh"
-    wait_for_unavailable_services "${SHARED_API_DIR}" "${MAIN_SERVICE_NAME}/ai_agent"
-'; then
-    echo "AI-agent API dependencies did not become ready"
-    exit 255
-fi
-
-# Dependency reports can respond before the agent has finished publishing its APIs.
-if ! timeout "${AI_AGENT_READY_TIMEOUT_SEC:-120}" python - <<'PY'
-import json
-import os
-from pathlib import Path
-import time
-
-from api_schema_utils import compose_api_queries_pipe_names
-
-schemas = [*Path('/API').glob('*.json'), *Path('/API/deps').glob('*.json')]
-pipes = [Path(pipe) for schema in schemas for pipe in compose_api_queries_pipe_names(
-    os.environ['SHARED_API_DIR'], json.loads(schema.read_text())
-)]
-ready = Path(os.environ['SHARED_API_DIR']) / os.environ['MAIN_SERVICE_NAME'] / 'ai_agent/README-API-STATISTIC.md'
-while not (ready.is_file() and all(pipe.is_fifo() for pipe in pipes)):
-    time.sleep(0.1)
-PY
-then
-    echo "AI-agent API initialization did not finish"
+source "${OPT_DIR}/shell_utils/init_utils.sh"
+MICROSERVICE_NAME_TO_TEST=ai_agent
+echo -e "Wait for ai_agent starting"
+if ! wait_for_unavailable_services "${SHARED_API_DIR}" "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME_TO_TEST}" "${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC}"; then
+    echo -e "${BRed}ERROR: As required APIs are missing, the service considered as inoperable. Abort${Color_Off}"
     exit 255
 fi
 

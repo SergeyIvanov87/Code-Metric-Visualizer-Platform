@@ -3,20 +3,7 @@
 # docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml \
 #   -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml up
 services:
-  rag-agent:
-    build:
-      args:
-        UID: ${AI_AGENT_TEST_UID:-1531}
-
-  file-uploader:
-    build:
-      args:
-        UID: ${AI_AGENT_TEST_UID:-1531}
-
   rag-doc-storage-dispatcher:
-    build:
-      args:
-        UID: ${AI_AGENT_TEST_UID:-1531}
     depends_on:
       rag-document-storage-permissions:
         condition: service_healthy
@@ -53,8 +40,6 @@ services:
     build:
       context: ..
       dockerfile: ai_agents_framework/ai_agent/test/Dockerfile
-      args:
-        UID: ${AI_AGENT_TEST_UID:-1531}
       additional_contexts:
         test_pseudo_fs: service:test_pseudo_fs
     environment:

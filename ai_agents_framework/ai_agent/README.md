@@ -14,30 +14,26 @@ and `sync`, plus the file uploader's `streaming_directory_events`.
 
 The agent exposes `ai_agent/all_dependencies/GET` and
 `ai_agent/unmet_dependencies/GET` under `api.pmccabe_collector.restapi.org`.
-When `SKIP_API_DEPS_CHECK=false`, startup waits for the declared APIs to respond
-before publishing the agent's document and chat APIs. Both images and base
-Compose models default to
-`SKIP_API_DEPS_CHECK=false` and
-`TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30`, following the service broker's
-dependency-check settings. The latter controls a retry count in the shared
-helper, despite its `SEC` suffix; it is not an overall seconds deadline.
-These settings can be overridden through container environment variables or
-Compose environment interpolation. Dependency-report endpoints are included in
-API cleanup. The ready message and README are published only after keep-alive
-probes succeed for the agent's own APIs, including its dependency reports.
-Both API managers use `--deferred-query-root` to restrict deferred-request
-cleanup to the agent's subtree, preserving requests owned by providers.
-Startup, API generation, and cleanup run as the service user. Generated files
-are stored in `/mnt/generated`, so startup does not write to development source
-mounts.
+Startup launches the business and dependency command APIs with the shared
+unprivileged helpers. When `SKIP_API_DEPS_CHECK=false`, it waits for the declared
+providers before publishing the ready message and README. Images and base
+Compose models default to `SKIP_API_DEPS_CHECK=false` and
+`TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30`. The latter is a retry count in
+the shared helper, despite its `SEC` suffix. Container environment variables
+and Compose interpolation can override these settings.
 
-Existing functional and streaming testers wait for dependency readiness and the
-agent's own API initialization before running tests. Each wait is bounded by
-`AI_AGENT_READY_TIMEOUT_SEC` (default `120`).
-Functional and streaming test deployments build the agent, dispatcher, uploader,
-and tester with the same non-root `AI_AGENT_TEST_UID` (default `1531`). This lets
-the existing outage test mask and restore request FIFOs as their owner. Every
-test runs as the tester user without privilege elevation.
+Both business and command schemas are registered with the API cleanup manager.
+Startup, API generation, and cleanup run as the service user. Generated files
+are stored in `/mnt/generated`, leaving startup writes off development source
+mounts. The Docker images retain their existing user and package setup; runtime
+scripts do not use superuser privileges.
+
+Functional and streaming testers keep their own users and wait on the real
+agent's `unmet_dependencies` endpoint before running tests. They write requests
+to `exec` (mode `0622`) and read `result*` (mode `0644`); method directories remain
+`0755`. The shared dependency test checks live provider availability without
+replacing foreign-owned FIFOs. Outage mutation remains covered using tester-owned
+fixtures in the existing common regression tests.
 
 The Chroma HTTP service remains a separate runtime prerequisite configured by
 `VECTORDB_HOST` and `VECTORDB_PORT`; the shared filesystem dependency checker

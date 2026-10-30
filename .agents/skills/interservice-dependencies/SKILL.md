@@ -61,7 +61,8 @@ is insufficient. These checks do not prove successful application processing.
    schema directory, writable work directory, shared API directory and
    `"${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"`. It canonicalizes command
    schemas, builds their executors and FIFOs, and launches the command servers.
-   Use the established privilege variant if permissions require it.
+   Use the unprivileged helper. Services must create their own API nodes without
+   runtime elevation; do not use the `doas_` variants.
 3. Include both owned command and business API schemas in API-manager cleanup.
    Trace generated paths and managers; do not make the consumer remove its
    providers' pipes. Register command servers in shutdown tracking too.
@@ -93,6 +94,27 @@ is insufficient. These checks do not prove successful application processing.
    Check EXIT/signal traps so failure remains nonzero and cleanup does not turn
    `exit 255` into success. Adapt PID/manager arguments to the actual service.
 
+## Ownership and permissions
+
+Each service creates and removes its API as its own non-root user. The tester
+must use a different user. Never use `doas`, `sudo`, a shared service/tester UID,
+or runtime `chown` to bypass this ownership, even when image setup installs
+elevation tools. `/api` starts with mode `0777`, established during image build.
+
+Preserve the filesystem API permission contract:
+
+- Request directories containing the numbered argument files add
+  `stat.S_IWUSR | stat.S_IRUSR | stat.S_IWGRP | stat.S_IRGRP | stat.S_IWOTH | stat.S_IROTH`
+  (the `0666` read/write mask), retaining existing execute/traversal bits.
+- Terminal method directories use
+  `stat.S_IRUSR | stat.S_IXUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH`
+  (`0755`).
+- `exec` FIFOs use `0622`; all `result*` FIFOs use `0644`.
+
+Consumer access is writing `exec` and reading `result*`; it does not include
+replacing or deleting provider-owned FIFOs. Follow the shared generator rather
+than adding runtime permission repairs.
+
 ## Gate functional and integration tests
 
 Before any API-conformance or business tests, call
@@ -104,6 +126,9 @@ A tester with no child processes need not invent a PID array or API manager.
 In isolated tests, prepare working mock providers for the declared APIs before
 waiting, following the broker functional tester. Do not mock the tested service's
 own management endpoints. In integration tests, wait on the real service.
+Check the live unmet-dependency report in integration tests without mutating
+provider-owned nodes. Apply request-FIFO outage masking only to tester-owned
+fixtures; keep service and tester UIDs distinct.
 Inspect every functional/integration entrypoint and inherited Compose model;
 do not add the wait only to one test path. Check how common tests are copied
 into each tester image.

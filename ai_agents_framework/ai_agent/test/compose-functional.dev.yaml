@@ -3,9 +3,6 @@ include:
 
 services:
   ai_agent:
-    build:
-      args:
-        UID: ${AI_AGENT_TEST_UID:-1531}
     extends:
       file: ../compose-default.dev.yaml
       service: ai_agent
@@ -25,9 +22,6 @@ services:
         condition: service_started
 
   file-uploader:
-    build:
-      args:
-        UID: ${AI_AGENT_TEST_UID:-1531}
     extends:
       file: ../compose-default.dev.yaml
       service: file-uploader
@@ -42,9 +36,6 @@ services:
       - ai_agent_rag_data:/mnt
 
   ai_agent_docs_dispatcher:
-    build:
-      args:
-        UID: ${AI_AGENT_TEST_UID:-1531}
     extends:
       file: ../../docs_dispatcher/compose-default.prod.yaml
       service: docs_dispatcher
@@ -75,8 +66,6 @@ services:
     build:
       context: ../../..
       dockerfile: ai_agents_framework/ai_agent/test/Dockerfile
-      args:
-        UID: ${AI_AGENT_TEST_UID:-1531}
       additional_contexts:
         test_pseudo_fs: service:test_pseudo_fs
     environment:

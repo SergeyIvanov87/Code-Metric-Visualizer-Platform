@@ -58,8 +58,9 @@ def check_unmet_dependencies_api(query, pipes):
     global global_settings
     if len(before_deps_json_str):
         before_json_obj = json.loads(before_deps_json_str)
+    assert not before_json_obj, f"Dependencies are unavailable before outage simulation: {before_json_obj}"
 
-    # Make each dependency endpoint unavailable in turn
+    # Simulate outages only for dependency fixtures owned by this tester.
     service_api_deps = get_api_service_dependencies("/API/deps", r".*", r".*\.json$")
     for dep_on_service, dep_request_schemas in service_api_deps.items():
         for req_name, req_schema in dep_request_schemas.items():
@@ -69,6 +70,15 @@ def check_unmet_dependencies_api(query, pipes):
 
             api_req_directory, api_exec_node_directory = compose_api_fs_request_location_paths(
                 global_settings.api_dir, req_api, req_type)
+
+            # Integration clients may write exec and read results, but cannot
+            # replace provider-owned nodes. Exercise outages only on fixtures
+            # owned by this tester; live providers were checked above.
+            request_pipe = pathlib.Path(api_exec_node_directory) / "exec"
+            if (request_pipe.stat().st_uid != os.geteuid()
+                    or request_pipe.parent.stat().st_uid != os.geteuid()):
+                print(f"{get_timestamp()}\tchecked live provider {req_api}; outage simulation requires a tester-owned fixture")
+                continue
 
             with UnavailableAPI(api_exec_node_directory, global_settings.api_dir):
                 api_query.execute()

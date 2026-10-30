@@ -7,7 +7,7 @@ SHELL ["/bin/bash", "-c"]
 RUN <<EOF
     set -e
     apt-get update
-    apt-get install -y --no-install-recommends coreutils python3 python3-pip python-is-python3 dos2unix inotify-tools bash cmake libgomp1 gcc g++
+    apt-get install -y --no-install-recommends coreutils python3 python3-pip python-is-python3 dos2unix inotify-tools bash doas cmake libgomp1 gcc g++
 EOF
 
 # Keep CMake, GCC/G++, and libgomp1 for llama-cpp-python source builds, including
@@ -78,10 +78,12 @@ RUN <<EOF
     apt-get install adduser
     groupadd --gid "$GID" "$GROUPNAME"
     adduser --disabled-password --gecos "" --home "$(pwd)" -u $UID --ingroup "$GROUPNAME" --no-create-home $USER
+    adduser ${USER} sudo
 EOF
 
 
 RUN <<EOF
+echo "permit nopass :${GROUPNAME}" >> /etc/doas.conf
 mkdir -p -m 777 /mnt && mkdir -p -m 777 /api
 chown -R ${USER}:${GROUPNAME} /mnt && chown -R ${USER}:${GROUPNAME} /api && chown -R ${USER}:${GROUPNAME} /assets && chown -R ${USER}:${GROUPNAME} /api
 chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
