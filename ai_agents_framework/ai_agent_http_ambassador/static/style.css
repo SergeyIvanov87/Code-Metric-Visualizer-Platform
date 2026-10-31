@@ -15,3 +15,9 @@ a { color: #234ad1; }
 nav a { display: block; width: fit-content; }
 nav a + a { margin-top: .5rem; }
 @media (max-width: 600px) { main { margin: 0; padding: 1rem; } }
+
+input[type="text"], input:not([type]) { box-sizing: border-box; width: 100%; padding: .55rem; font: inherit; border: 1px solid #aab4c5; border-radius: .35rem; }
+.picker-grid, .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; }
+.settings-grid label { margin: 0; }
+.settings-grid label span { display: block; margin-bottom: .4rem; }
+progress { width: 100%; }

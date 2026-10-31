@@ -124,12 +124,37 @@ def test_start_uploader_uses_precreated_query_handle(tmp_path):
         "WaitInitialQueryTimeoutSec": "60",
         "WaitQueryUpdateTimeoutSec": "10",
         "WaitResultConsumptionTimeoutSec": "60",
+        "file_allow_regex": r".*[.]txt",
+        "file_skip_regex": r"(?!skip)",
+        "dir_allow_regex": ".*",
+        "dir_skip_regex": r"(?:^|.*/)hidden",
     }
 
     assert start_uploader(query, tmp_path, config, "uploader-session") == report
     assert query.session_id == "uploader-session"
     assert query.exec_args.startswith("SESSION_ID=uploader-session ")
+    for name, value in config.items():
+        assert f"{name}={json.dumps(value)}" in query.exec_args
     assert json.loads((tmp_path / "uploader.json").read_text()) == report
+
+
+def test_rag_add_file_returns_structured_processor_failure(tmp_path):
+    query = JsonQuery(
+        '{"error_code": -1, "error_msg": "image category is unsupported"}'
+    )
+    result = rag_add_file(
+        query,
+        "worker-session",
+        {"metadata": ""},
+        tmp_path,
+        "image.png",
+        2,
+    )
+    assert result["status"] == "failed"
+    assert result["path"] == "image.png"
+    assert result["doc_type"] == "image,png"
+    assert result["rag_result"]["error_code"] == -1
+    assert "image category is unsupported" in result["rag_result"]["error_msg"]
 
 
 def test_rag_add_file_uses_precreated_query_and_preserves_unicode(tmp_path):

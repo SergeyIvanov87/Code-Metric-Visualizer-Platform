@@ -1,6 +1,7 @@
 """Opt-in real HTTP integration: ENVOY_BINARY=/path/to/envoy pytest ..."""
 
 from contextlib import contextmanager
+import base64
 import json
 import os
 from pathlib import Path
@@ -49,8 +50,8 @@ def routed_http(app, filesystem_api, tmp_path):
         pytest.skip("Set ENVOY_BINARY to enable real Envoy HTTP tests")
     generic = Flask("generic-rest-api-stub")
 
-    @generic.route("/", defaults={"path": ""}, methods=["GET", "POST", "PUT"])
-    @generic.route("/<path:path>", methods=["GET", "POST", "PUT"])
+    @generic.route("/", defaults={"path": ""}, methods=["GET", "POST", "PUT", "PATCH"])
+    @generic.route("/<path:path>", methods=["GET", "POST", "PUT", "PATCH"])
     def generic_query(path):
         return jsonify(
             backend="generic",
@@ -72,10 +73,10 @@ def routed_http(app, filesystem_api, tmp_path):
             0: [],
             1: [
                 {
-                    "path": "/" + filesystem_api[1][name]["Query"],
+                    "path": "/" + schema["Query"],
                     "timeout_seconds": 40,
                 }
-                for name in ("chat", "rag_add")
+                for schema in filesystem_api[1].values()
             ],
         }
         merged = merge_routes(backends, discovered)
@@ -127,7 +128,14 @@ def test_envoy_routes_self_contained_chat_page_and_actions(routed_http, filesyst
     for suffix in ("", "/", "?probe=1", "/?probe=1"):
         status, body = routed_http(chat + suffix)
         assert status == 200 and b"Chat history" in body
-    status, body = routed_http(chat, "POST", json.dumps({"user_prompt": "Hello\nProxy"}).encode(), "application/json")
+    params = filesystem_api[1]["chat"]["Params"]
+    message_parameter = next(name for name, value in params.items() if value == "")
+    status, body = routed_http(
+        chat,
+        "POST",
+        json.dumps({message_parameter: "Hello\nProxy"}).encode(),
+        "application/json",
+    )
     assert status == 200
     assert json.loads(body)["response"] == "Hello\rProxy"
     assert b"fetch(window.location.pathname" in routed_http(chat)[1]
@@ -138,9 +146,37 @@ def test_envoy_routes_upload_page_and_put(routed_http, filesystem_api):
     upload = "/" + filesystem_api[1]["rag_add"]["Query"]
     status, body = routed_http(upload)
     assert status == 200 and b"Browse file" in body
-    status, body = routed_http(upload + "/?ignored=true", "PUT", b"A document\n", "application/octet-stream")
+    params = filesystem_api[1]["rag_add"]["Params"]
+    document_parameter = next(
+        name for name, value in params.items()
+        if not name.startswith("-") and value == ""
+    )
+    payload = {
+        document_parameter: base64.b64encode(b"A document\n").decode("ascii")
+    }
+    status, body = routed_http(
+        upload + "/?ignored=true",
+        "PUT",
+        json.dumps(payload).encode(),
+        "application/json",
+    )
     assert status == 200
     assert json.loads(body)["document"] == "A document\n"
+
+
+def test_envoy_routes_bulk_file_and_folder_page(routed_http, filesystem_api):
+    bulk_name = next(
+        name
+        for name, schema in filesystem_api[1].items()
+        if schema["Query"].endswith("/rag/bulk_add/v1")
+    )
+    bulk = "/" + filesystem_api[1][bulk_name]["Query"]
+    status, body = routed_http(bulk)
+    assert status == 200
+    assert b"Choose files" in body
+    assert b"Choose folders" in body
+    assert b"webkitdirectory" in body
+    assert b"Bulk upload settings" in body
 
 
 def test_envoy_preserves_generic_paths_methods_queries_and_bodies(routed_http):

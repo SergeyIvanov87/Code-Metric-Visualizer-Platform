@@ -70,7 +70,7 @@ paths, names, or HTML asset locations.
 | HTTP API gateway controller | Polls providers, validates discovery documents, resolves ownership, and atomically publishes Envoy bootstrap and RDS resources. |
 | HTTP API gateway | Runs Envoy with generated private clusters and watches the controller's RDS file for route updates. |
 | Represented Service | Owns the business operations exposed through the ambassador; it does not need to implement the HTTP presentation layer. |
-| Shared `/api` volume | Carries filesystem API schemas, request FIFOs, session results, and ambassador staging data. |
+| Shared `/api` volume | Carries filesystem API schemas, request FIFOs, and session results. |
 
 ```mermaid
 flowchart LR
@@ -146,8 +146,9 @@ BACKENDS_FOR_FRONTENDS=http://rest-api:5000,http://ai-agent-http-ambassador:8081
 ```
 
 In this example, `rest-api` owns its unique routes and is the catch-all. The
-AI-agent HTTP ambassador owns the overlapping chat and `rag_add` paths because
-its concrete service, `ai-agent-http-ambassador`, appears later. The old
+AI-agent HTTP ambassador owns the overlapping chat, `rag_add`, and
+`rag_bulk_add` paths because its concrete service,
+`ai-agent-http-ambassador`, appears later. The old
 `ai_agent_http` Envoy cluster name is not exposed.
 
 ## Controller lifecycle and dynamic Envoy configuration
@@ -197,27 +198,36 @@ connection details, and generated Envoy cluster name are not public API.
 
 ### Example: AI-agent HTTP ambassador
 
-This concrete HTTP ambassador image copies exactly `chat.json` and
-`rag_add.json` from the AI-agent Represented Service. At startup it reads every
-JSON file in its configured schema directory, rejects query paths the server
-does not support, and advertises the two supported action paths.
+This concrete HTTP ambassador image copies exactly `chat.json`,
+`rag_add.json`, and `rag_bulk_add.json` from the AI-agent Represented Service.
+At startup it reads every
+JSON file in its configured schema directory, validates query schemas, rejects
+query paths the server does not support, and advertises the supported action
+paths. Supported query names, methods, page metadata, and scripts are selected
+through `SUPPORTED_SCHEMAS`; route paths and parameter names come from the
+loaded schemas.
+
 It provides:
 
-- a chat page and JSON `POST` adapter;
-- a UTF-8 document-selection page and binary `PUT` adapter;
-- prompt, media-type, size, Unicode, FIFO, result, and timeout validation; and
-- bounded session-aware translation to the existing filesystem API.
+- schema-driven chat, document-selection, and bulk file/folder pages;
+- JSON adapters that forward received query parameters as-is;
+- parallel per-file HTTP transfer into the deferred bulk request's shared
+  staging input, followed by explicit sealing and final-result consumption;
+- media-type, size, Unicode framing, FIFO result, and timeout handling; and
+- bounded session-aware translation through the shared
+  `APIQueryInterruptible` implementation.
 
 The UI has no public `/ai-agent-ui` prefix. CSS and JavaScript are embedded
 with per-response CSP nonces, so asset placement remains private to the
 ambassador. Chat history is browser-tab state, not server-side agent memory.
-The user can choose whether prior successful turns are included in the next
-`user_prompt`.
-
-Uploads are staged below `/api/.http_ambassador/staging`, outside the generic
-filesystem API domain. Completed operations remove their staging directory.
-Files are retained when completion is unknown so a queued agent operation is
-not deprived of its input.
+The single-document page base64-encodes the selected file into the
+schema-defined document parameter. The bulk page starts `rag_bulk_add`, uploads
+selected files concurrently under their relative paths using temporary names
+and atomic publication, drains bulk events, explicitly seals the underlying
+directory-events request, and consumes the final asynchronous result. Its
+collapsed settings are derived from `rag_bulk_add`, whose filter defaults match
+`streaming_directory_events`. The filesystem APIs remain responsible for
+parameter validation, filtering, ingestion, and result semantics.
 
 ## Failure and readiness behavior
 
@@ -230,8 +240,9 @@ not deprived of its input.
   while action requests return `503` when required dependencies are
   unavailable.
 - Invalid downstream JSON returns `502`; an uncertain FIFO deadline returns
-  `504` with `completion_unknown: true`; client validation uses `400`,
-  `413`, or `415` as appropriate.
+  `504` with `completion_unknown: true`; malformed JSON objects, oversized
+  bodies, and unsupported media types use `400`, `413`, or `415` as
+  appropriate. Filesystem query parameters are validated by the filesystem API.
 - The gateway does not retry application operations whose completion is
   unknown.
 
@@ -286,8 +297,8 @@ do not use.
 - Last-known-good discovery improves availability but can temporarily preserve
   a route that a failing provider intended to remove.
 - In the AI-agent HTTP ambassador example, browser chat history is serialized
-  into one filesystem API `user_prompt`; it is not structured or persistent
-  model memory.
+  into the schema-defined chat message parameter; it is not structured or
+  persistent model memory.
 - Filesystem FIFOs require a shared local-volume implementation. A remote
   gateway needs only HTTP reachability, but the HTTP ambassador and its
   Represented Service must share compatible filesystem semantics.

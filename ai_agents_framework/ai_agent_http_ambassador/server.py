@@ -1,30 +1,80 @@
-"""HTTP ambassador: query-specific presentation and filesystem API adaptation."""
+"""HTTP ambassador: schema-derived presentation and filesystem API adaptation."""
 
-import codecs
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
+import math
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
-import shutil
-from secrets import token_urlsafe
+import threading
 from uuid import uuid4
 
 from flask import Flask, g, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
 
-from fifo_client import FifoClient, InvalidResult, QueryTimeout, Unavailable
+from api_fs_query import APIQueryInterruptible
+from api_schema_utils import compose_api_queries_pipe_names
 
 
 DISCOVERY_PATH = "/.well-known/http-api-routes/v1"
-SUPPORTED_SCHEMAS = {"chat": "POST", "rag_add": "PUT"}
+TRANSPORT_PARAMETERS = {
+    "SESSION_ID",
+    "WaitInitialQueryTimeoutSec",
+    "WaitQueryUpdateTimeoutSec",
+    "WaitResultConsumptionTimeoutSec",
+}
+SUPPORTED_SCHEMAS = {
+    "chat": {
+        "method": "POST",
+        "template": "chat.html",
+        "script": "chat.js",
+        "navigation_label": "Chat with the knowledge base",
+    },
+    "rag_add": {
+        "method": "PUT",
+        "template": "rag_add.html",
+        "script": "rag_add.js",
+        "navigation_label": "Add a document to the knowledge base",
+    },
+    "rag_bulk_add": {
+        "method": "POST",
+        "template": "rag_bulk_add.html",
+        "script": "rag_bulk_add.js",
+        "navigation_label": "Add files and folders to the knowledge base",
+        "bulk_upload": True,
+    },
+}
+
+
+class APIUnavailable(RuntimeError):
+    pass
+
+
+class APIQueryTimeout(RuntimeError):
+    """The operation may have been accepted; callers must not retry it blindly."""
+
+
+class InvalidAPIResult(RuntimeError):
+    pass
 
 
 def load_schemas(schema_dir):
-    return {
-        path.stem: json.loads(path.read_text())
-        for path in sorted(Path(schema_dir).glob("*.json"))
-    }
+    schemas = {}
+    for path in sorted(Path(schema_dir).glob("*.json")):
+        schema = json.loads(path.read_text())
+        if "Query" not in schema:
+            continue
+        missing = {"Method", "Params"} - schema.keys()
+        if missing:
+            raise ValueError(
+                f"Filesystem API schema {path.name} is missing: "
+                + ", ".join(sorted(missing))
+            )
+        if not isinstance(schema["Params"], dict):
+            raise ValueError(f"Filesystem API schema {path.name} has invalid Params")
+        schemas[path.stem] = schema
+    return schemas
 
 
 def build_discovery_document(schemas, timeout_seconds):
@@ -44,106 +94,295 @@ def build_discovery_document(schemas, timeout_seconds):
     return {"schema_version": 1, "revision": "sha256:" + revision, "routes": routes}
 
 
-def create_app(config_path=None, client=None):
-    config_path = config_path or os.environ.get("AI_AGENT_HTTP_CONFIG", str(Path(__file__).with_name("config.json")))
+def quote_argument_value(value):
+    if not isinstance(value, str):
+        value = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    if "\0" in value:
+        raise ValueError("Filesystem API arguments cannot contain NUL")
+    value = value.replace("\r\n", "\n").replace("\n", "\r")
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def serialize_arguments(arguments, session_id):
+    forwarded = dict(arguments)
+    forwarded["SESSION_ID"] = session_id
+    return " ".join(
+        f"{name}={quote_argument_value(value)}"
+        for name, value in forwarded.items()
+    )
+
+
+def display_default(params):
+    for value in params.values():
+        if isinstance(value, list):
+            value = "\n".join(str(part) for part in value)
+        if isinstance(value, str) and value:
+            if value.startswith('"') and value.endswith('"'):
+                value = value[1:-1]
+            return value.replace('\\"', '"').replace("\\\\", "\\")
+    return ""
+
+
+def result_failed(result):
+    return result.get("error_code") not in (None, 0, "0", False)
+
+
+def create_app(config_path=None, query_factory=None):
+    config_path = config_path or os.environ.get(
+        "AI_AGENT_HTTP_CONFIG", str(Path(__file__).with_name("config.json"))
+    )
     settings = json.loads(Path(config_path).read_text())
     main_menu_path = os.environ["MAIN_MENU_PATH"]
     if not main_menu_path.startswith("/") or main_menu_path.startswith("//"):
         raise ValueError("MAIN_MENU_PATH must be a root-relative path")
-    api_mount = Path(settings["api_mount"]).resolve()
-    agent_mount = Path(settings.get("agent_api_mount", settings["api_mount"]))
-    # rag_add's existing executor uses xargs + sh -c. Only generated, shell-safe
-    # paths and metadata are allowed through that executor.
-    for mount in (api_mount, agent_mount):
-        if not mount.is_absolute() or not re.fullmatch(r"/[A-Za-z0-9_./-]+", str(mount)) or ".." in mount.parts:
-            raise ValueError("API mount paths must be absolute, shell-safe paths")
-    schema_dir = Path(settings["schema_dir"])
-    available_schemas = load_schemas(schema_dir)
+
+    api_mount = Path(settings["api_mount"])
+    available_schemas = load_schemas(settings["schema_dir"])
     missing_schemas = SUPPORTED_SCHEMAS.keys() - available_schemas.keys()
     if missing_schemas:
         raise ValueError(
             "Missing filesystem API schemas: " + ", ".join(sorted(missing_schemas))
         )
+
     schemas = {name: available_schemas[name] for name in SUPPORTED_SCHEMAS}
     supported_queries = {schema["Query"] for schema in schemas.values()}
     unsupported_queries = sorted(
         str(schema["Query"])
         for schema in available_schemas.values()
-        if "Query" in schema and schema["Query"] not in supported_queries
+        if schema["Query"] not in supported_queries
     )
     if unsupported_queries:
         raise ValueError(
             "Unsupported filesystem API queries: " + ", ".join(unsupported_queries)
         )
+
     for name, schema in schemas.items():
+        support = SUPPORTED_SCHEMAS[name]
         if (
             schema.get("Content-Type") != "application/json"
-            or schema.get("Method") != SUPPORTED_SCHEMAS[name]
+            or schema.get("Method") != support["method"]
         ):
             raise ValueError(f"Unsupported {name} filesystem API schema")
-    for key in ("timeout_seconds", "max_upload_bytes", "max_prompt_bytes", "max_result_bytes"):
+
+    for key in ("timeout_seconds", "max_upload_bytes", "max_result_bytes"):
         if not isinstance(settings[key], (int, float)) or settings[key] <= 0:
             raise ValueError(f"{key} must be positive")
-    client = client or FifoClient(api_mount, settings["timeout_seconds"], settings["max_result_bytes"])
-    paths = {name: "/" + schema["Query"] for name, schema in schemas.items()}
-    for schema in schemas.values():
-        FifoClient(api_mount).node(schema)  # Validate paths even with a test client.
-    prompt = schemas["chat"]["Params"]["-system_prompt"]
-    prompt = "\n".join(prompt) if isinstance(prompt, list) else prompt
-    # Schema quotes are CLI grouping delimiters, not part of the system prompt.
-    if prompt.startswith('"') and prompt.endswith('"'):
-        prompt = prompt[1:-1]
-    prompt = prompt.replace('\\"', '"').replace("\\\\", "\\")
+
+    query_factory = query_factory or APIQueryInterruptible
+    timeout_seconds = float(settings["timeout_seconds"])
+    max_result_bytes = int(settings["max_result_bytes"])
+    paths = {name: "/" + schema["Query"].lstrip("/") for name, schema in schemas.items()}
+    write_locks = {
+        schema["Query"]: threading.Lock()
+        for schema in schemas.values()
+    }
+    sessions = threading.local()
+
     service_root = Path(__file__).resolve().parent
     page_style = (service_root / "static/style.css").read_text()
     page_scripts = {
-        name: (service_root / f"static/{name}.js").read_text()
-        for name in ("chat", "rag_add")
+        name: (service_root / "static" / support["script"]).read_text()
+        for name, support in SUPPORTED_SCHEMAS.items()
     }
-    discovery_document = build_discovery_document(schemas, settings["timeout_seconds"])
+    discovery_document = build_discovery_document(schemas, timeout_seconds)
+
     app = Flask(__name__, static_folder=None)
     app.config["MAX_CONTENT_LENGTH"] = int(settings["max_upload_bytes"])
 
+    def make_query(schema):
+        pipes = compose_api_queries_pipe_names(str(api_mount), schema)
+        return query_factory(pipes, remove_session_pipe_on_result_done=False)
+
+    def execute(schema, arguments, reuse_session=True):
+        query = make_query(schema)
+        if not query.is_valid():
+            raise APIUnavailable(
+                f"Filesystem API {schema['Query']} is not ready"
+            )
+
+        session_id = (
+            getattr(sessions, "completed", None) if reuse_session else None
+        ) or "http_" + uuid4().hex
+        sessions.completed = None
+        command = serialize_arguments(arguments, session_id)
+
+        with write_locks[schema["Query"]]:
+            sent, remaining = query.execute(timeout_seconds, command)
+        if not sent or remaining <= 0:
+            raise APIQueryTimeout(
+                "Filesystem API write deadline exceeded; completion is unknown"
+            )
+
+        wait_result = query.wait_result(
+            remaining,
+            session_id,
+            0.1,
+            max(1, math.ceil(remaining / 0.1)),
+            False,
+        )
+        if not wait_result or not wait_result[0]:
+            raise APIQueryTimeout(
+                "Filesystem API result deadline exceeded; completion is unknown"
+            )
+
+        raw = wait_result[1]
+        if len(raw.encode("utf-8")) > max_result_bytes:
+            raise InvalidAPIResult("Filesystem API result exceeds configured limit")
+        if reuse_session:
+            sessions.completed = session_id
+
+        try:
+            result = json.loads(raw)
+        except (TypeError, ValueError, UnicodeDecodeError) as exc:
+            raise InvalidAPIResult("Filesystem API returned invalid JSON") from exc
+        if not isinstance(result, dict):
+            raise InvalidAPIResult("Filesystem API returned a non-object result")
+        return result
+
+    def bulk_request_paths(schema, upload_id):
+        if not re.fullmatch(r"deferred-[A-Za-z0-9_-]+", upload_id or ""):
+            raise FileNotFoundError("Bulk upload session was not found")
+        root = api_mount / schema["Query"] / schema["Method"]
+        request_directory = root / upload_id
+        report_path = request_directory / "stage.json"
+        if not request_directory.is_dir() or not report_path.is_file():
+            raise FileNotFoundError("Bulk upload session is no longer available")
+        report = json.loads(report_path.read_text())
+        return {
+            "request": request_directory,
+            "input": request_directory / "input",
+            "events": request_directory / "events",
+            "result": request_directory / "async_result",
+            "seal": Path(report["uploader_request"]) / "seal",
+        }
+
+    def bulk_start(schema):
+        arguments = request.get_json(silent=True)
+        if not isinstance(arguments, dict):
+            return jsonify(error="Expected a JSON object of filesystem API parameters"), 400
+        result = execute(schema, arguments, reuse_session=False)
+        if result_failed(result):
+            return jsonify(result), 502
+        required = {"input", "events", "result", "protocol"}
+        if not required.issubset(result):
+            raise InvalidAPIResult("Bulk filesystem API returned an invalid readiness report")
+        upload_id = Path(result["input"]).parent.name
+        return jsonify(upload_id=upload_id, protocol=result["protocol"])
+
+    def safe_upload_relative_path(value):
+        if not isinstance(value, str) or not value or "\\" in value or "\0" in value:
+            raise ValueError("Upload path must be a nonempty POSIX relative path")
+        relative = PurePosixPath(value)
+        if relative.is_absolute() or any(part in ("", ".", "..") for part in relative.parts):
+            raise ValueError("Upload path must remain below the bulk input directory")
+        return relative
+
+    def bulk_upload_file(schema):
+        if request.mimetype != "application/octet-stream":
+            return jsonify(error="Bulk file uploads require application/octet-stream"), 415
+        upload_id = request.args.get("upload_id", "")
+        relative = safe_upload_relative_path(request.args.get("path", ""))
+        paths_for_request = bulk_request_paths(schema, upload_id)
+        stage = paths_for_request["input"].resolve(strict=True)
+        destination = stage.joinpath(*relative.parts)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        resolved_parent = destination.parent.resolve(strict=True)
+        if not resolved_parent.is_relative_to(stage):
+            raise ValueError("Upload path escaped the bulk input directory")
+
+        incoming = stage / ".incoming"
+        incoming.mkdir(exist_ok=True)
+        temporary = incoming / uuid4().hex
+        written = 0
+        try:
+            with temporary.open("xb") as output:
+                while True:
+                    chunk = request.stream.read(64 * 1024)
+                    if not chunk:
+                        break
+                    output.write(chunk)
+                    written += len(chunk)
+                output.flush()
+                os.fsync(output.fileno())
+            try:
+                os.link(temporary, destination)
+            except FileExistsError:
+                return jsonify(error=f"Upload path already exists: {relative.as_posix()}"), 409
+            temporary.unlink()
+        finally:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
+        return jsonify(path=relative.as_posix(), bytes=written)
+
+    def bulk_finish(schema):
+        upload_id = request.args.get("upload_id", "")
+        paths_for_request = bulk_request_paths(schema, upload_id)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            events_future = pool.submit(
+                APIQueryInterruptible.read_fifo,
+                paths_for_request["events"],
+                timeout_seconds,
+                max_result_bytes,
+            )
+            sealed, _ = APIQueryInterruptible.write_fifo(
+                paths_for_request["seal"],
+                min(timeout_seconds, 5),
+                b"seal\n",
+            )
+            result_status, raw_result, _ = APIQueryInterruptible.read_fifo(
+                paths_for_request["result"],
+                timeout_seconds,
+                max_result_bytes,
+            )
+            events_status, raw_events, _ = events_future.result()
+
+        if not result_status or not events_status:
+            detail = "seal or result" if not sealed else "result"
+            raise APIQueryTimeout(
+                f"Bulk upload {detail} deadline exceeded; completion is unknown"
+            )
+        try:
+            result = json.loads(raw_result.decode())
+            events = [
+                json.loads(line)
+                for line in raw_events.decode().splitlines()
+                if line.strip()
+            ]
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise InvalidAPIResult("Bulk filesystem API returned invalid JSON") from exc
+        if not isinstance(result, dict):
+            raise InvalidAPIResult("Bulk filesystem API returned a non-object result")
+        return jsonify(result=result, events=events), 502 if result_failed(result) else 200
+
     @app.before_request
     def request_nonce():
-        g.csp_nonce = token_urlsafe(18)
+        g.csp_nonce = uuid4().hex
 
     @app.errorhandler(HTTPException)
     def http_error(exc):
         return jsonify(error=exc.description), exc.code
 
-    @app.after_request
-    def response_headers(response):
-        response.headers["Cache-Control"] = "no-store"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            f"script-src 'nonce-{g.csp_nonce}'; "
-            f"style-src 'nonce-{g.csp_nonce}'; frame-ancestors 'none'"
-        )
-        return response
+    @app.errorhandler(ValueError)
+    def bad_request(exc):
+        return jsonify(error=str(exc)), 400
 
-    def execute(name, args):
-        raw = client.execute(schemas[name], args)
-        try:
-            result = json.loads(raw)
-        except (ValueError, UnicodeDecodeError) as exc:
-            raise InvalidResult("Filesystem API returned invalid JSON") from exc
-        if not isinstance(result, dict):
-            raise InvalidResult("Filesystem API returned a non-object result")
-        return result
-
-    @app.errorhandler(Unavailable)
+    @app.errorhandler(APIUnavailable)
     def unavailable(exc):
         return jsonify(error=str(exc)), 503
 
-    @app.errorhandler(QueryTimeout)
+    @app.errorhandler(APIQueryTimeout)
     def timeout(exc):
         return jsonify(error=str(exc), completion_unknown=True), 504
 
-    @app.errorhandler(InvalidResult)
+    @app.errorhandler(InvalidAPIResult)
     def invalid_result(exc):
         return jsonify(error=str(exc)), 502
+
+    @app.errorhandler(FileNotFoundError)
+    def missing_upload(exc):
+        return jsonify(error=str(exc)), 410
 
     @app.errorhandler(OSError)
     def io_error(exc):
@@ -156,100 +395,82 @@ def create_app(config_path=None, client=None):
 
     @app.route("/healthz", methods=["GET"])
     def health():
-        ready = all(client_path_ready(schema) for schema in schemas.values())
+        ready = all(make_query(schema).is_valid() for schema in schemas.values())
         return jsonify(ready=ready), 200 if ready else 503
 
-    def client_path_ready(schema):
-        node = FifoClient(api_mount).node(schema)
-        return FifoClient._fifo(node / "exec") and FifoClient._fifo(node / "result.json")
+    def render_page(name, schema):
+        navigation = [
+            {"path": paths[other_name], "label": support["navigation_label"]}
+            for other_name, support in SUPPORTED_SCHEMAS.items()
+            if other_name != name
+        ]
+        hidden_parameters = (
+            {"SESSION_ID"} if SUPPORTED_SCHEMAS[name].get("bulk_upload")
+            else TRANSPORT_PARAMETERS
+        )
+        page_parameters = {
+            parameter: default
+            for parameter, default in schema["Params"].items()
+            if parameter not in hidden_parameters
+        }
+        concurrency_parameter = next(
+            (
+                parameter
+                for parameter, default in page_parameters.items()
+                if str(default).isdigit() and 1 <= int(default) <= 32
+            ),
+            None,
+        )
+        return render_template(
+            SUPPORTED_SCHEMAS[name]["template"],
+            main_menu_path=main_menu_path,
+            navigation=navigation,
+            csp_nonce=g.csp_nonce,
+            page_style=page_style,
+            page_script=page_scripts[name],
+            request_method=schema["Method"],
+            request_parameters=schema["Params"],
+            page_parameters=page_parameters,
+            concurrency_parameter=concurrency_parameter,
+            default_prompt=display_default(schema["Params"]),
+        )
 
-    @app.route(paths["chat"], methods=["GET", "POST"], strict_slashes=False)
-    def chat():
-        if request.method == "GET":
-            return render_template(
-                "chat.html",
-                main_menu_path=main_menu_path,
-                system_prompt=prompt,
-                upload_path=paths["rag_add"],
-                csp_nonce=g.csp_nonce,
-                page_style=page_style,
-                page_script=page_scripts["chat"],
-            )
-        data = request.get_json()
-        if not isinstance(data, dict) or set(data) - {"user_prompt", "system_prompt"}:
-            return jsonify(error="Expected user_prompt and optional system_prompt"), 400
-        user_prompt = data.get("user_prompt")
-        system_prompt = data.get("system_prompt", prompt)
-        if not isinstance(user_prompt, str) or not user_prompt.strip() or not isinstance(system_prompt, str):
-            return jsonify(error="Prompts must be strings; user_prompt must be nonempty"), 400
-        if "\0" in user_prompt + system_prompt:
-            return jsonify(error="Prompts cannot contain NUL"), 400
-        try:
-            prompt_size = len((user_prompt + system_prompt).encode("utf-8"))
-        except UnicodeEncodeError:
-            return jsonify(error="Prompts must contain valid Unicode"), 400
-        if prompt_size > settings["max_prompt_bytes"]:
-            return jsonify(error="Prompts exceed configured size limit"), 413
-        result = execute("chat", {"-user_prompt": user_prompt, "-system_prompt": system_prompt})
-        if "response" not in result and not result.get("error_code"):
-            raise InvalidResult("Chat result has no response")
-        return jsonify(result), 502 if result.get("error_code") else 200
+    def make_view(name, schema):
+        support = SUPPORTED_SCHEMAS[name]
 
-    @app.route(paths["rag_add"], methods=["GET", "PUT"], strict_slashes=False)
-    def rag_add():
-        if request.method == "GET":
-            return render_template(
-                "rag_add.html",
-                chat_path=paths["chat"],
-                main_menu_path=main_menu_path,
-                csp_nonce=g.csp_nonce,
-                page_style=page_style,
-                page_script=page_scripts["rag_add"],
-            )
-        if request.mimetype != "application/octet-stream":
-            return jsonify(error="Send the file bytes as application/octet-stream"), 415
-        token = uuid4().hex
-        relative = Path(".http_ambassador") / "staging" / token
-        # Ensure all new ancestors are traversable by the agent's distinct UID,
-        # including when this server was launched with a restrictive umask.
-        for parent in (api_mount / ".http_ambassador", api_mount / ".http_ambassador/staging"):
-            parent.mkdir(mode=0o755, exist_ok=True)
-            parent.chmod(0o755)
-        directory = api_mount / relative
-        directory.mkdir(parents=True, mode=0o755)
-        directory.chmod(0o755)
-        staged_file = directory / "document.txt"
-        retain = False
-        try:
-            decoder = codecs.getincrementaldecoder("utf-8")()
-            size = 0
-            with staged_file.open("xb") as output:
-                staged_file.chmod(0o644)  # ai_agent has a different container UID.
-                while chunk := request.stream.read(65536):
-                    size += len(chunk)
-                    if size > settings["max_upload_bytes"]:
-                        return jsonify(error="Upload exceeds configured size limit"), 413
-                    decoder.decode(chunk)
-                    output.write(chunk)
-                decoder.decode(b"", final=True)
-            if not size:
-                return jsonify(error="The selected file is empty"), 400
+        def view():
+            if request.method == "GET":
+                return render_page(name, schema)
+            if support.get("bulk_upload"):
+                if request.method == schema["Method"]:
+                    return bulk_start(schema)
+                if request.method == "PUT":
+                    return bulk_upload_file(schema)
+                if request.method == "PATCH":
+                    return bulk_finish(schema)
+
+            arguments = request.get_json(silent=True)
+            if not isinstance(arguments, dict):
+                return jsonify(error="Expected a JSON object of filesystem API parameters"), 400
             try:
-                result = execute("rag_add", {
-                    "-URI": str(agent_mount / relative / staged_file.name),
-                    "-doc_type": "txt",
-                    "-metadata": "http_upload_" + token,
-                })
-            except (QueryTimeout, OSError):
-                retain = True  # The agent may still be using this file.
-                raise
-            if "error_code" not in result or (not result["error_code"] and "doc_id" not in result):
-                raise InvalidResult("rag_add result has no error_code or document ID")
-            return jsonify(result), 502 if result.get("error_code") else 200
-        except UnicodeDecodeError:
-            return jsonify(error="rag_add currently supports UTF-8 text files"), 415
-        finally:
-            if not retain:
-                shutil.rmtree(directory)
+                result = execute(schema, arguments)
+            except ValueError as exc:
+                return jsonify(error=str(exc)), 400
+            return jsonify(result), 502 if result_failed(result) else 200
+
+        view.__name__ = f"{name}_view"
+        return view
+
+    for name, schema in schemas.items():
+        methods = ["GET", schema["Method"]]
+        if SUPPORTED_SCHEMAS[name].get("bulk_upload"):
+            methods.extend(["PUT", "PATCH"])
+        app.add_url_rule(
+            paths[name],
+            endpoint=f"{name}_endpoint",
+            view_func=make_view(name, schema),
+            methods=methods,
+            strict_slashes=False,
+        )
 
     return app

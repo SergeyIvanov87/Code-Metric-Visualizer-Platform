@@ -6,8 +6,18 @@ const systemPrompt = document.getElementById("system-prompt");
 const history = document.getElementById("history");
 const status = document.getElementById("status");
 const submit = document.getElementById("submit");
+const parameterEntries = Object.entries(requestParameters);
+const messageParameter = parameterEntries.find(([, value]) => value === "")?.[0];
+const systemParameter = parameterEntries.find(([, value]) =>
+  Array.isArray(value) || (typeof value === "string" && value !== "")
+)?.[0];
+
+if (!messageParameter) {
+  throw new Error("Chat schema has no message parameter");
+}
+
 // The agent's API is stateless. Keep this conversation in this browser tab and
-// pass previous turns as context in user_prompt on each successful submission.
+// pass previous turns as context in the schema-defined message parameter.
 const turns = [];
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -17,13 +27,15 @@ form.addEventListener("submit", async (event) => {
     ? [...turns, {role: "User", text}]
       .map((turn) => `${turn.role}:\n${turn.text}`).join("\n\n")
     : text;
+  const parameters = {[messageParameter]: prompt};
+  if (systemParameter) parameters[systemParameter] = systemPrompt.value;
   submit.disabled = true;
   status.textContent = "Waiting for the agent…";
   try {
     const response = await fetch(window.location.pathname, {
-      method: "POST",
+      method: requestMethod,
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({user_prompt: prompt, system_prompt: systemPrompt.value}),
+      body: JSON.stringify(parameters),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || result.error_msg || "Chat request failed");

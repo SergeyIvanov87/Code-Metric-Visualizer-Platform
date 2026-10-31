@@ -150,6 +150,90 @@ class APIQueryInterruptible(APIQuery):
         super().__init__(command_pipes, remove_session_pipe_on_result_done)
         self.result_queue = LifoQueue()
 
+    @staticmethod
+    def write_fifo(pipe_path, wait_second_before_interrupt, data):
+        """Write all bytes to an arbitrary FIFO within a monotonic deadline."""
+        payload = data.encode() if isinstance(data, str) else bytes(data)
+        deadline = time.monotonic() + max(0, wait_second_before_interrupt)
+        descriptor = None
+        offset = 0
+        try:
+            while offset < len(payload) and time.monotonic() < deadline:
+                if descriptor is None:
+                    try:
+                        descriptor = os.open(
+                            pipe_path, os.O_NONBLOCK | os.O_WRONLY
+                        )
+                    except OSError as error:
+                        if error.errno not in (
+                            errno.ENOENT, errno.ENXIO, errno.EAGAIN,
+                            errno.EWOULDBLOCK,
+                        ):
+                            raise
+                        time.sleep(0.02)
+                        continue
+                try:
+                    offset += os.write(descriptor, payload[offset:])
+                except OSError as error:
+                    if error.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
+                        raise
+                    time.sleep(0.02)
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+        remaining = max(0.0, deadline - time.monotonic())
+        return offset == len(payload), remaining
+
+    @staticmethod
+    def read_fifo(
+        pipe_path, wait_second_before_interrupt, max_bytes=None,
+        sleep_between_cycles=0.02,
+    ):
+        """Read one writer-to-EOF FIFO stream within a monotonic deadline."""
+        if max_bytes is not None and max_bytes <= 0:
+            raise ValueError("max_bytes must be positive")
+        deadline = time.monotonic() + max(0, wait_second_before_interrupt)
+        descriptor = None
+        chunks = []
+        total = 0
+        writer_seen = False
+        try:
+            while time.monotonic() < deadline:
+                if descriptor is None:
+                    try:
+                        descriptor = os.open(
+                            pipe_path, os.O_NONBLOCK | os.O_RDONLY
+                        )
+                    except OSError as error:
+                        if error.errno not in (
+                            errno.ENOENT, errno.EAGAIN, errno.EWOULDBLOCK,
+                        ):
+                            raise
+                        time.sleep(sleep_between_cycles)
+                        continue
+                try:
+                    chunk = os.read(descriptor, 64 * 1024)
+                except OSError as error:
+                    if error.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
+                        raise
+                    time.sleep(sleep_between_cycles)
+                    continue
+                if chunk:
+                    writer_seen = True
+                    total += len(chunk)
+                    if max_bytes is not None and total > max_bytes:
+                        raise ValueError("FIFO result exceeds configured limit")
+                    chunks.append(chunk)
+                elif writer_seen:
+                    remaining = max(0.0, deadline - time.monotonic())
+                    return True, b"".join(chunks), remaining
+                else:
+                    time.sleep(sleep_between_cycles)
+        finally:
+            if descriptor is not None:
+                os.close(descriptor)
+        return False, None, 0.0
+
     def __prepare_for_async__(self, wait_second_before_interrupt):
         begin_ts = time.time()  # measure duration
 
@@ -202,24 +286,19 @@ class APIQueryInterruptible(APIQuery):
         # larger than the available pipe capacity must reach the timeout path
         # below instead of blocking forever inside os.write().
 
-        # the data to write in, must be terminated by \n
-        data_to_write = canonize_args(exec_args_str)
-        data_to_write += "\n"       # add additional EOL, because for some reason os.write ignore a single EOL
-        data_to_write_size=len(data_to_write)
-
-        # pipe doesn't consume single terminating \n here (for some reason), thus do not count it
-        if data_to_write_size > 0 and data_to_write[-1] == '\n':
-            data_to_write_size -= 1
+        # FIFO commands are newline-framed. Measure the encoded payload because
+        # os.write reports bytes, not Unicode characters.
+        data_to_write = canonize_args(exec_args_str).encode()
+        data_to_write_size = len(data_to_write)
         offset_to_write=0
         backpressure_events=0
 
-        data_to_write = data_to_write.encode()
         try:
             while offset_to_write < data_to_write_size and wait_second_before_interrupt > 0:
                 try:
                     # write until the end or timeout happened
                     wait_second_before_interrupt, local_begin_ts = get_elapsed_duration(wait_second_before_interrupt, local_begin_ts)
-                    written=os.write(pin, data_to_write[offset_to_write:-1])
+                    written=os.write(pin, data_to_write[offset_to_write:])
                     offset_to_write += written
                 except OSError as err:
                     if err.errno != errno.EAGAIN and err.errno != errno.EWOULDBLOCK:

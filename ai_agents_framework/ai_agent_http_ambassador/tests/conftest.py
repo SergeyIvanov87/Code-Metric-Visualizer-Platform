@@ -16,7 +16,7 @@ sys.path[:0] = [str(SERVICE), str(REPO / "common"), str(REPO / "common/modules")
 from api_fs_args import write_args
 from api_fs_conventions import get_api_request_plain_params
 from build_api_services import create_cli_server_content_from_schema
-from server import create_app
+from server import SUPPORTED_SCHEMAS, create_app
 
 
 @pytest.fixture
@@ -30,7 +30,38 @@ def filesystem_api(tmp_path, monkeypatch):
     spec.loader.exec_module(generator)
     scripts = tmp_path / "scripts"
     scripts.mkdir()
-    stub = f"#!{sys.executable}\n" + '''
+    schemas = {
+        name: json.loads(
+            (REPO / f"ai_agents_framework/ai_agent/API/{name}.json").read_text()
+        )
+        for name in SUPPORTED_SCHEMAS
+    }
+    chat_schema = next(
+        schemas[name]
+        for name, support in SUPPORTED_SCHEMAS.items()
+        if support["method"] == "POST"
+    )
+    upload_schema = next(
+        schemas[name]
+        for name, support in SUPPORTED_SCHEMAS.items()
+        if support["method"] == "PUT"
+    )
+    chat_message_parameter = next(
+        name for name, default in chat_schema["Params"].items() if default == ""
+    )
+    chat_system_parameter = next(
+        name for name, default in chat_schema["Params"].items() if default != ""
+    )
+    document_type_parameter = next(
+        name for name, default in upload_schema["Params"].items() if default == "txt"
+    )
+    stub = (
+        f"#!{sys.executable}\n"
+        f"CHAT_MESSAGE_PARAMETER = {chat_message_parameter!r}\n"
+        f"CHAT_SYSTEM_PARAMETER = {chat_system_parameter!r}\n"
+        f"DOCUMENT_TYPE_PARAMETER = {document_type_parameter!r}\n"
+        + '''
+import base64
 import json
 import sys
 from pathlib import Path
@@ -39,23 +70,30 @@ def value(key):
     return sys.argv[sys.argv.index(key) + 1]
 
 if Path(sys.argv[0]).name == "agentic_rag.py":
-    print(json.dumps({"response": value("-user_prompt"), "system_prompt": value("-system_prompt")}))
+    print(json.dumps({
+        "response": value(CHAT_MESSAGE_PARAMETER),
+        "secondary": value(CHAT_SYSTEM_PARAMETER),
+    }))
 else:
-    uri = value("-URI")
-    print(json.dumps({"error_code": 0, "doc_id": "fixture-document", "chunk_ids": ["fixture-chunk"], "document": Path(uri).read_text(), "uri": uri, "doc_type": value("-doc_type")}))
+    document = base64.b64decode(sys.stdin.buffer.read()).decode("utf-8")
+    print(json.dumps({
+        "error_code": 0,
+        "doc_id": "fixture-document",
+        "chunk_ids": ["fixture-chunk"],
+        "document": document,
+        "doc_type": value(DOCUMENT_TYPE_PARAMETER),
+    }))
 '''
+    )
     for filename in ("agentic_rag.py", "rag_add.py"):
         path = scripts / filename
         path.write_text(stub)
         path.chmod(0o755)
     processes = []
     logs = []
-    schemas = {}
     env = dict(os.environ, SHARED_API_DIR=str(api), WORK_DIR=str(scripts), VECTOR_DB_HOST="fixture", VECTOR_DB_PORT="8000", MAIN_SERVICE_NAME="fixture", ASSET_MODELS="fixture")
     try:
-        for name in ("chat", "rag_add"):
-            schema = json.loads((REPO / f"ai_agents_framework/ai_agent/API/{name}.json").read_text())
-            schemas[name] = schema
+        for name, schema in schemas.items():
             node = api / schema["Query"]
             (node / schema["Method"]).mkdir(parents=True)
             write_args(node, get_api_request_plain_params(schema["Params"]))
@@ -74,11 +112,11 @@ else:
             time.sleep(0.01)
         schema_dir = tmp_path / "API"
         schema_dir.mkdir()
-        for name in ("chat", "rag_add"):
+        for name in SUPPORTED_SCHEMAS:
             source = REPO / f"ai_agents_framework/ai_agent/API/{name}.json"
             (schema_dir / f"{name}.json").write_text(source.read_text())
         config = tmp_path / "http.json"
-        config.write_text(json.dumps({"api_mount": str(api), "schema_dir": str(schema_dir), "timeout_seconds": 30, "max_upload_bytes": 1024 * 1024, "max_prompt_bytes": 65536, "max_result_bytes": 1024 * 1024}))
+        config.write_text(json.dumps({"api_mount": str(api), "schema_dir": str(schema_dir), "timeout_seconds": 30, "max_upload_bytes": 2 * 1024 * 1024, "max_result_bytes": 1024 * 1024}))
         yield api, schemas, config
     finally:
         for process in processes:
