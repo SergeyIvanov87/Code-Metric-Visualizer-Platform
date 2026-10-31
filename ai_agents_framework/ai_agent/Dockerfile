@@ -47,7 +47,7 @@ EOF
 
 COPY common/modules /opt/modules
 COPY common/shell_utils /opt/shell_utils
-COPY ["common/api_management.py", "common/build_api_executors.py", "common/build_api_services.py", "common/build_api_pseudo_fs.py", "common/build_common_api_services.py", "common/make_api_readme.py", "common/renew_pseudo_fs_pipes.py", "common/deferred_query_launcher.py", "common/deferred_query_executor.py", "/opt/"]
+COPY ["common/api_management.py", "common/build_api_executors.py", "common/build_api_services.py", "common/build_api_pseudo_fs.py", "common/build_common_api_services.py", "common/canonize_internal_api.py", "common/check_missing_pseudo_fs_from_schema.py", "common/get_service_api_deps.py", "common/make_api_readme.py", "common/renew_pseudo_fs_pipes.py", "common/deferred_query_launcher.py", "common/deferred_query_executor.py", "/opt/"]
 
 RUN <<EOF
     dos2unix /opt/* && \
@@ -58,6 +58,11 @@ EOF
 COPY ai_agents_framework/ai_agent/config /config
 ENV AI_AGENT_INFERENCE_CONFIG=/config/inference.cpu.json
 ENV MAX_WORKERS=32
+
+ARG SKIP_API_DEPS_CHECK=false
+ENV SKIP_API_DEPS_CHECK=$SKIP_API_DEPS_CHECK
+ARG TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30
+ENV TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=$TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC
 COPY ai_agents_framework/ai_agent/API /API
 COPY ai_agents_framework/ai_agent/sources /package
 RUN dos2unix /package/*

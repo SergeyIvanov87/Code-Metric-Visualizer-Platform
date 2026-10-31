@@ -15,6 +15,30 @@ Read the [API source map](../../../HowTo/Agent-Repository-Map.md#filesystem-api-
 6. Follow [interservice dependencies](../interservice-dependencies/SKILL.md) when declaring consumed APIs or changing dependency command endpoints and startup/test readiness gates. Trace affected `API/deps` consumers and the REST adapter in `rest_api/rest_api_server/rest_api_server`. Preserve response content type and error reporting through both transports.
 7. Add focused behavior coverage for the changed contract: session isolation, invalid arguments, disconnected readers, timeout, shutdown, or large payloads as relevant. Run the owning functional tests and common lifecycle tests when generation/transport changes.
 
+## Ownership and permissions
+
+Containers create, serve, and remove their filesystem APIs as their own service
+users. Service and tester users must remain distinct. Never use superuser
+privileges, `doas`, `sudo`, or runtime `chown` to create API artifacts or bypass
+ownership. Restore any required image setup at build time; an installed elevation
+tool does not authorize using it after container startup.
+
+The image initializes `/api` with mode `0777`. Keep these runtime permissions,
+as implemented by `common/build_api_pseudo_fs.py` and the shared server generator:
+
+| Node | Required permissions |
+| --- | --- |
+| Request directory containing `0.<parameter>`, `1.<parameter>`, etc. | Add `stat.S_IWUSR \| stat.S_IRUSR \| stat.S_IWGRP \| stat.S_IRGRP \| stat.S_IWOTH \| stat.S_IROTH` (`0666` read/write mask), preserving existing directory traversal bits. |
+| Terminal method directory, such as `GET`, `PUT`, or `POST` | `stat.S_IRUSR \| stat.S_IXUSR \| stat.S_IWUSR \| stat.S_IRGRP \| stat.S_IXGRP \| stat.S_IROTH \| stat.S_IXOTH` (`0755`). |
+| `exec` FIFO | `0622`. |
+| `result*` FIFO, including session results | `0644`. |
+
+Clients write requests to `exec` and read `result*`. They do not need ownership
+or permission to rename, replace, or delete provider-owned nodes. Do not widen
+directory permissions, share service/tester UIDs, or elevate tests to simulate
+an outage. Use tester-owned fixtures for mutation-based outage checks; check
+live availability through the provider's public API in integration tests.
+
 ## Checks
 
 From the repository root, the focused deferred transport checks are:

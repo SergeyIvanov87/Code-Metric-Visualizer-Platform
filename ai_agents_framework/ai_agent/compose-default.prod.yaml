@@ -9,6 +9,8 @@ services:
       VECTORDB_HOST: rag-db
       VECTORDB_PORT: 8000
       AI_AGENT_INFERENCE_CONFIG: /config/inference.cpu.json
+      SKIP_API_DEPS_CHECK: ${SKIP_API_DEPS_CHECK:-false}
+      TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC: ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC:-30}
     volumes:
       - ./config:/config:ro
       - api.pmccabe_collector.restapi.org:/api

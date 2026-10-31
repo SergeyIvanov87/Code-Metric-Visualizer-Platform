@@ -14,6 +14,7 @@ COPY ai_agents_framework/ai_agent/test/data /tests/data
 
 RUN dos2unix /tests/init.sh /tests/*.py \
  && chmod +x /tests/init.sh \
+ && PYTHONPATH=/tests/utils:/tests/utils/modules python /tests/utils/canonize_internal_api.py /API/deps api.pmccabe_collector.restapi.org/ai_agent \
  && addgroup --gid "$GID" "$GROUPNAME" \
  && adduser --disabled-password --gecos "" --home /tests --uid "$UID" \
       --ingroup "$GROUPNAME" --no-create-home "$USER" \
