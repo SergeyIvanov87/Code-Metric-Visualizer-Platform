@@ -21,7 +21,7 @@ This map was derived from the code, API schemas, Compose models, tests, and CI o
 - [Analysis](../compose-analysis.yaml): measures a locally mounted project (`PROJECT_PATH`).
 - [Analytic](../compose-analytic.yaml): adds VCS/broker orchestration, scheduled measurements, and persistent RRD storage (`PROJECT_URL`, `PROJECT_BRANCH`, optional `CRON_REPO_UPDATE_SCHEDULE`).
 - [Analysis over HTTP](../compose-analysis-http-api.yaml) and [Analytic over HTTP](../compose-analytic-http-api.yaml): inspect proxy and transport boundaries as well as providers.
-- [Agentic RAG](../ai_agents_framework/compose.rag-agent.yaml) and [streaming variant](../ai_agents_framework/compose.rag-agent.streaming.yaml): distinct agent/document/vector-store topology.
+- [Agentic RAG with HTTP gateway](../ai_agents_framework/compose.rag-agent.yaml) and its [streaming-capture variant](../ai_agents_framework/compose.rag-agent.http.streaming.yaml): agent/document/vector-store topology with REST and ambassador access.
 
 Root [README prerequisites](../README.md#prerequisites) describe external API, logger and RRD volumes and shared network requirements. Inspect the chosen Compose model before creating resources. Historical setup examples include broad permissions and daemon changes; these are not necessary for reading code or authoring skills.
 
@@ -73,7 +73,6 @@ Commands run from the repository root. CI definitions are the source for setup a
 | All isolated services | `compose-functional.test.yaml` | `test_aggregator` |
 | Running Analysis/Analytic integration | `compose-analysis.integrational-test.yaml` | `test_aggregator`; start the selected stack first |
 | Streaming event pipeline | `common/images/streaming_test_aggregator/tests/functional/compose-functional.test.yaml` | aggregator, then `functional-tests`; detached orchestration |
-| Agent and RAG with streaming capture | `ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml` | follow the dedicated workflow |
 | Agent, RAG, and discovered HTTP gateway with streaming capture | `ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml` | HTTP smoke checks, filesystem tester, then authoritative aggregator result |
 
 Example finite service suite:
@@ -91,7 +90,7 @@ For image-only changes, inspect Dockerfile `COPY` sources and Compose `build.con
 - [Agentic RAG CI](../.github/workflows/agentic-rag-subsystem.yml): dispatcher/vector-store builds and tests.
 - GPU agent image builds: independent [NVIDIA](../.github/workflows/ai-agent-nvidia-image.yml) and [Vulkan](../.github/workflows/ai-agent-vulkan-image.yml) workflows compile production/development images in parallel, with cached builds and manual dispatch. These checks do not validate GPU runtime behavior.
 - [Streaming pipeline CI](../.github/workflows/streaming-test-aggregator.yml): detached launch, aggregator status, final checks, diagnostic export.
-- [Streaming integration CI](../.github/workflows/streaming-test-aggregator-integration.yml) and [agent streaming CI](../.github/workflows/agentic-rag-streaming-test-aggregator-integration.yml).
+- [Streaming integration CI](../.github/workflows/streaming-test-aggregator-integration.yml).
 - [Agentic RAG HTTP streaming CI](../.github/workflows/agentic-rag-http-streaming-test-aggregator-integration.yml): builds all stack, logger, and aggregator images before launching and testing the discovered HTTP topology.
 - [Streaming lifecycle](../common/images/streaming_test_aggregator/README.md): permanent logger, on-demand capture IDs and one active subscriber constraint.
 - [Capture event schema](../common/images/streaming_test_aggregator/tap_subscriber/EVENT_SCHEMA.md).

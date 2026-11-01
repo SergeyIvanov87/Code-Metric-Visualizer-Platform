@@ -150,7 +150,8 @@ Use these producers as examples:
     routes. Do not customize Envoy configuration for the new service.
 
 The current AI-agent HTTP ambassador example is integrated in
-[compose.rag-agent.http.streaming.yaml](../../../ai_agents_framework/compose.rag-agent.http.streaming.yaml).
+[compose.rag-agent.yaml](../../../ai_agents_framework/compose.rag-agent.yaml).
+Its streaming-capture topology is defined in [compose.rag-agent.http.streaming.yaml](../../../ai_agents_framework/compose.rag-agent.http.streaming.yaml).
 
 The implemented boundaries, discovery lifecycle, precedence rules, failure
 behavior, and deployment topology are recorded in [REST API customization

@@ -32,8 +32,10 @@ jobs:
 
     - name: Validate Compose configurations
       run: |
+        docker compose -f ai_agents_framework/compose.rag-agent.yaml config --quiet
         docker compose -f ai_agents_framework/compose.rag-agent.http.streaming.yaml config --quiet
         docker compose \
+          --profile functional-test \
           -f ai_agents_framework/compose.rag-agent.http.streaming.yaml \
           -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml \
           config --quiet
@@ -48,8 +50,8 @@ jobs:
           -f ai_agents_framework/compose.rag-agent.http.streaming.yaml
           -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml
         )
-        docker compose "${http_stack[@]}" build --pull
-        docker compose "${http_stack[@]}" pull --ignore-buildable
+        docker compose --profile functional-test "${http_stack[@]}" build --pull
+        docker compose --profile functional-test "${http_stack[@]}" pull --ignore-buildable
         docker compose -f common/images/compose-logger-subsystem.yaml build --pull
         docker compose -f common/images/compose-logger-subsystem.yaml pull --ignore-buildable
         docker compose -f common/images/compose-test-aggregator-subsystem.yaml build --pull
@@ -73,9 +75,6 @@ jobs:
         -f ai_agents_framework/compose.rag-agent.http.streaming.yaml
         -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml
         up --detach --no-build
-        rag-db rag-document-storage-permissions rag-doc-storage-dispatcher
-        test_pseudo_fs rag-agent rest-api ai-agent-http-ambassador
-        http-api-gateway-controller http-api-gateway
 
     - name: Verify discovered HTTP routes
       id: http-smoke
@@ -111,6 +110,7 @@ jobs:
       continue-on-error: true
       run: >-
         docker compose
+        --profile functional-test
         -f ai_agents_framework/compose.rag-agent.http.streaming.yaml
         -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml
         up --no-build --no-deps --abort-on-container-exit
@@ -159,9 +159,9 @@ jobs:
           -f ai_agents_framework/compose.rag-agent.http.streaming.yaml
           -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.http.streaming.tests.yaml
         )
-        docker compose "${http_stack[@]}" ps --all > "${diagnostics}/http-stack-ps.txt" 2>&1
-        docker compose "${http_stack[@]}" logs --no-color > "${diagnostics}/http-stack-logs.txt" 2>&1
-        docker compose "${http_stack[@]}" config > "${diagnostics}/http-stack-config.yaml" 2>&1
+        docker compose --profile functional-test "${http_stack[@]}" ps --all > "${diagnostics}/http-stack-ps.txt" 2>&1
+        docker compose --profile functional-test "${http_stack[@]}" logs --no-color > "${diagnostics}/http-stack-logs.txt" 2>&1
+        docker compose --profile functional-test "${http_stack[@]}" config > "${diagnostics}/http-stack-config.yaml" 2>&1
 
         for compose_file in \
           common/images/compose-logger-subsystem.yaml \
@@ -172,7 +172,7 @@ jobs:
           docker compose -f "${compose_file}" config > "${diagnostics}/${slug}-config.yaml" 2>&1
         done
 
-        docker compose "${http_stack[@]}" down --volumes --remove-orphans || true
+        docker compose --profile functional-test "${http_stack[@]}" down --volumes --remove-orphans || true
         docker compose -f common/images/compose-test-aggregator-subsystem.yaml down --volumes --remove-orphans || true
         docker compose -f common/images/compose-logger-subsystem.yaml down --volumes --remove-orphans || true
         docker volume rm api.pmccabe_collector.restapi.org 2>/dev/null || true

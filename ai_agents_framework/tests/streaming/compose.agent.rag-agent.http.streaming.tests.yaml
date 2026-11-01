@@ -37,6 +37,8 @@ services:
       - api.pmccabe_collector.network
 
   ai-agent-rag-functional-tester:
+    profiles:
+      - functional-test
     build:
       context: ..
       dockerfile: ai_agents_framework/ai_agent/test/Dockerfile
