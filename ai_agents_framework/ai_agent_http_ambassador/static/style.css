@@ -21,3 +21,8 @@ input[type="text"], input:not([type]) { box-sizing: border-box; width: 100%; pad
 .settings-grid label { margin: 0; }
 .settings-grid label span { display: block; margin-bottom: .4rem; }
 progress { width: 100%; }
+.help-page { max-width: 72rem; }
+.readme { margin-top: 2rem; }
+.readme table { border-collapse: collapse; width: 100%; display: block; overflow-x: auto; }
+.readme th, .readme td { border: 1px solid #d4dae4; padding: .5rem; text-align: left; }
+.readme pre { padding: 1rem; border-radius: .35rem; background: #f8fafc; }

@@ -122,7 +122,7 @@ def test_start_uploader_uses_precreated_query_handle(tmp_path):
     query = JsonQuery(json.dumps(report))
     config = {
         "WaitInitialQueryTimeoutSec": "60",
-        "WaitQueryUpdateTimeoutSec": "10",
+        "WaitQueryUpdateTimeoutSec": "60",
         "WaitResultConsumptionTimeoutSec": "60",
         "file_allow_regex": r".*[.]txt",
         "file_skip_regex": r"(?!skip)",

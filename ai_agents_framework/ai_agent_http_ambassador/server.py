@@ -1,23 +1,28 @@
 """HTTP ambassador: schema-derived presentation and filesystem API adaptation."""
 
 from concurrent.futures import ThreadPoolExecutor
+import errno
 import hashlib
 import json
 import math
 import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 import threading
 from uuid import uuid4
 
 from flask import Flask, g, jsonify, render_template, request
+from markdown import markdown
 from werkzeug.exceptions import HTTPException
 
 from api_fs_query import APIQueryInterruptible
 from api_schema_utils import compose_api_queries_pipe_names
 
-
 DISCOVERY_PATH = "/.well-known/http-api-routes/v1"
+HELP_PATH = "/help"
+
+BULK_UPLOAD_TEMPORARY_PREFIX = ".http-ambassador-incoming-"
 TRANSPORT_PARAMETERS = {
     "SESSION_ID",
     "WaitInitialQueryTimeoutSec",
@@ -43,6 +48,7 @@ SUPPORTED_SCHEMAS = {
         "script": "rag_bulk_add.js",
         "navigation_label": "Add files and folders to the knowledge base",
         "bulk_upload": True,
+        "page_parameter_defaults": {"WaitQueryUpdateTimeoutSec": "60"},
     },
 }
 
@@ -88,6 +94,8 @@ def build_discovery_document(schemas, timeout_seconds):
         ),
         key=lambda route: route["path"],
     )
+    routes.append({"path": HELP_PATH, "timeout_seconds": route_timeout})
+    routes.sort(key=lambda route: route["path"])
     revision = hashlib.sha256(
         json.dumps(routes, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -163,6 +171,11 @@ def create_app(config_path=None, query_factory=None):
             or schema.get("Method") != support["method"]
         ):
             raise ValueError(f"Unsupported {name} filesystem API schema")
+        unknown_page_defaults = (
+            support.get("page_parameter_defaults", {}).keys() - schema["Params"].keys()
+        )
+        if unknown_page_defaults:
+            raise ValueError(f"Unsupported {name} page parameter defaults")
 
     for key in ("timeout_seconds", "max_upload_bytes", "max_result_bytes"):
         if not isinstance(settings[key], (int, float)) or settings[key] <= 0:
@@ -180,6 +193,10 @@ def create_app(config_path=None, query_factory=None):
 
     service_root = Path(__file__).resolve().parent
     page_style = (service_root / "static/style.css").read_text()
+    readme_html = markdown(
+        (service_root / "README.md").read_text(),
+        extensions=("fenced_code", "tables"),
+    )
     page_scripts = {
         name: (service_root / "static" / support["script"]).read_text()
         for name, support in SUPPORTED_SCHEMAS.items()
@@ -290,8 +307,16 @@ def create_app(config_path=None, query_factory=None):
         if not resolved_parent.is_relative_to(stage):
             raise ValueError("Upload path escaped the bulk input directory")
 
-        incoming = stage / ".incoming"
-        incoming.mkdir(exist_ok=True)
+        incoming = stage.parent / f"{BULK_UPLOAD_TEMPORARY_PREFIX}{upload_id}"
+        try:
+            incoming.mkdir(mode=0o700)
+        except FileExistsError:
+            pass
+        incoming_info = incoming.lstat()
+        if (not stat.S_ISDIR(incoming_info.st_mode)
+                or incoming_info.st_uid != os.geteuid()
+                or incoming.resolve(strict=True).parent != stage.parent):
+            raise ValueError("Bulk upload temporary directory is unsafe")
         temporary = incoming / uuid4().hex
         written = 0
         try:
@@ -319,6 +344,8 @@ def create_app(config_path=None, query_factory=None):
     def bulk_finish(schema):
         upload_id = request.args.get("upload_id", "")
         paths_for_request = bulk_request_paths(schema, upload_id)
+        stage = paths_for_request["input"].resolve(strict=True)
+        incoming = stage.parent / f"{BULK_UPLOAD_TEMPORARY_PREFIX}{upload_id}"
         with ThreadPoolExecutor(max_workers=1) as pool:
             events_future = pool.submit(
                 APIQueryInterruptible.read_fifo,
@@ -354,6 +381,17 @@ def create_app(config_path=None, query_factory=None):
             raise InvalidAPIResult("Bulk filesystem API returned invalid JSON") from exc
         if not isinstance(result, dict):
             raise InvalidAPIResult("Bulk filesystem API returned a non-object result")
+        try:
+            incoming.rmdir()
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            if exc.errno != errno.ENOTEMPTY:
+                app.logger.warning(
+                    "Could not remove bulk upload temporary directory %s: %s",
+                    incoming,
+                    exc,
+                )
         return jsonify(result=result, events=events), 502 if result_failed(result) else 200
 
     @app.before_request
@@ -398,19 +436,37 @@ def create_app(config_path=None, query_factory=None):
         ready = all(make_query(schema).is_valid() for schema in schemas.values())
         return jsonify(ready=ready), 200 if ready else 503
 
+    @app.route(HELP_PATH, methods=["GET"], strict_slashes=False)
+    def help_page():
+        navigation = [
+            {"path": paths[name], "label": support["navigation_label"]}
+            for name, support in SUPPORTED_SCHEMAS.items()
+        ]
+        return render_template(
+            "help.html",
+            main_menu_path=main_menu_path,
+            navigation=navigation,
+            csp_nonce=g.csp_nonce,
+            page_style=page_style,
+            readme_html=readme_html,
+        )
+
     def render_page(name, schema):
+        support = SUPPORTED_SCHEMAS[name]
+        request_parameters = dict(schema["Params"])
+        request_parameters.update(support.get("page_parameter_defaults", {}))
         navigation = [
             {"path": paths[other_name], "label": support["navigation_label"]}
             for other_name, support in SUPPORTED_SCHEMAS.items()
             if other_name != name
         ]
         hidden_parameters = (
-            {"SESSION_ID"} if SUPPORTED_SCHEMAS[name].get("bulk_upload")
+            {"SESSION_ID"} if support.get("bulk_upload")
             else TRANSPORT_PARAMETERS
         )
         page_parameters = {
             parameter: default
-            for parameter, default in schema["Params"].items()
+            for parameter, default in request_parameters.items()
             if parameter not in hidden_parameters
         }
         concurrency_parameter = next(
@@ -424,12 +480,13 @@ def create_app(config_path=None, query_factory=None):
         return render_template(
             SUPPORTED_SCHEMAS[name]["template"],
             main_menu_path=main_menu_path,
+            help_path=HELP_PATH,
             navigation=navigation,
             csp_nonce=g.csp_nonce,
             page_style=page_style,
             page_script=page_scripts[name],
             request_method=schema["Method"],
-            request_parameters=schema["Params"],
+            request_parameters=request_parameters,
             page_parameters=page_parameters,
             concurrency_parameter=concurrency_parameter,
             default_prompt=display_default(schema["Params"]),

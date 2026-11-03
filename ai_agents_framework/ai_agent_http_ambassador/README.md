@@ -30,6 +30,7 @@ loaded schemas rather than a second hardcoded API contract.
 | PATCH | Same bulk path | Seal the upload, drain events, and return the final RAG result |
 | GET | `/.well-known/http-api-routes/v1` | Route-discovery document |
 | GET | `/healthz` | Check the supported queries' exec and result FIFOs |
+| GET | `/help` | Render this container-local README as an HTML help page |
 
 Trailing slashes are accepted. Pages can render while the agent is starting;
 actions return 503 when their filesystem query is unavailable. Health checks
@@ -47,15 +48,197 @@ The bulk page accumulates repeated file and folder selections, preserves each
 browser-provided relative path, and uploads files concurrently. Its collapsed
 settings are generated from the bulk schema and include metadata, RAG worker
 count, directory-event allow/skip expressions, and deferred lifecycle timeouts
-with their schema defaults. The browser starts `rag_bulk_add` before transferring bytes. Each
-HTTP `PUT` writes to a private `.incoming` name, synchronizes it, and publishes
-the final path atomically. After all transfers, `PATCH` seals the underlying
+with page defaults. The page presents `WaitQueryUpdateTimeoutSec` as 60 seconds
+unless the user edits it. The browser starts `rag_bulk_add` before transferring
+bytes. Each
+HTTP `PUT` writes to a private, session-specific directory beside the watched
+staging tree, synchronizes the file, and publishes the final path atomically.
+After all transfers, `PATCH` seals the underlying
 `streaming_directory_events` request, drains the RAG event FIFO, and reads the
 authoritative asynchronous result.
 
 CSS and JavaScript are embedded in each response under a per-request content
 security policy nonce. All pages link back to the generic REST API menu through
-the configured `MAIN_MENU_PATH`.
+the configured `MAIN_MENU_PATH` and link to the rendered ambassador README at
+`/help`.
+
+## RAG bulk-add flow
+
+The central idea is that the ambassador, RAG agent, and file uploader all mount
+the same `/api` volume. The ambassador writes completed files into shared
+staging, the file uploader observes that staging directory, and
+`rag_bulk_add` consumes the uploader's events and invokes `rag_add` for each
+file.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Ambassador
+    participant Bulk as rag_bulk_add
+    participant Uploader as streaming_directory_events
+    participant Stage as /api/.staging
+    participant Add as rag_add
+
+    Browser->>Ambassador: POST bulk settings
+    Ambassador->>Bulk: Start filesystem API request
+    Bulk->>Uploader: Start directory-events request
+    Uploader->>Stage: Create watched staging directory
+    Bulk-->>Ambassador: Readiness report and upload_id
+
+    par Multiple HTTP uploads
+        Browser->>Ambassador: PUT file bytes and relative path
+        Ambassador->>Stage: Write temporary file outside watched directory
+        Ambassador->>Stage: Atomically publish final path
+    end
+
+    Uploader->>Stage: Scan watched directory
+    Uploader-->>Bulk: ready event for each stable file
+    Bulk->>Add: rag_add with URI, metadata, and document type
+    Add-->>Bulk: Per-file result
+
+    Browser->>Ambassador: PATCH finalize
+    Ambassador->>Uploader: Write seal message
+    Uploader-->>Bulk: Remaining events and termination
+    Bulk-->>Ambassador: Statistics, added list, and failed list
+    Ambassador-->>Browser: Final JSON result
+```
+
+### 1. The browser starts the bulk request
+
+The page accumulates selected files in a map keyed by their relative paths.
+Folder selection uses the browser-provided relative path, so a file can retain a
+name such as `project/docs/readme.md`. Empty directories are not transferred
+because browsers expose the files contained in a selected directory.
+
+Before sending file content, the browser sends a JSON `POST` to the schema
+path for `rag_bulk_add`. The body contains the page settings: metadata, RAG
+worker count, file and directory filters, and deferred-query timeouts.
+
+The page presents `WaitQueryUpdateTimeoutSec` as 60 seconds by default. The
+browser sends the value currently shown in the field, so an edited value is
+preserved. The ambassador does not override a caller-provided value.
+
+### 2. The ambassador starts the deferred RAG request
+
+The ambassador creates an `APIQueryInterruptible` from the loaded
+`rag_bulk_add` schema, adds an internal session identifier, serializes the
+submitted values, writes the command to the filesystem API's `exec` FIFO, and
+waits for the session-specific readiness result.
+
+The deferred launcher allocates a request directory below the
+`rag_bulk_add/POST` API directory. This first result is a readiness handshake;
+the bulk processor continues asynchronously after that handshake is returned.
+
+### 3. RAG starts directory observation
+
+During preparation, `rag_bulk_add` starts a nested
+`streaming_directory_events` request and forwards the file filters, directory
+filters, and deferred-query timeout values. The file uploader creates its own
+deferred request and a shared staging directory resembling:
+
+```text
+/api/.staging/events-<uploader-session>-<request-id>/
+```
+
+The uploader request contains:
+
+- an `input` symbolic link to that staging directory;
+- an `events` FIFO carrying file-readiness records;
+- a `seal` FIFO used to announce that the producer is finished; and
+- an `async_result` FIFO for the uploader's final summary.
+
+The RAG bulk request creates its own `input` symbolic link to the same
+canonical staging directory and its own `events` FIFO for RAG outcomes.
+Consequently, there are two distinct event streams:
+
+- uploader events mean that a staged file is complete and ready;
+- RAG bulk events mean that a file was added or failed during ingestion.
+
+The readiness report returns through the filesystem API to the ambassador. The
+ambassador derives the deferred request identifier and returns it to the browser
+as `upload_id`.
+
+### 4. The browser transfers files in parallel
+
+The browser runs a bounded group of upload workers. Each worker sends one
+`application/octet-stream` `PUT` containing the raw bytes for one file. The
+request query contains the `upload_id` and the file's relative path. This is
+not a multipart upload.
+
+### 5. The ambassador publishes each file atomically
+
+For each `PUT`, the ambassador resolves the bulk request's `input` link to
+the uploader's watched staging directory. It validates the relative destination
+and creates any required destination directories.
+
+It does not write an incomplete HTTP body inside the watched tree. It first
+streams the body in 64 KiB chunks into a session-specific sibling directory:
+
+```text
+/api/.staging/.http-ambassador-incoming-<upload-id>/<random-id>
+```
+
+After flushing and synchronizing the temporary file, the ambassador creates the
+final destination with a hard link and removes the temporary name. The final
+pathname therefore appears in one filesystem operation instead of growing while
+the HTTP request is still arriving. The temporary directory is outside the
+uploader's watched session tree, so it needs no special file-uploader filter.
+
+### 6. The file uploader discovers stable files
+
+The file uploader periodically scans only its session's staging directory. It
+applies the configured file and directory allow/skip expressions, validates
+regular files and safe relative paths, and enforces depth, file-count, and
+total-size limits.
+
+A file becomes ready only after its device, inode, size, and modification time
+remain unchanged across scans. The uploader journals a sequence-numbered
+`ready` event and writes JSON-Line event batches to its `events` FIFO.
+Because all three services share the `/api` volume, no network copy or direct
+notification from the ambassador is required for discovery.
+
+### 7. RAG processes readiness events
+
+The `rag_bulk_add` processor reads the uploader's JSON-Line event stream.
+Every `ready` event is assigned to one of the configured RAG workers. The
+worker invokes the ordinary `rag_add` filesystem query with:
+
+- the staged file path as `-URI`;
+- caller metadata augmented with every component of the relative path; and
+- a document type derived from the filename extension.
+
+`rag_add` reads the file directly from shared staging. The content is not
+copied through the file-uploader service or embedded into the nested query.
+Each worker publishes an `added` or `failed` RAG outcome. A per-file failure
+is recorded without stopping other workers.
+
+### 8. The browser finalizes the request
+
+After every HTTP `PUT` has settled, the browser sends `PATCH` with the
+`upload_id`. The ambassador begins reading the RAG bulk event FIFO, writes a
+non-empty message to the underlying uploader's `seal` FIFO, and reads the RAG
+bulk `async_result` FIFO.
+
+The explicit seal prevents normal uploads from waiting for the full inactivity
+timeout. The uploader performs one final reconciliation scan, sends remaining
+readiness events and a terminal event, and closes its event stream.
+`rag_bulk_add` then drains its worker queues, emits its own terminal event, and
+produces the authoritative statistics plus the added and failed lists.
+
+Per-file failures remain in the statistics and do not make the complete bulk
+request fail. A nonzero top-level `error_code` represents a request-level
+failure.
+
+### 9. Cleanup and retained staging
+
+The ambassador returns the final result and collected progress events to the
+browser, then removes its empty session-specific temporary directory. Deferred
+request directories, FIFOs, symbolic links, and journals are cleaned according
+to their result-consumption lifetimes.
+
+The file uploader does not copy these files to `/uploads`. Shared staged files
+remain below `/api/.staging`; deferred cleanup removes the request-local input
+link without following it into shared staging.
 
 ## Request and result behavior
 
@@ -111,9 +294,10 @@ The HTTP API gateway provider order is:
 
 1. `rest-api`, the generic catch-all provider;
 2. `ai-agent-http-ambassador`, which advertises the three schema-derived
-   action paths and therefore owns those overlaps.
+   action paths plus `/help`, and therefore owns those routes.
 
-Unadvertised paths continue to fall back to `rest-api`.
+Other unadvertised paths continue to fall back to `rest-api`. `/healthz`
+remains an ambassador-local readiness endpoint and is not advertised.
 
 ## Run
 

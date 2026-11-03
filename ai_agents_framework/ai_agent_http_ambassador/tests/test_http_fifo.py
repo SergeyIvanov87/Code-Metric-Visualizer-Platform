@@ -12,7 +12,12 @@ import time
 
 import pytest
 
-from server import SUPPORTED_SCHEMAS, create_app, load_schemas
+from server import (
+    BULK_UPLOAD_TEMPORARY_PREFIX,
+    SUPPORTED_SCHEMAS,
+    create_app,
+    load_schemas,
+)
 
 
 def path(filesystem_api, name):
@@ -113,8 +118,10 @@ def test_schema_driven_pages_load(app, filesystem_api):
     page = client.get(path(filesystem_api, "chat") + "/")
     assert page.status_code == 200
     main_menu_link = b'<a href="/api.pmccabe_collector.restapi.org">Return to the main menu</a>'
+    help_link = b'<a href="/help">Ambassador help</a>'
     upload_link = f'<a href="{path(filesystem_api, "rag_add")}">Add a document to the knowledge base</a>'.encode()
-    assert page.data.index(main_menu_link) < page.data.index(upload_link)
+    assert page.data.index(main_menu_link) < page.data.index(help_link)
+    assert page.data.index(help_link) < page.data.index(upload_link)
     assert b"You are a knowledge-base assistant." in page.data
     assert b"const requestParameters =" in page.data
     for parameter in filesystem_api[1]["chat"]["Params"]:
@@ -129,6 +136,11 @@ def test_schema_driven_pages_load(app, filesystem_api):
     assert upload_page.data.index(main_menu_link) < upload_page.data.index(chat_link)
     assert document_parameter(filesystem_api).encode() in upload_page.data
     assert b"application/json" in upload_page.data
+
+    help_page = client.get("/help/")
+    assert help_page.status_code == 200
+    assert b"<h2>RAG bulk-add flow</h2>" in help_page.data
+    assert b"The central idea is that the ambassador" in help_page.data
     assert client.get("/healthz").json == {"ready": True}
 
 
@@ -145,15 +157,16 @@ def test_discovery_endpoint_lists_schema_paths(app, filesystem_api):
     assert response.status_code == 200
     assert response.json["schema_version"] == 1
     assert response.json["revision"].startswith("sha256:")
+    expected = [
+        {
+            "path": "/" + schema["Query"],
+            "timeout_seconds": 40,
+        }
+        for schema in filesystem_api[1].values()
+    ]
+    expected.append({"path": "/help", "timeout_seconds": 40})
     assert response.json["routes"] == sorted(
-        [
-            {
-                "path": "/" + schema["Query"],
-                "timeout_seconds": 40,
-            }
-            for schema in filesystem_api[1].values()
-        ],
-        key=lambda route: route["path"],
+        expected, key=lambda route: route["path"]
     )
 
 
@@ -406,6 +419,9 @@ def test_bulk_page_has_multi_file_folder_and_collapsed_schema_settings(
         for name, default in filesystem_api[1][schema_name]["Params"].items()
         if name != "SESSION_ID"
     }
+    visible_parameters.update(
+        SUPPORTED_SCHEMAS[schema_name].get("page_parameter_defaults", {})
+    )
     for name, default in visible_parameters.items():
         assert f'data-parameter="{name}"'.encode() in response.data
         assert f'value="{default}"'.encode() in response.data
@@ -417,7 +433,7 @@ def test_bulk_page_has_multi_file_folder_and_collapsed_schema_settings(
 
 
 def test_bulk_upload_starts_query_forwards_settings_and_publishes_files_in_parallel(
-    filesystem_api
+    filesystem_api, monkeypatch
 ):
     schema, request_directory, _uploader_request, report = bulk_session(filesystem_api)
 
@@ -444,17 +460,35 @@ def test_bulk_upload_starts_query_forwards_settings_and_publishes_files_in_paral
         if name != "SESSION_ID"
     }
     settings[next(name for name in settings if name.startswith("-"))] = "team=docs"
+    settings["WaitQueryUpdateTimeoutSec"] = "1"
+    settings["dir_skip_regex"] = "(?!)"
     started = app.test_client().post(url, json=settings)
     assert started.status_code == 200
     assert started.json["upload_id"] == request_directory.name
     for name, value in settings.items():
         assert f'{name}="{value}"' in BulkQuery.commands[-1]
+    assert 'WaitQueryUpdateTimeoutSec="1"' in BulkQuery.commands[-1]
 
     uploads = {
         "one.txt": b"first",
         "folder/two.txt": b"second",
         "folder/deeper/three.md": b"third",
     }
+    stage = (request_directory / "input").resolve()
+    incoming = stage.parent / (
+        f"{BULK_UPLOAD_TEMPORARY_PREFIX}{request_directory.name}"
+    )
+    linked_sources = []
+    real_link = os.link
+
+    def checked_link(source, destination):
+        source = Path(source)
+        assert source.parent == incoming
+        assert not source.is_relative_to(stage)
+        linked_sources.append(source)
+        return real_link(source, destination)
+
+    monkeypatch.setattr(os, "link", checked_link)
 
     def upload(item):
         relative, content = item
@@ -473,7 +507,10 @@ def test_bulk_upload_starts_query_forwards_settings_and_publishes_files_in_paral
     assert all(response.status_code == 200 for response in responses)
     for relative, content in uploads.items():
         assert (request_directory / "input" / relative).read_bytes() == content
-    assert not any((request_directory / "input" / ".incoming").iterdir())
+    assert len(linked_sources) == len(uploads)
+    assert not (stage / ".incoming").exists()
+    assert incoming.is_dir()
+    assert not any(incoming.iterdir())
 
 
 def test_bulk_upload_rejects_path_traversal(filesystem_api):
@@ -551,6 +588,11 @@ def test_bulk_finish_returns_partial_failures_as_successful_statistics(filesyste
     backend = threading.Thread(target=represented_service)
     backend.start()
     app = create_app(filesystem_api[2], BulkQuery)
+    stage = (request_directory / "input").resolve()
+    incoming = stage.parent / (
+        f"{BULK_UPLOAD_TEMPORARY_PREFIX}{request_directory.name}"
+    )
+    incoming.mkdir()
     response = app.test_client().patch(
         "/" + schema["Query"],
         query_string={"upload_id": request_directory.name},
@@ -560,3 +602,4 @@ def test_bulk_finish_returns_partial_failures_as_successful_statistics(filesyste
     assert response.status_code == 200, response.data
     assert response.json["result"] == expected_result
     assert response.json["events"][-1]["status"] == "terminated"
+    assert not incoming.exists()
