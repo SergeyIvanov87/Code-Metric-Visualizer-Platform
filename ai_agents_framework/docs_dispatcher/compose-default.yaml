@@ -4,6 +4,7 @@ services:
       context: ../../
       dockerfile: ./ai_agents_framework/docs_dispatcher/Dockerfile
     environment:
+       DISPATCHER_BACKEND: ${DISPATCHER_BACKEND:-mysql_persistent}
        BE_MYSQL_PASSWORD_FILE: /run/secrets/backend_mysql_db_password
        BE_MYSQL_LOGIN_FILE: /run/secrets/backend_mysql_db_login
        BE_MYSQL_MYSQL_DATABASE: rag_docs_database
@@ -19,6 +20,6 @@ volumes:
     external: true
 secrets:
    backend_mysql_db_login:
-     file: sources/backend/mysql/default_user.txt
+     file: sources/backend/mysql_persistent/access/default_user.txt
    backend_mysql_db_password:
-     file: sources/backend/mysql/default_pwd.txt
+     file: sources/backend/mysql_persistent/access/default_pwd.txt

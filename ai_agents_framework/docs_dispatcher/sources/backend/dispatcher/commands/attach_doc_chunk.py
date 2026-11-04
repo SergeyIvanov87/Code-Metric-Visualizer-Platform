@@ -6,13 +6,11 @@ import json
 import sys
 from pathlib import Path
 
-from mysql.app import crud
-from mysql.app.database import create_engine, create_session, initialize_schema
-from mysql.config import load_mysql_backend_config
-from mysql.doc_storage import operations as doc_storage_operations
-from mysql.doc_storage.fs_entity import StorageRecordEntry
-from mysql.doc_storage.models import StorageRecord
-from mysql.utils import prepare_doc_data
+from dispatcher.runtime import get_backend
+from dispatcher.runtime_config import load_runtime_config
+from interfaces.store import operations as doc_storage_operations
+from interfaces.store.models import StorageRecord
+from interfaces.access.utils import prepare_doc_data
 
 parent_id_for_orphans = 0
 
@@ -32,8 +30,7 @@ def _extract_chunk_bounds(
     parent_storage_record: StorageRecord,
     chunk_data: bytes,
 ) -> tuple[int, int]:
-    parent_doc_path = StorageRecord.canonize_file_uri(storage_uri / str(parent_storage_record.unique_id), parent_storage_record.file_uri)
-    parent_data = parent_doc_path.read_bytes()
+    parent_data = parent_storage_record.entry(storage_uri).read_document(parent_storage_record.file_uri)
     offset = parent_data.find(chunk_data)
     if offset < 0:
         raise ValueError("chunk does not belong to the parent document")
@@ -41,12 +38,12 @@ def _extract_chunk_bounds(
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="Insert document chunk using MYSQL backend")
+    parser = argparse.ArgumentParser(prog="Insert document chunk using selected backend")
     parser.add_argument("doc_id", type=int, help="Parent document id")
     parser.add_argument("-m", "--metadata", type=str, help="chunk metadata")
 
     args = parser.parse_args()
-    backend_config = load_mysql_backend_config()
+    backend_config = load_runtime_config()
 
     error_code = 0
     ret = {}
@@ -54,21 +51,10 @@ def main():
         stdin_stream = getattr(sys.stdin, "buffer", sys.stdin)
         chunk_data = stdin_stream.read()
 
-        login = None
-        password = None
-        engine = None
-        if backend_config.db_uri.find("sqlite:///") == -1:
-            login = backend_config.db_login_secret_path
-            password = backend_config.db_pwd_secret_path
-            engine = create_engine(login, password, backend_config.db_uri)
-        else:
-            engine = create_engine(backend_config.db_uri)
 
-        initialize_schema(engine)
-
-        with create_session(engine) as session:
+        with get_backend().access.open(backend_config) as access:
             # read parent document first
-            parent_db_record = crud.get_file_record(session, args.doc_id)
+            parent_db_record = access.get_file_record(args.doc_id)
             parent_storage_record = doc_storage_operations.get_record(backend_config.storage_uri, args.doc_id)
 
             if parent_db_record is None:
@@ -97,9 +83,7 @@ def main():
             if parent_db_record.size >= 0 and chunk_offset + chunk_size > parent_db_record.size:
                 raise ValueError(f"chunk with offset: {chunk_offset} and size: {chunk_size} does not fit into the parent document of size: {parent_db_record.size}, type: {parent_db_record.doc_type}")
 
-            created_db_record = crud.create_file_record(
-                session,
-                str(parent_db_record.file_path),
+            created_db_record = access.create_file_record(str(parent_db_record.file_path),
                 0,
                 0,
                 parent_id_for_orphans,
@@ -122,12 +106,12 @@ def main():
                 created_db_record.offset = chunk_offset
                 created_db_record.size = chunk_size
                 created_db_record.parent_id = args.doc_id
-                crud.update_file_record_ext(session, created_db_record.id, created_db_record)
+                access.update_file_record_ext(created_db_record.id, created_db_record)
             except Exception:
                 if created_storage_record is not None:
                     doc_storage_operations.delete_record(backend_config.storage_uri, created_storage_record.unique_id)
                 if created_db_record is not None:
-                    crud.delete_file_record(session, created_db_record.id)
+                    access.delete_file_record(created_db_record.id)
                 raise
 
             ret = {"unique_id": created_db_record.id if created_db_record is not None else 0}
