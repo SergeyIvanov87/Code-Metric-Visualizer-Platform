@@ -6,7 +6,7 @@ From the repository root, run:
 ./Dood/persistent_RAG/launch.sh
 ```
 
-Requires Docker Engine, Compose v2 (with `up --wait`), Linux/amd64, and enough disk/RAM for the CPU inference image. The first launch builds the framework images and packages them in the controller. Builds require Internet access. Subsequent launches use the packaged images.
+Requires Docker Engine with BuildKit/buildx (for named build contexts), Compose v2 (with `up --wait`), Linux/amd64, and enough disk/RAM for the CPU inference image. The first launch builds the framework images and packages them in the controller. Builds require Internet access. Subsequent launches use the packaged images.
 
 The only deployment setting is the **Docker named volume for the filesystem API**:
 
@@ -22,9 +22,9 @@ Defaults to `persistent-rag-api`. An existing named volume is reused; otherwise 
 ./Dood/persistent_RAG/launch.sh down
 ```
 
-After building, the minimal deployment is `docker compose -f Dood/persistent_RAG/compose.yaml up -d`. To deploy independently of this repository, transfer the built `persistent-rag/controller:local` image using Docker save/load, plus `compose.yaml`; run `docker compose up -d --no-build`. The controller contains the three application images and internal Compose definition. The source folder alone supports rebuilds when located in this repository.
+After building, the minimal deployment is `docker compose -f Dood/persistent_RAG/compose.yaml up -d`. To deploy independently of this repository, transfer the built `persistent-rag/controller:local` image using Docker save/load, plus `compose.yaml`; run `docker compose up -d --no-build`. The controller contains the application images (including the HTTP services and Envoy) and internal Compose definition. The source folder alone supports rebuilds when located in this repository.
 
-The public Compose file runs the controller and `tecnativa/docker-socket-proxy`. The controller imports its images and creates the sibling containers, their network, and all named storage volumes. The agent waits for Chroma and the dispatcher. The dispatcher uses the existing SQLite backend; no separate MySQL server or credentials are needed. Chroma is explicitly persisted at `/mnt/chroma` and launched without the original password-enabled SSH bootstrap. No service ports or Docker API ports are published. Logs use Docker's default logging driver, so no external syslog stack is required.
+The public Compose file runs the controller and `tecnativa/docker-socket-proxy`. The controller imports its images and creates the sibling containers, their network, and all named storage volumes. The agent waits for Chroma and the dispatcher. The file uploader and HTTP services share the filesystem API; uploaded files and generated gateway configuration use automatically managed named volumes. The gateway controller discovers REST API and ambassador routes before Envoy starts. The ambassador uses its image-bundled configuration, with no host configuration mounts. The dispatcher uses the existing SQLite backend; no separate MySQL server or credentials are needed. Chroma is explicitly persisted at `/mnt/chroma` and launched without the original password-enabled SSH bootstrap. The HTTP gateway is published at port 8080 and REST API at port 5000, matching the reference HTTP streaming stack. Ambassador port 8081 and the Docker API remain internal. Logs use Docker's default logging driver, so no external syslog stack is required.
 
 Application containers cannot join the private control network or access the socket proxy. Only the proxy mounts the host socket. API categories needed for container/image/network/volume lifecycle and POST are enabled; build, exec, auth, secrets, and swarm operations are disabled. This reduces exposed API surface but is not a full security boundary: container creation and image import are powerful host-level permissions, and a read-only socket mount does not make API operations read-only. Treat the controller and proxy as trusted components.
 
@@ -49,3 +49,5 @@ docker compose down --volumes
 These cleanup commands delete test storage. Use a dedicated daemon or fresh volumes for tests: the grounded-chat assertions assume an empty knowledge base. Tests use real embedding/inference models, including first-use downloads, rather than mocks. CI collects controller and sibling logs even on failures. The controller's health check reports readiness after the internal `compose up --wait` succeeds.
 
 CPU/Intel production agent builds select PyTorch from the CPU wheel index before installing sentence-transformers, constrain that wheel during dependency resolution, and disable pip caching. NVIDIA builds retain their existing PyTorch selection. CI verifies the DooD agent contains CPU-only PyTorch, no NVIDIA Python packages, and no root pip cache before exporting the controller.
+
+The HTTP services follow `ai_agents_framework/compose.rag-agent.http.streaming.yaml`, while retaining this package's Docker logging driver rather than its syslog stack. `launch.sh build` packages all service images, including Envoy, so the controller can start the entire stack on another daemon without source mounts.

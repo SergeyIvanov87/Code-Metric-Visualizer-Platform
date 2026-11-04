@@ -13,13 +13,16 @@ check_health() {
         return 1
     fi
     status=$(docker inspect --format '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}missing-healthcheck{{end}}' "$container")
-    if [ "$status" != running/healthy ]; then
+    if [ "$status" != running/healthy ] && ! { [ "${3:-}" = running ] && [ "$status" = running/missing-healthcheck ]; }; then
         echo "Required service $service is $status; refusing to run functional tests" >&2
         docker inspect --format '{{json .State}}' "$container" >&2
         return 1
     fi
 }
 check_health "$HERE/compose-test-functional.yml" rag
-for service in rag-db docs-dispatcher ai-agent; do
+for service in rag-db docs-dispatcher ai-agent rest-api ai-agent-http-ambassador http-api-gateway-controller; do
     check_health "$HERE/../../stack.yaml" "$service"
+done
+for service in file-uploader http-api-gateway; do
+    check_health "$HERE/../../stack.yaml" "$service" running
 done
