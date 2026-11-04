@@ -27,9 +27,14 @@ DEFAULTS = {
     "metadata": "", "WaitInitialQueryTimeoutSec": "60",
     "WaitQueryUpdateTimeoutSec": "10", "WaitResultConsumptionTimeoutSec": "60",
     "SESSION_ID": "default", "workers": "4",
+    "file_allow_regex": ".*", "file_skip_regex": r"(?!)",
+    "dir_allow_regex": ".*",
+    "dir_skip_regex": (
+        r"(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)"
+    ),
 }
 MAX_WORKERS = 32
-EVENT_RETRY_INTERVAL = 0.05
+EVENT_DELIVERY_TIMEOUT = 1
 API_SERVICE_NAME = "api.pmccabe_collector.restapi.org"
 API_QUERY_PATTERNS = {
     "streaming_directory_events": re.compile(
@@ -150,14 +155,17 @@ def add_file_worker(
 
 
 def collect_outcomes(outcome_queue, added, failed, writer):
-    """Publish worker results as they arrive, retrying the current result."""
+    """Record results without letting an absent event reader block completion."""
+    delivery_available = True
     while True:
         outcome = outcome_queue.get()
         if outcome is TERMINATE_COLLECTOR:
             outcome_queue.task_done()
             return
-        while not publish_event(writer, outcome, timeout=EVENT_RETRY_INTERVAL):
-            time.sleep(EVENT_RETRY_INTERVAL)
+        if delivery_available:
+            delivery_available = publish_event(
+                writer, outcome, timeout=EVENT_DELIVERY_TIMEOUT
+            )
         (added if outcome["status"] == "added" else failed).append(outcome)
         outcome_queue.task_done()
 
@@ -245,8 +253,13 @@ def run(options, config, rag_add_queries):
     publish_event(writer, terminal)
     if writer[0] is not None:
         os.close(writer[0])
-    print(json.dumps({"error_code": "0" if not failed else "1",
-                      "timestamp": timestamp, "added": added, "failed": failed},
+    statistics = {
+        "total": len(added) + len(failed),
+        "added": len(added),
+        "failed": len(failed),
+    }
+    print(json.dumps({"error_code": "0", "timestamp": timestamp,
+                      "statistics": statistics, "added": added, "failed": failed},
                      separators=(",", ":")))
     return 0
 

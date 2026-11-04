@@ -5,6 +5,10 @@
     "Params": {
         "-metadata": "",
         "workers": "4",
+        "file_allow_regex": ".*",
+        "file_skip_regex": "(?!)",
+        "dir_allow_regex": ".*",
+        "dir_skip_regex": "(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)",
         "WaitInitialQueryTimeoutSec": "60",
         "WaitQueryUpdateTimeoutSec": "10",
         "WaitResultConsumptionTimeoutSec": "60",
@@ -12,7 +16,7 @@
     },
     "Description": {
         "header": "Stream a directory of documents into RAG",
-        "body": "Returns a deferred request with an input directory link, an events FIFO, and an async_result FIFO. Copy completed files through input. Each successful upload is passed to rag_add and reported through events. Read async_result for the final added and failed file report.",
-        "footer": "Metadata is augmented with every component of each uploaded file path. The request seals after the uploader idle timeout."
+        "body": "Returns a deferred request with an input directory link, an events FIFO, and an async_result FIFO. Copy completed files through input. Each file is passed to rag_add and reported through events. Read async_result for the final added and failed file report. Per-file failures are statistics and do not fail the bulk request; request-level failures still return a nonzero error_code.",
+        "footer": "Metadata is augmented with every component of each uploaded file path. File and directory allow/skip expressions are forwarded to streaming_directory_events. The request seals explicitly or after the uploader idle timeout."
     }
 }

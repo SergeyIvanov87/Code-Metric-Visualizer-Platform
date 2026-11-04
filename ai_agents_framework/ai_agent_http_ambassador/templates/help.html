@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI-agent HTTP ambassador help</title>
+  <style nonce="{{ csp_nonce }}">{{ page_style|safe }}</style>
+</head>
+<body>
+  <main class="help-page">
+    <nav>
+      <a href="{{ main_menu_path }}">Return to the main menu</a>
+      {% for link in navigation %}<a href="{{ link.path }}">{{ link.label }}</a>{% endfor %}
+    </nav>
+    <article class="readme">{{ readme_html|safe }}</article>
+  </main>
+</body>
+</html>

@@ -1,0 +1,17 @@
+FROM python:3.12-alpine
+
+WORKDIR /app
+COPY fs_api_proxy/http_api_gateway/controller.py /app/controller.py
+
+RUN addgroup -g 23456 pmccabe \
+    && adduser -D -H -u 2003 -G pmccabe gateway-controller \
+    && mkdir -p /var/lib/http-api-gateway \
+    && chown -R gateway-controller:pmccabe /var/lib/http-api-gateway /app
+
+USER gateway-controller
+ENV BACKENDS_FOR_FRONTENDS="" \
+    HTTP_API_GATEWAY_CONFIG_DIR=/var/lib/http-api-gateway \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["python", "/app/controller.py"]

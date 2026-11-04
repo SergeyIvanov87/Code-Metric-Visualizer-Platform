@@ -15,6 +15,37 @@ generator = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(generator)
 
 
+def test_binary_uri_returns_structured_failure_instead_of_crashing(tmp_path):
+    binary = tmp_path / "image.png"
+    binary.write_bytes(b"\x89PNG\r\n\x1a\n")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "ai_agents_framework/ai_agent/sources/rag_add.py"),
+            "-URI",
+            str(binary),
+            "-doc_type",
+            "image,png",
+            "/api",
+            "api.pmccabe_collector.restapi.org",
+        ],
+        env={
+            **os.environ,
+            "PYTHONPATH": os.pathsep.join((
+                str(ROOT / "ai_agents_framework/ai_agent/sources"),
+                str(ROOT / "common/modules"),
+            )),
+        },
+        text=True,
+        capture_output=True,
+    )
+    assert completed.returncode != 0
+    assert "Traceback" not in completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["error_code"] == -1
+    assert '"image" document category is unsupported' in result["error_msg"]
+
+
 @pytest.mark.parametrize('metadata', ['', 'team_docs'])
 @pytest.mark.parametrize('override', [None, '', 'test_compose-functional.dev.yaml'])
 def test_generated_add_executor_preserves_argv(tmp_path, metadata, override):

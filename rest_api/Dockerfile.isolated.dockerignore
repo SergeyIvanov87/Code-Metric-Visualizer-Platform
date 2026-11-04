@@ -1,0 +1,21 @@
+# Paths are relative to the rest_api build context.
+# Allow only local COPY inputs; common is supplied as a named context.
+**
+
+!rest_api_server/
+!rest_api_server/**
+!*.sh
+!*.py
+!API/
+!API/**
+
+# Exclude local secrets and generated files within allowed directories.
+**/.env
+**/.env.*
+**/.git
+**/__pycache__
+**/*.pyc
+**/.cache
+**/.config
+**/.chroma
+**/.local

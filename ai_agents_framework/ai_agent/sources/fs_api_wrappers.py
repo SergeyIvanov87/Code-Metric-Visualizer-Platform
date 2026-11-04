@@ -103,12 +103,15 @@ def _execute_json_query(query, session_id, timeout, exec_args, description):
 
 def start_uploader(query, request, config, session_id, timeout=10):
     """Start the streaming-directory uploader through a prepared API handle."""
-    arguments = " ".join((
-        f"SESSION_ID={session_id}",
-        f"WaitInitialQueryTimeoutSec={config['WaitInitialQueryTimeoutSec']}",
-        f"WaitQueryUpdateTimeoutSec={config['WaitQueryUpdateTimeoutSec']}",
-        f"WaitResultConsumptionTimeoutSec={config['WaitResultConsumptionTimeoutSec']}",
-    ))
+    names = (
+        "WaitInitialQueryTimeoutSec", "WaitQueryUpdateTimeoutSec",
+        "WaitResultConsumptionTimeoutSec", "file_allow_regex",
+        "file_skip_regex", "dir_allow_regex", "dir_skip_regex",
+    )
+    arguments = " ".join(
+        [f"SESSION_ID={session_id}"]
+        + [f"{name}={json.dumps(str(config[name]))}" for name in names]
+    )
     report = _execute_json_query(
         query,
         session_id,

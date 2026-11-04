@@ -13,6 +13,8 @@ import pytest
 MODULE_PATH = Path(__file__).parents[1] / "sources/rag_bulk_add.py"
 sys.path.insert(0, str(MODULE_PATH.parent))
 sys.path.insert(0, str(Path(__file__).parents[3] / "common/modules"))
+from doc_type_association import IMAGE_EXTENSIONS
+
 spec = importlib.util.spec_from_file_location("rag_bulk_add", MODULE_PATH)
 rag_bulk_add = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(rag_bulk_add)
@@ -61,6 +63,11 @@ def test_document_type_groups_code_and_semantic_text_types():
     assert rag_bulk_add.document_type("NOTICE") == "txt,document"
 
 
+@pytest.mark.parametrize("extension", sorted(IMAGE_EXTENSIONS))
+def test_document_type_groups_known_image_extensions(extension):
+    assert rag_bulk_add.document_type(f"asset.{extension.upper()}") == f"image,{extension}"
+
+
 def test_augmented_metadata_contains_every_path_component():
     assert rag_bulk_add.augmented_metadata(
         "project=demo", "source/tools/build.py"
@@ -77,7 +84,12 @@ def test_values_accepts_only_bulk_query_parameters(monkeypatch):
     assert parsed["metadata"] == "team=docs"
     assert parsed["SESSION_ID"] == "bulk-1"
     assert parsed["workers"] == "8"
-    assert rag_bulk_add.values([])["workers"] == "4"
+    defaults = rag_bulk_add.values([])
+    assert defaults["workers"] == "4"
+    assert defaults["file_allow_regex"] == ".*"
+    assert defaults["file_skip_regex"] == "(?!)"
+    assert defaults["dir_allow_regex"] == ".*"
+    assert "__pycache__" in defaults["dir_skip_regex"]
 
 
 def test_values_enforces_configured_worker_limit(monkeypatch):
@@ -162,13 +174,62 @@ def test_run_processes_files_in_parallel_and_publishes_as_completed(
     assert published[-1]["failed_count"] == 0
     assert_utc_timestamp(published[-1]["timestamp"])
     assert result["timestamp"] == published[-1]["timestamp"]
+    assert result["error_code"] == "0"
+    assert result["statistics"] == {"total": 4, "added": 4, "failed": 0}
     for outcome in result["added"]:
         assert_utc_timestamp(outcome["timestamp"])
     assert sorted(outcome["sequence"] for outcome in result["added"]) == [1, 2, 3, 4]
     assert result["failed"] == []
 
 
-def test_collect_outcomes_retries_current_event_before_advancing(monkeypatch):
+
+def test_run_finishes_with_failed_file_when_event_reader_is_unavailable(
+    monkeypatch, tmp_path, capsys,
+):
+    request = tmp_path / "request"
+    request.mkdir()
+    source_events = tmp_path / "source-events"
+    source_events.write_text("")
+    (request / "stage.json").write_text(json.dumps({
+        "staging": str(tmp_path / "stage"),
+        "events": str(tmp_path / "result-events"),
+    }))
+    (request / "uploader.json").write_text(json.dumps({
+        "events": str(source_events),
+    }))
+    monkeypatch.setattr(
+        rag_bulk_add,
+        "iter_directory_event_stream",
+        lambda _stream: iter(({"status": "ready", "path": "image.png"},)),
+    )
+    monkeypatch.setattr(
+        rag_bulk_add,
+        "rag_add_file",
+        lambda *_args: {
+            "sequence": 1,
+            "status": "failed",
+            "path": "image.png",
+            "doc_id": "",
+            "rag_result": {
+                "error_code": -1,
+                "error_msg": 'The "image" document category is unsupported',
+            },
+        },
+    )
+    monkeypatch.setattr(rag_bulk_add, "publish_event", lambda *_args, **_kwargs: False)
+    options = type("Options", (), {"request_directory": request})()
+    config = rag_bulk_add.values(["workers", "1"])
+    config["RUN_ID"] = "run-id"
+
+    assert rag_bulk_add.run(options, config, [(object(), "worker-session")]) == 0
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["error_code"] == "0"
+    assert result["statistics"] == {"total": 1, "added": 0, "failed": 1}
+    assert result["added"] == []
+    assert result["failed"][0]["path"] == "image.png"
+
+def test_collect_outcomes_does_not_block_completion_without_event_reader(monkeypatch):
     outcome_queue = rag_bulk_add.Queue()
     outcomes = [
         {"sequence": 2, "status": "added"},
@@ -179,25 +240,20 @@ def test_collect_outcomes_retries_current_event_before_advancing(monkeypatch):
     outcome_queue.put(rag_bulk_add.TERMINATE_COLLECTOR)
     attempts = []
     published = []
-    delays = []
 
     def publish(_writer, event, **_kwargs):
         attempts.append(event["sequence"])
-        if event["sequence"] == 2 and attempts.count(2) < 3:
-            return False
         published.append(event["sequence"])
-        return True
+        return False
 
     monkeypatch.setattr(rag_bulk_add, "publish_event", publish)
-    monkeypatch.setattr(rag_bulk_add.time, "sleep", delays.append)
 
     added, failed = [], []
     rag_bulk_add.collect_outcomes(outcome_queue, added, failed, object())
     outcome_queue.join()
 
-    assert attempts == [2, 2, 2, 1]
-    assert published == [2, 1]
-    assert delays == [rag_bulk_add.EVENT_RETRY_INTERVAL] * 2
+    assert attempts == [2]
+    assert published == [2]
     assert added == [outcomes[0]]
     assert failed == [outcomes[1]]
 
@@ -258,3 +314,20 @@ def test_start_workers_cleans_up_started_threads_after_partial_failure():
     assert workers[0].joined
     assert queues[1].items == []
     assert not workers[1].joined
+
+
+def test_bulk_schema_filter_defaults_match_streaming_directory_events():
+    root = Path(__file__).parents[3]
+    bulk_schema = json.loads(
+        (root / "ai_agents_framework/ai_agent/API/rag_bulk_add.json").read_text()
+    )
+    event_schema = json.loads(
+        (root / "utility/file-uploader/API/streaming_directory_events.json").read_text()
+    )
+    filter_names = (
+        "file_allow_regex", "file_skip_regex",
+        "dir_allow_regex", "dir_skip_regex",
+    )
+    for name in filter_names:
+        assert bulk_schema["Params"][name] == event_schema["Params"][name]
+        assert rag_bulk_add.DEFAULTS[name] == event_schema["Params"][name]

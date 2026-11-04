@@ -1,7 +1,7 @@
-# Test overlay for compose.rag-agent.streaming.yaml.
-# Use the service Compose file first; paths are relative to ai_agents_framework/:
-# docker compose -f ai_agents_framework/compose.rag-agent.streaming.yaml \
-#   -f ai_agents_framework/tests/streaming/compose.agent.rag-agent.streaming.tests.yaml up
+# Test overlay for compose.rag-agent.http.streaming.yaml.
+# The HTTP stack uses the external API volume shared by rest_api, the ambassador,
+# and the agent, so this overlay must not use the private rag-agent-api volume
+# from the non-HTTP streaming test topology.
 services:
   rag-doc-storage-dispatcher:
     depends_on:
@@ -37,6 +37,8 @@ services:
       - api.pmccabe_collector.network
 
   ai-agent-rag-functional-tester:
+    profiles:
+      - functional-test
     build:
       context: ..
       dockerfile: ai_agents_framework/ai_agent/test/Dockerfile
@@ -53,5 +55,4 @@ services:
     networks:
       - api.pmccabe_collector.network
     volumes:
-      - rag-agent-api:/api
-
+      - api.pmccabe_collector.restapi.org:/api

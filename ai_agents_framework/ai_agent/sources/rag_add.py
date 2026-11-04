@@ -9,12 +9,6 @@ import sys
 
 from pathlib import Path
 
-from langchain_chroma import Chroma
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-import chromadb
-from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-
 from fs_api_wrappers import (
     create_api_query_interruptible,
     get_normalized_api_queries,
@@ -24,9 +18,9 @@ from fs_api_wrappers import (
     execute_delete_doc_query,
 )
 
-from embedding_model import get_embedding_model
-
 def split_document(doc_data, doc_type, max_chunk_size, max_chunk_overlap_count):
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
     chunks = []
     if "txt" in doc_type:
         splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
@@ -62,6 +56,11 @@ def main(
     doc_data: str,
     timeout: int,
 ):
+    import chromadb
+    from langchain_chroma import Chroma
+
+    from embedding_model import get_embedding_model
+
     # Break down a doc onto chunks
     embedding_model = get_embedding_model()
 
@@ -240,18 +239,16 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     doc_type = args.doc_type
-    if args.uri is None:
-        document_data_bytes = sys.stdin.read().encode('utf-8')
-        document_data = base64.b64decode(document_data_bytes).decode('utf-8')
-    else:
-        with open(args.uri,'rb') as f:
-            document_data = f.read()
-            document_data=document_data.decode('utf-8')
-
-
     error_code = 0
     return_data = {"error_code": error_code, "error_msg": "success", "doc_id": "", "chunk_ids": []}
     try:
+        if doc_type.split(",", 1)[0] == "image":
+            raise ValueError('The "image" document category is unsupported')
+        if args.uri is None:
+            document_data_bytes = sys.stdin.read().encode("utf-8")
+            document_data = base64.b64decode(document_data_bytes).decode("utf-8")
+        else:
+            document_data = Path(args.uri).read_bytes().decode("utf-8")
         doc_id, chunk_ids = main(
             args.shared_api_dir,
             args.main_service_name,
