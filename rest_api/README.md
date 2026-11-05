@@ -13,7 +13,7 @@ Browser pages live under `/<API domain>/_browse/services/<container>` and `/<API
 
 Each supported filesystem API method has its own template (`query_get.html`, `query_put.html`, and `query_post.html`) extending the shared query form. Text fields contain the defaults recovered from the filesystem argument files, including inherited parameters from parent directories. If a parameter is defined at multiple levels, the default closest to the query wins. `SESSION_ID` remains managed by the server.
 
-Select **Execute query** to send the declared HTTP method with the entered parameters encoded in the query string. The page reports the HTTP status and provides a link to open the returned result, including binary results. JavaScript is required for this execution control. Existing direct API URLs, query-string parameters, the `default` option, and HEAD readiness probes remain available to programmatic clients. A browser GET to a POST-only API URL redirects to its parameter page.
+Select **Execute query** to send the declared HTTP method with the entered parameters encoded in the query string. The page reports the HTTP status and provides a link to open the returned result, including binary results. JavaScript is required for this execution control. Existing direct API URLs, query-string parameters, the `default` option, and HEAD readiness probes remain available to programmatic clients. The `default` option sends no parameter overrides: providers read their own parameter files, preserving quoted defaults across filesystem API calls. A browser GET to a POST-only API URL redirects to its parameter page.
 
 Only the API action paths are published in the HTTP route discovery document; browser pages use the generic REST provider's existing gateway fallback. Provider order and route precedence are unchanged. Multiple methods on one action path are advertised once.
 
@@ -80,10 +80,22 @@ Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), [rrd](..
 
 ### Standalone container functional test
 
+Executable REST tests belong in `tests/functional/service_tester/` and run only
+through the tester Dockerfile's `/tests/init.sh /tests /api` entrypoint. The
+browser checks use the predefined JSON queries under `tests/functional/data/`
+and the existing Compose service at `http://rest-api:5000`. They check grouped
+navigation, parameter fields, execution links, submitted field values, and
+quoted defaults. They do not start an additional Flask application.
+
 From the main repository directory run:
 
 `docker compose -f rest_api/compose-functional.test.yaml build`
 
 and then
 
-`docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit`
+`docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from rest-api-functional-service-tester`
+
+Do not invoke individual Python or JavaScript tests directly. Agent-local
+reproduction must use a temporary Python environment prepared according to the
+tester Dockerfile, then invoke its `init.sh` with the declared arguments. See
+[container test diagnostics](../.agents/skills/container-test-diagnostics/SKILL.md).

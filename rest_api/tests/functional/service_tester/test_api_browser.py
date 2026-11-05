@@ -1,0 +1,99 @@
+"""Check the browser pages served by the Compose rest-api instance."""
+
+from html.parser import HTMLParser
+import json
+from pathlib import Path
+
+import pytest
+import requests
+
+from settings import Settings
+
+
+BASE_URL = "http://rest-api:5000"
+DOMAIN = Settings().domain_name_api_entry
+QUERIES = [json.loads(source.read_text())
+           for source in sorted((Path(Settings().work_dir) / "data").glob("req_*.json"))]
+SERVICES = sorted({query["Query"].split("/")[1] for query in QUERIES})
+
+
+class Page(HTMLParser):
+    def __init__(self, content):
+        super().__init__()
+        self.links = []
+        self.inputs = {}
+        self.form = {}
+        self.execute_link = None
+        self.feed(content)
+
+    def handle_starttag(self, tag, attributes):
+        attributes = dict(attributes)
+        if tag == "a":
+            self.links.append(attributes.get("href", ""))
+            if attributes.get("id") == "execute-query":
+                self.execute_link = attributes["href"]
+        elif tag == "input" and attributes.get("type") == "text":
+            self.inputs[attributes["name"]] = attributes["value"]
+        elif tag == "form":
+            self.form = attributes
+
+
+def page_at(path):
+    response = requests.get(BASE_URL + path, timeout=10)
+    response.raise_for_status()
+    return Page(response.text)
+
+
+def query_pages(service):
+    listing = page_at(f"/{DOMAIN}/_browse/services/{service}")
+    return [page_at(link) for link in sorted(set(listing.links))
+            if "/_browse/queries/" in link]
+
+
+def query_page(query):
+    service = query["Query"].split("/")[1]
+    return next(page for page in query_pages(service)
+                if page.form.get("action") == "/" + query["Query"]
+                and page.form.get("data-method") == query["Method"])
+
+
+def test_portal_lists_service_containers():
+    portal = page_at("/")
+    assert set(portal.links) == {f"/{DOMAIN}/_browse/services/{service}" for service in SERVICES}
+
+
+@pytest.mark.parametrize("service", SERVICES)
+def test_service_links_lead_to_its_api_pages(service):
+    expected = {(query["Method"], "/" + query["Query"]) for query in QUERIES
+                if query["Query"].split("/")[1] == service}
+    assert {(page.form["data-method"], page.form["action"])
+            for page in query_pages(service)} == expected
+
+
+@pytest.mark.parametrize("query", QUERIES, ids=lambda query: query["Method"])
+def test_query_page_has_parameter_fields_and_execution_link(query):
+    page = query_page(query)
+    assert page.inputs == query["Params"]
+    assert page.execute_link == page.form["action"] == "/" + query["Query"]
+    assert page.form["data-method"] == query["Method"]
+
+
+@pytest.mark.parametrize("query", QUERIES, ids=lambda query: query["Method"])
+def test_execute_query_with_edited_field_values(query):
+    page = query_page(query)
+    fields = page.inputs.copy()
+    value = 'edited space &plus+ ä "quoted" \\value'
+    fields["param_1"] = value
+    result = requests.request(page.form["data-method"], BASE_URL + page.execute_link,
+                              params=fields, timeout=30)
+    result.raise_for_status()
+    assert value in result.text
+
+
+@pytest.mark.parametrize("query", QUERIES, ids=lambda query: query["Method"])
+def test_default_preserves_parameter_file_quotes_and_backslashes(query):
+    result = requests.request(query["Method"], BASE_URL + "/" + query["Query"],
+                              params={"default": ""}, timeout=30)
+    result.raise_for_status()
+    for value in query["Params"].values():
+        assert value in result.text

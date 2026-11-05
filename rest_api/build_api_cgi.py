@@ -131,21 +131,20 @@ for service in services.values():
 
 def get_query_params(params):
     return [
-        f"    default_params = {flatten_params(params)!r}",
+        f"    allowed_params = {list(flatten_params(params))!r}",
         '    query_params_str = "SESSION_ID=" + session_id_value',
-        '    for name, default in default_params.items():',
-        '        if "default" in request.args:',
-        '            value = str(default)',
-        '        elif name in request.args:',
-        '            value = request.args[name]',
-        '        else:',
+        '    for name in allowed_params:',
+        # Providers read their own parameter files when no override is sent.
+        # Forwarding defaults would consume their quoting again at each FIFO
+        # hop, corrupting inherited regexes in statistic/view/flamegraph.
+        '        if "default" in request.args or name not in request.args:',
         '            continue',
+        '        value = request.args[name]',
         r'        if any(character in value for character in ("\n", "\r", "\x00")):',
         '            abort(400, description="Parameters must fit in one filesystem request line")',
-        '        if "default" not in request.args:',
         # The filesystem protocol groups with double quotes, not shell quoting.
-        # Keep spaces, literal quotes and backslashes inside one parameter.
-        r'''            value = '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"' ''',
+        # Preserve spaces, literal quotes and backslashes in explicit values.
+        r'''        value = '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"' ''',
         '        query_params_str += f" {name}={value}"',
     ]
 

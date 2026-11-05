@@ -1,7 +1,7 @@
 {
     "Content-Type" : "text/plain",
     "Method" : "PUT",
-    "Query": "api.pmccabe_collector.restapi.org/req_2",
+    "Query": "api.pmccabe_collector.restapi.org/sample_service/req_2",
     "Params": {
         "param_1": "value_1"
     },

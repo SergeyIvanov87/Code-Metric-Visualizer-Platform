@@ -45,18 +45,27 @@ The REST browser groups recovered schemas by the first component after the API
 domain. Its generated pages and method templates are owned by
 `rest_api/build_api_cgi.py` and `rest_api/rest_api_server/rest_api_server/templates`.
 Keep navigation separate from direct API execution and include inherited
-filesystem parameters. The focused browser/handler checks are:
+filesystem parameters. Place REST tests in
+`rest_api/tests/functional/service_tester/` and use the predefined schemas under
+`rest_api/tests/functional/data/`. Check the existing `http://rest-api:5000`
+instance for container links, API links, editable parameters, and execution;
+do not construct another Flask application or test client.
+
+All executable tests must belong to a testing container and run only through
+its Dockerfile and `init.sh`; do not create or run standalone tests in
+`rest_api/tests/` or invoke a test runner directly. Use
+[container test diagnostics](../container-test-diagnostics/SKILL.md) for the
+temporary virtual environment and Dockerfile layout required for agent-local
+reproduction. The REST container entrypoint runs the registered checks:
 
 ```sh
-python -m pytest -q rest_api/tests/test_build_api_cgi.py rest_api/tests/test_api_browser.py
-node rest_api/tests/test_query_form.js
+docker compose -f rest_api/compose-functional.test.yaml config --quiet
+docker compose -f rest_api/compose-functional.test.yaml up --build --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
 ```
 
-From the repository root, the focused deferred transport checks are:
-
-```sh
-python -m pytest -q common/test_deferred_query_executor.py
-```
+Deferred transport regressions must likewise be registered in the owning
+testing container and launched through its `init.sh`, rather than running a
+common Python test file directly.
 
 The container suite covers service creation, API queries, multiple sessions, and graceful shutdown; see [test diagnostics](../container-test-diagnostics/SKILL.md). After stopping a test service, check that request FIFOs and results were removed, including deferred request resources. Persistent shared staging has a different lifetime: see [streaming ingestion](../streaming-ingestion/SKILL.md).
 

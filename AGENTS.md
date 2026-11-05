@@ -35,6 +35,11 @@ when fixing a bug; explain an intentional architectural change when necessary.
 
 ## Working conventions
 
+- Create executable tests only in the owning testing container's source
+  directories and register them through its Dockerfile and `init.sh`. Do not
+  invoke pytest, unittest, or standalone test scripts directly. Follow
+  [container test diagnostics](.agents/skills/container-test-diagnostics/SKILL.md)
+  for Compose execution or an agent's temporary-environment reproduction.
 - Run repository commands from the checkout root unless the selected workflow
   specifies another directory. Inspect Compose build contexts and overlays.
 - Change source schemas and generators for generated filesystem APIs.

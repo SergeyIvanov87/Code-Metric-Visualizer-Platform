@@ -9,24 +9,10 @@ import sys
 from types import SimpleNamespace
 
 
-TEST_DIRECTORY = Path(__file__).resolve().parent
-
-# In repo layout tests/ is under <repo>/rest_api/tests, so parents[1] is repo root.
-# In the functional-test Docker image the tests are copied into /tests and
-# do not have two parents; handle that gracefully.
-try:
-    REPOSITORY_ROOT = TEST_DIRECTORY.parents[1]
-except IndexError:
-    REPOSITORY_ROOT = TEST_DIRECTORY
-
-if (REPOSITORY_ROOT / "rest_api" / "build_api_cgi.py").is_file():
-    BUILD_API_CGI = REPOSITORY_ROOT / "rest_api" / "build_api_cgi.py"
-    COMMON_DIRECTORY = REPOSITORY_ROOT / "common"
-else:
-    # The REST API functional-test image copies this test and the generator
-    # into /tests, while common helpers are inherited under /tests/utils.
-    BUILD_API_CGI = TEST_DIRECTORY / "build_api_cgi.py"
-    COMMON_DIRECTORY = TEST_DIRECTORY / "utils"
+# The tester Dockerfile stages these files; init.sh supplies WORK_DIR.
+TEST_DIRECTORY = Path(os.environ["WORK_DIR"])
+BUILD_API_CGI = TEST_DIRECTORY / "build_api_cgi.py"
+COMMON_DIRECTORY = TEST_DIRECTORY / "utils"
 
 
 def generate_cgi(tmp_path, schemas=None, readme=None):

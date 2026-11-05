@@ -16,9 +16,17 @@ Use the [RAG source map](../../../HowTo/Agent-Repository-Map.md#agentic-rag) to 
 
 ## Focused checks
 
-```sh
-python -m pytest -q ai_agents_framework/ai_agent/tests/test_fs_api_wrappers.py ai_agents_framework/ai_agent/tests/test_rag_sync.py ai_agents_framework/ai_agent/tests/test_rag_delete.py ai_agents_framework/ai_agent/tests/test_inference_config.py
-```
+Executable tests must belong to the owning testing container and be registered
+through its Dockerfile and `init.sh`. Do not create standalone tests in
+service-level test roots or invoke pytest/test scripts directly. Register any
+legacy wrapper, reconciliation, deletion, or inference checks with the owning
+tester before execution. Use the Compose-provided services rather than creating
+an extra web application for HTTP checks.
+
+Follow [container test diagnostics](../container-test-diagnostics/SKILL.md) to
+launch the container entrypoint. For an agent-local reproduction, create a
+temporary Python environment, reproduce dependencies and staging from the
+tester Dockerfile, and execute its `init.sh` with the declared arguments.
 
 ## Architecture references
 

@@ -1,7 +1,7 @@
 {
     "Content-Type" : "text/plain",
     "Method" : "POST",
-    "Query": "api.pmccabe_collector.restapi.org/req_3",
+    "Query": "api.pmccabe_collector.restapi.org/other_service/req_3",
     "Params": {
         "param_1": "value_1"
     },
