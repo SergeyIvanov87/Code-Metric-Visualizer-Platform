@@ -1,0 +1,13 @@
+{
+    "Content-Type": "text/plain",
+    "Method": "GET",
+    "Query": "api.pmccabe_collector.restapi.org/sample_service/req_4",
+    "Params": {
+        "param_1": "\".*\\.\\(hpp\\|cpp\\|c\\|h\\)\""
+    },
+    "Description": {
+        "header": "req_1 header\n",
+        "body": "req_1 body\n",
+        "footer": "req_1 footer"
+    }
+}

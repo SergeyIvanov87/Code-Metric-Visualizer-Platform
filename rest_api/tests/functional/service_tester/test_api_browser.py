@@ -8,13 +8,14 @@ import pytest
 import requests
 
 from settings import Settings
+from api_browser_utils import service_name, service_page_url, query_page_url
 
 
 BASE_URL = "http://rest-api:5000"
 DOMAIN = Settings().domain_name_api_entry
 QUERIES = [json.loads(source.read_text())
            for source in sorted((Path(Settings().work_dir) / "data").glob("req_*.json"))]
-SERVICES = sorted({query["Query"].split("/")[1] for query in QUERIES})
+SERVICES = sorted({service_name(query["Query"], DOMAIN) for query in QUERIES} - {None})
 
 
 class Page(HTMLParser):
@@ -45,27 +46,27 @@ def page_at(path):
 
 
 def query_pages(service):
-    listing = page_at(f"/{DOMAIN}/_browse/services/{service}")
+    listing = page_at(service_page_url(service, DOMAIN))
     return [page_at(link) for link in sorted(set(listing.links))
             if "/_browse/queries/" in link]
 
 
 def query_page(query):
-    service = query["Query"].split("/")[1]
-    return next(page for page in query_pages(service)
-                if page.form.get("action") == "/" + query["Query"]
-                and page.form.get("data-method") == query["Method"])
+    return page_at(query_page_url(query["Query"], query["Method"], DOMAIN))
 
 
 def test_portal_lists_service_containers():
     portal = page_at("/")
-    assert set(portal.links) == {f"/{DOMAIN}/_browse/services/{service}" for service in SERVICES}
+    expected = {service_page_url(service, DOMAIN) for service in SERVICES}
+    expected.update(query_page_url(query["Query"], query["Method"], DOMAIN)
+                    for query in QUERIES if service_name(query["Query"], DOMAIN) is None)
+    assert set(portal.links) == expected
 
 
 @pytest.mark.parametrize("service", SERVICES)
 def test_service_links_lead_to_its_api_pages(service):
     expected = {(query["Method"], "/" + query["Query"]) for query in QUERIES
-                if query["Query"].split("/")[1] == service}
+                if service_name(query["Query"], DOMAIN) == service}
     assert {(page.form["data-method"], page.form["action"])
             for page in query_pages(service)} == expected
 

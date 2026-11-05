@@ -6,7 +6,7 @@ import requests
 import shutil
 import time
 import service_tester_utils
-from urllib.parse import quote
+from api_browser_utils import service_name, service_page_url
 
 from api_schema_utils import deserialize_api_request_from_schema_file
 from settings import Settings
@@ -29,8 +29,7 @@ testdata = [
 def check_if_query_available(domain, query):
     global global_settings
 
-    service_name = query["Query"][len(domain):].strip("/").split("/", 1)[0] or domain
-    url = f'http://rest-api:5000/{domain}/_browse/services/{quote(service_name, safe="")}'
+    url = 'http://rest-api:5000' + service_page_url(service_name(query["Query"], domain), domain)
     headers = {'Accept-Charset': 'UTF-8'}
     resp = requests.get(url, headers=headers)
     if resp.status_code == 404:

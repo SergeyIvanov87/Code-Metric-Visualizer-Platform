@@ -1,7 +1,7 @@
 {% extends "index.html" %}
 {% block title %}{{ query.method }} {{ query.query }}{% endblock %}
 {% block content %}
-<nav><a href="{{ query.service_url }}">{{ query.service_name }} APIs</a></nav>
+<nav><a href="{{ query.service_url }}">{{ query.service_name or "All" }} APIs</a></nav>
 <h1>{{ query.method }} {{ query.query }}</h1>
 {{ documentation_html|safe }}
 {% block method_help %}{% endblock %}

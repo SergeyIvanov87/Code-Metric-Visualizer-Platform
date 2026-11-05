@@ -41,27 +41,10 @@ live availability through the provider's public API in integration tests.
 
 ## Checks
 
-The REST browser groups recovered schemas by the first component after the API
-domain. Its generated pages and method templates are owned by
-`rest_api/build_api_cgi.py` and `rest_api/rest_api_server/rest_api_server/templates`.
-Keep navigation separate from direct API execution and include inherited
-filesystem parameters. Place REST tests in
-`rest_api/tests/functional/service_tester/` and use the predefined schemas under
-`rest_api/tests/functional/data/`. Check the existing `http://rest-api:5000`
-instance for container links, API links, editable parameters, and execution;
-do not construct another Flask application or test client.
-
-All executable tests must belong to a testing container and run only through
-its Dockerfile and `init.sh`; do not create or run standalone tests in
-`rest_api/tests/` or invoke a test runner directly. Use
-[container test diagnostics](../container-test-diagnostics/SKILL.md) for the
-temporary virtual environment and Dockerfile layout required for agent-local
-reproduction. The REST container entrypoint runs the registered checks:
-
-```sh
-docker compose -f rest_api/compose-functional.test.yaml config --quiet
-docker compose -f rest_api/compose-functional.test.yaml up --build --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
-```
+All executable tests belong to their owning testing container and run through
+its Dockerfile and `init.sh`. Follow
+[container test diagnostics](../container-test-diagnostics/SKILL.md) for execution
+and temporary-environment reproduction.
 
 Deferred transport regressions must likewise be registered in the owning
 testing container and launched through its `init.sh`, rather than running a

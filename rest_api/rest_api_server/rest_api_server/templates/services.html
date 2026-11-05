@@ -4,8 +4,9 @@
 <ul>
 {% for service in services %}
   <li><a href="{{ service.url }}">{{ service.name }}</a> ({{ service.queries|length }} queries)</li>
-{% else %}
-  <li>No service APIs discovered.</li>
+{% endfor %}
+{% for query in ungrouped_queries %}
+  <li><a href="{{ query.page_url }}">{{ query.method }} {{ query.query }}</a></li>
 {% endfor %}
 </ul>
 {% endblock %}

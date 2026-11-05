@@ -20,6 +20,7 @@ from urllib.parse import quote
 sys.path.append('modules')
 
 import filesystem_utils
+from api_browser_utils import canonize, request_fields, service_name, service_page_url
 
 from api_schema_utils import compose_api_queries_pipe_names
 from api_schema_utils import deserialize_api_request_from_schema_file
@@ -67,10 +68,6 @@ discovery_document = {
 }
 
 
-def canonize_precedure_call(req_api):
-    return req_api.replace('-','_')
-
-
 def flatten_params(params):
     """Expose inherited defaults; the parameter closest to the query wins."""
     flattened = {}
@@ -85,6 +82,7 @@ def flatten_params(params):
 portal_path = "/" + args.domain_name_api_entry.strip("/")
 browser_path = portal_path + "/_browse"
 services = {}
+ungrouped_queries = []
 browser_queries = {}
 
 # Recovery supplies the collected README alongside the recovered schemas. Keep
@@ -94,13 +92,10 @@ readme_content = readme_path.read_text() if readme_path.exists() else ""
 readme_sections = re.split(r"(?m)(?=^## )", readme_content)
 
 for req_name, request_data, domain_entry_pos in api_requests:
-    query = request_data["Query"][domain_entry_pos:].strip("/")
-    method = request_data["Method"]
-    relative_path = query[len(args.domain_name_api_entry.strip("/")):].strip("/")
-    service_name = relative_path.split("/", 1)[0] or args.domain_name_api_entry
-    service_url = browser_path + "/services/" + quote(service_name, safe="")
-    query_id = hashlib.sha256((method + " " + query).encode("utf-8")).hexdigest()
-    page_url = browser_path + "/queries/" + query_id
+    fields = request_fields(request_data, args.domain_name_api_entry)
+    query, method = fields["query"], fields["method"]
+    page_url = fields["page_url"]
+    query_id = page_url.rsplit("/", 1)[1]
     documentation = ""
     heading = "### " + query + "/" + method
     for section in readme_sections:
@@ -117,12 +112,15 @@ for req_name, request_data, domain_entry_pos in api_requests:
     entry = {
         "name": req_name, "query": query, "method": method,
         "action_url": "/" + query, "page_url": page_url,
-        "service_name": service_name, "service_url": service_url,
+        "service_name": fields["service_name"], "service_url": fields["service_url"],
         "params": flatten_params(request_data["Params"]),
         "documentation": documentation,
     }
     browser_queries[query_id] = entry
-    services.setdefault(service_name, {"name": service_name, "url": service_url, "queries": []})["queries"].append(entry)
+    if fields["service_name"]:
+        services.setdefault(fields["service_name"], {"name": fields["service_name"], "url": fields["service_url"], "queries": []})["queries"].append(entry)
+    else:
+        ungrouped_queries.append(entry)
 
 services = dict(sorted(services.items()))
 for service in services.values():
@@ -149,9 +147,7 @@ def get_query_params(params):
     ]
 
 def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
-    canonize_api_method_name = req_api.replace(os.sep, "_")
-    canonize_api_method_name = canonize_api_method_name.replace('.', '_')
-    canonize_api_method_name = canonize_api_method_name.replace('-', '_')
+    canonize_api_method_name = canonize(req_api)
     # The same path may expose multiple methods without sharing Flask endpoints.
     canonize_api_method_name = req_type.lower() + "_" + canonize_api_method_name
 
@@ -268,11 +264,12 @@ print("")
 
 
 # print the main page
-cgi_main = [ f'BROWSER_SERVICES = {services!r}',
+cgi_main = [ f'BROWSER_UNGROUPED = {ungrouped_queries!r}',
+             f'BROWSER_SERVICES = {services!r}',
              f'BROWSER_QUERIES = {browser_queries!r}',
              f'@app.route({portal_path!r}, methods=["GET"], strict_slashes=False)',
              r'def index():',
-             f'    return render_template("services.html", services=BROWSER_SERVICES.values(), portal_url={portal_path!r})',
+             f'    return render_template("services.html", services=BROWSER_SERVICES.values(), ungrouped_queries=BROWSER_UNGROUPED, portal_url={portal_path!r})',
              '',
              f'@app.route({browser_path + "/services/<service_name>"!r}, methods=["GET"], strict_slashes=False)',
              'def browse_service(service_name):',
@@ -303,22 +300,12 @@ print("")
 
 
 for req_name, request_data, domain_entry_pos in api_requests:
-    req_type = request_data["Method"]
-    req_api = request_data["Query"]
-    req_params = request_data["Params"]
+    fields = request_fields(request_data, args.domain_name_api_entry)
+    req_type, req_api, req_params = fields["method"], fields["query"], fields["params"]
 
     fs_pipes = compose_api_queries_pipe_names(args.filesystem_api_mount_point, request_data)
 
-    # Content-Type is an optional field
-    content_type=""
-    if "Content-Type" in request_data:
-        content_type = request_data["Content-Type"]
-
-    # determine output PIPE name extension base on Content-Type
-    if content_type == "":
-        content_type="text/plain"
-
-    req_api = req_api[domain_entry_pos:]
+    content_type = fields["content_type"]
     cgi_content = generate_cgi_schema(req_api, req_type, fs_pipes, req_params, content_type)
     for l in cgi_content:
         print(l)

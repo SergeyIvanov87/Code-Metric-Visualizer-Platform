@@ -54,13 +54,19 @@ def generate_script_req_3_help():
 def get():
     scripts_generator = {
         "req_1": make_script_req_1,
+        "req_4": make_script_req_1,
         "req_2": make_script_req_2,
-        "req_3": make_script_req_3
+        "req_5": make_script_req_2,
+        "req_3": make_script_req_3,
+        "req_6": make_script_req_3
     }
 
     scripts_help_generator = {
         "req_1": generate_script_req_1_help,
+        "req_4": generate_script_req_1_help,
         "req_2": generate_script_req_2_help,
-        "req_3": generate_script_req_3_help
+        "req_5": generate_script_req_2_help,
+        "req_3": generate_script_req_3_help,
+        "req_6": generate_script_req_3_help
     }
     return scripts_generator, scripts_help_generator

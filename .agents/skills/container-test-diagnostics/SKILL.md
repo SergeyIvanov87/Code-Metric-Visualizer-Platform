@@ -12,7 +12,7 @@ Run commands from the repository root unless a source explicitly states otherwis
 All executable tests belong to testing containers. Add test files only under
 the owning tester's source directories, copy them through its Dockerfile, and
 register execution in its `init.sh`. Do not create executable tests directly in
-service-level test roots such as `rest_api/tests/`, or create a standalone test
+service-level test roots or create a standalone test
 runner. Existing helper modules may remain there.
 
 The Dockerfile and `init.sh` are the only test execution entrypoints. Start the
@@ -30,13 +30,6 @@ Dockerfile ENTRYPOINT. The script discovers and runs registered tests itself;
 do not replace it with a direct test-runner command. Keep service and tester
 identities distinct. If the required service or container setup cannot be
 reproduced, report that prerequisite instead of substituting an in-process app.
-
-For REST, `rest_api/compose-functional.test.yaml` includes the tester layers under
-`rest_api/tests/`. Browser tests live in
-`rest_api/tests/functional/service_tester/`, use the JSON fixtures in
-`rest_api/tests/functional/data/`, and call the existing `http://rest-api:5000`.
-The tester Dockerfile invokes `/tests/init.sh /tests /api`. Its `test_*.py` loop
-registers the checks; no separate browser-test command is needed.
 
 ## Select and run a stack
 
