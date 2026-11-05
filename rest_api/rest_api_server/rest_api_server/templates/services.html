@@ -1,0 +1,11 @@
+{% extends "index.html" %}
+{% block content %}
+<h1>Service APIs</h1>
+<ul>
+{% for service in services %}
+  <li><a href="{{ service.url }}">{{ service.name }}</a> ({{ service.queries|length }} queries)</li>
+{% else %}
+  <li>No service APIs discovered.</li>
+{% endfor %}
+</ul>
+{% endblock %}

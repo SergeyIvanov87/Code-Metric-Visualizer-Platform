@@ -29,19 +29,26 @@ else:
     COMMON_DIRECTORY = TEST_DIRECTORY / "utils"
 
 
-def generate_cgi(tmp_path):
+def generate_cgi(tmp_path, schemas=None, readme=None):
     schema_directory = tmp_path / "schemas"
     schema_directory.mkdir()
-    (schema_directory / "probe.json").write_text(
-        json.dumps(
-            {
+    if schemas is None:
+        schemas = {
+            "probe": {
                 "Content-Type": "text/plain",
                 "Method": "GET",
                 "Query": "api.pmccabe_collector.restapi.org/probe",
                 "Params": {},
-            }
-        )
-    )
+            },
+        }
+    for name, schema in schemas.items():
+        (schema_directory / (name + ".json")).write_text(json.dumps(schema))
+    if readme is not None:
+        (schema_directory / "index.md").write_text(readme)
+    return generate_from_directory(schema_directory)
+
+
+def generate_from_directory(schema_directory):
 
     environment = os.environ.copy()
     python_path = [

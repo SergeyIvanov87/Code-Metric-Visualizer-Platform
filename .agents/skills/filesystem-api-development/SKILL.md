@@ -41,6 +41,17 @@ live availability through the provider's public API in integration tests.
 
 ## Checks
 
+The REST browser groups recovered schemas by the first component after the API
+domain. Its generated pages and method templates are owned by
+`rest_api/build_api_cgi.py` and `rest_api/rest_api_server/rest_api_server/templates`.
+Keep navigation separate from direct API execution and include inherited
+filesystem parameters. The focused browser/handler checks are:
+
+```sh
+python -m pytest -q rest_api/tests/test_build_api_cgi.py rest_api/tests/test_api_browser.py
+node rest_api/tests/test_query_form.js
+```
+
 From the repository root, the focused deferred transport checks are:
 
 ```sh

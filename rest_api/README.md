@@ -7,7 +7,15 @@ It's very important to provide a convenient interface for comfortable use of any
 This image is developed as an `ambassador` service representing the main service and its submodules as an application gateway. This representation encompasses gathering all available pseudo filesystem API PIPEs nodes and unveils them as typical REST queries: **GET**, **POST** etc.
 
 After being started, the container launches a simple WEB-server providing the entry point of REST API communication to the main service and its complementary services as submodules.
-The root URI represents the main index-page comprising all **`*.md`** manual-pages from all registered services which were recognized. Therefore, it's important for service developers to supplement their containers with a holistic API description accompanied by a **README.md** file.
+The root URI redirects to the API landing page, which lists the discovered service containers. A container is identified by the first path component after the API domain prefix (for example, `cyclomatic_complexity` in `api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic`). Select a container to open its API list, then select a query to configure its parameters before execution. Services should publish a **README.md** file with their API documentation; the existing README discovery and restart cycle also rebuilds these pages when APIs appear or disappear.
+
+Browser pages live under `/<API domain>/_browse/services/<container>` and `/<API domain>/_browse/queries/<query ID>`. They do not execute filesystem queries. The service page preserves each query's recovered markdown documentation and replaces the generated immediate-execution links with links to its parameter page. When a collected README is present, only its documented query entries appear in the browser, preserving README-driven publication and withdrawal. Direct action routes continue to follow the discovered FIFOs.
+
+Each supported filesystem API method has its own template (`query_get.html`, `query_put.html`, and `query_post.html`) extending the shared query form. Text fields contain the defaults recovered from the filesystem argument files, including inherited parameters from parent directories. If a parameter is defined at multiple levels, the default closest to the query wins. `SESSION_ID` remains managed by the server.
+
+Select **Execute query** to send the declared HTTP method with the entered parameters encoded in the query string. The page reports the HTTP status and provides a link to open the returned result, including binary results. JavaScript is required for this execution control. Existing direct API URLs, query-string parameters, the `default` option, and HEAD readiness probes remain available to programmatic clients. A browser GET to a POST-only API URL redirects to its parameter page.
+
+Only the API action paths are published in the HTTP route discovery document; browser pages use the generic REST provider's existing gateway fallback. Provider order and route precedence are unchanged. Multiple methods on one action path are advertised once.
 
 Once started, as being said before, the REST-API service searches for all registered services by parsing the filesystem tree using the set of predefined rules:
 

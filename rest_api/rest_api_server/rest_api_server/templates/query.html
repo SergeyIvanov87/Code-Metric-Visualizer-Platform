@@ -1,0 +1,71 @@
+{% extends "index.html" %}
+{% block title %}{{ query.method }} {{ query.query }}{% endblock %}
+{% block content %}
+<nav><a href="{{ query.service_url }}">{{ query.service_name }} APIs</a></nav>
+<h1>{{ query.method }} {{ query.query }}</h1>
+{{ documentation_html|safe }}
+{% block method_help %}{% endblock %}
+<form id="query-form" action="{{ query.action_url }}" data-method="{{ query.method }}">
+{% for name, value in query.params.items() %}
+  <p><label for="param-{{ loop.index }}">{{ name }}</label>
+  <input type="text" id="param-{{ loop.index }}" name="{{ name }}" value="{{ value }}"></p>
+{% else %}
+  <p>This query has no parameters.</p>
+{% endfor %}
+  <button type="submit" hidden>Execute {{ query.method }} query</button>
+  <a id="execute-query" href="{{ query.action_url }}">Execute {{ query.method }} query</a>
+</form>
+<noscript><p>Enable JavaScript to execute this query with its declared HTTP method.</p></noscript>
+<p id="query-status" role="status"></p>
+<a id="query-result" hidden>Open query result</a>
+<pre id="query-error" hidden></pre>
+<script>
+const form = document.getElementById('query-form');
+const executeLink = document.getElementById('execute-query');
+const button = form.querySelector('button');
+let resultUrl;
+function updateExecutionUrl() {
+  const url = new URL(form.action);
+  url.search = new URLSearchParams(new FormData(form)).toString();
+  executeLink.href = url.href;
+  return url;
+}
+form.addEventListener('input', updateExecutionUrl);
+updateExecutionUrl();
+executeLink.addEventListener('click', (event) => {
+  event.preventDefault();
+  if (!button.disabled) form.requestSubmit();
+});
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const status = document.getElementById('query-status');
+  const result = document.getElementById('query-result');
+  const error = document.getElementById('query-error');
+  if (button.disabled) return;
+  const url = updateExecutionUrl();
+  result.hidden = true;
+  error.hidden = true;
+  button.disabled = true;
+  executeLink.setAttribute('aria-disabled', 'true');
+  status.textContent = 'Executing query…';
+  try {
+    const response = await fetch(url, {method: form.dataset.method});
+    status.textContent = `HTTP ${response.status} ${response.statusText}`;
+    if (!response.ok) {
+      error.textContent = await response.text();
+      error.hidden = false;
+      return;
+    }
+    if (resultUrl) URL.revokeObjectURL(resultUrl);
+    resultUrl = URL.createObjectURL(await response.blob());
+    result.href = resultUrl;
+    result.hidden = false;
+  } catch (failure) {
+    status.textContent = `Query failed: ${failure.message}`;
+  } finally {
+    button.disabled = false;
+    executeLink.removeAttribute('aria-disabled');
+  }
+});
+</script>
+{% endblock %}

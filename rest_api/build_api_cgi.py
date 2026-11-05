@@ -12,8 +12,10 @@ from math import log10
 import json
 import os
 import pathlib
+import re
 import sys
 import stat
+from urllib.parse import quote
 
 sys.path.append('modules')
 
@@ -37,7 +39,7 @@ args = parser.parse_args()
 schemas_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, r".*\.json$")
 
 api_requests = []
-for schema_file in schemas_file_list:
+for schema_file in sorted(schemas_file_list):
     req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
     domain_entry_pos = request_data["Query"].find(args.domain_name_api_entry)
     if domain_entry_pos == -1:
@@ -46,10 +48,13 @@ for schema_file in schemas_file_list:
 
 discovery_routes = [
     {
-        "path": "/" + request_data["Query"][domain_entry_pos:].lstrip("/"),
+        "path": path,
         "timeout_seconds": 60,
     }
-    for _, request_data, domain_entry_pos in api_requests
+    for path in sorted({
+        "/" + request_data["Query"][domain_entry_pos:].lstrip("/")
+        for _, request_data, domain_entry_pos in api_requests
+    })
 ]
 discovery_routes.sort(key=lambda route: route["path"])
 discovery_revision = hashlib.sha256(
@@ -65,32 +70,91 @@ discovery_document = {
 def canonize_precedure_call(req_api):
     return req_api.replace('-','_')
 
+
+def flatten_params(params):
+    """Expose inherited defaults; the parameter closest to the query wins."""
+    flattened = {}
+    for value in params.values():
+        if isinstance(value, dict):
+            flattened.update(flatten_params(value))
+    flattened.update({key: value for key, value in params.items()
+                      if not isinstance(value, dict) and key != "SESSION_ID"})
+    return flattened
+
+
+portal_path = "/" + args.domain_name_api_entry.strip("/")
+browser_path = portal_path + "/_browse"
+services = {}
+browser_queries = {}
+
+# Recovery supplies the collected README alongside the recovered schemas. Keep
+# each query's documentation, replacing the old immediate-execution link.
+readme_path = pathlib.Path(args.api_schemas_input_dir) / "index.md"
+readme_content = readme_path.read_text() if readme_path.exists() else ""
+readme_sections = re.split(r"(?m)(?=^## )", readme_content)
+
+for req_name, request_data, domain_entry_pos in api_requests:
+    query = request_data["Query"][domain_entry_pos:].strip("/")
+    method = request_data["Method"]
+    relative_path = query[len(args.domain_name_api_entry.strip("/")):].strip("/")
+    service_name = relative_path.split("/", 1)[0] or args.domain_name_api_entry
+    service_url = browser_path + "/services/" + quote(service_name, safe="")
+    query_id = hashlib.sha256((method + " " + query).encode("utf-8")).hexdigest()
+    page_url = browser_path + "/queries/" + query_id
+    documentation = ""
+    heading = "### " + query + "/" + method
+    for section in readme_sections:
+        if any(line == heading or line.startswith(heading + " ")
+               for line in section.splitlines()):
+            documentation = section.replace(f"[execute](/{query})", f"[configure]({page_url})")
+            break
+    # README publication controls browser visibility, as it did on the original
+    # landing page. A still-live FIFO must not keep a withdrawn entry visible.
+    if readme_path.exists() and not documentation:
+        continue
+    if not documentation:
+        documentation = "\n\n".join(str(value) for value in request_data.get("Description", {}).values())
+    entry = {
+        "name": req_name, "query": query, "method": method,
+        "action_url": "/" + query, "page_url": page_url,
+        "service_name": service_name, "service_url": service_url,
+        "params": flatten_params(request_data["Params"]),
+        "documentation": documentation,
+    }
+    browser_queries[query_id] = entry
+    services.setdefault(service_name, {"name": service_name, "url": service_url, "queries": []})["queries"].append(entry)
+
+services = dict(sorted(services.items()))
+for service in services.values():
+    service["queries"].sort(key=lambda entry: (entry["query"], entry["method"]))
+
+
 def get_query_params(params):
-    #str_keys = (f"'{k}'" for k in params.keys()).join(", ")
-    #str_values = (f"'{v}'" for v in params.values()).join(", ")
-    return [ f"    default_params = {json.dumps(params)}",
-            # rest_api always uses SESSION_ID
-             r'    query_params = {"SESSION_ID": session_id_value}',
-             r'    if "default" in request.args:',
-             r'         for k,v in default_params.items():',
-             r'            if not isinstance(v, dict):',
-             f"                query_params[k]=v",
-             r'    else:',
-             r'        # allow only params from JSON schema ',
-             f"        for k,v in default_params.items():",
-             r'            # pass params from query, if exist',
-             r'            if not isinstance(v, dict) and k in request.args:',
-             f"                query_params[k]=request.args.get(k,v)",
-             f"    query_params_str=''",
-             f"    for k,v in query_params.items():",
-             r'        query_params_str +=f"{k}={v} "',
-             r'    query_params_str=query_params_str.removesuffix(" ")'
+    return [
+        f"    default_params = {flatten_params(params)!r}",
+        '    query_params_str = "SESSION_ID=" + session_id_value',
+        '    for name, default in default_params.items():',
+        '        if "default" in request.args:',
+        '            value = str(default)',
+        '        elif name in request.args:',
+        '            value = request.args[name]',
+        '        else:',
+        '            continue',
+        r'        if any(character in value for character in ("\n", "\r", "\x00")):',
+        '            abort(400, description="Parameters must fit in one filesystem request line")',
+        '        if "default" not in request.args:',
+        # The filesystem protocol groups with double quotes, not shell quoting.
+        # Keep spaces, literal quotes and backslashes inside one parameter.
+        r'''            value = '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"' ''',
+        '        query_params_str += f" {name}={value}"',
     ]
 
 def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
     canonize_api_method_name = req_api.replace(os.sep, "_")
     canonize_api_method_name = canonize_api_method_name.replace('.', '_')
     canonize_api_method_name = canonize_api_method_name.replace('-', '_')
+    # The same path may expose multiple methods without sharing Flask endpoints.
+    canonize_api_method_name = req_type.lower() + "_" + canonize_api_method_name
 
     if len(content_type) != 0:
         response_generator = [
@@ -125,9 +189,16 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
         # For each POST-request we just generate the appropriate GET-request which provides us
         # with a submit HTML form
         methods += ", \"GET\""
-        make_redirect_url =[ r'    if request.method == "GET":',
-                             r'        return f"<form style=\"display: none\" action=\"/{}\" method=\"post\">"+'.format(req_api) + r'"<button type=\"submit\" id=\"button_to_link\"> </button></form><label style=\"text-decoration: underline\" for=\"button_to_link\"> submit {} </label>"'.format(req_api)
-        ]
+        # A real GET operation at this path takes precedence over the POST UI.
+        if any(data["Query"][offset:] == req_api and data["Method"] == "GET"
+               for _, data, offset in api_requests):
+            methods = '"POST"'
+        else:
+            page_id = hashlib.sha256((req_type + " " + req_api).encode("utf-8")).hexdigest()
+            make_redirect_url = [
+                '    if request.method == "GET":',
+                f'        return redirect({browser_path + "/queries/" + page_id!r})',
+            ]
     methods += ", \"HEAD\""
     make_session_id = [      r'    session_id_value = request.method + "_" + socket.gethostname() + "_" + socket.gethostbyaddr(request.remote_addr)[0]']
     make_query = [           r'    api_query_pipe="/{}"'.format(fs_pipes[0]),
@@ -167,10 +238,10 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
     cgi_schema = [ r'@app.route("/{}",  methods=[{}], strict_slashes=False)'.format(req_api, methods),
                    r'def {}():'.format(canonize_api_method_name),
                    r'    global queries_in_progress',
+                   *make_redirect_url,
                    *make_session_id,
                    *make_query,
                    *make_head_probe_check,
-                   *make_redirect_url,
                    *get_query_params(params), r'',
                    r'    queries_in_progress += 1',
                    r'    query.execute(query_params_str)',
@@ -191,19 +262,34 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
 # print the main portal page
 cgi_portal_main = [ r'@app.route("/", methods=["GET"], strict_slashes=False)',
              r'def portal():',
-             r'    return redirect("/api.pmccabe_collector.restapi.org")'
+             f'    return redirect({portal_path!r})'
 ]
 print("\n".join(cgi_portal_main))
 print("")
 
 
 # print the main page
-cgi_main = [ r'@app.route("/api.pmccabe_collector.restapi.org", methods=["GET"], strict_slashes=False)',
+cgi_main = [ f'BROWSER_SERVICES = {services!r}',
+             f'BROWSER_QUERIES = {browser_queries!r}',
+             f'@app.route({portal_path!r}, methods=["GET"], strict_slashes=False)',
              r'def index():',
-             r'    with open("rest_api_server/templates/index.md", "r") as readme_file:',
-             r'        api_description = readme_file.read()',
-             r'        api_description = markdown.markdown(api_description)',
-             r'    return render_template("index.html", content_body=api_description)'
+             f'    return render_template("services.html", services=BROWSER_SERVICES.values(), portal_url={portal_path!r})',
+             '',
+             f'@app.route({browser_path + "/services/<service_name>"!r}, methods=["GET"], strict_slashes=False)',
+             'def browse_service(service_name):',
+             '    service = BROWSER_SERVICES.get(service_name)',
+             '    if service is None:',
+             '        abort(404)',
+             '    queries = [dict(query, documentation_html=markdown.markdown(query["documentation"])) for query in service["queries"]]',
+             f'    return render_template("service.html", service=service, queries=queries, portal_url={portal_path!r})',
+             '',
+             f'@app.route({browser_path + "/queries/<query_id>"!r}, methods=["GET"], strict_slashes=False)',
+             'def browse_query(query_id):',
+             '    query = BROWSER_QUERIES.get(query_id)',
+             '    if query is None:',
+             '        abort(404)',
+             '    template = "query_" + query["method"].lower() + ".html"',
+             '    return render_template(template, query=query, documentation_html=markdown.markdown(query["documentation"]))',
 ]
 print("\n".join(cgi_main))
 print("")

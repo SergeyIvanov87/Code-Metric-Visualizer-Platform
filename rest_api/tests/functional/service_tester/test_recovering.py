@@ -6,6 +6,7 @@ import requests
 import shutil
 import time
 import service_tester_utils
+from urllib.parse import quote
 
 from api_schema_utils import deserialize_api_request_from_schema_file
 from settings import Settings
@@ -17,14 +18,23 @@ from utils import get_api_schema_files
 from make_api_readme import make_api_readme
 
 global_settings = Settings()
-testdata = list(get_api_queries(os.path.join(global_settings.work_dir, "restored_API"), global_settings.domain_name_api_entry).items())
+# portal.json is synthetic tester documentation, not a discovered FIFO query.
+# The portal itself now lists service containers rather than README entries.
+testdata = [
+    (name, query)
+    for name, query in get_api_queries(os.path.join(global_settings.work_dir, "restored_API"), global_settings.domain_name_api_entry).items()
+    if query["Query"] != global_settings.domain_name_api_entry
+]
 
 def check_if_query_available(domain, query):
     global global_settings
 
-    url = 'http://rest-api:5000/' + domain
+    service_name = query["Query"][len(domain):].strip("/").split("/", 1)[0] or domain
+    url = f'http://rest-api:5000/{domain}/_browse/services/{quote(service_name, safe="")}'
     headers = {'Accept-Charset': 'UTF-8'}
     resp = requests.get(url, headers=headers)
+    if resp.status_code == 404:
+        return False
     assert resp.ok
     readme_html_content = str(resp.text)
     return readme_html_content.find(query["Query"]) != -1
