@@ -99,3 +99,49 @@ Do not invoke individual Python or JavaScript tests directly. Agent-local
 reproduction must use a temporary Python environment prepared according to the
 tester Dockerfile, then invoke its `init.sh` with the declared arguments. See
 [container test diagnostics](../.agents/skills/container-test-diagnostics/SKILL.md).
+
+### Optional proxy CA certificate
+
+The Compose configurations accept an optional `PROXY_CA_FILE`: an **absolute
+path** to a PEM CA certificate or CA bundle, readable by the container's service
+user. No environment-specific certificate path is assumed.
+
+Without an additional CA, use the normal commands:
+
+```sh
+docker compose -f rest_api/compose-functional.test.yaml build
+docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
+```
+
+Behind a TLS-inspecting proxy, set the certificate path for both commands:
+
+```sh
+export PROXY_CA_FILE=/absolute/path/to/company-proxy-ca.pem
+docker compose -f rest_api/compose-functional.test.yaml build
+docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
+```
+
+An unset or empty variable selects the checked-in empty PEM file. An explicitly
+provided empty file also adds no trust and needs no special handling. A nonempty
+CA file extends the normal system trust; TLS verification stays enabled. An
+explicitly configured nonexistent file is a configuration error. Only provide
+public CA certificates here, never private keys.
+
+BuildKit mounts the file as the optional `proxy_ca` secret during package
+installation. The combined trust bundle is removed in the same build step, so
+additional certificates do not enter image layers. Direct `docker build` works
+without a secret; optionally pass `--secret id=proxy_ca,src=/path/to/ca.pem`.
+The isolated REST Dockerfile supports the same secret.
+
+Compose also mounts the optional CA in the REST service at runtime. Startup
+creates a temporary combined bundle for Python, Requests, pip/pipx, and curl,
+then removes it on normal shutdown. Missing or empty files leave existing trust
+settings untouched. The production `rest_api/compose.yaml` uses the same option.
+
+Proxy routing remains configured through Docker's standard proxy settings;
+`PROXY_CA_FILE` configures trust, not the proxy address. REST functional services
+append their internal REST hostname and loopback addresses to `NO_PROXY` and
+`no_proxy` so local requests do not go through an outbound proxy. Restart the
+containers after changing the runtime CA. Build secrets do not invalidate the
+Docker build cache; use `build --no-cache` when you need to re-exercise package
+installation with a changed CA.

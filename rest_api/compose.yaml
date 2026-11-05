@@ -3,11 +3,19 @@ services:
     build:
       context: ../
       dockerfile: ./rest_api/Dockerfile
+      secrets:
+        - source: rest_api_proxy_ca
+          target: proxy_ca
+    secrets:
+      - source: rest_api_proxy_ca
+        target: proxy_ca
+    environment:
+      FLASK_RUN_PORT: ${FLASK_RUN_PORT:-5000}
+      FLASK_RUN_HOST: ${FLASK_RUN_HOST:-0.0.0.0}
+      NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1},localhost,127.0.0.1,0.0.0.0,rest-api"
+      no_proxy: "${no_proxy:-${NO_PROXY:-localhost,127.0.0.1}},localhost,127.0.0.1,0.0.0.0,rest-api"
     depends_on:
       - syslog-ng
-    environment:
-      - FLASK_RUN_PORT=${FLASK_RUN_PORT:-5000}
-      - FLASK_RUN_HOST=${FLASK_RUN_HOST:-0.0.0.0}
     hostname: rest-api
     logging:
       driver: syslog
@@ -25,3 +33,7 @@ volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
+
+secrets:
+  rest_api_proxy_ca:
+    file: ${PROXY_CA_FILE:-./empty-proxy-ca.pem}

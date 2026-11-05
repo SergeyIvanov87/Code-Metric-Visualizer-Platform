@@ -38,3 +38,11 @@ docker compose -f rest_api/compose-functional.test.yaml up --build --abort-on-co
 Use the generic [container test diagnostics](../container-test-diagnostics/SKILL.md)
 for environment setup and authoritative tester status. Do not add REST-specific
 execution details to generic filesystem or container skills.
+
+For TLS-inspecting proxies, set `PROXY_CA_FILE` to an absolute path to a readable
+PEM CA file before the normal Compose build/up commands. With no value or an
+empty file, the stack uses system trust. Dockerfiles consume optional BuildKit
+secrets and do not persist the extra CA. Startup combines runtime CA trust in a
+temporary file; `test_proxy_ca.py` checks missing, empty, and supplied files via
+the existing tester entrypoint. Keep this configuration independent of any
+specific development environment.
