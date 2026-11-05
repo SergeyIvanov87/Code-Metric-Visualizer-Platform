@@ -35,6 +35,10 @@ reproduced, report that prerequisite instead of substituting an in-process app.
 
 1. Choose the smallest owning container suite that exercises the changed behavior: common API lifecycle or service functional tests, then cross-service integration when needed. Do not run standalone Python checks outside the registered tester.
 2. Inspect the selected Compose file and included/extended files. Resolve build contexts relative to their defining Compose file and inspect Dockerfile `COPY` sources; many images require the repository root. Use `docker compose -f <selected-file> config --quiet` before a build. This validates configuration, not behavior.
+   With `extends`, redeclare referenced top-level secrets/configs/networks/volumes
+   in the consuming model; service inheritance does not import them. Validate
+   combined CI stacks as well as standalone stacks after adding a resource.
+   For `-f` overlays, resolve relative paths from the first Compose file.
 3. Inspect external volume/network prerequisites and required environment variables. Analysis needs `PROJECT_PATH`; Analytic needs `PROJECT_URL` and `PROJECT_BRANCH`. Do not blindly reproduce CI-wide image/container pruning or remove unrelated resources on a shared machine.
 4. For finite service functional tests, propagate the tester's status using `--abort-on-container-exit --exit-code-from <tester-service>`. The tester name is specific to the Compose model; see the matrix.
 5. For streaming capture, read [its lifecycle documentation](../../../common/images/streaming_test_aggregator/README.md) and `.github/workflows/streaming-test-aggregator.yml`. This is detached orchestration: collect the aggregator status first, and run/collect final validation only after success. `docker wait` prints the container status; its own successful invocation does not mean that status was zero.

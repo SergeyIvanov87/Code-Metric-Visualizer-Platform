@@ -272,6 +272,9 @@ volumes:
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.models.test:
 
 secrets:
+   # extends imports the service references, not its top-level secrets.
+   rest_api_proxy_ca:
+     file: ${PROXY_CA_FILE:-./rest_api/empty-proxy-ca.pem}
    backend_mysql_db_login:
      file: ai_agents_framework/docs_dispatcher/tests/backend_mysql_default_user.txt
    backend_mysql_db_password:

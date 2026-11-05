@@ -56,3 +56,9 @@ services:
       - api.pmccabe_collector.network
     volumes:
       - api.pmccabe_collector.restapi.org:/api
+
+# Paths in this overlay resolve relative to the first Compose file, under
+# ai_agents_framework/. extends does not import the base file's secrets.
+secrets:
+  test_pseudo_fs_proxy_ca:
+    file: ${PROXY_CA_FILE:-../common/images/test_pseudo_fs/empty-proxy-ca.pem}
