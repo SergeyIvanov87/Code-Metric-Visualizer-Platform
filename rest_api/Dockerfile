@@ -10,17 +10,9 @@ ARG WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS=4 WAIT_FOR_API_SERVICE_PR
 ENV WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS=$WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS=$WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS WAIT_FOR_SERVER_STARTING_LIMIT_SEC=$WAIT_FOR_SERVER_STARTING_LIMIT_SEC MY_FLASK_INSTANCE_PIDFILE=$MY_FLASK_INSTANCE_PIDFILE
 
 # install app dependencies
-# Optional extra trust is used only during this RUN, never stored in a layer.
+COPY --chmod=0755 common/proxy_setup_image_helpers/with-proxy-ca.sh /usr/local/bin/with-proxy-ca.sh
 RUN --mount=type=secret,id=proxy_ca,mode=0444 \
-    set -eu; \
-    ca_bundle="$(mktemp)"; \
-    trap 'rm -f "$ca_bundle"' EXIT; \
-    cat /etc/ssl/certs/ca-certificates.crt > "$ca_bundle"; \
-    if [ -s /run/secrets/proxy_ca ]; then \
-        printf '\n' >> "$ca_bundle"; \
-        cat /run/secrets/proxy_ca >> "$ca_bundle"; \
-    fi; \
-    SSL_CERT_FILE="$ca_bundle" apk add --no-cache coreutils python3 dos2unix inotify-tools bash busybox-openrc alpine-conf doas py3-flask py3-markdown pipx curl
+    /usr/local/bin/with-proxy-ca.sh apk add --no-cache coreutils python3 dos2unix inotify-tools bash busybox-openrc alpine-conf doas py3-flask py3-markdown pipx curl
 
 COPY rest_api/rest_api_server /package/rest_api_server
 COPY rest_api/*.sh /package/
@@ -72,4 +64,4 @@ RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :$
     chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
 
 USER ${USER}
-ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api"]
+ENTRYPOINT ["/usr/local/bin/with-proxy-ca.sh", "/package/init.sh", "/package", "/opt", "/api"]

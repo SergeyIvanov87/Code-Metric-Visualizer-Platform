@@ -1,15 +1,13 @@
+include:
+  - ../../proxy_setup_image_helpers/compose-proxy-trust.yaml
+
 services:
   test_pseudo_fs:
     build:
       context: ../../../
       dockerfile: common/images/test_pseudo_fs/Dockerfile
       secrets:
-        - source: test_pseudo_fs_proxy_ca
-          target: proxy_ca
+        - proxy_ca
     image: test_pseudo_fs
     environment:
         - EXIT_ONCE_DONE=${EXIT_ONCE_DONE:-true}
-
-secrets:
-  test_pseudo_fs_proxy_ca:
-    file: ${PROXY_CA_FILE:-./empty-proxy-ca.pem}

@@ -4,8 +4,7 @@ services:
       context: ../../../
       dockerfile: rest_api/tests/integrational/Dockerfile
       secrets:
-        - source: test_pseudo_fs_proxy_ca
-          target: proxy_ca
+        - proxy_ca
       additional_contexts:
         test_pseudo_fs: "service:test_pseudo_fs"
     environment:

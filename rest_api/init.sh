@@ -6,11 +6,6 @@ export PYTHONPATH="${2}:${2}/modules"
 export SHARED_API_DIR=${3}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
-# Extra CA trust is optional and remains in this container's temporary storage.
-REST_PROXY_CA_BUNDLE=""
-source "${WORK_DIR}/proxy_ca.sh"
-configure_proxy_ca || exit 1
-
 # start & activate syslogd
 doas -u root rc-status
 doas -u root touch /run/openrc/softlevel
@@ -52,7 +47,6 @@ count_files_by_name_excluding_paths(){
 termination_handler(){
    echo -e "${BRed}***Stopping${Color_Off}"
    remove_populated_host_ip_file
-   if [ -n "$REST_PROXY_CA_BUNDLE" ]; then rm -f "$REST_PROXY_CA_BUNDLE"; fi
    exit 0
 }
 

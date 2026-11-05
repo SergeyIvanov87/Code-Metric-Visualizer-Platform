@@ -7,11 +7,9 @@ services:
       context: ../
       dockerfile: ./rest_api/Dockerfile
       secrets:
-        - source: rest_api_proxy_ca
-          target: proxy_ca
+        - proxy_ca
     secrets:
-      - source: rest_api_proxy_ca
-        target: proxy_ca
+      - proxy_ca
     environment:
       NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1},localhost,127.0.0.1,0.0.0.0,rest-api"
       no_proxy: "${no_proxy:-${NO_PROXY:-localhost,127.0.0.1}},localhost,127.0.0.1,0.0.0.0,rest-api"
@@ -25,7 +23,3 @@ services:
 
 volumes:
   api.pmccabe_collector.restapi.org.rest-api.test:
-
-secrets:
-  rest_api_proxy_ca:
-    file: ${PROXY_CA_FILE:-./empty-proxy-ca.pem}

@@ -121,20 +121,29 @@ docker compose -f rest_api/compose-functional.test.yaml build
 docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
 ```
 
-An unset or empty variable selects the checked-in empty PEM file. An explicitly
+An unset or empty variable selects the shared empty PEM file in
+`common/proxy_setup_image_helpers/`. An explicitly
 provided empty file also adds no trust and needs no special handling. A nonempty
 CA file extends the normal system trust; TLS verification stays enabled. An
 explicitly configured nonexistent file is a configuration error. Only provide
 public CA certificates here, never private keys.
 
+The shared `common/proxy_setup_image_helpers/compose-proxy-trust.yaml`
+defines one `proxy_ca` secret. Compose entrypoints import it through `include`;
+services explicitly reference it for builds or runtime. `extends` alone does
+not import top-level resources.
+
 BuildKit mounts the file as the optional `proxy_ca` secret during package
-installation. The combined trust bundle is removed in the same build step, so
+installation. The shared `with-proxy-ca.sh` wrapper handles trust setup, command
+execution, exit status, signal forwarding, and cleanup. The combined trust
+bundle is removed in the same build step, so
 additional certificates do not enter image layers. Direct `docker build` works
 without a secret; optionally pass `--secret id=proxy_ca,src=/path/to/ca.pem`.
 The isolated REST Dockerfile supports the same secret.
 
-Compose also mounts the optional CA in the REST service at runtime. Startup
-creates a temporary combined bundle for Python, Requests, pip/pipx, and curl,
+Compose also mounts the optional CA in the REST service at runtime. The REST
+entrypoint uses the same wrapper to
+create a temporary combined bundle for Python, Requests, pip/pipx, and curl,
 then removes it on normal shutdown. Missing or empty files leave existing trust
 settings untouched. The production `rest_api/compose.yaml` uses the same option.
 

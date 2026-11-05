@@ -1,3 +1,6 @@
+include:
+  - ../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
 # Test overlay for compose.rag-agent.http.streaming.yaml.
 # The HTTP stack uses the external API volume shared by rest_api, the ambassador,
 # and the agent, so this overlay must not use the private rag-agent-api volume
@@ -56,9 +59,3 @@ services:
       - api.pmccabe_collector.network
     volumes:
       - api.pmccabe_collector.restapi.org:/api
-
-# Paths in this overlay resolve relative to the first Compose file, under
-# ai_agents_framework/. extends does not import the base file's secrets.
-secrets:
-  test_pseudo_fs_proxy_ca:
-    file: ${PROXY_CA_FILE:-../common/images/test_pseudo_fs/empty-proxy-ca.pem}
