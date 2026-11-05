@@ -12,7 +12,7 @@ ENV WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS=$WAIT_FOR_API_SERVICE_PRO
 # install app dependencies
 COPY --chmod=0755 common/proxy_setup_image_helpers/with-proxy-ca.sh /usr/local/bin/with-proxy-ca.sh
 RUN --mount=type=secret,id=proxy_ca,mode=0444 \
-    /usr/local/bin/with-proxy-ca.sh apk add --no-cache coreutils python3 dos2unix inotify-tools bash busybox-openrc alpine-conf doas py3-flask py3-markdown pipx curl
+    /usr/local/bin/with-proxy-ca.sh apk add --no-cache coreutils python3 dos2unix inotify-tools bash busybox-openrc alpine-conf doas py3-flask py3-markdown curl
 
 COPY rest_api/rest_api_server /package/rest_api_server
 COPY rest_api/*.sh /package/
@@ -64,4 +64,4 @@ RUN mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :$
     chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
 
 USER ${USER}
-ENTRYPOINT ["/usr/local/bin/with-proxy-ca.sh", "/package/init.sh", "/package", "/opt", "/api"]
+ENTRYPOINT ["/package/init.sh", "/package", "/opt", "/api"]

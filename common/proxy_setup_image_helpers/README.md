@@ -23,8 +23,9 @@ RUN --mount=type=secret,id=proxy_ca,mode=0444 \
 
 Derived images inherit the helper but must still mount the secret for each
 network-dependent RUN. The isolated REST image copies the same helper from its
-existing `common` named build context. Runtime services can prefix their
-ENTRYPOINT with `/usr/local/bin/with-proxy-ca.sh`.
+existing `common` named build context. Services that genuinely require outbound TLS at runtime can prefix their
+ENTRYPOINT with `/usr/local/bin/with-proxy-ca.sh`. REST installs dependencies
+during the build and therefore does not use this runtime option.
 
 The helper is compatible with Bash and `/bin/sh`, so it can bootstrap Alpine
 before Bash is installed. It combines the system bundle with a nonempty extra

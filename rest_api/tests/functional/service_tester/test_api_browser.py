@@ -92,9 +92,17 @@ def test_execute_query_with_edited_field_values(query):
 
 
 @pytest.mark.parametrize("query", QUERIES, ids=lambda query: query["Method"])
-def test_default_preserves_parameter_file_quotes_and_backslashes(query):
-    result = requests.request(query["Method"], BASE_URL + "/" + query["Query"],
-                              params={"default": ""}, timeout=30)
+@pytest.mark.parametrize("submission", ["default-option", "unchanged-form"])
+def test_default_preserves_parameter_file_quotes_and_backslashes(query, submission):
+    if submission == "unchanged-form":
+        page = query_page(query)
+        # The rendered fields remain unchanged, so the browser sends no overrides.
+        parameters = {}
+        method, action = page.form["data-method"], page.execute_link
+    else:
+        parameters = {"default": ""}
+        method, action = query["Method"], "/" + query["Query"]
+    result = requests.request(method, BASE_URL + action, params=parameters, timeout=30)
     result.raise_for_status()
     for value in query["Params"].values():
         assert value in result.text

@@ -26,7 +26,11 @@ const button = form.querySelector('button');
 let resultUrl;
 function updateExecutionUrl() {
   const url = new URL(form.action);
-  url.search = new URLSearchParams(new FormData(form)).toString();
+  const parameters = new URLSearchParams();
+  for (const input of form.querySelectorAll('input[name]')) {
+    if (input.value !== input.defaultValue) parameters.append(input.name, input.value);
+  }
+  url.search = parameters.toString();
   executeLink.href = url.href;
   return url;
 }

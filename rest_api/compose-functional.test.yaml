@@ -8,8 +8,6 @@ services:
       dockerfile: ./rest_api/Dockerfile
       secrets:
         - proxy_ca
-    secrets:
-      - proxy_ca
     environment:
       NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1},localhost,127.0.0.1,0.0.0.0,rest-api"
       no_proxy: "${no_proxy:-${NO_PROXY:-localhost,127.0.0.1}},localhost,127.0.0.1,0.0.0.0,rest-api"

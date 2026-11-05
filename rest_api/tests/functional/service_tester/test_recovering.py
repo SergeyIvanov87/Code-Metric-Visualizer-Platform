@@ -5,7 +5,6 @@ import pytest
 import requests
 import shutil
 import time
-import service_tester_utils
 from api_browser_utils import service_name, service_page_url
 
 from api_schema_utils import deserialize_api_request_from_schema_file
@@ -31,12 +30,26 @@ def check_if_query_available(domain, query):
 
     url = 'http://rest-api:5000' + service_page_url(service_name(query["Query"], domain), domain)
     headers = {'Accept-Charset': 'UTF-8'}
-    resp = requests.get(url, headers=headers)
+    resp = requests.get(url, headers=headers, timeout=5)
     if resp.status_code == 404:
         return False
     assert resp.ok
     readme_html_content = str(resp.text)
     return readme_html_content.find(query["Query"]) != -1
+
+
+def wait_for_query_visibility(domain, query, expected, timeout=30):
+    # A fast restart need not be observable by a periodic HEAD probe. Wait for
+    # the published API state, rather than requiring an availability outage.
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if check_if_query_available(domain, query) == expected:
+                return True
+        except requests.RequestException:
+            pass  # A connection failure alone does not establish publication.
+        time.sleep(0.2)
+    return False
 
 
 @pytest.fixture()
@@ -74,25 +87,11 @@ def test_api_queries_lietening(name_query_2_turn_off, query_2_turn_off, all_api_
             break
     assert len(query_to_disable_file)
 
-    stopped, started = service_tester_utils.if_service_reconfigured("rest-api", 5000, 10, 30, 1)
-    assert stopped
-    assert started
-
-    turned_off_query_result = check_if_query_available("api.pmccabe_collector.restapi.org", query_2_turn_off)
-    if turned_off_query_result:
-        print(f"{get_timestamp()}\tService must not serve query anymore: ${name_query_2_turn_off}. Test ${name_query_2_turn_off} failed!")
+    try:
+        assert wait_for_query_visibility(main_service_name, query_2_turn_off, False)
+    finally:
+        # Restore fixtures even if withdrawal fails, so later cases stay isolated.
+        os.remove(initial_readme_file)
         tear_down(initial_readme_file, query_to_disable_file)
-        assert not turned_off_query_result
 
-    # retrieve all disabled queries
-    os.remove(initial_readme_file)
-    tear_down(initial_readme_file, query_to_disable_file)
-
-    stopped, started = service_tester_utils.if_service_reconfigured("rest-api", 5000, 10, 30, 1)
-    assert stopped
-    assert started
-
-    expected_query_result = check_if_query_available("api.pmccabe_collector.restapi.org", query_2_turn_off)
-    if not expected_query_result:
-        print(f"{get_timestamp()}\tService must serve query: ${name_query_2_turn_off} after its retrieval. Test ${name_query_2_turn_off} failed!")
-        assert expected_query_result
+    assert wait_for_query_visibility(main_service_name, query_2_turn_off, True)

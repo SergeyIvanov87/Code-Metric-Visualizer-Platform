@@ -51,22 +51,67 @@ def make_script_req_3(script, desired_file_ext):
 def generate_script_req_3_help():
     return "Help req_3"
 
+def make_script_req_4(script, desired_file_ext):
+    file_extension = "." + desired_file_ext
+
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), r"",
+        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
+        *api_fs_exec_utils.generate_api_node_env_init(), r"",
+        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}"',
+    )
+    script.writelines(line + "\n" for line in body)
+
+def generate_script_req_4_help():
+    return "Help req_4 "
+
+def make_script_req_5(script, desired_file_ext):
+    file_extension = "." + desired_file_ext
+
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), r"",
+        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
+        *api_fs_exec_utils.generate_api_node_env_init(), r"",
+        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}"',
+    )
+    script.writelines(line + "\n" for line in body)
+
+def generate_script_req_5_help():
+    return "Help req_5 "
+
+def make_script_req_6(script, desired_file_ext):
+    file_extension = "." + desired_file_ext
+
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), r"",
+        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
+        *api_fs_exec_utils.generate_api_node_env_init(), r"",
+        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}"',
+    )
+    script.writelines(line + "\n" for line in body)
+
+def generate_script_req_6_help():
+    return "Help req_6 "
+
 def get():
     scripts_generator = {
         "req_1": make_script_req_1,
-        "req_4": make_script_req_1,
+        "req_4": make_script_req_4,
         "req_2": make_script_req_2,
-        "req_5": make_script_req_2,
+        "req_5": make_script_req_5,
         "req_3": make_script_req_3,
-        "req_6": make_script_req_3
+        "req_6": make_script_req_6
     }
 
     scripts_help_generator = {
         "req_1": generate_script_req_1_help,
-        "req_4": generate_script_req_1_help,
+        "req_4": generate_script_req_4_help,
         "req_2": generate_script_req_2_help,
-        "req_5": generate_script_req_2_help,
+        "req_5": generate_script_req_5_help,
         "req_3": generate_script_req_3_help,
-        "req_6": generate_script_req_3_help
+        "req_6": generate_script_req_6_help
     }
     return scripts_generator, scripts_help_generator

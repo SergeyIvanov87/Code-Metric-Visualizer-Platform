@@ -9,7 +9,10 @@ import sys
 from types import SimpleNamespace
 
 
-# The tester Dockerfile stages these files; init.sh supplies WORK_DIR.
+# The tester Dockerfile stages these paths; init.sh supplies WORK_DIR.
+# BUILD_API_CGI is invoked by generate_from_directory. COMMON_DIRECTORY and its
+# modules child form that subprocess's PYTHONPATH. TEST_DIRECTORY anchors both
+# to the actual staged directory, rather than the source checkout.
 TEST_DIRECTORY = Path(os.environ["WORK_DIR"])
 BUILD_API_CGI = TEST_DIRECTORY / "build_api_cgi.py"
 COMMON_DIRECTORY = TEST_DIRECTORY / "utils"

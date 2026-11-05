@@ -13,7 +13,7 @@ Browser pages live under `/<API domain>/_browse/services/<container>` and `/<API
 
 Each supported filesystem API method has its own template (`query_get.html`, `query_put.html`, and `query_post.html`) extending the shared query form. Text fields contain the defaults recovered from the filesystem argument files, including inherited parameters from parent directories. If a parameter is defined at multiple levels, the default closest to the query wins. `SESSION_ID` remains managed by the server.
 
-Select **Execute query** to send the declared HTTP method with the entered parameters encoded in the query string. The page reports the HTTP status and provides a link to open the returned result, including binary results. JavaScript is required for this execution control. Existing direct API URLs, query-string parameters, the `default` option, and HEAD readiness probes remain available to programmatic clients. The `default` option sends no parameter overrides: providers read their own parameter files, preserving quoted defaults across filesystem API calls. A browser GET to a POST-only API URL redirects to its parameter page.
+Select **Execute query** to send the declared HTTP method with only edited parameters encoded in the query string. Unchanged fields are omitted so providers retain their own defaults, including inherited quotes and backslashes. The page reports the HTTP status and provides a link to open the returned result, including binary results. JavaScript is required for this execution control. Existing direct API URLs, query-string parameters, the `default` option, and HEAD readiness probes remain available to programmatic clients. The `default` option sends no parameter overrides: providers read their own parameter files, preserving quoted defaults across filesystem API calls. A browser GET to a POST-only API URL redirects to its parameter page.
 
 Only the API action paths are published in the HTTP route discovery document; browser pages use the generic REST provider's existing gateway fallback. Provider order and route precedence are unchanged. Multiple methods on one action path are advertised once.
 
@@ -141,16 +141,14 @@ additional certificates do not enter image layers. Direct `docker build` works
 without a secret; optionally pass `--secret id=proxy_ca,src=/path/to/ca.pem`.
 The isolated REST Dockerfile supports the same secret.
 
-Compose also mounts the optional CA in the REST service at runtime. The REST
-entrypoint uses the same wrapper to
-create a temporary combined bundle for Python, Requests, pip/pipx, and curl,
-then removes it on normal shutdown. Missing or empty files leave existing trust
-settings untouched. The production `rest_api/compose.yaml` uses the same option.
+The REST service needs the CA only while building. Flask and Markdown are
+installed by apk in the image; the watchdog loads generated source directly
+without installing packages or contacting package indexes at startup/restart.
+Consequently, the REST runtime has no proxy CA secret mount or wrapper entrypoint.
 
 Proxy routing remains configured through Docker's standard proxy settings;
 `PROXY_CA_FILE` configures trust, not the proxy address. REST functional services
 append their internal REST hostname and loopback addresses to `NO_PROXY` and
-`no_proxy` so local requests do not go through an outbound proxy. Restart the
-containers after changing the runtime CA. Build secrets do not invalidate the
+`no_proxy` so local requests do not go through an outbound proxy. Build secrets do not invalidate the
 Docker build cache; use `build --no-cache` when you need to re-exercise package
 installation with a changed CA.

@@ -6,8 +6,8 @@
         "param_1": "value_1"
     },
     "Description": {
-        "header": "req_3 header\n",
-        "body": "req_3 body\n",
-        "footer": "req_3 footer"
+        "header": "req_6 header\n",
+        "body": "req_6 body\n",
+        "footer": "req_6 footer"
     }
 }

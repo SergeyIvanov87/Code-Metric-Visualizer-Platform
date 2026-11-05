@@ -6,24 +6,16 @@ Generates `CGI` script for API request serving
 
 import argparse
 from argparse import RawTextHelpFormatter
-import hashlib
-from math import log10
 
-import json
-import os
 import pathlib
-import re
 import sys
-import stat
-from urllib.parse import quote
 
 sys.path.append('modules')
 
-import filesystem_utils
-from api_browser_utils import canonize, request_fields, service_name, service_page_url
+from api_browser_utils import (canonize, request_fields, query_page_url, flatten_params,
+                               load_api_requests, build_discovery_document, build_browser_catalog)
 
 from api_schema_utils import compose_api_queries_pipe_names
-from api_schema_utils import deserialize_api_request_from_schema_file
 from api_schema_utils import file_extension_from_content_type
 
 
@@ -37,94 +29,13 @@ parser.add_argument("filesystem_api_mount_point", help="Path to the shared mount
 parser.add_argument("domain_name_api_entry", help="build API queries processor for that particular domain")
 args = parser.parse_args()
 
-schemas_file_list = filesystem_utils.read_files_from_path(args.api_schemas_input_dir, r".*\.json$")
-
-api_requests = []
-for schema_file in sorted(schemas_file_list):
-    req_name, request_data = deserialize_api_request_from_schema_file(schema_file)
-    domain_entry_pos = request_data["Query"].find(args.domain_name_api_entry)
-    if domain_entry_pos == -1:
-        continue
-    api_requests.append((req_name, request_data, domain_entry_pos))
-
-discovery_routes = [
-    {
-        "path": path,
-        "timeout_seconds": 60,
-    }
-    for path in sorted({
-        "/" + request_data["Query"][domain_entry_pos:].lstrip("/")
-        for _, request_data, domain_entry_pos in api_requests
-    })
-]
-discovery_routes.sort(key=lambda route: route["path"])
-discovery_revision = hashlib.sha256(
-    json.dumps(discovery_routes, sort_keys=True, separators=(",", ":")).encode("utf-8")
-).hexdigest()
-discovery_document = {
-    "schema_version": 1,
-    "revision": "sha256:" + discovery_revision,
-    "routes": discovery_routes,
-}
-
-
-def flatten_params(params):
-    """Expose inherited defaults; the parameter closest to the query wins."""
-    flattened = {}
-    for value in params.values():
-        if isinstance(value, dict):
-            flattened.update(flatten_params(value))
-    flattened.update({key: value for key, value in params.items()
-                      if not isinstance(value, dict) and key != "SESSION_ID"})
-    return flattened
-
-
+api_requests = load_api_requests(args.api_schemas_input_dir, args.domain_name_api_entry)
+discovery_document = build_discovery_document(api_requests, args.domain_name_api_entry)
 portal_path = "/" + args.domain_name_api_entry.strip("/")
 browser_path = portal_path + "/_browse"
-services = {}
-ungrouped_queries = []
-browser_queries = {}
-
-# Recovery supplies the collected README alongside the recovered schemas. Keep
-# each query's documentation, replacing the old immediate-execution link.
-readme_path = pathlib.Path(args.api_schemas_input_dir) / "index.md"
-readme_content = readme_path.read_text() if readme_path.exists() else ""
-readme_sections = re.split(r"(?m)(?=^## )", readme_content)
-
-for req_name, request_data, domain_entry_pos in api_requests:
-    fields = request_fields(request_data, args.domain_name_api_entry)
-    query, method = fields["query"], fields["method"]
-    page_url = fields["page_url"]
-    query_id = page_url.rsplit("/", 1)[1]
-    documentation = ""
-    heading = "### " + query + "/" + method
-    for section in readme_sections:
-        if any(line == heading or line.startswith(heading + " ")
-               for line in section.splitlines()):
-            documentation = section.replace(f"[execute](/{query})", f"[configure]({page_url})")
-            break
-    # README publication controls browser visibility, as it did on the original
-    # landing page. A still-live FIFO must not keep a withdrawn entry visible.
-    if readme_path.exists() and not documentation:
-        continue
-    if not documentation:
-        documentation = "\n\n".join(str(value) for value in request_data.get("Description", {}).values())
-    entry = {
-        "name": req_name, "query": query, "method": method,
-        "action_url": "/" + query, "page_url": page_url,
-        "service_name": fields["service_name"], "service_url": fields["service_url"],
-        "params": flatten_params(request_data["Params"]),
-        "documentation": documentation,
-    }
-    browser_queries[query_id] = entry
-    if fields["service_name"]:
-        services.setdefault(fields["service_name"], {"name": fields["service_name"], "url": fields["service_url"], "queries": []})["queries"].append(entry)
-    else:
-        ungrouped_queries.append(entry)
-
-services = dict(sorted(services.items()))
-for service in services.values():
-    service["queries"].sort(key=lambda entry: (entry["query"], entry["method"]))
+services, ungrouped_queries, browser_queries = build_browser_catalog(
+    api_requests, args.domain_name_api_entry, pathlib.Path(args.api_schemas_input_dir) / "index.md"
+)
 
 
 def get_query_params(params):
@@ -147,9 +58,7 @@ def get_query_params(params):
     ]
 
 def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
-    canonize_api_method_name = canonize(req_api)
-    # The same path may expose multiple methods without sharing Flask endpoints.
-    canonize_api_method_name = req_type.lower() + "_" + canonize_api_method_name
+    canonize_api_method_name = canonize(req_api, req_type)
 
     if len(content_type) != 0:
         response_generator = [
@@ -185,14 +94,14 @@ def generate_cgi_schema(req_api, req_type, fs_pipes, params, content_type):
         # with a submit HTML form
         methods += ", \"GET\""
         # A real GET operation at this path takes precedence over the POST UI.
-        if any(data["Query"][offset:] == req_api and data["Method"] == "GET"
-               for _, data, offset in api_requests):
+        if any(request_fields(data, args.domain_name_api_entry)["query"] == req_api and data["Method"] == "GET"
+               for _, data in api_requests):
             methods = '"POST"'
         else:
-            page_id = hashlib.sha256((req_type + " " + req_api).encode("utf-8")).hexdigest()
+            page_url = query_page_url(req_api, req_type, args.domain_name_api_entry)
             make_redirect_url = [
                 '    if request.method == "GET":',
-                f'        return redirect({browser_path + "/queries/" + page_id!r})',
+                f'        return redirect({page_url!r})',
             ]
     methods += ", \"HEAD\""
     make_session_id = [      r'    session_id_value = request.method + "_" + socket.gethostname() + "_" + socket.gethostbyaddr(request.remote_addr)[0]']
@@ -299,7 +208,7 @@ print("")
 
 
 
-for req_name, request_data, domain_entry_pos in api_requests:
+for req_name, request_data in api_requests:
     fields = request_fields(request_data, args.domain_name_api_entry)
     req_type, req_api, req_params = fields["method"], fields["query"], fields["params"]
 

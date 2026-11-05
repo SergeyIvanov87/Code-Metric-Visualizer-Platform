@@ -44,6 +44,6 @@ PEM CA file before the normal Compose build/up commands. With no value or an
 empty file, the stack uses system trust. Dockerfiles use the shared wrapper under
 `common/proxy_setup_image_helpers/` with optional BuildKit secrets; no extra CA
 is persisted. Compose entrypoints import that directory's `compose-proxy-trust.yaml`
-resource. The REST runtime entrypoint uses the same wrapper; `test_proxy_ca.py` checks missing, empty, and supplied files via
-the existing tester entrypoint. Keep this configuration independent of any
-specific development environment.
+resource. REST dependencies are installed during image builds; startup uses
+those packages directly, without pipx or runtime CA mounts/wrappers. Keep this
+configuration independent of any specific development environment.
