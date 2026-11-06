@@ -1,0 +1,12 @@
+{% extends "index.html" %}
+{% block content %}
+<h1>Service APIs</h1>
+<ul>
+{% for service in services %}
+  <li><a href="{{ service.url }}">{{ service.name }}</a> ({{ service.queries|length }} queries)</li>
+{% endfor %}
+{% for query in ungrouped_queries %}
+  <li><a href="{{ query.page_url }}">{{ query.method }} {{ query.query }}</a></li>
+{% endfor %}
+</ul>
+{% endblock %}

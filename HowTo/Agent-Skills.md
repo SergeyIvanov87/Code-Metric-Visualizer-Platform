@@ -11,6 +11,7 @@ Each skill here lives in `.agents/skills/<name>/SKILL.md`. The YAML frontmatter 
 | [repository-navigation](../.agents/skills/repository-navigation/SKILL.md) | Finding the owner and tracing dependencies across platform stacks |
 | [interservice-dependencies](../.agents/skills/interservice-dependencies/SKILL.md) | Declaring consumed APIs, dependency command endpoints, and service/test readiness gates |
 | [filesystem-api-development](../.agents/skills/filesystem-api-development/SKILL.md) | Schema/generator changes, FIFO sessions, deferred lifecycle and REST exposure |
+| [rest-api-development](../.agents/skills/rest-api-development/SKILL.md) | REST discovery, grouped browser pages, query forms, and REST functional tests |
 | [http-api-customization](../.agents/skills/http-api-customization/SKILL.md) | HTTP route discovery, gateway precedence and ambassador development |
 | [streaming-ingestion](../.agents/skills/streaming-ingestion/SKILL.md) | File/directory transfers, shared-staging events, sealing, backpressure and cleanup |
 | [agentic-rag-development](../.agents/skills/agentic-rag-development/SKILL.md) | Dispatcher backends, chunk/vector consistency, retrieval and inference configuration |
@@ -25,6 +26,16 @@ In agents that support repository skills under `.agents/skills`, open this check
 > Use $filesystem-api-development to add a new endpoint. Use $container-test-diagnostics to choose and run its checks.
 
 The root [AGENTS.md](../AGENTS.md) lists task-to-skill mappings so agents can find these procedures even without automatic skill discovery. Each skill links relevant architecture records with guidance on when to read them and how to distinguish implemented behavior from proposals or historical findings.
+
+Every testing procedure must use the owning testing container's Dockerfile and
+`init.sh` as its execution entrypoints. Add executable tests only to that
+container's source directories; do not create standalone tests under
+service-level test roots or document direct pytest/unittest/Node invocations.
+HTTP checks use the service instance supplied by Compose. For agent-local
+reproduction, create a temporary Python environment, reproduce the tester
+Dockerfile setup, and invoke `init.sh` with the arguments from its ENTRYPOINT.
+The [test diagnostics skill](../.agents/skills/container-test-diagnostics/SKILL.md)
+describes this workflow.
 
 Automatic selection depends on the agent and its skill-discovery support. For agents that do not discover this directory, explicitly ask them to read the relevant `SKILL.md` and follow its linked references. Keep each skill beside this checkout because its relative links point into repository source. These files are repository skills, not an installation into this chat's hosted skill catalog.
 
@@ -54,7 +65,7 @@ Read [the relevant contract](relative/path/to/source) first.
 1. Locate the owner and closest working example.
 2. Make the change while preserving [specific invariant].
 3. Handle [known failure mode].
-4. Run [verified focused command], then the relevant integration scope.
+4. Run the owning testing container's Dockerfile/init.sh entrypoint, then the relevant integration scope.
 
 ## Completion
 

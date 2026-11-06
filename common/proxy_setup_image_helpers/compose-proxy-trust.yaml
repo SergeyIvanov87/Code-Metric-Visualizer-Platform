@@ -1,0 +1,4 @@
+# Include this resource from Compose entrypoints that use proxy_ca.
+secrets:
+  proxy_ca:
+    file: ${PROXY_CA_FILE:-./empty-proxy-ca.pem}

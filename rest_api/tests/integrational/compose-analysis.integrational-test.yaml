@@ -3,6 +3,8 @@ services:
     build:
       context: ../../../
       dockerfile: rest_api/tests/integrational/Dockerfile
+      secrets:
+        - proxy_ca
       additional_contexts:
         test_pseudo_fs: "service:test_pseudo_fs"
     environment:

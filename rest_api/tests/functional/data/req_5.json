@@ -1,0 +1,13 @@
+{
+    "Content-Type": "text/plain",
+    "Method": "PUT",
+    "Query": "api.pmccabe_collector.restapi.org/sample_service/req_5",
+    "Params": {
+        "param_1": "value_1"
+    },
+    "Description": {
+        "header": "req_5 header\n",
+        "body": "req_5 body\n",
+        "footer": "req_5 footer"
+    }
+}

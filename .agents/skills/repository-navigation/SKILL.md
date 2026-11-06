@@ -12,6 +12,14 @@ description: Use when locating code, tracing service dependencies, or choosing t
 5. Read applicable design decisions as context, then verify behavior in current code and tests. A proposal is not proof that a feature is implemented.
 6. Use [container-test-diagnostics](../container-test-diagnostics/SKILL.md) to select checks for the owning component and its consumers.
 
+Executable tests belong only in the owning testing container's source
+directories. Its Dockerfile and `init.sh` are the only execution entrypoints;
+do not create standalone tests in service-level test roots or invoke test
+runners directly. Use the running services supplied by Compose. For agent-local
+reproduction, create a temporary Python environment, reproduce the tester's
+Dockerfile setup, and call its `init.sh` with its ENTRYPOINT arguments, as
+described in the test diagnostics skill.
+
 ## Architecture references
 
 When a task needs the reasoning behind a feature, use the focused record lists in:

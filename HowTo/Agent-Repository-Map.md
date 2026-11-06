@@ -57,11 +57,18 @@ Start with [wrappers](../ai_agents_framework/ai_agent/sources/fs_api_wrappers.py
 
 Commands run from the repository root. CI definitions are the source for setup and orchestration; the root README contains older testing descriptions. A command below identifies a scope, not a promise that its Docker prerequisites are installed.
 
+All executable tests must belong to a testing container and be registered by its
+Dockerfile and `init.sh`. Do not create standalone tests under service-level
+test roots or invoke pytest, unittest, or Node tests directly. Launch the
+Compose tester entrypoint against the provided services. An agent-local
+reproduction must use a temporary Python environment, reproduce the tester
+Dockerfile's dependencies and layout, and execute its `init.sh` with the
+declared ENTRYPOINT arguments. See [test diagnostics](../.agents/skills/container-test-diagnostics/SKILL.md).
+Legacy standalone common/agent checks must be registered with their owning
+tester before execution.
+
 | Scope | Entry point | Status authority |
 | --- | --- | --- |
-| Common deferred transport | `python -m pytest -q common/test_deferred_query_executor.py` | pytest |
-| Directory event parser | `python -m pytest -q common/test_directory_event_protocol.py` | pytest |
-| Agent isolated behavior | `python -m pytest -q ai_agents_framework/ai_agent/tests` | pytest; inspect optional dependencies |
 | Common API lifecycle | `common/images/unit_test/compose.yaml` | `unit_tests` |
 | File uploader | `utility/file-uploader/compose-functional.test.yaml` | `file-uploader-functional-tester` |
 | Cyclomatic complexity | `cyclomatic_complexity/compose-functional.test.yaml` | `cc-functional-tester` |

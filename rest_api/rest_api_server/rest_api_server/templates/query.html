@@ -1,0 +1,165 @@
+{% extends "index.html" %}
+{% block title %}{{ query.method }} {{ query.query }}{% endblock %}
+{% block content %}
+<nav><a href="{{ query.service_url }}">{{ query.service_name or "All" }} APIs</a></nav>
+<h1>{{ query.method }} {{ query.query }}</h1>
+{{ documentation_html|safe }}
+{% block method_help %}{% endblock %}
+<form id="query-form" action="{{ query.action_url }}" data-method="{{ query.method }}" data-result-kind="{{ query.response.kind }}" data-result-extension="{{ query.response.extension }}">
+{% for name, value in query.params.items() %}
+  <p><label for="param-{{ loop.index }}">{{ name }}</label>
+  <input type="text" id="param-{{ loop.index }}" name="{{ name }}" value="{{ value }}"></p>
+{% else %}
+  <p>This query has no parameters.</p>
+{% endfor %}
+  <button type="submit" hidden>Execute {{ query.method }} query</button>
+  <a id="execute-query" href="{{ query.action_url }}">Execute {{ query.method }} query</a>
+</form>
+<noscript><p>Enable JavaScript to execute this query with its declared HTTP method.</p></noscript>
+<p id="query-status" role="status"></p>
+<pre id="query-text" hidden></pre>
+<details id="query-json" hidden>
+  <summary>View Server Response (JSON)</summary>
+  <pre><code id="query-json-body"></code></pre>
+</details>
+<button id="image-open" type="button" hidden aria-label="Open full-resolution image">
+  <img id="query-thumbnail" alt="Server response thumbnail" style="max-width:360px;max-height:240px">
+</button>
+<p><a id="query-result" hidden download>Download response</a></p>
+<pre id="query-error" hidden></pre>
+<dialog id="image-modal" aria-labelledby="image-title">
+  <div class="image-toolbar">
+    <strong id="image-title">Server response image</strong>
+    <button id="image-zoom-out" type="button" aria-label="Zoom out">−</button>
+    <label>Zoom <input id="image-zoom" type="range" min="1" max="400" value="100"></label>
+    <output id="image-scale" for="image-zoom">100%</output>
+    <button id="image-zoom-in" type="button" aria-label="Zoom in">+</button>
+    <button id="image-fit" type="button">Fit</button>
+    <button id="image-actual" type="button">100%</button>
+    <button id="image-close" type="button">Close</button>
+  </div>
+  <div id="image-viewport"><img id="image-full" alt="Full-resolution server response"></div>
+</dialog>
+<style>
+#image-modal { width:94vw; height:90vh; max-width:1600px; max-height:94vh; padding:1rem; }
+#image-modal::backdrop { background:rgba(0,0,0,.75); }
+.image-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding-bottom:.75rem; }
+#image-viewport { height:calc(100% - 5rem); overflow:auto; background:#eee; }
+#image-full { display:block; max-width:none; margin:auto; }
+#image-open { cursor:zoom-in; }
+#query-text, #query-json pre, #query-error { white-space:pre-wrap; overflow-wrap:anywhere; }
+</style>
+<script>
+const form = document.getElementById('query-form');
+const executeLink = document.getElementById('execute-query');
+const button = form.querySelector('button');
+const modal = document.getElementById('image-modal');
+const fullImage = document.getElementById('image-full');
+const thumbnail = document.getElementById('query-thumbnail');
+const zoom = document.getElementById('image-zoom');
+let resultUrl;
+function setZoom(percent) {
+  const scale = Math.min(400, Math.max(1, percent));
+  zoom.value = scale;
+  document.getElementById('image-scale').textContent = `${scale}%`;
+  fullImage.style.width = `${fullImage.naturalWidth * scale / 100}px`;
+}
+function fitImage() {
+  if (!fullImage.naturalWidth) return;
+  const viewport = document.getElementById('image-viewport');
+  const scale = Math.min(viewport.clientWidth / fullImage.naturalWidth,
+                         viewport.clientHeight / fullImage.naturalHeight, 1);
+  setZoom(Math.floor(scale * 100));
+}
+document.getElementById('image-open').addEventListener('click', () => {
+  modal.showModal();
+  fitImage();
+});
+document.getElementById('image-close').addEventListener('click', () => modal.close());
+modal.addEventListener('click', (event) => { if (event.target === modal) modal.close(); });
+zoom.addEventListener('input', () => setZoom(Number(zoom.value)));
+document.getElementById('image-zoom-in').addEventListener('click', () => setZoom(Number(zoom.value) + 25));
+document.getElementById('image-zoom-out').addEventListener('click', () => setZoom(Number(zoom.value) - 25));
+document.getElementById('image-fit').addEventListener('click', fitImage);
+document.getElementById('image-actual').addEventListener('click', () => setZoom(100));
+fullImage.addEventListener('load', () => { if (modal.open) fitImage(); });
+thumbnail.addEventListener('error', () => {
+  document.getElementById('image-open').hidden = true;
+  document.getElementById('query-status').textContent += ' — Image preview unavailable; use the download link.';
+});
+function clearResponse() {
+  if (modal.open) modal.close();
+  for (const id of ['query-result', 'query-text', 'query-json', 'image-open', 'query-error']) {
+    document.getElementById(id).hidden = true;
+  }
+  document.getElementById('query-json').open = false;
+  fullImage.removeAttribute('src');
+  thumbnail.removeAttribute('src');
+  if (resultUrl) URL.revokeObjectURL(resultUrl);
+  resultUrl = undefined;
+}
+function updateExecutionUrl() {
+  const url = new URL(form.action);
+  const parameters = new URLSearchParams();
+  for (const input of form.querySelectorAll('input[name]')) {
+    if (input.value !== input.defaultValue) parameters.append(input.name, input.value);
+  }
+  url.search = parameters.toString();
+  executeLink.href = url.href;
+  return url;
+}
+form.addEventListener('input', updateExecutionUrl);
+updateExecutionUrl();
+executeLink.addEventListener('click', (event) => {
+  event.preventDefault();
+  if (!button.disabled) form.requestSubmit();
+});
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (button.disabled) return;
+  const status = document.getElementById('query-status');
+  const result = document.getElementById('query-result');
+  const error = document.getElementById('query-error');
+  const url = updateExecutionUrl();
+  clearResponse();
+  button.disabled = true;
+  executeLink.setAttribute('aria-disabled', 'true');
+  status.textContent = 'Executing query…';
+  try {
+    const response = await fetch(url, {method: form.dataset.method});
+    status.textContent = `HTTP ${response.status} ${response.statusText}`;
+    if (!response.ok) {
+      error.textContent = await response.text();
+      error.hidden = false;
+      return;
+    }
+    const kind = form.dataset.resultKind;
+    if (kind === 'text') {
+      const text = document.getElementById('query-text');
+      text.textContent = await response.text();
+      text.hidden = false;
+    } else if (kind === 'json') {
+      document.getElementById('query-json-body').textContent = await response.text();
+      document.getElementById('query-json').hidden = false;
+    } else {
+      resultUrl = URL.createObjectURL(await response.blob());
+      result.href = resultUrl;
+      result.download = `response.${form.dataset.resultExtension}`;
+      result.textContent = kind === 'image' ? 'Download image' : 'Download response';
+      result.hidden = false;
+      if (kind === 'image') {
+        thumbnail.src = resultUrl;
+        fullImage.src = resultUrl;
+        document.getElementById('image-open').hidden = false;
+      }
+    }
+  } catch (failure) {
+    status.textContent = `Query failed: ${failure.message}`;
+  } finally {
+    button.disabled = false;
+    executeLink.removeAttribute('aria-disabled');
+  }
+});
+window.addEventListener('pagehide', clearResponse);
+</script>
+{% endblock %}

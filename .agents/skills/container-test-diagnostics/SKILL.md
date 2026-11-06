@@ -7,8 +7,38 @@ description: Use when choosing or running repository tests, debugging Compose bu
 
 Run commands from the repository root unless a source explicitly states otherwise. Read [the test matrix](../../../HowTo/Agent-Repository-Map.md#test-matrix) and the matching `.github/workflows` job before launching a suite.
 
-1. Choose the smallest scope that exercises the changed behavior: pure Python checks, common API lifecycle suite, owning-service functional tests, then cross-service integration when needed.
+## Test ownership and execution
+
+All executable tests belong to testing containers. Add test files only under
+the owning tester's source directories, copy them through its Dockerfile, and
+register execution in its `init.sh`. Do not create executable tests directly in
+service-level test roots or create a standalone test
+runner. Existing helper modules may remain there.
+
+The Dockerfile and `init.sh` are the only test execution entrypoints. Start the
+selected Compose stack so the tester's declared ENTRYPOINT runs `init.sh`; never
+invoke pytest, unittest, Node test scripts, or selected test functions directly,
+including with `docker exec`. If a legacy test is not registered with a tester,
+register it before running it. Use the existing service instance supplied by the
+Compose stack, rather than starting an extra Flask server or test client.
+
+For an agent's local reproduction, create a temporary Python virtual environment
+under `work/`, install dependencies specified by the tester Dockerfile, and
+reproduce its COPY layout, required utilities, environment, shared mounts, and
+service access. Then run the tester's `init.sh` with the exact arguments from its
+Dockerfile ENTRYPOINT. The script discovers and runs registered tests itself;
+do not replace it with a direct test-runner command. Keep service and tester
+identities distinct. If the required service or container setup cannot be
+reproduced, report that prerequisite instead of substituting an in-process app.
+
+## Select and run a stack
+
+1. Choose the smallest owning container suite that exercises the changed behavior: common API lifecycle or service functional tests, then cross-service integration when needed. Do not run standalone Python checks outside the registered tester.
 2. Inspect the selected Compose file and included/extended files. Resolve build contexts relative to their defining Compose file and inspect Dockerfile `COPY` sources; many images require the repository root. Use `docker compose -f <selected-file> config --quiet` before a build. This validates configuration, not behavior.
+   With `extends`, declare or include referenced top-level resources
+   (secrets/configs/networks/volumes) in the consuming model; service inheritance does not import them. Validate
+   combined CI stacks as well as standalone stacks after adding a resource.
+   For `-f` overlays, resolve relative paths from the first Compose file.
 3. Inspect external volume/network prerequisites and required environment variables. Analysis needs `PROJECT_PATH`; Analytic needs `PROJECT_URL` and `PROJECT_BRANCH`. Do not blindly reproduce CI-wide image/container pruning or remove unrelated resources on a shared machine.
 4. For finite service functional tests, propagate the tester's status using `--abort-on-container-exit --exit-code-from <tester-service>`. The tester name is specific to the Compose model; see the matrix.
 5. For streaming capture, read [its lifecycle documentation](../../../common/images/streaming_test_aggregator/README.md) and `.github/workflows/streaming-test-aggregator.yml`. This is detached orchestration: collect the aggregator status first, and run/collect final validation only after success. `docker wait` prints the container status; its own successful invocation does not mean that status was zero.

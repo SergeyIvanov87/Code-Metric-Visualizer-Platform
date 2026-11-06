@@ -17,11 +17,18 @@ Read [the upload protocol](../../../utility/file-uploader/README.md) and the mat
 
 ## Verify
 
-```sh
-python -m pytest -q common/test_directory_event_protocol.py common/test_deferred_query_executor.py
-```
+Create executable tests only in the owning testing container's source
+directories and register parser/deferred regressions through its Dockerfile and
+`init.sh`. Do not create or run standalone Python tests outside testing
+containers or invoke a test runner directly. Run the file-uploader functional
+suite using [test diagnostics](../container-test-diagnostics/SKILL.md); an
+agent-local reproduction must create a temporary Python environment, reproduce
+the tester Dockerfile setup, and call its `init.sh` with the declared arguments.
+Use the running services supplied by Compose.
 
-Then run the file-uploader functional suite using [test diagnostics](../container-test-diagnostics/SKILL.md). Select cases for slow/no readers, partial records, concurrent sessions, mount-path differences, seal, timeout, and shutdown based on the changed behavior. Do not infer end-to-end transfer success from a readiness event.
+Select cases for slow/no readers, partial records, concurrent sessions,
+mount-path differences, seal, timeout, and shutdown based on the changed
+behavior. Do not infer end-to-end transfer success from a readiness event.
 
 ## Architecture references
 
