@@ -96,6 +96,38 @@ def make_script_req_6(script, desired_file_ext):
 def generate_script_req_6_help():
     return "Help req_6 "
 
+def make_script_response_json(script, desired_file_ext):
+    script.writelines(line + "\n" for line in (
+        *api_fs_exec_utils.generate_exec_header(),
+        *api_fs_exec_utils.generate_get_result_type("." + desired_file_ext),
+        'printf \'%s\' \'{"auth":true,"message":"<b id=server-markup>JSON</b>"}\'',
+    ))
+
+
+def make_script_response_text(script, desired_file_ext):
+    script.writelines(line + "\n" for line in (
+        *api_fs_exec_utils.generate_exec_header(),
+        *api_fs_exec_utils.generate_get_result_type("." + desired_file_ext),
+        r"printf '%s' 'Plain text <b id=server-markup>response</b>'",
+    ))
+
+
+def make_script_response_image(script, desired_file_ext):
+    script.writelines(line + "\n" for line in (
+        *api_fs_exec_utils.generate_exec_header(),
+        *api_fs_exec_utils.generate_get_result_type("." + desired_file_ext),
+        'printf \'%s\' \'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="steelblue"/></svg>\'',
+    ))
+
+
+def make_script_response_binary(script, desired_file_ext):
+    script.writelines(line + "\n" for line in (
+        *api_fs_exec_utils.generate_exec_header(),
+        *api_fs_exec_utils.generate_get_result_type("." + desired_file_ext),
+        r"printf '\000\001\377fixture\n'",
+    ))
+
+
 def get():
     scripts_generator = {
         "req_1": make_script_req_1,
@@ -103,7 +135,11 @@ def get():
         "req_2": make_script_req_2,
         "req_5": make_script_req_5,
         "req_3": make_script_req_3,
-        "req_6": make_script_req_6
+        "req_6": make_script_req_6,
+        "response_json": make_script_response_json,
+        "response_text": make_script_response_text,
+        "response_image": make_script_response_image,
+        "response_binary": make_script_response_binary
     }
 
     scripts_help_generator = {

@@ -1,0 +1,11 @@
+{
+    "Method": "GET",
+    "Query": "api.pmccabe_collector.restapi.org/sample_service/response_image",
+    "Content-Type": "image/svg+xml",
+    "Params": {},
+    "Description": {
+        "header": "image response fixture",
+        "body": "Returns a fixed image payload.",
+        "footer": ""
+    }
+}

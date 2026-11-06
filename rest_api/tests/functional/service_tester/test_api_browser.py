@@ -15,6 +15,8 @@ BASE_URL = "http://rest-api:5000"
 DOMAIN = Settings().domain_name_api_entry
 QUERIES = [json.loads(source.read_text())
            for source in sorted((Path(Settings().work_dir) / "data").glob("req_*.json"))]
+RESPONSE_QUERIES = [json.loads(source.read_text())
+                    for source in sorted((Path(Settings().work_dir) / "data").glob("response_*.json"))]
 SERVICES = sorted({service_name(query["Query"], DOMAIN) for query in QUERIES} - {None})
 
 
@@ -65,7 +67,7 @@ def test_portal_lists_service_containers():
 
 @pytest.mark.parametrize("service", SERVICES)
 def test_service_links_lead_to_its_api_pages(service):
-    expected = {(query["Method"], "/" + query["Query"]) for query in QUERIES
+    expected = {(query["Method"], "/" + query["Query"]) for query in QUERIES + RESPONSE_QUERIES
                 if service_name(query["Query"], DOMAIN) == service}
     assert {(page.form["data-method"], page.form["action"])
             for page in query_pages(service)} == expected

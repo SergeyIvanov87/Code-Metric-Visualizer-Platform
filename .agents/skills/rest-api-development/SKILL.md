@@ -21,7 +21,17 @@ filesystem parameters. Place REST tests in
 `rest_api/tests/functional/service_tester/` and use the predefined schemas under
 `rest_api/tests/functional/data/`. Check the existing `http://rest-api:5000`
 instance for container links, API links, editable parameters, and execution;
-do not construct another Flask application or test client.
+do not construct another Flask application or test client. Response presentation
+uses `file_extension_from_content_type_or_default` on recovered FIFO metadata.
+Text/JSON must be inserted safely as text; images use a full-resolution zoom
+modal and binary results download unchanged. Response regression tests compare page metadata with actual FIFO payloads
+through the existing tester image and init.sh against rest-api:5000.
+
+Preserve the recovery test's available → withdraw → stop/start → unavailable →
+restore → stop/start → available contract. Do not replace process stop/start
+assertions with visibility-only waits or change server restart behavior. The
+100ms polling interval keeps the nominal 10s/30s waiting windows and observes
+fast restarts after runtime package installation was removed.
 
 All executable tests must belong to a testing container and run only through
 its Dockerfile and `init.sh`; do not create or run standalone tests in

@@ -33,6 +33,22 @@ def request_fields(request_data, domain):
             "page_url": query_page_url(query, method, domain)}
 
 
+def response_presentation(request_data):
+    """Use the MIME metadata recovered from the result FIFO's extension."""
+    from api_schema_utils import file_extension_from_content_type_or_default
+
+    extension = file_extension_from_content_type_or_default(request_data, "txt")
+    if extension == "json":
+        kind = "json"
+    elif extension in {"apng", "bmp", "gif", "jpg", "png", "svg", "tiff"}:
+        kind = "image"
+    elif extension in {"txt", "csv", "xml", "html"}:
+        kind = "text"
+    else:
+        kind = "binary"
+    return {"kind": kind, "extension": extension}
+
+
 def canonize(value, req_type):
     """Create a Python identifier; browser URLs retain their original spelling."""
     return req_type.lower() + "_" + re.sub(r"[^a-zA-Z0-9_]", "_", value)
@@ -95,7 +111,8 @@ def build_browser_catalog(requests, domain, index_path):
         entry = {"name": name, "query": fields["query"], "method": fields["method"],
                  "action_url": "/" + fields["query"], "page_url": fields["page_url"],
                  "service_name": fields["service_name"], "service_url": fields["service_url"],
-                 "params": flatten_params(fields["params"]), "documentation": documentation}
+                 "params": flatten_params(fields["params"]), "documentation": documentation,
+                 "response": response_presentation(data)}
         queries[fields["query_id"]] = entry
         service = fields["service_name"]
         if service:

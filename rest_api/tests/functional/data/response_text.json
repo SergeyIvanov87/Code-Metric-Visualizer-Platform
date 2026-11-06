@@ -1,0 +1,11 @@
+{
+    "Method": "GET",
+    "Query": "api.pmccabe_collector.restapi.org/sample_service/response_text",
+    "Content-Type": "text/plain",
+    "Params": {},
+    "Description": {
+        "header": "text response fixture",
+        "body": "Returns a fixed text payload.",
+        "footer": ""
+    }
+}
