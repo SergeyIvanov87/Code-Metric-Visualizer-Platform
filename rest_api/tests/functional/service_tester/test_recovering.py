@@ -6,7 +6,8 @@ import requests
 import shutil
 import time
 import service_tester_utils
-from api_browser_utils import service_name, service_page_url
+from api_browser_utils import service_name, service_page_url, query_page_url
+from test_api_browser import Page
 
 from api_schema_utils import deserialize_api_request_from_schema_file
 from settings import Settings
@@ -35,8 +36,8 @@ def check_if_query_available(domain, query):
     if resp.status_code == 404:
         return False
     assert resp.ok
-    readme_html_content = str(resp.text)
-    return readme_html_content.find(query["Query"]) != -1
+    # Query paths are no longer printed as headings; identify the exact form link.
+    return query_page_url(query["Query"], query["Method"], domain) in Page(resp.text).links
 
 
 @pytest.fixture()

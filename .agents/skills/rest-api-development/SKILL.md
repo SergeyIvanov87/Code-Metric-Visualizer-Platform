@@ -17,6 +17,10 @@ registrations when new coverage is needed.
 The REST browser groups recovered schemas by the first component after the API
 domain. Its generated pages and method templates are owned by
 `rest_api/build_api_cgi.py` and `rest_api/rest_api_server/rest_api_server/templates`.
+Keep README query names as headings without repeating method/path headings.
+Filesystem recovery inserts execute links into matching README headings;
+preserve their rewrite into configure links. Recovery visibility checks identify the exact method-qualified
+query form URL rather than printed heading text.
 Keep navigation separate from direct API execution and include inherited
 filesystem parameters. Place REST tests in
 `rest_api/tests/functional/service_tester/` and use the predefined schemas under

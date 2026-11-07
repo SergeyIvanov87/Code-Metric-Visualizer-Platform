@@ -24,6 +24,8 @@ class Page(HTMLParser):
     def __init__(self, content):
         super().__init__()
         self.links = []
+        self.headings = []
+        self.heading_parts = None
         self.inputs = {}
         self.form = {}
         self.execute_link = None
@@ -31,6 +33,8 @@ class Page(HTMLParser):
 
     def handle_starttag(self, tag, attributes):
         attributes = dict(attributes)
+        if tag in {"h1", "h2", "h3"}:
+            self.heading_parts = []
         if tag == "a":
             self.links.append(attributes.get("href", ""))
             if attributes.get("id") == "execute-query":
@@ -39,6 +43,15 @@ class Page(HTMLParser):
             self.inputs[attributes["name"]] = attributes["value"]
         elif tag == "form":
             self.form = attributes
+
+    def handle_data(self, data):
+        if self.heading_parts is not None:
+            self.heading_parts.append(data)
+
+    def handle_endtag(self, tag):
+        if tag in {"h1", "h2", "h3"} and self.heading_parts is not None:
+            self.headings.append("".join(self.heading_parts).strip())
+            self.heading_parts = None
 
 
 def page_at(path):
@@ -121,3 +134,12 @@ def test_single_component_fixture_is_grouped_on_portal():
     listing = page_at("/" + DOMAIN + "/_browse/services/req_1")
     query = next(query for query in QUERIES if query["Query"] == DOMAIN + "/req_1")
     assert query_page_url(query["Query"], query["Method"], DOMAIN) in listing.links
+
+
+@pytest.mark.parametrize("source", sorted((Path(Settings().work_dir) / "data").glob("req_*.json")), ids=lambda source: source.stem)
+def test_service_keeps_readme_names_without_repeated_query_path_headings(source):
+    query = json.loads(source.read_text())
+    page = page_at(service_page_url(service_name(query["Query"], DOMAIN), DOMAIN))
+    assert source.stem in page.headings
+    assert all(query["Query"] not in heading for heading in page.headings)
+    assert page.links.count(query_page_url(query["Query"], query["Method"], DOMAIN)) == 1
