@@ -19,6 +19,9 @@ COPY rest_api/*.sh /package/
 COPY rest_api/*.py /package/
 COPY rest_api/API /package/API
 
+RUN --mount=type=secret,id=proxy_ca,mode=0444 \
+    /usr/local/bin/with-proxy-ca.sh sh /package/download-jsonformatter.sh /package/rest_api_server/rest_api_server/static/vendor/jsonformatter
+
 RUN mkdir -p /opt
 COPY common/modules /opt/modules
 COPY common/shell_utils /opt/shell_utils

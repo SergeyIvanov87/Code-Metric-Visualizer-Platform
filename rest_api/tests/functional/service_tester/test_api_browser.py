@@ -108,3 +108,16 @@ def test_default_preserves_parameter_file_quotes_and_backslashes(query, submissi
     result.raise_for_status()
     for value in query["Params"].values():
         assert value in result.text
+
+
+@pytest.mark.parametrize("service", ["cyclomatic_complexity", "rrd_analytic"])
+def test_service_root_endpoint_belongs_to_its_container(service):
+    assert service_name(DOMAIN + "/" + service, DOMAIN) == service
+
+
+def test_single_component_fixture_is_grouped_on_portal():
+    portal = page_at("/")
+    assert "/" + DOMAIN + "/_browse/services/req_1" in portal.links
+    listing = page_at("/" + DOMAIN + "/_browse/services/req_1")
+    query = next(query for query in QUERIES if query["Query"] == DOMAIN + "/req_1")
+    assert query_page_url(query["Query"], query["Method"], DOMAIN) in listing.links

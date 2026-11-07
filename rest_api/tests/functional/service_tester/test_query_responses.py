@@ -14,6 +14,8 @@ from test_api_browser import Page
     ("text", "text", "txt", "text/plain", b"Plain text <b id=server-markup>response</b>"),
     ("json", "json", "json", "application/json", b'{"auth":true,"message":"<b id=server-markup>JSON</b>"}'),
     ("image", "image", "svg", "image/svg+xml", b'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="steelblue"/></svg>'),
+    ("html", "html", "html", "text/html", b"<html><body><h2>HTML response</h2></body></html>"),
+    ("xml", "xml", "xml", "application/xml", b"<root><child>XML response</child></root>"),
     ("binary", "binary", "bin", "application/octet-stream", b"\x00\x01\xfffixture\n"),
 ])
 def test_response_page_metadata_matches_fifo_payload(name, kind, extension, content_type, payload):
@@ -29,3 +31,12 @@ def test_response_page_metadata_matches_fifo_payload(name, kind, extension, cont
     response.raise_for_status()
     assert response.headers["Content-Type"].split(";")[0] == content_type
     assert response.content == payload
+
+
+def test_jsonformatter_assets_are_served_locally():
+    for asset in ["json-formatter.umd.js", "json-formatter.css", "LICENSE"]:
+        response = requests.get("http://rest-api:5000/static/vendor/jsonformatter/" + asset, timeout=10)
+        response.raise_for_status()
+        assert len(response.content) > 100
+    assert "JSONFormatter" in requests.get(
+        "http://rest-api:5000/static/vendor/jsonformatter/json-formatter.umd.js", timeout=10).text

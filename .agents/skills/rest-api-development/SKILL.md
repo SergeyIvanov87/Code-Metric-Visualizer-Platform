@@ -8,8 +8,9 @@ description: Use when changing filesystem API discovery, generated REST pages, q
 Read `rest_api/build_api_cgi.py`, `rest_api/api_browser_utils.py`, the templates,
 and the existing functional tester before editing. Use `service_name`,
 `service_page_url`, and `request_fields` for shared metadata and URL conventions.
-A query directly below the API domain has no service name and stays ungrouped
-on the landing page. Group only paths containing a service and an operation.
+The first path component after the domain names the service, including a query
+at the service root (for example the watch_list schema uses the
+cyclomatic_complexity root endpoint). Only the bare domain has no service.
 Preserve the existing fixture queries; add separate schemas and executor
 registrations when new coverage is needed.
 
@@ -23,7 +24,9 @@ filesystem parameters. Place REST tests in
 instance for container links, API links, editable parameters, and execution;
 do not construct another Flask application or test client. Response presentation
 uses `file_extension_from_content_type_or_default` on recovered FIFO metadata.
-Text/JSON must be inserted safely as text; images use a full-resolution zoom
+Text stays plain; HTML renders in a sandboxed iframe; XML uses collapsible
+elements; JSON uses the pinned, locally served JSONFormatter installed during
+both REST image builds. All responses offer original-byte downloads; images use a full-resolution zoom
 modal and binary results download unchanged. Response regression tests compare page metadata with actual FIFO payloads
 through the existing tester image and init.sh against rest-api:5000.
 

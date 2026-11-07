@@ -128,6 +128,22 @@ def make_script_response_binary(script, desired_file_ext):
     ))
 
 
+def make_script_response_html(script, desired_file_ext):
+    script.writelines(line + "\n" for line in (
+        *api_fs_exec_utils.generate_exec_header(),
+        *api_fs_exec_utils.generate_get_result_type("." + desired_file_ext),
+        "printf '%s' '<html><body><h2>HTML response</h2></body></html>'",
+    ))
+
+
+def make_script_response_xml(script, desired_file_ext):
+    script.writelines(line + "\n" for line in (
+        *api_fs_exec_utils.generate_exec_header(),
+        *api_fs_exec_utils.generate_get_result_type("." + desired_file_ext),
+        "printf '%s' '<root><child>XML response</child></root>'",
+    ))
+
+
 def get():
     scripts_generator = {
         "req_1": make_script_req_1,
@@ -139,6 +155,8 @@ def get():
         "response_json": make_script_response_json,
         "response_text": make_script_response_text,
         "response_image": make_script_response_image,
+        "response_html": make_script_response_html,
+        "response_xml": make_script_response_xml,
         "response_binary": make_script_response_binary
     }
 

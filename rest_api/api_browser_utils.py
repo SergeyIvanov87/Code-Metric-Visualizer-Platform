@@ -9,7 +9,7 @@ from urllib.parse import quote
 def service_name(query, domain):
     relative = query.strip("/").removeprefix(domain.strip("/")).strip("/")
     parts = relative.split("/")
-    return parts[0] if len(parts) > 1 else None
+    return parts[0] if relative else None
 
 
 def service_page_url(service, domain):
@@ -38,11 +38,11 @@ def response_presentation(request_data):
     from api_schema_utils import file_extension_from_content_type_or_default
 
     extension = file_extension_from_content_type_or_default(request_data, "txt")
-    if extension == "json":
-        kind = "json"
+    if extension in {"json", "xml", "html"}:
+        kind = extension
     elif extension in {"apng", "bmp", "gif", "jpg", "png", "svg", "tiff"}:
         kind = "image"
-    elif extension in {"txt", "csv", "xml", "html"}:
+    elif extension in {"txt", "csv"}:
         kind = "text"
     else:
         kind = "binary"
