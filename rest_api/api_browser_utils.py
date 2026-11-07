@@ -95,7 +95,7 @@ def query_documentation(sections, fields, description):
         heading = "### " + fields["query"] + "/" + fields["method"]
         for section in sections:
             if any(line == heading or line.startswith(heading + " ") for line in section.splitlines()):
-                return section.replace(f"[execute](/{fields['query']})", f"[configure]({fields['page_url']})")
+                return section.replace(f"[execute](/{fields['query']})", f"[configure]({fields['page_url']})").replace(heading, " -> ")
         return None  # An existing README controls query publication/withdrawal.
     return "\n\n".join(str(value) for value in description.values())
 

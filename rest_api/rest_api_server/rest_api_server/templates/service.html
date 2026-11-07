@@ -5,7 +5,6 @@
 <h1>{{ service.name }} APIs</h1>
 {% for query in queries %}
 <section>
-  <h2><a href="{{ query.page_url }}">{{ query.method }} {{ query.query }}</a></h2>
   {{ query.documentation_html|safe }}
 </section>
 {% endfor %}
