@@ -249,12 +249,21 @@ def _validate_dispatcher_sync_result(sync_result: Any) -> dict[str, Any]:
             "The rag_doc_dispatcher sync failed: "
             f"{sync_result.get('error_msg', sync_result)}"
         )
-    output = sync_result.get("output")
-    if not isinstance(output, dict):
+    result_fields = (
+        "created",
+        "updated",
+        "deleted",
+        "not_changed",
+        "initial DB records",
+        "storage size",
+    )
+    missing_fields = [field for field in result_fields if field not in sync_result]
+    if missing_fields:
         raise RuntimeError(
-            "The rag_doc_dispatcher sync response does not contain an output object"
+            "The rag_doc_dispatcher sync response is missing fields: "
+            + ", ".join(missing_fields)
         )
-    return output
+    return {field: sync_result[field] for field in result_fields}
 
 
 def main(

@@ -2,11 +2,10 @@
 
 import argparse
 import json
-import subprocess
 import sys
 
 from dispatcher_backend_config import load_backend_config
-
+from utils import get_impl_procedure_name
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="Read an ID using assigned backend")
@@ -25,31 +24,17 @@ def main() -> int:
 
     record_id = int(parameters["id"])
     backend_config = load_backend_config()
-    command = [
-        "python",
-        "-m",
-        backend_config.command_module("read_id"),
-        "--id",
-        str(record_id),
-    ]
-    exec_status = subprocess.run(
+    command = backend_config.create_executable_command_prefix(get_impl_procedure_name(__file__))
+    command.extend(["--id", str(record_id)])
+    exec_status = backend_config.delegate_query(
         command,
-        capture_output=True,
-        cwd=backend_config.backends_code_dir,
         text=True,
-        shell=False,
     )
 
-    if exec_status.stdout:
-        try:
-            result = json.loads(exec_status.stdout)
-        except json.JSONDecodeError:
-            result = {"id": record_id, "error_code": -1, "error_msg": exec_status.stdout}
-    else:
-        result = {"id": record_id, "error_code": -1, "error_msg": exec_status.stderr}
-
-    if exec_status.stderr and isinstance(result, dict) and "error_msg" not in result:
-        result["error_msg"] = exec_status.stderr
+    result = backend_config.get_formatted_response(exec_status,
+                                                   get_impl_procedure_name(__file__),
+                                                   text=True)
+    result["id"] = record_id
 
     context = result.get("context", "<Not found ID>")
     sys.stdout.write(context)

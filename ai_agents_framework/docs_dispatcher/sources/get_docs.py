@@ -2,11 +2,10 @@
 
 import argparse
 import json
-import subprocess
 import sys
 
 from dispatcher_backend_config import load_backend_config
-
+from utils import get_impl_procedure_name
 
 def main():
     parser = argparse.ArgumentParser(
@@ -30,36 +29,18 @@ def main():
     limit = int(parameters["limit"])
 
     backend_config = load_backend_config()
-    backends_path = backend_config.backends_code_dir
-    command = [
-        "python",
-        "-m",
-        backend_config.command_module("get_docs"),
-        "--offset",
-        str(offset),
-        "--limit",
-        str(limit),
-    ]
+    command = backend_config.create_executable_command_prefix(get_impl_procedure_name(__file__))
+    command.extend(["--offset", str(offset)])
+    command.extend(["--limit", str(limit)])
 
-    exec_status = subprocess.run(
+    exec_status = backend_config.delegate_query(
         command,
-        capture_output=True,
-        cwd=backends_path,
         text=True,
-        shell=False,
     )
 
-    if exec_status.stdout:
-        try:
-            result = json.loads(exec_status.stdout)
-        except json.JSONDecodeError:
-            result = {"error_code": -1, "error_msg": exec_status.stdout}
-    else:
-        result = {"error_code": -1, "error_msg": exec_status.stderr}
-
-    if exec_status.stderr and isinstance(result, dict) and "error_msg" not in result:
-        result["error_msg"] = exec_status.stderr
-
+    result = backend_config.get_formatted_response(exec_status,
+                                                   get_impl_procedure_name(__file__),
+                                                   text=True)
     print(json.dumps(result))
     return exec_status.returncode
 

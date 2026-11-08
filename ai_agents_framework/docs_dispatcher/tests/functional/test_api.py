@@ -164,12 +164,12 @@ def _sync_counter(payload: dict, *names: str) -> int:
 def _assert_sync_is_clean(expected_storage_records: int | None = None, expected_to_delete: int = 0) -> dict:
     payload = _sync()
 
-    assert _sync_counter(payload["output"], "created", "not_changed") == 0
-    assert _sync_counter(payload["output"], "updated") == 0
-    assert _sync_counter(payload["output"], "deleted") == expected_to_delete
+    assert _sync_counter(payload, "created", "not_changed") == 0
+    assert _sync_counter(payload, "updated") == 0
+    assert _sync_counter(payload, "deleted") == expected_to_delete
 
-    storage_size = _sync_counter(payload["output"], "storage size")
-    initial_db_records = _sync_counter(payload["output"], "initial DB records")
+    storage_size = _sync_counter(payload, "storage size")
+    initial_db_records = _sync_counter(payload, "initial DB records")
     assert initial_db_records == storage_size
     if expected_storage_records is not None:
         assert storage_size == expected_storage_records
@@ -615,7 +615,7 @@ def test_sync_recreates_db_records_added_to_storage(created_record_ids):
     created_record_ids.extend([doc_id, chunk_id])
 
     sync_result = _sync()
-    assert _sync_counter(sync_result["output"], "created") == 2
+    assert _sync_counter(sync_result, "created") == 2
     _assert_document_storage(doc_id, document_data)
     _assert_chunk_storage(chunk_id, doc_id, document_data, chunk_data, "")
     _assert_sync_is_clean(len(before_ids) + 2)

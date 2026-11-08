@@ -2,11 +2,10 @@
 
 import argparse
 import json
-import subprocess
 import sys
 
 from dispatcher_backend_config import load_backend_config
-
+from utils import get_impl_procedure_name
 
 def _parse_doc_ids(value: str) -> list[int]:
     values = value.split(",")
@@ -28,33 +27,18 @@ def main() -> int:
     args = parser.parse_args()
 
     backend_config = load_backend_config()
-    command = [
-        "python",
-        "-m",
-        backend_config.command_module("get_doc_info"),
-        "--doc-ids",
-        ",".join(str(doc_id) for doc_id in args.doc_ids),
-    ]
-    exec_status = subprocess.run(
+    command = backend_config.create_executable_command_prefix(get_impl_procedure_name(__file__))
+    command.extend(["--doc-ids", ",".join(str(doc_id) for doc_id in args.doc_ids)])
+
+    exec_status = backend_config.delegate_query(
         command,
-        capture_output=True,
-        cwd=backend_config.backends_code_dir,
         text=True,
-        shell=False,
     )
 
-    if exec_status.stdout:
-        try:
-            result = json.loads(exec_status.stdout)
-        except json.JSONDecodeError:
-            result = {"error_code": -1, "error_msg": exec_status.stdout}
-    else:
-        result = {"error_code": -1, "error_msg": exec_status.stderr}
-
-    if exec_status.stderr and isinstance(result, dict) and "error_msg" not in result:
-        result["error_msg"] = exec_status.stderr
-
-    print(json.dumps(result))
+    return_data = backend_config.get_formatted_response(exec_status,
+                                                        get_impl_procedure_name(__file__),
+                                                        text=True)
+    print(json.dumps(return_data))
     return exec_status.returncode
 
 

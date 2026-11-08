@@ -2,11 +2,10 @@
 
 import argparse
 import json
-import subprocess
 import sys
 
 from dispatcher_backend_config import load_backend_config
-
+from utils import get_impl_procedure_name
 
 def _parse_ids(value: str) -> list[int]:
     values = value.split(",")
@@ -51,39 +50,21 @@ def main():
     args = parser.parse_args(_normalize_assignment_args(sys.argv[1:]))
 
     backend_config = load_backend_config()
-    backends_path = backend_config.backends_code_dir
-
-    sys.path.insert(0, str(backends_path))
-    command = [
-        "python",
-        "-m",
-        backend_config.command_module("delete_doc"),
-        "-ids",
-        ",".join(str(record_id) for record_id in args.ids),
-    ]
+    command = backend_config.create_executable_command_prefix(get_impl_procedure_name(__file__))
+    command.extend(["-ids", ",".join(str(record_id) for record_id in args.ids)])
     if args.metadata is not None:
         command.extend(["-m", args.metadata])
 
-    exec_status = subprocess.run(
+    exec_status = backend_config.delegate_query(
         command,
-        capture_output=True,
-        cwd=backends_path,
-        text=False,
-        shell=False,
+        text=False
     )
-    return_data = {}
-    err_str = exec_status.stderr.decode('utf-8')
-    if err_str:
-        return_data["error_msg"] = err_str
 
-    output_str = exec_status.stdout.decode('utf-8')
-    output = {}
-    if output_str:
-        output = json.loads(output_str)
-
-    return_data = return_data | output
+    return_data = backend_config.get_formatted_response(exec_status,
+                                                        get_impl_procedure_name(__file__),
+                                                        text=False)
     print(json.dumps(return_data))
-
+    return exec_status.returncode
 
 if __name__ == "__main__":
     sys.exit(main())

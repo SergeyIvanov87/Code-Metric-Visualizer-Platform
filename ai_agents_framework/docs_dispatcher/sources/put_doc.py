@@ -1,15 +1,13 @@
 #!/usr/bin/env python
 
 import argparse
-import base64
 import json
-import subprocess
 import sys
 
 from pathlib import Path
 
 from dispatcher_backend_config import load_backend_config
-
+from utils import get_impl_procedure_name
 
 def main():
     parser = argparse.ArgumentParser(prog="Insert document using assigned backend")
@@ -22,25 +20,13 @@ def main():
         args = parser.parse_args()
         metadata = args.metadata
         doc_type = args.doc_type
+        document_data = None
         if args.URI is None:
             # read as is
-            document_data = sys.stdin.read()
-            document_data = document_data.encode()
-        else:
-            with open(args.URI, 'rb') as f:
-                document_data = f.read()
-                if "base64" in doc_type:
-                    document_data = base64.b64encode(document_data)
+            document_data = sys.stdin.buffer.read()
 
         backend_config = load_backend_config()
-        backends_path = backend_config.backends_code_dir
-        sys.path.insert(0, str(backends_path))
-
-        command = [
-            "python",
-            "-m",
-            backend_config.command_module("put_doc")
-        ]
+        command = backend_config.create_executable_command_prefix(get_impl_procedure_name(__file__))
         if args.URI is not None:
             command.append(str(args.URI))
 
@@ -50,26 +36,21 @@ def main():
         if doc_type is not None:
             command.extend(["-doc_type", str(doc_type)])
 
-        exec_status = subprocess.run(
+        exec_status = backend_config.delegate_query(
             command,
-            input=document_data,
-            capture_output=True,
-            cwd=backends_path,
+            input_data=document_data,
             text=False,
-            shell=False,
         )
 
-        output_msg = {}
-        out_output = exec_status.stdout.decode('utf-8').strip()
-        if out_output:
-            output_msg = json.loads(out_output)
-
-        return_data = return_data | output_msg
+        return_data = backend_config.get_formatted_response(exec_status,
+                                                            get_impl_procedure_name(__file__),
+                                                            text=False)
     except Exception as ex:
         return_data["error_code"] = -1
         return_data["error_msg"] = str(ex)
 
     print(json.dumps(return_data))
+    return return_data["error_code"]
 
 
 if __name__ == "__main__":
