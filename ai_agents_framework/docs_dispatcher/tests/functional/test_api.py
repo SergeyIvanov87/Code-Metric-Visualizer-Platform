@@ -398,12 +398,14 @@ def test_get_docs_returns_decanonized_uris_chunk_ids_and_document_pagination(cre
         "limit": 1,
         "remaining": len(all_documents) - doc_0_position - 1,
         "docs": [expected_doc_0],
+        'error_code': 0,
     }
     assert _execute_json_api("get_docs", {"offset": 0, "limit": 0}) == {
         "offset": 0,
         "limit": 0,
         "remaining": len(all_documents),
         "docs": [],
+        'error_code': 0,
     }
 
 
@@ -432,6 +434,7 @@ def test_get_doc_info_returns_complete_info_and_classifies_invalid_ids(created_r
     )
 
     assert result == {
+        "error_code": 0,
         "found": [document_id],
         "inconsistent": [],
         "not_found": [chunk_id, absent_id],
@@ -511,6 +514,7 @@ def test_get_doc_info_recovers_info_for_inconsistent_documents(created_record_id
         db_only_backup_dir.rename(db_only_record_dir)
 
     assert result == {
+        "error_code": 0,
         "found": [],
         "inconsistent": [db_only_id, storage_only_id],
         "not_found": [],

@@ -249,21 +249,7 @@ def _validate_dispatcher_sync_result(sync_result: Any) -> dict[str, Any]:
             "The rag_doc_dispatcher sync failed: "
             f"{sync_result.get('error_msg', sync_result)}"
         )
-    result_fields = (
-        "created",
-        "updated",
-        "deleted",
-        "not_changed",
-        "initial DB records",
-        "storage size",
-    )
-    missing_fields = [field for field in result_fields if field not in sync_result]
-    if missing_fields:
-        raise RuntimeError(
-            "The rag_doc_dispatcher sync response is missing fields: "
-            + ", ".join(missing_fields)
-        )
-    return {field: sync_result[field] for field in result_fields}
+    return sync_result
 
 
 def main(
