@@ -1,9 +1,13 @@
+# syntax=docker/dockerfile:1
+
 FROM alpine:3.20.6
 
 WORKDIR tests
 
 # install app dependencies
-RUN apk add --no-cache coreutils python3 pytest dos2unix inotify-tools bash
+COPY --chmod=0755 common/proxy_setup_image_helpers/with-proxy-ca.sh /usr/local/bin/with-proxy-ca.sh
+RUN --mount=type=secret,id=proxy_ca,mode=0444 \
+    /usr/local/bin/with-proxy-ca.sh apk add --no-cache coreutils python3 pytest dos2unix inotify-tools bash
 
 COPY common/tests/*.py /tests/
 

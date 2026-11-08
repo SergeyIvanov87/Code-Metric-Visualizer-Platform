@@ -149,7 +149,7 @@ do
     cd ${WORK_DIR}/rest_api_server/
 
     echo "${LOG_PREFIX}Start REST_API server"
-    pipx install -e .
+    # Flask and Markdown are installed in the image; load generated source from cwd.
     python -m flask run &
     SERVER_INSTANCE_PID=$!
     SERVER_INSTANCE_RET=$?

@@ -1,0 +1,13 @@
+{
+    "Content-Type": "text/plain",
+    "Method": "POST",
+    "Query": "api.pmccabe_collector.restapi.org/other_service/req_6",
+    "Params": {
+        "param_1": "value_1"
+    },
+    "Description": {
+        "header": "req_6 header\n",
+        "body": "req_6 body\n",
+        "footer": "req_6 footer"
+    }
+}

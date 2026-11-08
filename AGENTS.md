@@ -12,6 +12,7 @@ Load only the skills and references needed for the task.
 | Locate an owner, trace dependencies, or choose a platform stack | [repository-navigation](.agents/skills/repository-navigation/SKILL.md) |
 | Declare consumed APIs, manage interservice dependencies, or gate startup/tests on API readiness | [interservice-dependencies](.agents/skills/interservice-dependencies/SKILL.md) |
 | Change schemas, generated executors, FIFO sessions, deferred requests, or REST exposure | [filesystem-api-development](.agents/skills/filesystem-api-development/SKILL.md) |
+| Change REST discovery, browser pages, or REST functional tests | [rest-api-development](.agents/skills/rest-api-development/SKILL.md) |
 | Change HTTP discovery, gateway precedence, or add an HTTP ambassador | [http-api-customization](.agents/skills/http-api-customization/SKILL.md) |
 | Change streaming uploads, shared staging, directory events, sealing, or cleanup | [streaming-ingestion](.agents/skills/streaming-ingestion/SKILL.md) |
 | Change document storage, chunk/vector consistency, retrieval, or inference configuration | [agentic-rag-development](.agents/skills/agentic-rag-development/SKILL.md) |
@@ -35,6 +36,11 @@ when fixing a bug; explain an intentional architectural change when necessary.
 
 ## Working conventions
 
+- Create executable tests only in the owning testing container's source
+  directories and register them through its Dockerfile and `init.sh`. Do not
+  invoke pytest, unittest, or standalone test scripts directly. Follow
+  [container test diagnostics](.agents/skills/container-test-diagnostics/SKILL.md)
+  for Compose execution or an agent's temporary-environment reproduction.
 - Run repository commands from the checkout root unless the selected workflow
   specifies another directory. Inspect Compose build contexts and overlays.
 - Change source schemas and generators for generated filesystem APIs.

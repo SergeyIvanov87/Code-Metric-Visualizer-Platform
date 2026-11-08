@@ -155,9 +155,17 @@ FIFO creation and that shutdown preserves provider-owned resources.
 For outage tests use
 [UnavailableAPI](../../../common/tests/unavailable_api.py), which masks the request
 FIFO while preserving live result FIFOs. See
-[its regression checks](../../../common/test_unavailable_api.py); run
-`python -m pytest -q common/test_unavailable_api.py` when changing that mechanism.
+[its regression checks](../../../common/test_unavailable_api.py); register them
+in the owning testing container's Dockerfile and `init.sh` when changing that
+mechanism. Do not invoke the Python file or a test runner directly.
 Do not move live result FIFOs to simulate an outage.
+
+Create executable tests only in tester-owned source directories, never as
+standalone files in service-level test roots. The Dockerfile and `init.sh` are
+the only execution entrypoints. Use Compose-provided service instances. For an
+agent-local reproduction, follow [container test diagnostics](../container-test-diagnostics/SKILL.md):
+create a temporary Python environment, reproduce the tester Dockerfile setup,
+and invoke its `init.sh` with the declared arguments.
 
 For a skill-only change, check frontmatter, relative links, discoverability and
 examples against current source; runtime suites are not required.

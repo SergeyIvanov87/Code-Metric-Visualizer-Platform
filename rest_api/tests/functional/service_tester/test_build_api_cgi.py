@@ -9,39 +9,35 @@ import sys
 from types import SimpleNamespace
 
 
-TEST_DIRECTORY = Path(__file__).resolve().parent
-
-# In repo layout tests/ is under <repo>/rest_api/tests, so parents[1] is repo root.
-# In the functional-test Docker image the tests are copied into /tests and
-# do not have two parents; handle that gracefully.
-try:
-    REPOSITORY_ROOT = TEST_DIRECTORY.parents[1]
-except IndexError:
-    REPOSITORY_ROOT = TEST_DIRECTORY
-
-if (REPOSITORY_ROOT / "rest_api" / "build_api_cgi.py").is_file():
-    BUILD_API_CGI = REPOSITORY_ROOT / "rest_api" / "build_api_cgi.py"
-    COMMON_DIRECTORY = REPOSITORY_ROOT / "common"
-else:
-    # The REST API functional-test image copies this test and the generator
-    # into /tests, while common helpers are inherited under /tests/utils.
-    BUILD_API_CGI = TEST_DIRECTORY / "build_api_cgi.py"
-    COMMON_DIRECTORY = TEST_DIRECTORY / "utils"
+# The tester Dockerfile stages these paths; init.sh supplies WORK_DIR.
+# BUILD_API_CGI is invoked by generate_from_directory. COMMON_DIRECTORY and its
+# modules child form that subprocess's PYTHONPATH. TEST_DIRECTORY anchors both
+# to the actual staged directory, rather than the source checkout.
+TEST_DIRECTORY = Path(os.environ["WORK_DIR"])
+BUILD_API_CGI = TEST_DIRECTORY / "build_api_cgi.py"
+COMMON_DIRECTORY = TEST_DIRECTORY / "utils"
 
 
-def generate_cgi(tmp_path):
+def generate_cgi(tmp_path, schemas=None, readme=None):
     schema_directory = tmp_path / "schemas"
     schema_directory.mkdir()
-    (schema_directory / "probe.json").write_text(
-        json.dumps(
-            {
+    if schemas is None:
+        schemas = {
+            "probe": {
                 "Content-Type": "text/plain",
                 "Method": "GET",
                 "Query": "api.pmccabe_collector.restapi.org/probe",
                 "Params": {},
-            }
-        )
-    )
+            },
+        }
+    for name, schema in schemas.items():
+        (schema_directory / (name + ".json")).write_text(json.dumps(schema))
+    if readme is not None:
+        (schema_directory / "index.md").write_text(readme)
+    return generate_from_directory(schema_directory)
+
+
+def generate_from_directory(schema_directory):
 
     environment = os.environ.copy()
     python_path = [
@@ -69,6 +65,9 @@ def generate_cgi(tmp_path):
 
 
 class FakeApplication:
+    def before_request(self, handler):
+        return handler
+
     def route(self, *_args, **_kwargs):
         return lambda handler: handler
 
@@ -238,3 +237,26 @@ def test_discovery_endpoint_is_generated_from_api_schemas(tmp_path):
             "timeout_seconds": 60,
         }
     ]
+
+
+def test_generated_forms_select_method_on_the_advertised_action_path(tmp_path):
+    # Test the CGI boundary directly: the existing filesystem collector keys by
+    # path and currently cannot supply both methods from the same FIFO tree.
+    query = "api.pmccabe_collector.restapi.org/shared"
+    schemas = {method.lower(): {"Query": query, "Method": method, "Params": {},
+                               "Content-Type": "text/plain"}
+               for method in ("GET", "PUT")}
+    namespace = {"app": FakeApplication(),
+                 "markdown": SimpleNamespace(markdown=lambda text: text),
+                 "render_template": lambda template, **context: (template, context)}
+    exec(compile(generate_cgi(tmp_path, schemas), "<generated-cgi>", "exec"), namespace)
+    urls = set()
+    for method in ("GET", "PUT"):
+        namespace["request"] = SimpleNamespace(method="GET", path="/" + query,
+                                               args={"__rest_api_view": method})
+        template, context = namespace["browse_query"]()
+        assert template == "query_" + method.lower() + ".html"
+        assert context["query"]["method"] == method
+        assert context["query"]["action_url"] == "/" + query
+        urls.add(context["query"]["page_url"])
+    assert urls == {"/" + query + "?__rest_api_view=" + method for method in ("GET", "PUT")}

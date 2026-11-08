@@ -7,7 +7,15 @@ It's very important to provide a convenient interface for comfortable use of any
 This image is developed as an `ambassador` service representing the main service and its submodules as an application gateway. This representation encompasses gathering all available pseudo filesystem API PIPEs nodes and unveils them as typical REST queries: **GET**, **POST** etc.
 
 After being started, the container launches a simple WEB-server providing the entry point of REST API communication to the main service and its complementary services as submodules.
-The root URI represents the main index-page comprising all **`*.md`** manual-pages from all registered services which were recognized. Therefore, it's important for service developers to supplement their containers with a holistic API description accompanied by a **README.md** file.
+The root URI redirects to the API landing page, which lists the discovered service containers. A container is identified by the first path component after the API domain prefix (for example, `cyclomatic_complexity` in `api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic`). A service-root endpoint such as `api.pmccabe_collector.restapi.org/cyclomatic_complexity` is grouped under `cyclomatic_complexity`, even when its README section is named `watch_list`. Select a container to open its API list, then select a query to configure its parameters before execution. Services should publish a **README.md** file with their API documentation; the existing README discovery and restart cycle also rebuilds these pages when APIs appear or disappear.
+
+Service lists live under `/<API domain>/_browse/services/<container>`. A query form uses the complete action path with a query-string suffix, for example `/api.pmccabe_collector.restapi.org/cyclomatic_complexity?__rest_api_view=GET`. The selector identifies the filesystem method to configure (GET, PUT or POST). Loading a form does not execute a filesystem query. The service page preserves each query's recovered markdown documentation and replaces the generated immediate-execution links with links to its parameter page. When a collected README is present, only its documented query entries appear in the browser, preserving README-driven publication and withdrawal. Direct action routes continue to follow the discovered FIFOs.
+
+Each supported filesystem API method has its own template (`query_get.html`, `query_put.html`, and `query_post.html`) extending the shared query form. Text fields contain the defaults recovered from the filesystem argument files, including inherited parameters from parent directories. If a parameter is defined at multiple levels, the default closest to the query wins. `SESSION_ID` remains managed by the server.
+
+Select **Execute query** to send the declared HTTP method with only edited parameters encoded in the query string. Unchanged fields are omitted so providers retain their own defaults, including inherited quotes and backslashes. The page reports HTTP status and selects presentation from the recovered result FIFO extension: text is shown inline, HTML renders in a sandboxed frame, XML has collapsible elements, JSON uses locally served JSONFormatter in an expandable details panel, images as clickable thumbnails with a full-resolution zoom dialog, and binary files as downloads. Every response has a download button preserving its original bytes and extension. JSONFormatter 2.5.23 is downloaded and checksum-verified at build time in both REST Dockerfiles; browsers load its JS/CSS from Flask without contacting a CDN. Image controls include zoom in/out, a scale slider, fit-to-pane, actual size, and close/Escape. JavaScript is required for this execution control. Existing direct API URLs, query-string parameters, the `default` option, and HEAD readiness probes remain available to programmatic clients. The `default` option sends no parameter overrides: providers read their own parameter files, preserving quoted defaults across filesystem API calls. A browser GET to a POST-only API URL redirects to its parameter page.
+
+Only API action paths are published in the HTTP route discovery document. Query forms and their JSONFormatter assets preserve that exact path, using the reserved `__rest_api_view` and `__rest_api_asset` query parameters respectively; Envoy routes them to the action owner instead of the catch-all. Execution uses the bare action URL and the declared HTTP method. Invalid view methods and non-whitelisted assets return 404 without executing a query. HEAD readiness probes retain their existing behavior. Portal and service-list pages continue to use the generic first provider's fallback. Provider order, later-provider precedence, and discovery paths are unchanged; multiple methods on one action path are advertised once.
 
 Once started, as being said before, the REST-API service searches for all registered services by parsing the filesystem tree using the set of predefined rules:
 
@@ -72,10 +80,86 @@ Launching depends on [cyclomatic_complexity](../cyclomatic_complexity), [rrd](..
 
 ### Standalone container functional test
 
+Executable REST tests belong in `tests/functional/service_tester/` and run only
+through the tester Dockerfile's `/tests/init.sh /tests /api` entrypoint. The
+browser checks use the predefined JSON queries under `tests/functional/data/`
+and the existing Compose service at `http://rest-api:5000`. They check grouped
+navigation, parameter fields, execution links, submitted field values, and
+quoted defaults. They do not start an additional Flask application.
+
 From the main repository directory run:
 
 `docker compose -f rest_api/compose-functional.test.yaml build`
 
 and then
 
-`docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit`
+`docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from rest-api-functional-service-tester`
+
+Do not invoke individual Python or JavaScript tests directly. Agent-local
+reproduction must use a temporary Python environment prepared according to the
+tester Dockerfile, then invoke its `init.sh` with the declared arguments. See
+[container test diagnostics](../.agents/skills/container-test-diagnostics/SKILL.md).
+
+### Optional proxy CA certificate
+
+The Compose configurations accept an optional `PROXY_CA_FILE`: an **absolute
+path** to a PEM CA certificate or CA bundle, readable by the container's service
+user. No environment-specific certificate path is assumed.
+
+Without an additional CA, use the normal commands:
+
+```sh
+docker compose -f rest_api/compose-functional.test.yaml build
+docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
+```
+
+Behind a TLS-inspecting proxy, set the certificate path for both commands:
+
+```sh
+export PROXY_CA_FILE=/absolute/path/to/company-proxy-ca.pem
+docker compose -f rest_api/compose-functional.test.yaml build
+docker compose -f rest_api/compose-functional.test.yaml up --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
+```
+
+An unset or empty variable selects the shared empty PEM file in
+`common/proxy_setup_image_helpers/`. An explicitly
+provided empty file also adds no trust and needs no special handling. A nonempty
+CA file extends the normal system trust; TLS verification stays enabled. An
+explicitly configured nonexistent file is a configuration error. Only provide
+public CA certificates here, never private keys.
+
+The shared `common/proxy_setup_image_helpers/compose-proxy-trust.yaml`
+defines one `proxy_ca` secret. Compose entrypoints import it through `include`;
+services explicitly reference it for builds or runtime. `extends` alone does
+not import top-level resources.
+
+BuildKit mounts the file as the optional `proxy_ca` secret during package
+installation. The shared `with-proxy-ca.sh` wrapper handles trust setup, command
+execution, exit status, signal forwarding, and cleanup. The combined trust
+bundle is removed in the same build step, so
+additional certificates do not enter image layers. Direct `docker build` works
+without a secret; optionally pass `--secret id=proxy_ca,src=/path/to/ca.pem`.
+The isolated REST Dockerfile supports the same secret.
+
+The REST service needs the CA only while building. Flask and Markdown are
+installed by apk in the image; the watchdog loads generated source directly
+without installing packages or contacting package indexes at startup/restart.
+Consequently, the REST runtime has no proxy CA secret mount or wrapper entrypoint.
+
+Proxy routing remains configured through Docker's standard proxy settings;
+`PROXY_CA_FILE` configures trust, not the proxy address. REST functional services
+append their internal REST hostname and loopback addresses to `NO_PROXY` and
+`no_proxy` so local requests do not go through an outbound proxy. Build secrets do not invalidate the
+Docker build cache; use `build --no-cache` when you need to re-exercise package
+installation with a changed CA.
+
+
+To exercise query pages through real Envoy with REST as the second provider:
+
+```sh
+docker compose -f rest_api/compose-functional.test.yaml -f rest_api/compose-routing.test.yaml up --build --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
+```
+
+This overlay runs the normal tester through its existing `init.sh` plus routing
+checks. A different provider is the catch-all and also advertises `req_1`, so
+REST must win the collision for its forms, assets, and action execution.

@@ -6,6 +6,8 @@ import requests
 import shutil
 import time
 import service_tester_utils
+from api_browser_utils import service_name, service_page_url, query_page_url
+from test_api_browser import Page
 
 from api_schema_utils import deserialize_api_request_from_schema_file
 from settings import Settings
@@ -17,17 +19,25 @@ from utils import get_api_schema_files
 from make_api_readme import make_api_readme
 
 global_settings = Settings()
-testdata = list(get_api_queries(os.path.join(global_settings.work_dir, "restored_API"), global_settings.domain_name_api_entry).items())
+# portal.json is synthetic tester documentation, not a discovered FIFO query.
+# The portal itself now lists service containers rather than README entries.
+testdata = [
+    (name, query)
+    for name, query in get_api_queries(os.path.join(global_settings.work_dir, "restored_API"), global_settings.domain_name_api_entry).items()
+    if query["Query"] != global_settings.domain_name_api_entry
+]
 
 def check_if_query_available(domain, query):
     global global_settings
 
-    url = 'http://rest-api:5000/' + domain
+    url = 'http://rest-api:5000' + service_page_url(service_name(query["Query"], domain), domain)
     headers = {'Accept-Charset': 'UTF-8'}
     resp = requests.get(url, headers=headers)
+    if resp.status_code == 404:
+        return False
     assert resp.ok
-    readme_html_content = str(resp.text)
-    return readme_html_content.find(query["Query"]) != -1
+    # Query paths are no longer printed as headings; identify the exact form link.
+    return query_page_url(query["Query"], query["Method"], domain) in Page(resp.text).links
 
 
 @pytest.fixture()
@@ -45,6 +55,8 @@ def tear_down(main_readme_file, main_query_file):
 def test_api_queries_lietening(name_query_2_turn_off, query_2_turn_off, all_api_query_files):
     shared_api_dir = os.getenv('SHARED_API_DIR', '/api')
     main_service_name = os.getenv('MAIN_SERVICE_NAME', 'api.pmccabe_collector.restapi.org')
+
+    assert check_if_query_available(main_service_name, query_2_turn_off)
 
     # backup initial readme, which is used for backing an entrypoint of REST_API
     initial_readme_file = os.path.join(shared_api_dir, main_service_name, "README-API-MOCK.md")
@@ -65,7 +77,8 @@ def test_api_queries_lietening(name_query_2_turn_off, query_2_turn_off, all_api_
             break
     assert len(query_to_disable_file)
 
-    stopped, started = service_tester_utils.if_service_reconfigured("rest-api", 5000, 10, 30, 1)
+    # Preserve 10s/30s budgets; 100ms probes can observe sub-second restarts.
+    stopped, started = service_tester_utils.if_service_reconfigured("rest-api", 5000, 100, 300, 0.1)
     assert stopped
     assert started
 
@@ -79,7 +92,8 @@ def test_api_queries_lietening(name_query_2_turn_off, query_2_turn_off, all_api_
     os.remove(initial_readme_file)
     tear_down(initial_readme_file, query_to_disable_file)
 
-    stopped, started = service_tester_utils.if_service_reconfigured("rest-api", 5000, 10, 30, 1)
+    # Preserve 10s/30s budgets; 100ms probes can observe sub-second restarts.
+    stopped, started = service_tester_utils.if_service_reconfigured("rest-api", 5000, 100, 300, 0.1)
     assert stopped
     assert started
 

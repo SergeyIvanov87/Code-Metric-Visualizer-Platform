@@ -10,15 +10,17 @@ ARG WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS=4 WAIT_FOR_API_SERVICE_PR
 ENV WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS=$WAIT_FOR_API_SERVICE_PROVIDER_INITIALIZED_ATTEMPTS WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS=$WAIT_FOR_API_SERVICE_PROVIDER_STARTED_ATTEMPTS WAIT_FOR_SERVER_STARTING_LIMIT_SEC=$WAIT_FOR_SERVER_STARTING_LIMIT_SEC MY_FLASK_INSTANCE_PIDFILE=$MY_FLASK_INSTANCE_PIDFILE
 
 # install app dependencies
-RUN apk add --no-cache coreutils python3 dos2unix
-RUN apk add --no-cache inotify-tools bash
-RUN apk add --no-cache busybox-openrc alpine-conf doas
-RUN apk add --no-cache py3-flask py3-markdown pipx curl
+COPY --chmod=0755 common/proxy_setup_image_helpers/with-proxy-ca.sh /usr/local/bin/with-proxy-ca.sh
+RUN --mount=type=secret,id=proxy_ca,mode=0444 \
+    /usr/local/bin/with-proxy-ca.sh apk add --no-cache coreutils python3 dos2unix inotify-tools bash busybox-openrc alpine-conf doas py3-flask py3-markdown curl
 
 COPY rest_api/rest_api_server /package/rest_api_server
 COPY rest_api/*.sh /package/
 COPY rest_api/*.py /package/
 COPY rest_api/API /package/API
+
+RUN --mount=type=secret,id=proxy_ca,mode=0444 \
+    /usr/local/bin/with-proxy-ca.sh sh /package/download-jsonformatter.sh /package/rest_api_server/rest_api_server/static/vendor/jsonformatter
 
 RUN mkdir -p /opt
 COPY common/modules /opt/modules

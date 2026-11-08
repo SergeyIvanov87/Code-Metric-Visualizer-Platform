@@ -1,0 +1,54 @@
+# Overlay for compose-functional.test.yaml. REST is deliberately not the fallback.
+services:
+  routing-fallback:
+    build:
+      context: ../
+      dockerfile: rest_api/tests/functional/routing/Dockerfile.provider
+      additional_contexts:
+        test_pseudo_fs: "service:test_pseudo_fs"
+    environment:
+      BACKEND_NAME: fallback
+      ROUTES_JSON: '[{"path":"/api.pmccabe_collector.restapi.org/req_1","timeout_seconds":60}]'
+
+  http-api-gateway-controller:
+    build:
+      context: ../
+      dockerfile: rest_api/tests/functional/routing/Dockerfile.controller
+      additional_contexts:
+        test_pseudo_fs: "service:test_pseudo_fs"
+    environment:
+      BACKENDS_FOR_FRONTENDS: http://routing-fallback:8080,http://rest-api:5000
+      HTTP_API_DISCOVERY_POLL_INTERVAL_SECONDS: 0.25
+      HTTP_API_DISCOVERY_TIMEOUT_SECONDS: 2
+      HTTP_API_GATEWAY_LISTEN_PORT: 8080
+    volumes:
+      - routing-gateway-config:/var/lib/http-api-gateway
+    depends_on:
+      - routing-fallback
+      - rest-api
+    healthcheck:
+      test: ["CMD", "python", "-c", "from pathlib import Path; assert Path('/var/lib/http-api-gateway/ready').is_file()"]
+      interval: 2s
+      timeout: 1s
+      retries: 30
+
+  http-api-gateway:
+    image: envoyproxy/envoy:distroless-v1.36.0
+    entrypoint: ["/usr/local/bin/envoy"]
+    command: ["-c", "/var/lib/http-api-gateway/bootstrap.json", "--log-level", "warning"]
+    volumes:
+      - routing-gateway-config:/var/lib/http-api-gateway:ro
+    depends_on:
+      http-api-gateway-controller:
+        condition: service_healthy
+
+  rest-api-functional-service-tester:
+    environment:
+      REST_API_GATEWAY_URL: http://http-api-gateway:8080
+      NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1},rest-api,http-api-gateway"
+      no_proxy: "${no_proxy:-localhost,127.0.0.1},rest-api,http-api-gateway"
+    depends_on:
+      - http-api-gateway
+
+volumes:
+  routing-gateway-config:

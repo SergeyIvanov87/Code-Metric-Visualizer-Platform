@@ -1,3 +1,6 @@
+include:
+  - ../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
 # Test overlay for compose.rag-agent.http.streaming.yaml.
 # The HTTP stack uses the external API volume shared by rest_api, the ambassador,
 # and the agent, so this overlay must not use the private rag-agent-api volume

@@ -1,0 +1,11 @@
+{
+    "Method": "GET",
+    "Query": "api.pmccabe_collector.restapi.org/sample_service/response_xml",
+    "Content-Type": "application/xml",
+    "Params": {},
+    "Description": {
+        "header": "xml response fixture",
+        "body": "Returns a fixed XML payload.",
+        "footer": ""
+    }
+}

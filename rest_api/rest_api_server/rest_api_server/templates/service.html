@@ -1,0 +1,11 @@
+{% extends "index.html" %}
+{% block title %}{{ service.name }} APIs{% endblock %}
+{% block content %}
+<nav><a href="{{ portal_url }}">All services</a></nav>
+<h1>{{ service.name }} APIs</h1>
+{% for query in queries %}
+<section>
+  {{ query.documentation_html|safe }}
+</section>
+{% endfor %}
+{% endblock %}

@@ -1,7 +1,10 @@
+# syntax=docker/dockerfile:1
+
 FROM test_pseudo_fs
 
 # install app dependencies
-RUN apk add --no-cache py3-requests curl
+RUN --mount=type=secret,id=proxy_ca,mode=0444 \
+    /usr/local/bin/with-proxy-ca.sh apk add --no-cache py3-requests curl
 
 COPY rest_api/API /API
 

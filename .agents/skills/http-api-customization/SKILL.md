@@ -87,7 +87,10 @@ discovery response.
 - Omit `timeout_seconds` only when the gateway's configured default is suitable
   for that action.
 - Advertise an action path once even when GET renders its page and POST or PUT
-  performs the action.
+  performs the action. REST forms select their method with `__rest_api_view`
+  on that exact action path; their local assets use `__rest_api_asset`. Query
+  strings do not change Envoy path ownership. Avoid hashed UI paths or added
+  path suffixes that would fall through to the first provider.
 - Do not advertise `/healthz` or private asset paths unless external clients
   are intentionally meant to reach them through the gateway.
 
@@ -159,18 +162,15 @@ implementation v1](../../../Architecture_Design_Decisions/Rest-API-Customization
 
 ## Test the change
 
-Start with the smallest owning checks, then cover the routing boundary:
-
-```sh
-python3 -m pytest -q fs_api_proxy/http_api_gateway/tests/test_controller.py
-python3 -m pytest -q rest_api/tests/test_build_api_cgi.py
-```
-
-For the AI-agent HTTP ambassador example:
-
-```sh
-python3 -m pytest -q ai_agents_framework/ai_agent_http_ambassador/tests
-```
+Use the smallest owning container suite, then cover the routing boundary.
+All executable tests belong under a testing container's source directories and
+must be registered by its Dockerfile and `init.sh`. Do not create standalone
+tests under service-level test roots, run pytest directly, or start another
+Flask application/test client in place of a Compose-provided service.
+Follow [container test diagnostics](../container-test-diagnostics/SKILL.md) for
+Compose execution and agent-local reproduction in a temporary Python virtual
+environment. Reproduce the tester Dockerfile's setup and invoke `init.sh` with
+its ENTRYPOINT arguments; never bypass that script with a direct test command.
 
 For a new ambassador, add tests that prove:
 

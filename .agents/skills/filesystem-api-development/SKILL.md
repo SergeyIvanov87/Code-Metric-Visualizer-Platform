@@ -41,11 +41,14 @@ live availability through the provider's public API in integration tests.
 
 ## Checks
 
-From the repository root, the focused deferred transport checks are:
+All executable tests belong to their owning testing container and run through
+its Dockerfile and `init.sh`. Follow
+[container test diagnostics](../container-test-diagnostics/SKILL.md) for execution
+and temporary-environment reproduction.
 
-```sh
-python -m pytest -q common/test_deferred_query_executor.py
-```
+Deferred transport regressions must likewise be registered in the owning
+testing container and launched through its `init.sh`, rather than running a
+common Python test file directly.
 
 The container suite covers service creation, API queries, multiple sessions, and graceful shutdown; see [test diagnostics](../container-test-diagnostics/SKILL.md). After stopping a test service, check that request FIFOs and results were removed, including deferred request resources. Persistent shared staging has a different lifetime: see [streaming ingestion](../streaming-ingestion/SKILL.md).
 
