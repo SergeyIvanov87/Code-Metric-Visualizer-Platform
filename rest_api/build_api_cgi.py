@@ -13,7 +13,8 @@ import sys
 sys.path.append('modules')
 
 from api_browser_utils import (canonize, request_fields, query_page_url, flatten_params,
-                               load_api_requests, build_discovery_document, build_browser_catalog)
+                               load_api_requests, build_discovery_document, build_browser_catalog,
+                               QUERY_VIEW_PARAMETER, QUERY_ASSET_PARAMETER, QUERY_ASSETS)
 
 from api_schema_utils import compose_api_queries_pipe_names
 from api_schema_utils import file_extension_from_content_type
@@ -188,9 +189,22 @@ cgi_main = [ f'BROWSER_UNGROUPED = {ungrouped_queries!r}',
              '    queries = [dict(query, documentation_html=markdown.markdown(query["documentation"])) for query in service["queries"]]',
              f'    return render_template("service.html", service=service, queries=queries, portal_url={portal_path!r})',
              '',
-             f'@app.route({browser_path + "/queries/<query_id>"!r}, methods=["GET"], strict_slashes=False)',
-             'def browse_query(query_id):',
-             '    query = BROWSER_QUERIES.get(query_id)',
+             'BROWSER_PAGES = {(query["action_url"], query["method"]): query for query in BROWSER_QUERIES.values()}',
+             'BROWSER_ACTION_PATHS = {path for path, method in BROWSER_PAGES}',
+             '@app.before_request',
+             'def browse_query():',
+             '    if request.method != "GET":',
+             '        return None',
+             f'    view = request.args.get({QUERY_VIEW_PARAMETER!r})',
+             f'    asset = request.args.get({QUERY_ASSET_PARAMETER!r})',
+             '    if view is None and asset is None:',
+             '        return None',
+             '    path = request.path.rstrip("/")',
+             '    if asset is not None:',
+             f'        if view is not None or asset not in {QUERY_ASSETS!r} or path not in BROWSER_ACTION_PATHS:',
+             '            abort(404)',
+             '        return app.send_static_file("vendor/jsonformatter/" + asset)',
+             '    query = BROWSER_PAGES.get((path, view))',
              '    if query is None:',
              '        abort(404)',
              '    template = "query_" + query["method"].lower() + ".html"',

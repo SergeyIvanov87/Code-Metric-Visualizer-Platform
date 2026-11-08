@@ -55,8 +55,8 @@
 #query-xml { font-family:monospace; white-space:pre-wrap; }
 #query-text, #query-json pre, #query-error { white-space:pre-wrap; overflow-wrap:anywhere; }
 </style>
-<link rel="stylesheet" href="{{ url_for('static', filename='vendor/jsonformatter/json-formatter.css') }}">
-<script src="{{ url_for('static', filename='vendor/jsonformatter/json-formatter.umd.js') }}"></script>
+<link rel="stylesheet" href="{{ query.asset_urls['json-formatter.css'] }}">
+<script src="{{ query.asset_urls['json-formatter.umd.js'] }}"></script>
 <script>
 const form = document.getElementById('query-form');
 const executeLink = document.getElementById('execute-query');

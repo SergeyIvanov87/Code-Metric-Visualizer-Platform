@@ -21,6 +21,13 @@ Keep README query names as headings without repeating method/path headings.
 Filesystem recovery inserts execute links into matching README headings;
 preserve their rewrite into configure links. Recovery visibility checks identify the exact method-qualified
 query form URL rather than printed heading text.
+Query forms must preserve the exact advertised action path. Use the reserved
+`__rest_api_view=<METHOD>` query-string suffix, not a hashed `_browse/queries`
+path or an unadvertised path suffix. Form assets use the same action path with
+`__rest_api_asset=<whitelisted filename>`. Keep discovery action-only; selectors
+are handled on GET before action dispatch and never enter filesystem requests.
+Validate routing with the documented compose-routing.test.yaml overlay, which
+puts REST after a different fallback provider and overlaps an action route.
 Keep navigation separate from direct API execution and include inherited
 filesystem parameters. Place REST tests in
 `rest_api/tests/functional/service_tester/` and use the predefined schemas under

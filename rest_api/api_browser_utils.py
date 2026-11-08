@@ -3,7 +3,12 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
+
+
+QUERY_VIEW_PARAMETER = "__rest_api_view"
+QUERY_ASSET_PARAMETER = "__rest_api_asset"
+QUERY_ASSETS = ("json-formatter.umd.js", "json-formatter.css", "LICENSE")
 
 
 def service_name(query, domain):
@@ -18,8 +23,12 @@ def service_page_url(service, domain):
 
 
 def query_page_url(query, method, domain):
-    query_id = hashlib.sha256((method + " " + query).encode("utf-8")).hexdigest()
-    return "/" + domain.strip("/") + "/_browse/queries/" + query_id
+    # Keep the discovered action path unchanged for exact gateway ownership.
+    return "/" + query.strip("/") + "?" + urlencode({QUERY_VIEW_PARAMETER: method})
+
+
+def query_asset_url(query, asset):
+    return "/" + query.strip("/") + "?" + urlencode({QUERY_ASSET_PARAMETER: asset})
 
 
 def request_fields(request_data, domain):
@@ -112,7 +121,8 @@ def build_browser_catalog(requests, domain, index_path):
                  "action_url": "/" + fields["query"], "page_url": fields["page_url"],
                  "service_name": fields["service_name"], "service_url": fields["service_url"],
                  "params": flatten_params(fields["params"]), "documentation": documentation,
-                 "response": response_presentation(data)}
+                 "response": response_presentation(data),
+                 "asset_urls": {asset: query_asset_url(fields["query"], asset) for asset in QUERY_ASSETS}}
         queries[fields["query_id"]] = entry
         service = fields["service_name"]
         if service:

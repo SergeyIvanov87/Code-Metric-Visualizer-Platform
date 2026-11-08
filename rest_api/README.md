@@ -9,13 +9,13 @@ This image is developed as an `ambassador` service representing the main service
 After being started, the container launches a simple WEB-server providing the entry point of REST API communication to the main service and its complementary services as submodules.
 The root URI redirects to the API landing page, which lists the discovered service containers. A container is identified by the first path component after the API domain prefix (for example, `cyclomatic_complexity` in `api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic`). A service-root endpoint such as `api.pmccabe_collector.restapi.org/cyclomatic_complexity` is grouped under `cyclomatic_complexity`, even when its README section is named `watch_list`. Select a container to open its API list, then select a query to configure its parameters before execution. Services should publish a **README.md** file with their API documentation; the existing README discovery and restart cycle also rebuilds these pages when APIs appear or disappear.
 
-Browser pages live under `/<API domain>/_browse/services/<container>` and `/<API domain>/_browse/queries/<query ID>`. They do not execute filesystem queries. The service page preserves each query's recovered markdown documentation and replaces the generated immediate-execution links with links to its parameter page. When a collected README is present, only its documented query entries appear in the browser, preserving README-driven publication and withdrawal. Direct action routes continue to follow the discovered FIFOs.
+Service lists live under `/<API domain>/_browse/services/<container>`. A query form uses the complete action path with a query-string suffix, for example `/api.pmccabe_collector.restapi.org/cyclomatic_complexity?__rest_api_view=GET`. The selector identifies the filesystem method to configure (GET, PUT or POST). Loading a form does not execute a filesystem query. The service page preserves each query's recovered markdown documentation and replaces the generated immediate-execution links with links to its parameter page. When a collected README is present, only its documented query entries appear in the browser, preserving README-driven publication and withdrawal. Direct action routes continue to follow the discovered FIFOs.
 
 Each supported filesystem API method has its own template (`query_get.html`, `query_put.html`, and `query_post.html`) extending the shared query form. Text fields contain the defaults recovered from the filesystem argument files, including inherited parameters from parent directories. If a parameter is defined at multiple levels, the default closest to the query wins. `SESSION_ID` remains managed by the server.
 
 Select **Execute query** to send the declared HTTP method with only edited parameters encoded in the query string. Unchanged fields are omitted so providers retain their own defaults, including inherited quotes and backslashes. The page reports HTTP status and selects presentation from the recovered result FIFO extension: text is shown inline, HTML renders in a sandboxed frame, XML has collapsible elements, JSON uses locally served JSONFormatter in an expandable details panel, images as clickable thumbnails with a full-resolution zoom dialog, and binary files as downloads. Every response has a download button preserving its original bytes and extension. JSONFormatter 2.5.23 is downloaded and checksum-verified at build time in both REST Dockerfiles; browsers load its JS/CSS from Flask without contacting a CDN. Image controls include zoom in/out, a scale slider, fit-to-pane, actual size, and close/Escape. JavaScript is required for this execution control. Existing direct API URLs, query-string parameters, the `default` option, and HEAD readiness probes remain available to programmatic clients. The `default` option sends no parameter overrides: providers read their own parameter files, preserving quoted defaults across filesystem API calls. A browser GET to a POST-only API URL redirects to its parameter page.
 
-Only the API action paths are published in the HTTP route discovery document; browser pages use the generic REST provider's existing gateway fallback. Provider order and route precedence are unchanged. Multiple methods on one action path are advertised once.
+Only API action paths are published in the HTTP route discovery document. Query forms and their JSONFormatter assets preserve that exact path, using the reserved `__rest_api_view` and `__rest_api_asset` query parameters respectively; Envoy routes them to the action owner instead of the catch-all. Execution uses the bare action URL and the declared HTTP method. Invalid view methods and non-whitelisted assets return 404 without executing a query. HEAD readiness probes retain their existing behavior. Portal and service-list pages continue to use the generic first provider's fallback. Provider order, later-provider precedence, and discovery paths are unchanged; multiple methods on one action path are advertised once.
 
 Once started, as being said before, the REST-API service searches for all registered services by parsing the filesystem tree using the set of predefined rules:
 
@@ -152,3 +152,14 @@ append their internal REST hostname and loopback addresses to `NO_PROXY` and
 `no_proxy` so local requests do not go through an outbound proxy. Build secrets do not invalidate the
 Docker build cache; use `build --no-cache` when you need to re-exercise package
 installation with a changed CA.
+
+
+To exercise query pages through real Envoy with REST as the second provider:
+
+```sh
+docker compose -f rest_api/compose-functional.test.yaml -f rest_api/compose-routing.test.yaml up --build --abort-on-container-exit --exit-code-from rest-api-functional-service-tester
+```
+
+This overlay runs the normal tester through its existing `init.sh` plus routing
+checks. A different provider is the catch-all and also advertises `req_1`, so
+REST must win the collision for its forms, assets, and action execution.

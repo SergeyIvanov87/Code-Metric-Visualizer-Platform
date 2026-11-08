@@ -3,6 +3,7 @@
 from html.parser import HTMLParser
 import json
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 import requests
@@ -24,6 +25,7 @@ class Page(HTMLParser):
     def __init__(self, content):
         super().__init__()
         self.links = []
+        self.assets = []
         self.headings = []
         self.heading_parts = None
         self.inputs = {}
@@ -33,6 +35,10 @@ class Page(HTMLParser):
 
     def handle_starttag(self, tag, attributes):
         attributes = dict(attributes)
+        if tag == "script" and attributes.get("src"):
+            self.assets.append(attributes["src"])
+        if tag == "link" and attributes.get("rel") == "stylesheet":
+            self.assets.append(attributes["href"])
         if tag in {"h1", "h2", "h3"}:
             self.heading_parts = []
         if tag == "a":
@@ -63,7 +69,7 @@ def page_at(path):
 def query_pages(service):
     listing = page_at(service_page_url(service, DOMAIN))
     return [page_at(link) for link in sorted(set(listing.links))
-            if "/_browse/queries/" in link]
+            if "__rest_api_view" in parse_qs(urlsplit(link).query)]
 
 
 def query_page(query):
@@ -143,3 +149,15 @@ def test_service_keeps_readme_names_without_repeated_query_path_headings(source)
     assert source.stem in page.headings
     assert all(query["Query"] not in heading for heading in page.headings)
     assert page.links.count(query_page_url(query["Query"], query["Method"], DOMAIN)) == 1
+
+
+@pytest.mark.parametrize("query", QUERIES, ids=lambda query: query["Method"])
+def test_form_url_preserves_discovered_action_path(query):
+    url = query_page_url(query["Query"], query["Method"], DOMAIN)
+    assert urlsplit(url).path == "/" + query["Query"]
+    assert parse_qs(urlsplit(url).query) == {"__rest_api_view": [query["Method"]]}
+    assert page_at(url + "&param_1=ignored").form["data-method"] == query["Method"]
+
+def test_unknown_form_method_does_not_execute_action():
+    response = requests.get(BASE_URL + "/" + DOMAIN + "/req_1?__rest_api_view=DELETE", timeout=10)
+    assert response.status_code == 404

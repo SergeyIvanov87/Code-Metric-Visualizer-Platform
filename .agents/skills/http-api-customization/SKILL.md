@@ -87,7 +87,10 @@ discovery response.
 - Omit `timeout_seconds` only when the gateway's configured default is suitable
   for that action.
 - Advertise an action path once even when GET renders its page and POST or PUT
-  performs the action.
+  performs the action. REST forms select their method with `__rest_api_view`
+  on that exact action path; their local assets use `__rest_api_asset`. Query
+  strings do not change Envoy path ownership. Avoid hashed UI paths or added
+  path suffixes that would fall through to the first provider.
 - Do not advertise `/healthz` or private asset paths unless external clients
   are intentionally meant to reach them through the gateway.
 

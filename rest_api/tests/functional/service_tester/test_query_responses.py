@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import requests
 
-from api_browser_utils import query_page_url
+from api_browser_utils import query_page_url, query_asset_url
 from settings import Settings
 from test_api_browser import Page
 
@@ -35,8 +35,15 @@ def test_response_page_metadata_matches_fifo_payload(name, kind, extension, cont
 
 def test_jsonformatter_assets_are_served_locally():
     for asset in ["json-formatter.umd.js", "json-formatter.css", "LICENSE"]:
-        response = requests.get("http://rest-api:5000/static/vendor/jsonformatter/" + asset, timeout=10)
+        response = requests.get("http://rest-api:5000" + query_asset_url(
+            Settings().domain_name_api_entry + "/req_1", asset), timeout=10)
         response.raise_for_status()
         assert len(response.content) > 100
     assert "JSONFormatter" in requests.get(
-        "http://rest-api:5000/static/vendor/jsonformatter/json-formatter.umd.js", timeout=10).text
+        "http://rest-api:5000" + query_asset_url(
+            Settings().domain_name_api_entry + "/req_1", "json-formatter.umd.js"), timeout=10).text
+
+
+def test_query_assets_reject_unknown_files():
+    url = query_asset_url(Settings().domain_name_api_entry + "/req_1", "../cgi.py")
+    assert requests.get("http://rest-api:5000" + url, timeout=10).status_code == 404

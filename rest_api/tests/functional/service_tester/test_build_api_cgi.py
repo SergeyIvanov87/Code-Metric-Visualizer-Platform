@@ -65,6 +65,9 @@ def generate_from_directory(schema_directory):
 
 
 class FakeApplication:
+    def before_request(self, handler):
+        return handler
+
     def route(self, *_args, **_kwargs):
         return lambda handler: handler
 
@@ -234,3 +237,26 @@ def test_discovery_endpoint_is_generated_from_api_schemas(tmp_path):
             "timeout_seconds": 60,
         }
     ]
+
+
+def test_generated_forms_select_method_on_the_advertised_action_path(tmp_path):
+    # Test the CGI boundary directly: the existing filesystem collector keys by
+    # path and currently cannot supply both methods from the same FIFO tree.
+    query = "api.pmccabe_collector.restapi.org/shared"
+    schemas = {method.lower(): {"Query": query, "Method": method, "Params": {},
+                               "Content-Type": "text/plain"}
+               for method in ("GET", "PUT")}
+    namespace = {"app": FakeApplication(),
+                 "markdown": SimpleNamespace(markdown=lambda text: text),
+                 "render_template": lambda template, **context: (template, context)}
+    exec(compile(generate_cgi(tmp_path, schemas), "<generated-cgi>", "exec"), namespace)
+    urls = set()
+    for method in ("GET", "PUT"):
+        namespace["request"] = SimpleNamespace(method="GET", path="/" + query,
+                                               args={"__rest_api_view": method})
+        template, context = namespace["browse_query"]()
+        assert template == "query_" + method.lower() + ".html"
+        assert context["query"]["method"] == method
+        assert context["query"]["action_url"] == "/" + query
+        urls.add(context["query"]["page_url"])
+    assert urls == {"/" + query + "?__rest_api_view=" + method for method in ("GET", "PUT")}
