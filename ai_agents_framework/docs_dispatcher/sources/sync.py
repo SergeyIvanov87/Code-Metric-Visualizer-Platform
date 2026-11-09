@@ -5,15 +5,13 @@ import json
 import sys
 
 from backend.dispatcher.dispatcher import BackendDispatcher
-from dispatcher_backend_config import load_backend_config
 from utils import get_impl_procedure_name
 
 def main():
     parser = argparse.ArgumentParser(prog="Sync documents on a persistent storage")
     parser.parse_args()
 
-    backend_config = load_backend_config()
-    backend_dispatcher = BackendDispatcher(backend_config)
+    backend_dispatcher = BackendDispatcher()
     exec_status = backend_dispatcher.delegate_query(
         backend_dispatcher.create_executable_command_prefix(get_impl_procedure_name(__file__)),
         text=False,

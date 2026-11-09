@@ -5,7 +5,6 @@ import json
 import sys
 
 from backend.dispatcher.dispatcher import BackendDispatcher
-from dispatcher_backend_config import load_backend_config
 from utils import get_impl_procedure_name
 
 def _parse_ids(value: str) -> list[int]:
@@ -50,8 +49,7 @@ def main():
 
     args = parser.parse_args(_normalize_assignment_args(sys.argv[1:]))
 
-    backend_config = load_backend_config()
-    backend_dispatcher = BackendDispatcher(backend_config)
+    backend_dispatcher = BackendDispatcher()
     command = backend_dispatcher.create_executable_command_prefix(get_impl_procedure_name(__file__))
     command.extend(["-ids", ",".join(str(record_id) for record_id in args.ids)])
     if args.metadata is not None:

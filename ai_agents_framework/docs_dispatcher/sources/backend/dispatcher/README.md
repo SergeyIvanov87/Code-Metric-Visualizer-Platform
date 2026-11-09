@@ -32,13 +32,14 @@ selected bindings, and contain no concrete implementation imports.
 
 The frozen `BackendConfig` in `config.py` contains configuration data only, and
 `load_backend_config()` returns that data object. `BackendDispatcher` in
-`dispatcher.py` receives a `BackendConfig` in its constructor and provides
+`dispatcher.py` loads its own `BackendConfig` in its no-argument constructor and provides
 `command_module()`, `create_executable_command_prefix()`, `delegate_query()`,
 and `get_formatted_response()` for command routing, execution, and response
 formatting.
 
-All public dispatcher scripts construct a `BackendDispatcher` from the loaded
-configuration and route to shared `dispatcher.commands` modules.
+All public dispatcher scripts construct `BackendDispatcher()` and route to
+shared `dispatcher.commands` modules. They neither import nor load `BackendConfig`;
+configuration loading and access stay inside the dispatcher.
 `dispatcher.runtime.get_backend()` loads the selected composition and checks its
 two interface bindings. New backends implement these contracts and declare a
 composition, without duplicating command scripts.

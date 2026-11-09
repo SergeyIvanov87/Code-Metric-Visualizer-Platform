@@ -8,8 +8,9 @@ before changing backend configuration, schemas, or storage behavior.
 
 Keep `BackendConfig` data-only and `load_backend_config()` returning that data
 object. Command routing, delegation, and response formatting belong to
-`BackendDispatcher` in `dispatcher.py`, which receives the configuration in its
-constructor.
+`BackendDispatcher` in `dispatcher.py`, which loads its configuration inside its
+no-argument constructor. Top-level `sources/*.py` scripts must use only
+`BackendDispatcher()`, without importing, loading, or accessing `BackendConfig`.
 
 Treat `mysql_persistent` as a composition, not a renamed MySQL implementation.
 Keep the directory layout `backend/{dispatcher,interfaces,mysql_persistent}`,

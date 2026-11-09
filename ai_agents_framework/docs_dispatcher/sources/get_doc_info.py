@@ -5,7 +5,6 @@ import json
 import sys
 
 from backend.dispatcher.dispatcher import BackendDispatcher
-from dispatcher_backend_config import load_backend_config
 from utils import get_impl_procedure_name
 
 def _parse_doc_ids(value: str) -> list[int]:
@@ -27,8 +26,7 @@ def main() -> int:
     parser.add_argument("-doc_ids", "--doc_ids", required=True, type=_parse_doc_ids)
     args = parser.parse_args()
 
-    backend_config = load_backend_config()
-    backend_dispatcher = BackendDispatcher(backend_config)
+    backend_dispatcher = BackendDispatcher()
     command = backend_dispatcher.create_executable_command_prefix(get_impl_procedure_name(__file__))
     command.extend(["--doc-ids", ",".join(str(doc_id) for doc_id in args.doc_ids)])
 

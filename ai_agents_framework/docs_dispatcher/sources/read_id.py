@@ -5,7 +5,6 @@ import json
 import sys
 
 from backend.dispatcher.dispatcher import BackendDispatcher
-from dispatcher_backend_config import load_backend_config
 from utils import get_impl_procedure_name
 
 def main() -> int:
@@ -24,8 +23,7 @@ def main() -> int:
         parser.error("id parameter is required")
 
     record_id = int(parameters["id"])
-    backend_config = load_backend_config()
-    backend_dispatcher = BackendDispatcher(backend_config)
+    backend_dispatcher = BackendDispatcher()
     command = backend_dispatcher.create_executable_command_prefix(get_impl_procedure_name(__file__))
     command.extend(["--id", str(record_id)])
     exec_status = backend_dispatcher.delegate_query(

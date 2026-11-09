@@ -4,12 +4,12 @@ import json
 import subprocess
 import sys
 
-from .config import BackendConfig
+from .config import load_backend_config
 
 
 class BackendDispatcher:
-    def __init__(self, config: BackendConfig):
-        self.config = config
+    def __init__(self):
+        self._config = load_backend_config()
 
     def command_module(self, command_name: str) -> str:
         return f"dispatcher.commands.{command_name}"
@@ -29,7 +29,7 @@ class BackendDispatcher:
             command,
             input=input_data,
             capture_output=True,
-            cwd=self.config.backends_code_dir,
+            cwd=self._config.backends_code_dir,
             text=text,
             shell=False,
         )
