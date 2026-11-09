@@ -1,21 +1,22 @@
 from __future__ import annotations
+from interfaces_impl.store.persistent import PersistentStorageRecordEntry
+from interfaces import RuntimeConfig
 
 import io
 from contextlib import nullcontext
-from mysql_persistent.access.mysql import MysqlAccessRecordEntry
+from interfaces_impl.access.mysql import MysqlAccessRecordEntry
 import json
-from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from mysql_persistent.access.database import Base
-from mysql_persistent.access.crud import create_file_record, get_all_records, get_file_record, update_file_record_ext
-from interfaces.store.operations import add_abstract_document, get_record, get_all_records as get_all_storage_records
-from dispatcher.commands.attach_doc_chunk import main as attach_chunk_main
-from dispatcher.commands.delete_doc import main as delete_doc_main
+from interfaces_impl.access.mysql.database import Base
+
+
+from attach_doc_chunk import main as attach_chunk_main
+from delete_doc import main as delete_doc_main
 
 
 @pytest.fixture()
@@ -38,34 +39,18 @@ def db_session(db_engine):
 
 
 def _create_parent_document(db_session, storage_root: Path, file_name: str, content: str):
-    parent = create_file_record(
-        db_session,
-        file_path=file_name,
-        offset=0,
-        size=len(content),
-        parent_id=0,
-        metadata_json={"comment": "document metadata"},
-        doc_type="txt",
-    )
-    storage_record = add_abstract_document(storage_root, Path(file_name), parent.id, content.encode('utf-8'))
-    storage_record.commit_doc(
-        storage_root,
-        offset=parent.offset,
-        metadata_text="document metadata",
-        doc_type="txt",
-    )
+    parent = MysqlAccessRecordEntry(db_session).create_file_record(file_path=file_name, offset=0, size=len(content), parent_id=0, metadata_json={'comment': 'document metadata'}, doc_type='txt')
+    PersistentStorageRecordEntry(storage_root).add_document(
+        Path(file_name), parent.id, content.encode('utf-8'), offset=parent.offset,
+        metadata_text="document metadata", doc_type="txt")
     parent.parent_id = parent.id
-    update_file_record_ext(db_session, parent.id, parent)
+    MysqlAccessRecordEntry(db_session).update_file_record_ext(parent.id, parent)
     return parent
 
 
-def _mysql_backend_config(tmp_path: Path, storage_root: Path) -> SimpleNamespace:
-    return SimpleNamespace(
-        db_login_secret_path=tmp_path / "login",
-        db_pwd_secret_path=tmp_path / "pwd",
-        db_uri="sqlite:///ignored.db",
-        storage_uri=storage_root,
-    )
+def _mysql_backend_config(tmp_path: Path, storage_root: Path) -> RuntimeConfig:
+    return RuntimeConfig(options={"storage_uri": str(storage_root)}, spec_path=tmp_path / "current")
+
 
 
 def test_document_storage_round_trips_metadata_and_doc_type(tmp_path, db_session):
@@ -73,7 +58,7 @@ def test_document_storage_round_trips_metadata_and_doc_type(tmp_path, db_session
     storage_root.mkdir()
     parent = _create_parent_document(db_session, storage_root, "parent.txt", "abcdefghij")
 
-    storage_record = get_record(storage_root, parent.id)
+    storage_record = PersistentStorageRecordEntry(storage_root).get_record(parent.id)
 
     assert storage_record is not None
     assert storage_record.metadata == {"comment": "document metadata"}
@@ -95,18 +80,18 @@ def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_sess
         "sys.argv",
         [
             "attach_doc_chunk.py",
-            str(parent.id),
-            "-m",
+            "-doc_id", str(parent.id),
+            "-metadata",
             str(metadata_path),
         ],
     )
-    monkeypatch.setattr("dispatcher.commands.attach_doc_chunk.load_runtime_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("mysql_persistent.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
+    monkeypatch.setattr("backend.dispatcher.runtime.load_runtime_config", lambda config=None: _mysql_backend_config(tmp_path, storage_root))
+    monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
 
     assert attach_chunk_main() == 0
     capsys.readouterr()
 
-    records = get_all_records(db_session)
+    records = MysqlAccessRecordEntry(db_session).get_all_records()
     assert len(records) == 2
 
     chunk = next(record for record in records if record.id != parent.id)
@@ -116,7 +101,7 @@ def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_sess
     assert chunk.file_path == parent.file_path
     assert chunk.metadata_json == {"comment": "chunk comment"}
 
-    storage_chunk = get_record(storage_root, chunk.id)
+    storage_chunk = PersistentStorageRecordEntry(storage_root).get_record(chunk.id)
     assert storage_chunk is not None
     assert storage_chunk.parent_id == parent.id
     assert storage_chunk.offset == 3
@@ -138,13 +123,13 @@ def test_attach_chunk_rejects_missing_offset(monkeypatch, tmp_path, db_session, 
         "sys.argv",
         [
             "attach_doc_chunk.py",
-            str(parent.id),
-            "-m",
+            "-doc_id", str(parent.id),
+            "-metadata",
             str(metadata_path),
         ],
     )
-    monkeypatch.setattr("dispatcher.commands.attach_doc_chunk.load_runtime_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("mysql_persistent.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
+    monkeypatch.setattr("backend.dispatcher.runtime.load_runtime_config", lambda config=None: _mysql_backend_config(tmp_path, storage_root))
+    monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
 
     assert attach_chunk_main() == -1
 
@@ -173,13 +158,13 @@ def test_delete_doc_removes_multiple_documents_and_chunks(
             "sys.argv",
             [
                 "attach_doc_chunk.py",
-                str(parent.id),
-                "-m",
+                "-doc_id", str(parent.id),
+                "-metadata",
                 str(metadata_path),
             ],
         )
-        monkeypatch.setattr("dispatcher.commands.attach_doc_chunk.load_runtime_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-        monkeypatch.setattr("mysql_persistent.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
+        monkeypatch.setattr("backend.dispatcher.runtime.load_runtime_config", lambda config=None: _mysql_backend_config(tmp_path, storage_root))
+        monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
         assert attach_chunk_main() == 0
 
     second_parent = _create_parent_document(
@@ -188,19 +173,15 @@ def test_delete_doc_removes_multiple_documents_and_chunks(
         "second_parent.txt",
         "klmnopqrst",
     )
-    first_chunk = next(
-        record
-        for record in get_all_records(db_session)
-        if record.parent_id == parent.id and record.id != parent.id
-    )
+    first_chunk = next((record for record in MysqlAccessRecordEntry(db_session).get_all_records() if record.parent_id == parent.id and record.id != parent.id))
     capsys.readouterr()
     monkeypatch.setattr("sys.argv", [
         "delete_doc.py",
         "-ids",
         f"{parent.id},{first_chunk.id},{second_parent.id},{parent.id}",
     ])
-    monkeypatch.setattr("dispatcher.commands.delete_doc.load_runtime_config", lambda: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("mysql_persistent.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
+    monkeypatch.setattr("backend.dispatcher.runtime.load_runtime_config", lambda config=None: _mysql_backend_config(tmp_path, storage_root))
+    monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
 
     assert delete_doc_main() == 0
     result = json.loads(capsys.readouterr().out)
@@ -210,8 +191,8 @@ def test_delete_doc_removes_multiple_documents_and_chunks(
         "deleted from storage": 4,
         "error_code": 0,
     }
-    assert get_all_records(db_session) == []
-    assert get_all_storage_records(storage_root) == {}
+    assert MysqlAccessRecordEntry(db_session).get_all_records() == []
+    assert PersistentStorageRecordEntry(storage_root).get_all_records() == {}
 
 
 def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
@@ -230,11 +211,11 @@ def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
         ["delete_doc.py", "-ids", f"{parent.id},999"],
     )
     monkeypatch.setattr(
-        "dispatcher.commands.delete_doc.load_runtime_config",
-        lambda: _mysql_backend_config(tmp_path, storage_root),
+        "backend.dispatcher.runtime.load_runtime_config",
+        lambda config=None: _mysql_backend_config(tmp_path, storage_root),
     )
     monkeypatch.setattr(
-        "mysql_persistent.access.mysql.MysqlAccessRecordEntry.open",
+        "interfaces_impl.access.mysql.MysqlAccessRecordEntry.open",
         lambda config: nullcontext(MysqlAccessRecordEntry(db_session)),
     )
 
@@ -245,5 +226,5 @@ def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
     assert result["deleted from storage"] == 1
     assert result["error_code"] == 1
     assert result["error_msg"] == "Record id=999 does not exist"
-    assert get_all_records(db_session) == []
-    assert get_all_storage_records(storage_root) == {}
+    assert MysqlAccessRecordEntry(db_session).get_all_records() == []
+    assert PersistentStorageRecordEntry(storage_root).get_all_records() == {}

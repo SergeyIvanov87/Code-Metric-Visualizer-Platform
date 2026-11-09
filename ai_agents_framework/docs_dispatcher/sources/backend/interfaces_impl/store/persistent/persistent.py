@@ -1,18 +1,130 @@
-#!/usr/bin/env python
-
-import argparse
-import json
-import sys
-from dataclasses import dataclass
 from pathlib import Path
+
+from interfaces.access.utils import canonize_file_uri
+from interfaces.store.entry import StorageRecordEntryInterface
+from interfaces.store import StorageRecord
+from interfaces.access import AccessRecordEntryInterface, AccessRecord
+from interfaces import RuntimeConfig
 from typing import Iterable
+from dataclasses import dataclass
 
 
-from dispatcher.runtime import get_backend
-from dispatcher.runtime_config import load_runtime_config
-from interfaces.access import AccessRecord, AccessRecordEntryInterface
-from interfaces.store import operations as doc_storage_operations
-from interfaces.store.models import StorageRecord
+class PersistentStorageRecordEntry(StorageRecordEntryInterface):
+    """Own the naming, creation, reading and sizing of stored document data."""
+
+    doc_suffix = ".storage_bin"
+
+    def document_path(self, file_uri: str | Path) -> Path:
+        uri = self.directory / canonize_file_uri(str(file_uri))
+        return uri.with_name(f"{uri.name}{self.doc_suffix}")
+
+    def read_fields(self) -> dict:
+        fields = super().read_fields()
+        fields["file_uri"] = ""
+        for entry in self.directory.iterdir():
+            if entry.suffix == self.doc_suffix:
+                fields["file_uri"] = entry.stem
+        return fields
+
+    def write_document(self, file_uri: str | Path, data: bytes | bytearray) -> None:
+        self.document_path(file_uri).write_bytes(data)
+
+    def create_chunk(self, file_uri: str | Path) -> None:
+        self.document_path(file_uri).touch(exist_ok=False)
+
+    def read_document(self, file_uri: str | Path) -> bytes:
+        return self.document_path(file_uri).read_bytes()
+
+    def document_size(self, file_uri: str | Path) -> int:
+        return self.document_path(file_uri).stat().st_size
+
+    @classmethod
+    def from_config(cls, config: RuntimeConfig):
+        value = config.options.get("storage_uri")
+        if not value:
+            raise ValueError("Persistent storage requires storage_uri")
+        return cls(Path(value))
+
+    def _entry(self, unique_id: int):
+        return type(self)(self.record_path(self.directory, unique_id))
+
+    def get_all_records(self) -> dict[int, StorageRecord]:
+        records = {}
+        for directory in self.directories(self.directory):
+            record = StorageRecord(**type(self)(directory).read_fields())
+            records[record.unique_id] = record
+        return records
+
+    def get_record(self, unique_id: int) -> StorageRecord | None:
+        entry = self._entry(unique_id)
+        return StorageRecord(**entry.read_fields()) if entry.exists() else None
+
+    def delete_record(self, unique_id: int) -> bool:
+        return self._entry(unique_id).delete()
+
+    def add_document(self, file_uri: str | Path, unique_id: int, data: bytes, *,
+                     offset: int = 0, metadata_text: str = "", doc_type: str = "") -> StorageRecord:
+        if not self.exists():
+            raise RuntimeError(f"Cannot add the main document: {file_uri}, the storage path doesn't exist: {self.directory}")
+        entry = self._entry(unique_id)
+        entry.create()
+        entry.write_document(file_uri, data)
+        size = entry.document_size(file_uri)
+        entry.write_fields(offset=offset, size=size, parent_id=unique_id,
+                           metadata=metadata_text, doc_type=doc_type)
+        return StorageRecord(file_uri=file_uri, unique_id=unique_id, offset=offset, size=size,
+                             parent_id=unique_id, metadata={"comment": metadata_text} if metadata_text else {},
+                             doc_type=doc_type)
+
+    def add_chunk(self, file_uri: str | Path, unique_id: int, *, metadata_text: str = "") -> StorageRecord:
+        if not self.exists():
+            raise RuntimeError(f"Cannot add a chunk: {file_uri}, the storage path doesn't exist: {self.directory}")
+        entry = self._entry(unique_id)
+        entry.create()
+        entry.create_chunk(file_uri)
+        entry.write_fields(offset=0, size=0, parent_id=0, metadata=metadata_text)
+        return StorageRecord(file_uri=file_uri, unique_id=unique_id, offset=0, size=0,
+                             metadata={"comment": metadata_text} if metadata_text else {})
+
+    def update_record(self, unique_id: int, *, parent_id: int, offset_size: tuple[int, int]) -> None:
+        offset, size = offset_size
+        self._entry(unique_id).write_fields(offset=offset, size=size, parent_id=parent_id)
+
+    def get_chunk_bounds(self, document: StorageRecord, data: bytes) -> tuple[int, int]:
+        parent_data = self._entry(document.unique_id).read_document(document.file_uri)
+        offset = parent_data.find(data)
+        if offset < 0:
+            raise ValueError("chunk does not belong to the parent document")
+        return offset, len(data)
+
+    def read_ids(
+        self,
+        access: AccessRecordEntryInterface,
+        record_ids: Iterable[int],
+    ) -> dict[int, dict[str, object]]:
+        requested_ids = _unique_ids(record_ids)
+        storage_records = self.get_all_records()
+        resolved, resolution_errors = _resolve_records(
+            access,
+            storage_records,
+            requested_ids,
+        )
+        payloads, payload_errors = _read_document_payloads(
+            self,
+            storage_records,
+            (record.document_id for record in resolved.values()),
+        )
+        results = _extract_contexts(resolved, payloads, payload_errors)
+
+        for record_id, error_msg in resolution_errors.items():
+            results[record_id] = {
+                "id": record_id,
+                "error_code": -1,
+                "status": "error",
+                "error_msg": error_msg,
+            }
+
+        return {record_id: results[record_id] for record_id in requested_ids}
 
 
 @dataclass(frozen=True)
@@ -30,14 +142,11 @@ class ResolvedRecord:
     def document_id(self) -> int:
         return self.record_id if self.record_type == "document" else self.parent_id
 
-
 def _unique_ids(record_ids: Iterable[int]) -> list[int]:
     return list(dict.fromkeys(record_ids))
 
-
 def _record_fields(record: AccessRecord | StorageRecord) -> tuple[int, int, int]:
     return int(record.parent_id), int(record.offset), int(record.size)
-
 
 def _resolve_records(
     access: AccessRecordEntryInterface,
@@ -89,9 +198,8 @@ def _resolve_records(
 
     return resolved, errors
 
-
 def _read_document_payloads(
-    storage_uri: Path,
+    store: StorageRecordEntryInterface,
     storage_records: dict[int, StorageRecord],
     document_ids: Iterable[int],
 ) -> tuple[dict[int, bytes], dict[int, str]]:
@@ -112,14 +220,13 @@ def _read_document_payloads(
             continue
 
         try:
-            payloads[document_id] = document.entry(storage_uri).read_document(document.file_uri)
+            payloads[document_id] = store._entry(document.unique_id).read_document(document.file_uri)
         except OSError as exc:
             errors[document_id] = (
                 f"Cannot read parent document id={document_id} from file storage: {exc}"
             )
 
     return payloads, errors
-
 
 def _extract_contexts(
     records: dict[int, ResolvedRecord],
@@ -189,60 +296,3 @@ def _extract_contexts(
         }
 
     return results
-
-
-def read_ids(
-    access: AccessRecordEntryInterface,
-    storage_uri: Path,
-    record_ids: Iterable[int],
-) -> dict[int, dict[str, object]]:
-    requested_ids = _unique_ids(record_ids)
-    storage_records = doc_storage_operations.get_all_records(storage_uri)
-    resolved, resolution_errors = _resolve_records(
-        access,
-        storage_records,
-        requested_ids,
-    )
-    payloads, payload_errors = _read_document_payloads(
-        storage_uri,
-        storage_records,
-        (record.document_id for record in resolved.values()),
-    )
-    results = _extract_contexts(resolved, payloads, payload_errors)
-
-    for record_id, error_msg in resolution_errors.items():
-        results[record_id] = {
-            "id": record_id,
-            "error_code": -1,
-            "status": "error",
-            "error_msg": error_msg,
-        }
-
-    return {record_id: results[record_id] for record_id in requested_ids}
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(prog="Read an ID using selected backend")
-    parser.add_argument("--id", required=True, type=int)
-    args = parser.parse_args()
-
-    try:
-        backend_config = load_runtime_config()
-        with get_backend().access.open(backend_config) as access:
-            result = read_ids(access, backend_config.storage_uri, [args.id])[args.id]
-        return_code = 0 if result["error_code"] == 0 else -1
-    except Exception as exc:
-        result = {
-            "id": args.id,
-            "error_code": -1,
-            "status": "error",
-            "error_msg": str(exc),
-        }
-        return_code = -1
-
-    print(json.dumps(result))
-    return return_code
-
-
-if __name__ == "__main__":
-    sys.exit(main())

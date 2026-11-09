@@ -1,34 +1,22 @@
-from mysql_persistent.access.mysql import MysqlAccessRecordEntry
+from interfaces_impl.store.persistent import PersistentStorageRecordEntry
+from interfaces_impl.access.mysql import MysqlAccessRecordEntry
 from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from mysql_persistent.access.crud import create_file_record, update_file_record
-from mysql_persistent.access.database import Base
-from dispatcher.commands.read_id import read_ids
+
+from interfaces_impl.access.mysql.database import Base
+
 
 
 def _db_document(session, content: bytes):
-    document = create_file_record(
-        session,
-        "/docs/document.txt",
-        0,
-        len(content),
-        0,
-        doc_type="txt",
-    )
-    return update_file_record(session, document.id, parent_id=document.id)
+    document = MysqlAccessRecordEntry(session).create_file_record('/docs/document.txt', 0, len(content), 0, doc_type='txt')
+    return MysqlAccessRecordEntry(session).update_file_record(document.id, parent_id=document.id)
 
 
 def _db_chunk(session, document_id: int, offset: int, size: int):
-    return create_file_record(
-        session,
-        "/docs/document.txt",
-        offset,
-        size,
-        document_id,
-    )
+    return MysqlAccessRecordEntry(session).create_file_record('/docs/document.txt', offset, size, document_id)
 
 
 def _storage_record(
@@ -93,11 +81,7 @@ def test_read_ids_reads_document_once_for_document_and_multiple_chunks(tmp_path,
 
     monkeypatch.setattr(Path, "read_bytes", counted_read_bytes)
 
-    assert read_ids(
-        MysqlAccessRecordEntry(session),
-        tmp_path,
-        [document.id, db_only_chunk.id, storage_only_chunk_id, document.id],
-    ) == {
+    assert PersistentStorageRecordEntry(tmp_path).read_ids(MysqlAccessRecordEntry(session), [document.id, db_only_chunk.id, storage_only_chunk_id, document.id]) == {
         document.id: {
             "id": document.id,
             "parent_id": document.id,
@@ -161,7 +145,7 @@ def test_read_ids_reports_missing_inconsistent_and_out_of_bounds_records(tmp_pat
         1,
     )
 
-    result = read_ids(MysqlAccessRecordEntry(session), tmp_path, [999, inconsistent_chunk.id, out_of_bounds_id])
+    result = PersistentStorageRecordEntry(tmp_path).read_ids(MysqlAccessRecordEntry(session), [999, inconsistent_chunk.id, out_of_bounds_id])
 
     assert result[999] == {
         "id": 999,

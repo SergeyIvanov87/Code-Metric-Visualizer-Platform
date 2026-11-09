@@ -304,7 +304,7 @@ these properties:
 | Chunk reads through the dispatcher | `ai_agents_framework/ai_agent/sources/docs_retriever.py` |
 | Dispatcher backend selection | `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/config.py` and `sources/backend/dispatcher/current` |
 | Filesystem record model | `ai_agents_framework/docs_dispatcher/sources/backend/interfaces/store/` |
-| MySQL metadata model and ID generation | `ai_agents_framework/docs_dispatcher/sources/backend/mysql_persistent/access/models.py` |
-| Filesystem-to-MySQL synchronization | `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/commands/sync.py` |
+| MySQL metadata model and ID generation | `ai_agents_framework/docs_dispatcher/sources/backend/interfaces_impl/access/mysql/models.py` |
+| Filesystem-to-MySQL synchronization | `ai_agents_framework/docs_dispatcher/sources/backend/interfaces_impl/access/mysql/mysql.py` |
 
 <!-- markdownlint-enable MD013 -->

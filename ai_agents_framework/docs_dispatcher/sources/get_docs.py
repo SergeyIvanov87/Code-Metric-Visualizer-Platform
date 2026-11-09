@@ -5,7 +5,6 @@ import json
 import sys
 
 from backend.dispatcher.dispatcher import BackendDispatcher
-from utils import get_impl_procedure_name
 
 def main():
     parser = argparse.ArgumentParser(
@@ -28,21 +27,14 @@ def main():
     offset = int(parameters["offset"])
     limit = int(parameters["limit"])
 
-    backend_dispatcher = BackendDispatcher()
-    command = backend_dispatcher.create_executable_command_prefix(get_impl_procedure_name(__file__))
-    command.extend(["--offset", str(offset)])
-    command.extend(["--limit", str(limit)])
-
-    exec_status = backend_dispatcher.delegate_query(
-        command,
-        text=True,
-    )
-
-    result = backend_dispatcher.get_formatted_response(exec_status,
-                                                   get_impl_procedure_name(__file__),
-                                                   text=True)
+    try:
+        with BackendDispatcher().get_backend() as backend:
+            result = backend.access.get_documents(offset, limit)
+        result = {"error_code": 0, **result}
+    except Exception as ex:
+        result = {"error_code": -1, "error_msg": str(ex)}
     print(json.dumps(result))
-    return exec_status.returncode
+    return result["error_code"]
 
 
 if __name__ == "__main__":

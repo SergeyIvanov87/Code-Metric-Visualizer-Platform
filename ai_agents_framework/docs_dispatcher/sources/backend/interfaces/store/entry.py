@@ -1,11 +1,16 @@
 """Filesystem entries shared by storage backends and persistent payload handling."""
 
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Iterable, TYPE_CHECKING
 import shutil
 from pathlib import Path
 
 from abc import ABC, abstractmethod
+
+
+if TYPE_CHECKING:
+    from interfaces import RuntimeConfig
+    from interfaces.access import AccessRecordEntryInterface
 
 
 @dataclass
@@ -101,3 +106,41 @@ class StorageRecordEntryInterface(ABC):
     @abstractmethod
     def document_size(self, file_uri: str | Path) -> int:
         """Return the document size in bytes."""
+
+    @classmethod
+    @abstractmethod
+    def from_config(cls, config: "RuntimeConfig") -> "StorageRecordEntryInterface":
+        """Construct a store from backend-specific runtime options."""
+
+    @abstractmethod
+    def get_all_records(self) -> dict[int, StorageRecordSchema]:
+        """Read all document and chunk metadata."""
+
+    @abstractmethod
+    def get_record(self, unique_id: int) -> StorageRecordSchema | None:
+        """Read a record's metadata, if present."""
+
+    @abstractmethod
+    def delete_record(self, unique_id: int) -> bool:
+        """Remove a record and its stored data."""
+
+    @abstractmethod
+    def add_document(self, file_uri, unique_id: int, data: bytes, *,
+                     offset: int = 0, metadata_text: str = "", doc_type: str = "") -> StorageRecordSchema:
+        """Create a full document and its metadata."""
+
+    @abstractmethod
+    def add_chunk(self, file_uri, unique_id: int, *, metadata_text: str = "") -> StorageRecordSchema:
+        """Create a chunk placeholder and its metadata."""
+
+    @abstractmethod
+    def update_record(self, unique_id: int, *, parent_id: int, offset_size: tuple[int, int]) -> None:
+        """Set a chunk's parent and byte range."""
+
+    @abstractmethod
+    def get_chunk_bounds(self, document: StorageRecordSchema, data: bytes) -> tuple[int, int]:
+        """Locate chunk data in its parent document."""
+
+    @abstractmethod
+    def read_ids(self, access: "AccessRecordEntryInterface", record_ids: Iterable[int]) -> dict[int, dict[str, object]]:
+        """Resolve record consistency and retrieve document or chunk content."""

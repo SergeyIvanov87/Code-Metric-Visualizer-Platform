@@ -1,54 +1,54 @@
 ---
 name: docs-dispatcher
-description: Maintain dispatcher backend compositions, access/store interfaces, and document or chunk storage in ai_agents_framework/docs_dispatcher.
+description: Maintain dispatcher backend aggregators, access/store contracts, and reusable document implementations in ai_agents_framework/docs_dispatcher.
 ---
 
 Read `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/README.md`
-before changing backend configuration, schemas, or storage behavior.
+before changing configuration, schemas, or document behavior.
 
-Keep `BackendConfig` data-only and `load_backend_config()` returning that data
-object. Command routing, delegation, and response formatting belong to
-`BackendDispatcher` in `dispatcher.py`, which loads its configuration inside its
-no-argument constructor. Top-level `sources/*.py` scripts must use only
-`BackendDispatcher()`, without importing, loading, or accessing `BackendConfig`.
+Keep `BackendConfig` data-only. `BackendDispatcher()` loads it inside its
+no-argument constructor; top-level `sources/*.py` scripts must not import, load,
+or access configuration. They obtain opened access and store instances with
+`with BackendDispatcher().get_backend() as backend` and call their interfaces.
+Keep scripts limited to arguments, input, output, and exit-status handling.
 
-Treat `mysql_persistent` as a composition, not a renamed MySQL implementation.
-Keep the directory layout `backend/{dispatcher,interfaces,mysql_persistent}`,
-with `interfaces/{access,store}` for common contracts and utilities, and
-`mysql_persistent/{access,store}` for concrete implementations.
+Keep common contracts and schema declarations under `interfaces/{access,store}`.
+Reusable concrete implementations belong in `interfaces_impl/access/mysql` and
+`interfaces_impl/store/persistent`, as peers of `interfaces`. `mysql_persistent`
+is only an aggregator binding these implementations. Do not introduce backend
+command modules, concrete imports in scripts, a storage operations module, or a
+separate CRUD forwarding module. Implement application operations in the two
+concrete interface classes. Keep only required operations in the contracts;
+implementation-specific utilities must not constrain future SQL or NoSQL access.
 
-Declare the logical fields in the two interface schemas: document path, record
-ID, offset, size, parent ID, metadata, and document type. Keep ID and URI mappings
-between access and store explicit. `AccessRecordEntryInterface` must expose
-semantic record operations and plain records, with no ORM, SQL, engine, or cursor
-in its API, so another SQL or NoSQL implementation can fulfill the same contract.
+`RuntimeConfig` contains only `options` and `spec_path`. All implementation
+settings, including `storage_uri`, are opaque options to the dispatcher. Each
+implementation validates its own options. Do not require filesystem locations or
+SQL credentials in generic runtime configuration.
 
-Only the composition binds `MysqlAccessRecordEntry` and
-`PersistentStorageRecordEntry`. Shared dispatcher commands must call the selected
-interfaces through `dispatcher.runtime.get_backend()`. The MySQL implementation
-must not import or reference the storage implementation. Keep all database
-queries and engine/credential handling in the access implementation; pass
-implementation-specific configuration through opaque runtime options.
+Preserve the logical schema: document path, ID, offset, size, parent ID, metadata,
+and document type. Return plain access/storage records rather than ORM objects.
+Cross-store operations receive the other interface explicitly; MySQL access may
+not import a concrete store, and persistent storage may not import MySQL access.
+Only persistent storage defines `doc_suffix` or performs payload IO. Keep shared
+directory/metadata utilities in the store contract. Storage models are data-only
+and must not select a backend or perform filesystem work.
 
-Keep shared directory and metadata operations in `StorageRecordEntryInterface`.
-Only the persistent store implementation may define `doc_suffix` or access stored
-payload files, including chunk placeholders and size queries. Common models
-resolve the selected store instead of importing its concrete class. Do not add a
-nonpersistent implementation unless requested.
+Preserve database-generated IDs, URI encoding, metadata formats, byte ranges,
+rollback behavior, arguments, JSON/text responses, and exit statuses. Keep
+Compose credential paths, documentation, CI registration, and other skills
+consistent with moves. Do not rename MySQL protocol names or external secrets.
+Do not add a nonpersistent backend unless requested.
 
-Preserve database-generated directory IDs, filename encoding, metadata formats,
-chunk byte ranges, arguments, and JSON/text responses. Keep `current`, Compose
-backend defaults, credential file locations, architecture references, and agent
-skills consistent with the selected composition. Do not rename MySQL protocol
-or external secrets because a composition is named `mysql_persistent`.
-
-Run the existing suite from the repository root:
+The existing 20 backend cases belong to `tests/unit/cases` and are registered by
+`tests/unit/Dockerfile` and `init.sh`. Preserve their scenarios and expected
+results; adapt calls to the new interfaces, and add no test cases for this task.
+Never invoke a test runner directly. Run the owning container:
 
 ```sh
-PYTHONPATH=ai_agents_framework/docs_dispatcher/sources/backend python -m pytest -q ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/tests
+docker compose -f ai_agents_framework/docs_dispatcher/compose-unit.test.yaml up --build --abort-on-container-exit --exit-code-from docs-dispatcher-unit-tester
 ```
 
-Preserve existing test cases and assertions. Adapt import paths, access adapter
-arguments, and injected access contexts when changing the architecture; add no
-new tests for this task. Report container functional checks separately from local
-SQLite/filesystem checks.
+Run the existing dispatcher functional stack for public API changes, following
+[container test diagnostics](../container-test-diagnostics/SKILL.md). Distinguish
+SQLite/contract checks from public API checks and live MySQL checks in reports.

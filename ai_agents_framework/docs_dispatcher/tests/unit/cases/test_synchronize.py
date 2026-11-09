@@ -1,4 +1,4 @@
-from mysql_persistent.access.mysql import MysqlAccessRecordEntry
+from interfaces_impl.access.mysql import MysqlAccessRecordEntry
 from pathlib import Path
 
 import json
@@ -7,18 +7,11 @@ import sys
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from mysql_persistent.access.database import Base
-from mysql_persistent.access.models import FileRecord
-from mysql_persistent.access.crud import (
-    create_file_record,
-    create_file_record_ext,
-    get_file_record,
-    get_all_records,
-    update_file_record,
-    delete_file_record
-)
+from interfaces_impl.access.mysql.database import Base
+from interfaces_impl.access.mysql.models import FileRecord
 
-from dispatcher.commands.sync import apply_storage_fields_to_db_record, synchronize_records
+
+from interfaces_impl.access.mysql.mysql import apply_storage_fields_to_db_record
 from interfaces.store.models import StorageRecord
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -50,7 +43,7 @@ def db_session():
         print(user, flush = True)
 
     for req in stub_db_data.values():
-        create_file_record_ext(db, req)
+        MysqlAccessRecordEntry(db).create_file_record_ext(req)
     yield db
 
     db.close()
@@ -71,10 +64,10 @@ def test_amend_db_records(db_session):
     all_storage_records = { req.id: convert_to_StorageRecord(name, req) for name, req in stub_db_data.items() if convert_to_StorageRecord(name, req) != {}}
     new_added_id = 9999
     all_storage_records[new_added_id] = StorageRecord(file_uri=f"file_id_{new_added_id}", unique_id = new_added_id, offset = 0, size=new_added_id, parent_id = new_added_id, metadata={"comment": "new"}, doc_type="pdf")
-    all_db_records = get_all_records(db_session)
-    synchronize_records(MysqlAccessRecordEntry(db_session), all_db_records, all_storage_records)
+    all_db_records = MysqlAccessRecordEntry(db_session).get_all_records()
+    MysqlAccessRecordEntry(db_session).synchronize_records(all_db_records, all_storage_records)
 
-    updated_db_records = get_all_records(db_session)
+    updated_db_records = MysqlAccessRecordEntry(db_session).get_all_records()
     sorted_updated_db_records = sorted(updated_db_records, key = lambda x : x.id)
 
     assert len(updated_db_records) == len(all_storage_records), "sizes of colelctions must be equal"

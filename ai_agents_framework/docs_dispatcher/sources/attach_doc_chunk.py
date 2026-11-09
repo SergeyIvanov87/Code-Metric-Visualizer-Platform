@@ -5,7 +5,7 @@ import json
 import sys
 
 from backend.dispatcher.dispatcher import BackendDispatcher
-from utils import get_impl_procedure_name
+from utils import read_metadata_text
 
 def main():
     parser = argparse.ArgumentParser(prog="Attach document chunk using assigned backend")
@@ -13,26 +13,18 @@ def main():
     parser.add_argument("-metadata", "--metadata", type=str, default=None, help="chunk metadata")
 
     args = parser.parse_args()
-    chunk_data = sys.stdin.read()
-    chunk_data = chunk_data.encode('utf-8')
-
-    backend_dispatcher = BackendDispatcher()
-    command = backend_dispatcher.create_executable_command_prefix(get_impl_procedure_name(__file__))
-    command.append(str(args.doc_id))
-    if args.metadata is not None:
-        command.extend(["-m", args.metadata])
-
-    exec_status = backend_dispatcher.delegate_query(
-        command,
-        input_data=chunk_data,
-        text=False
-    )
-
-    return_data = backend_dispatcher.get_formatted_response(exec_status,
-                                                        get_impl_procedure_name(__file__),
-                                                        text=False)
-    print(json.dumps(return_data))
-    return exec_status.returncode
+    stream = getattr(sys.stdin, "buffer", sys.stdin)
+    chunk_data = stream.read()
+    if isinstance(chunk_data, str):
+        chunk_data = chunk_data.encode("utf-8")
+    try:
+        with BackendDispatcher().get_backend() as backend:
+            result = backend.access.attach_doc_chunk(backend.store, args.doc_id, chunk_data, metadata_text=read_metadata_text(args.metadata))
+        result = {"error_code": 0, **result}
+    except Exception as ex:
+        result = {"error_code": -1, "error_msg": str(ex)}
+    print(json.dumps(result))
+    return result["error_code"]
 
 
 if __name__ == "__main__":

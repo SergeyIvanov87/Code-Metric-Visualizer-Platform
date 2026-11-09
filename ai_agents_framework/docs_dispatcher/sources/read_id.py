@@ -5,7 +5,6 @@ import json
 import sys
 
 from backend.dispatcher.dispatcher import BackendDispatcher
-from utils import get_impl_procedure_name
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="Read an ID using assigned backend")
@@ -23,22 +22,13 @@ def main() -> int:
         parser.error("id parameter is required")
 
     record_id = int(parameters["id"])
-    backend_dispatcher = BackendDispatcher()
-    command = backend_dispatcher.create_executable_command_prefix(get_impl_procedure_name(__file__))
-    command.extend(["--id", str(record_id)])
-    exec_status = backend_dispatcher.delegate_query(
-        command,
-        text=True,
-    )
-
-    result = backend_dispatcher.get_formatted_response(exec_status,
-                                                   get_impl_procedure_name(__file__),
-                                                   text=True)
-    result["id"] = record_id
-
-    context = result.get("context", "<Not found ID>")
-    sys.stdout.write(context)
-    return exec_status.returncode
+    try:
+        with BackendDispatcher().get_backend() as backend:
+            result = backend.store.read_ids(backend.access, [record_id])[record_id]
+    except Exception:
+        result = {"error_code": -1}
+    sys.stdout.write(result.get("context", "<Not found ID>"))
+    return 0 if result["error_code"] == 0 else -1
 
 
 if __name__ == "__main__":

@@ -1,58 +1,20 @@
-"""Command delegation and response formatting for a configured backend."""
+"""Select and open a backend without exposing configuration to API scripts."""
 
-import json
-import subprocess
 import sys
+from pathlib import Path
+
+# Backend plugins use their own package root in both API and tester processes.
+_BACKENDS_ROOT = str(Path(__file__).resolve().parents[1])
+if _BACKENDS_ROOT not in sys.path:
+    sys.path.insert(0, _BACKENDS_ROOT)
 
 from .config import load_backend_config
+from .runtime import get_backend
 
 
 class BackendDispatcher:
     def __init__(self):
         self._config = load_backend_config()
 
-    def command_module(self, command_name: str) -> str:
-        return f"dispatcher.commands.{command_name}"
-
-    def create_executable_command_prefix(self, api_query_name):
-        return [
-            sys.executable,
-            "-m",
-            self.command_module(api_query_name)
-        ]
-
-    def delegate_query(self, command: list[str],
-                       *,
-                       input_data: bytes | str | None = None,
-                       text: bool = True):
-        exec_status = subprocess.run(
-            command,
-            input=input_data,
-            capture_output=True,
-            cwd=self._config.backends_code_dir,
-            text=text,
-            shell=False,
-        )
-        return exec_status
-
-    def get_formatted_response(self,
-                               exec_status, api_query_name,
-                               *,
-                               text: bool = True):
-        return_data = {'error_code' : exec_status.returncode}
-        err_str = exec_status.stderr if text else exec_status.stderr.decode('utf-8')
-        if err_str:
-            return_data["error_code"] = -1
-            return_data["error_msg"] = err_str
-
-        output_str = exec_status.stdout if text else exec_status.stdout.decode('utf-8')
-        output = {}
-        if output_str:
-            try:
-                output = json.loads(output_str)
-            except Exception as ex:
-                return_data["error_code"] = -1
-                return_data["error_msg"] = f"The query {api_query_name} using assigned backend couldn't decode string as a valid JSON obj: {output_str}"
-
-        return_data = return_data | output
-        return return_data
+    def get_backend(self):
+        return get_backend(self._config)

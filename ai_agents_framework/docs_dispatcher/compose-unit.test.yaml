@@ -1,0 +1,5 @@
+services:
+  docs-dispatcher-unit-tester:
+    build:
+      context: ../../
+      dockerfile: ai_agents_framework/docs_dispatcher/tests/unit/Dockerfile

@@ -5,7 +5,7 @@ import json
 import sys
 
 from backend.dispatcher.dispatcher import BackendDispatcher
-from utils import get_impl_procedure_name
+from utils import read_metadata_text
 
 def _parse_ids(value: str) -> list[int]:
     values = value.split(",")
@@ -49,22 +49,21 @@ def main():
 
     args = parser.parse_args(_normalize_assignment_args(sys.argv[1:]))
 
-    backend_dispatcher = BackendDispatcher()
-    command = backend_dispatcher.create_executable_command_prefix(get_impl_procedure_name(__file__))
-    command.extend(["-ids", ",".join(str(record_id) for record_id in args.ids)])
-    if args.metadata is not None:
-        command.extend(["-m", args.metadata])
+    deleted_db = deleted_storage = 0
+    try:
+        read_metadata_text(args.metadata)
+        with BackendDispatcher().get_backend() as backend:
+            deleted_db, deleted_storage, missing_ids = backend.access.delete_records(backend.store, args.ids)
+        errors = [f"Record id={record_id} does not exist" for record_id in missing_ids]
+    except Exception as ex:
+        errors = [str(ex)]
+    result = {"deleted from DB": deleted_db, "deleted from storage": deleted_storage,
+              "error_code": 1 if errors else 0}
+    if errors:
+        result["error_msg"] = "\n".join(errors)
+    print(json.dumps(result))
+    return result["error_code"]
 
-    exec_status = backend_dispatcher.delegate_query(
-        command,
-        text=False
-    )
-
-    return_data = backend_dispatcher.get_formatted_response(exec_status,
-                                                        get_impl_procedure_name(__file__),
-                                                        text=False)
-    print(json.dumps(return_data))
-    return exec_status.returncode
 
 if __name__ == "__main__":
     sys.exit(main())

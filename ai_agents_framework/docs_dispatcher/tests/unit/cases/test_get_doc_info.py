@@ -1,22 +1,23 @@
-from mysql_persistent.access.mysql import MysqlAccessRecordEntry
+from interfaces_impl.store.persistent import PersistentStorageRecordEntry
+from interfaces_impl.access.mysql import MysqlAccessRecordEntry
 from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from mysql_persistent.access.crud import create_file_record, update_file_record
-from mysql_persistent.access.database import Base
-from dispatcher.commands.get_doc_info import get_document_info
+
+from interfaces_impl.access.mysql.database import Base
+
 
 
 def _db_document(session, doc_id: int, file_uri: str, doc_type: str = "txt"):
-    document = create_file_record(session, file_uri, 0, 10, 0, doc_type=doc_type)
+    document = MysqlAccessRecordEntry(session).create_file_record(file_uri, 0, 10, 0, doc_type=doc_type)
     assert document.id == doc_id
-    return update_file_record(session, document.id, parent_id=document.id)
+    return MysqlAccessRecordEntry(session).update_file_record(document.id, parent_id=document.id)
 
 
 def _db_chunk(session, document_id: int, file_uri: str):
-    return create_file_record(session, file_uri, 0, 5, document_id)
+    return MysqlAccessRecordEntry(session).create_file_record(file_uri, 0, 5, document_id)
 
 
 def _storage_record(
@@ -50,7 +51,7 @@ def test_get_document_info_reports_complete_partial_and_absent_documents(tmp_pat
     _storage_record(tmp_path, 5, 5, "%slash%docs%slash%storage-only.txt", "pdf")
     _storage_record(tmp_path, 6, 5, "%slash%docs%slash%storage-only.txt")
 
-    assert get_document_info(MysqlAccessRecordEntry(session), tmp_path, [1, 3, 5, 99, 1]) == {
+    assert MysqlAccessRecordEntry(session).get_document_info(PersistentStorageRecordEntry(tmp_path), [1, 3, 5, 99, 1]) == {
         "found": [1],
         "inconsistent": [3, 5],
         "not_found": [99],
@@ -99,7 +100,7 @@ def test_chunk_id_is_not_mistaken_for_a_document(tmp_path):
     chunk = _db_chunk(session, document.id, document.file_path)
     _storage_record(tmp_path, chunk.id, document.id, "chunk.txt")
 
-    assert get_document_info(MysqlAccessRecordEntry(session), tmp_path, [chunk.id]) == {
+    assert MysqlAccessRecordEntry(session).get_document_info(PersistentStorageRecordEntry(tmp_path), [chunk.id]) == {
         "found": [],
         "inconsistent": [],
         "not_found": [chunk.id],

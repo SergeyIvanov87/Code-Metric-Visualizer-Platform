@@ -1,115 +1,127 @@
 # Dispatcher backend composition
 
-The default backend is `mysql_persistent`. This name selects a composition of
-record access and document storage; it is not a renamed database implementation.
-The existing MySQL/SQLite operations live under `mysql_persistent/access`.
+`mysql_persistent` is the default backend. It aggregates two independent interface
+implementations; it contains no database, filesystem, or command implementation.
 
-## Layout and responsibilities
+## Layout
 
 ```text
 backend/
-├── dispatcher/
+├── dispatcher/                         # configuration, selection, BackendDispatcher
 │   ├── current
-│   ├── backends/mysql_persistent.yaml
-│   ├── config.py, dispatcher.py, runtime.py, runtime_config.py
-│   ├── commands/
-│   └── tests/
+│   └── backends/mysql_persistent.yaml
 ├── interfaces/
-│   ├── access/             # AccessRecordEntryInterface, schema, utilities
-│   └── store/              # StorageRecordEntryInterface, schema, operations
-└── mysql_persistent/
-    ├── __init__.py          # Binds the two implementations
-    ├── access/              # MysqlAccessRecordEntry and legacy MySQL operations
-    └── store/               # PersistentStorageRecordEntry
+│   ├── access/                         # access contract and record schema
+│   └── store/                          # storage contract, schema, filesystem utilities
+├── interfaces_impl/
+│   ├── access/mysql/                   # MysqlAccessRecordEntry and SQL models
+│   └── store/persistent/               # PersistentStorageRecordEntry
+└── mysql_persistent/__init__.py         # binds the two implementation classes
 ```
 
-`mysql_persistent.backend` binds `MysqlAccessRecordEntry` as
-`AccessRecordEntryInterface` and `PersistentStorageRecordEntry` as
-`StorageRecordEntryInterface`. Only this composition imports both concrete
-implementations. The MySQL access implementation has no dependency on persistent
-storage. Dispatcher commands and common storage code use the interfaces and the
-selected bindings, and contain no concrete implementation imports.
+`BackendConfig` is data-only and `load_backend_config()` returns it.
+`BackendDispatcher()` loads this configuration internally. Top-level
+`sources/*.py` scripts use only the dispatcher and the selected interfaces:
 
-The frozen `BackendConfig` in `config.py` contains configuration data only, and
-`load_backend_config()` returns that data object. `BackendDispatcher` in
-`dispatcher.py` loads its own `BackendConfig` in its no-argument constructor and provides
-`command_module()`, `create_executable_command_prefix()`, `delegate_query()`,
-and `get_formatted_response()` for command routing, execution, and response
-formatting.
+```python
+with BackendDispatcher().get_backend() as backend:
+    result = backend.access.get_document_info(backend.store, document_ids)
+```
 
-All public dispatcher scripts construct `BackendDispatcher()` and route to
-shared `dispatcher.commands` modules. They neither import nor load `BackendConfig`;
-configuration loading and access stay inside the dispatcher.
-`dispatcher.runtime.get_backend()` loads the selected composition and checks its
-two interface bindings. New backends implement these contracts and declare a
-composition, without duplicating command scripts.
+`get_backend()` validates the selected class bindings, loads runtime options,
+constructs the store, opens access, and yields `BackendContext(access, store)`.
+The context closes the database session and disposes its engine on exit. Top-level
+scripts retain argument parsing, JSON/text output, and exit status handling; they
+do not load configuration or know concrete implementations.
 
-## Interface schemas
+There is no `dispatcher/commands` directory, subprocess delegation, or
+`interfaces/store/operations.py` helper layer. Command behavior belongs to the
+two interface implementations. `mysql_persistent` only imports and binds them.
 
-| Meaning | AccessRecord (`interfaces/access`) | StorageRecordSchema (`interfaces/store`) |
+## Interface responsibilities
+
+| Interface | Operations |
+| --- | --- |
+| `AccessRecordEntryInterface` | Open access, resolve records, create documents, attach chunks, list documents, report document information, delete records, synchronize metadata |
+| `StorageRecordEntryInterface` | Construct from runtime options, manage directories and metadata, create documents/chunk placeholders, update chunk bounds, locate chunk data, retrieve documents/chunks |
+
+MySQL access embeds the former CRUD functions as instance methods. There is no
+separate `crud.py` forwarding layer. SQL execution, engine creation, schema
+migration, and credentials remain private to the implementation; the generic
+access contract exposes semantic operations and plain records. Implementation
+utilities used by existing tests, such as rebuilding SQL metadata from a
+directory, remain with MySQL access.
+
+Cross-store operations receive the other interface explicitly. MySQL access
+never imports a concrete store. Persistent retrieval obtains access records
+through `AccessRecordEntryInterface`, validates consistency, and reads each
+parent payload once for multiple requested chunks. Chunk creation preserves
+existing rollback behavior. Existing cross-store transaction limits remain:
+a document write failure can leave an allocated database record, and deletion
+is not atomic across database and filesystem.
+
+Payload naming, creation, reading, writing, and sizing belong to the persistent
+implementation. Shared directory and metadata utilities stay in the store
+interface. Storage records are data-only; they do not select a backend or
+perform filesystem operations. Unused model operations and duplicate interface
+convenience methods have been removed. No nonpersistent implementation is added.
+
+## Schemas
+
+Both interfaces declare their schema through `record_schema`.
+
+| Meaning | AccessRecord | StorageRecordSchema |
 | --- | --- | --- |
-| Record ID | `id` (allocated by access, required on persisted records) | `unique_id` |
+| ID | `id` | `unique_id` |
 | Document path | `file_path` (original URI) | `file_uri` (encoded filename when read from persistent storage) |
 | Byte range | `offset`, `size` | `offset`, `size` |
-| Parent document | `parent_id` | `parent_id` |
+| Parent | `parent_id` | `parent_id` |
 | Metadata | `metadata_json` | `metadata` |
-| Document type | `doc_type` | `doc_type` |
+| Type | `doc_type` | `doc_type` |
 
-A full document has its own ID as `parent_id`; a chunk refers to its parent's ID
-and byte range. Both interfaces declare their schema through `record_schema`.
-
-The access interface exposes semantic create, get, update, delete, pagination,
-chunk lookup, and reconciliation operations. It returns plain records, not ORM
-objects, query strings, engines, or cursors. A SQL or NoSQL implementation owns
-connection setup, ID allocation, persistence, and query execution. Existing
-metadata-preserving reconciliation behavior is retained.
-
-The store interface provides directory and metadata utilities plus abstract
-payload operations. Its persistent implementation alone defines `doc_suffix`
-and creates, reads, writes, and sizes payload files. Common models delegate
-through the selected store binding. A nonpersistent implementation is not part
-of this change.
-
-The on-disk layout is unchanged: database-generated numeric directories,
-`parentId`, `offset`, `size`, `metadata`, and `doc_type` files, and encoded document
-filenames ending in `.storage_bin`. Chunks retain empty payload placeholders.
-Existing documents require no migration.
+Access allocates IDs. A full document's parent ID equals its own ID; chunks
+refer to a parent and byte range. The persistent layout is unchanged: numeric
+record directories, `parentId`, `offset`, `size`, `metadata`, and `doc_type`
+files, encoded payload filenames ending in `.storage_bin`, and empty chunk
+payload placeholders. Existing documents require no migration.
 
 ## Configuration
 
-This directory is copied to `/etc/dispatcher` in the dispatcher image. Mount a
-custom directory there to override bundled settings.
+Settings are copied to `/etc/dispatcher` in the image.
 
-- `current` is the active specification, or a symlink to a backend specification.
-- `DISPATCHER_SETTINGS_DIR` selects the settings directory, with bundled settings
-  as fallback when the configured directory is unavailable.
-- `DISPATCHER_BACKEND`, when set, selects `backends/<name>.yaml` instead of
-  `current`. Compose defaults it to `${DISPATCHER_BACKEND:-mysql_persistent}`.
-- `name` in the specification selects the composition package.
-- `storage_uri` is the shared record storage root. Other fields are passed as
-  opaque `RuntimeConfig.options` to the selected implementations. The dispatcher
-  does not require SQL credentials or interpret database URI schemes.
+- `current` is the active specification or a symlink to one.
+- `DISPATCHER_SETTINGS_DIR` selects the settings directory, falling back to the
+  bundled settings when unavailable.
+- `DISPATCHER_BACKEND` selects `backends/<name>.yaml` instead of `current`.
+  Compose defaults it to `${DISPATCHER_BACKEND:-mysql_persistent}`.
+- `name` selects the composition package.
+- `RuntimeConfig` contains only `options` and `spec_path`. All implementation
+  settings, including `storage_uri`, are entries in `options`. Only the
+  persistent store interprets and requires `storage_uri`.
 
-The bundled composition retains these values:
+Bundled options retain these values:
 
 - `db_login_secret`: `/run/secrets/backend_mysql_db_login`
 - `db_pwd_secret`: `/run/secrets/backend_mysql_db_password`
 - `mysql_db_uri`: `sqlite:////mnt/file_storage/rag_docs_database.db`
 - `storage_uri`: `/mnt/file_storage`
 
-MySQL access also accepts `db_uri`. Credential paths are used for MySQL
-connections; SQLite does not require them. Secret names and MySQL protocol names
-are unchanged. Compose credential source files now live in
-`mysql_persistent/access/`.
+MySQL access also accepts `db_uri`. SQLite does not require credentials. Secret
+names and MySQL protocol names are unchanged; credential source files now live
+under `interfaces_impl/access/mysql/`.
 
-## Existing checks
+## Existing tests
 
-Run from the repository root with the backend directory on the import path:
+The same 20 backend cases now live under `tests/unit/cases`, registered through
+`tests/unit/Dockerfile` and `init.sh`. No new test cases are added. Run from the
+repository root:
 
 ```sh
-PYTHONPATH=ai_agents_framework/docs_dispatcher/sources/backend python -m pytest -q ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/tests
+docker compose -f ai_agents_framework/docs_dispatcher/compose-unit.test.yaml up --build --abort-on-container-exit --exit-code-from docs-dispatcher-unit-tester
 ```
 
-The existing cases and expected results are preserved. Tests use the access
-adapter for shared command helpers and inject an access context for command
-entrypoints. No new tests are added.
+For public filesystem API behavior, run the existing functional tester:
+
+```sh
+docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml up --build --abort-on-container-exit --exit-code-from docs-dispatcher-functional-tester
+```

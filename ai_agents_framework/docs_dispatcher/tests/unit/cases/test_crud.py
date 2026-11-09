@@ -1,3 +1,4 @@
+from interfaces_impl.access.mysql import MysqlAccessRecordEntry
 import tempfile
 from pathlib import Path
 
@@ -5,15 +6,10 @@ import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
-from mysql_persistent.access.database import Base, initialize_schema
-from mysql_persistent.access.models import FileRecord
-from mysql_persistent.access.crud import (
-    create_file_record,
-    get_file_record,
-    update_file_record,
-    delete_file_record
-)
-from mysql_persistent.access.rebuild import rebuild_table_from_directory
+from interfaces_impl.access.mysql.database import Base, initialize_schema
+from interfaces_impl.access.mysql.models import FileRecord
+
+
 
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -41,15 +37,7 @@ def db_session():
 
 def test_create_record(db_session):
 
-    record = create_file_record(
-        db_session,
-        file_path="/tmp/test.bin",
-        offset=0,
-        size=100,
-        parent_id = 0,
-        metadata_json={"key": "value"},
-        doc_type="txt",
-    )
+    record = MysqlAccessRecordEntry(db_session).create_file_record(file_path='/tmp/test.bin', offset=0, size=100, parent_id=0, metadata_json={'key': 'value'}, doc_type='txt')
 
     assert record.id is not None
     assert record.file_path == "/tmp/test.bin"
@@ -58,15 +46,9 @@ def test_create_record(db_session):
 
 def test_get_record(db_session):
 
-    created = create_file_record(
-        db_session,
-        file_path="/tmp/file.bin",
-        offset=0,
-        size=123,
-        parent_id = 0,
-    )
+    created = MysqlAccessRecordEntry(db_session).create_file_record(file_path='/tmp/file.bin', offset=0, size=123, parent_id=0)
 
-    fetched = get_file_record(db_session, created.id)
+    fetched = MysqlAccessRecordEntry(db_session).get_file_record(created.id)
 
     assert fetched is not None
     assert fetched.id == created.id
@@ -74,22 +56,9 @@ def test_get_record(db_session):
 
 def test_update_record(db_session):
 
-    created = create_file_record(
-        db_session,
-        file_path="/tmp/old.bin",
-        offset=0,
-        size=100,
-        parent_id = 0
-    )
+    created = MysqlAccessRecordEntry(db_session).create_file_record(file_path='/tmp/old.bin', offset=0, size=100, parent_id=0)
 
-    updated = update_file_record(
-        db_session,
-        created.id,
-        offset=500,
-        size=999,
-        parent_id=123,
-        doc_type="markdown",
-    )
+    updated = MysqlAccessRecordEntry(db_session).update_file_record(created.id, offset=500, size=999, parent_id=123, doc_type='markdown')
 
     assert updated.offset == 500
     assert updated.size == 999
@@ -99,25 +68,13 @@ def test_update_record(db_session):
 
 def test_delete_record(db_session):
 
-    created = create_file_record(
-        db_session,
-        file_path="/tmp/delete.bin",
-        offset=0,
-        size=100,
-        parent_id = 123,
-    )
+    created = MysqlAccessRecordEntry(db_session).create_file_record(file_path='/tmp/delete.bin', offset=0, size=100, parent_id=123)
 
-    result = delete_file_record(
-        db_session,
-        created.id
-    )
+    result = MysqlAccessRecordEntry(db_session).delete_file_record(created.id)
 
     assert result is True
 
-    deleted = get_file_record(
-        db_session,
-        created.id
-    )
+    deleted = MysqlAccessRecordEntry(db_session).get_file_record(created.id)
 
     assert deleted is None
 
@@ -132,10 +89,7 @@ def test_rebuild_table_from_directory(db_session):
         file1.write_text("hello")
         file2.write_text("world!!!")
 
-        rebuild_table_from_directory(
-            db_session,
-            tmpdir
-        )
+        MysqlAccessRecordEntry(db_session).rebuild_table_from_directory(tmpdir)
 
         records = db_session.query(FileRecord).all()
 

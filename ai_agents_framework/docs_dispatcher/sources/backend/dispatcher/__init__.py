@@ -1,1 +1,1 @@
-"""Shared dispatcher commands and backend composition selection."""
+"""Backend configuration and interface aggregator selection."""

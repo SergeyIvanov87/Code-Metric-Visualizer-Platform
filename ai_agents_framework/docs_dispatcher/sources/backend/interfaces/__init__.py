@@ -16,6 +16,11 @@ class Backend:
 
 @dataclass(frozen=True)
 class RuntimeConfig:
-    storage_uri: Path
     options: Mapping[str, str]
     spec_path: Path
+
+
+@dataclass(frozen=True)
+class BackendContext:
+    access: AccessRecordEntryInterface
+    store: StorageRecordEntryInterface
