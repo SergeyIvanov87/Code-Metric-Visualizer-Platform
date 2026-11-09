@@ -6,6 +6,11 @@ description: Maintain dispatcher backend compositions, access/store interfaces, 
 Read `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/README.md`
 before changing backend configuration, schemas, or storage behavior.
 
+Keep `BackendConfig` data-only and `load_backend_config()` returning that data
+object. Command routing, delegation, and response formatting belong to
+`BackendDispatcher` in `dispatcher.py`, which receives the configuration in its
+constructor.
+
 Treat `mysql_persistent` as a composition, not a renamed MySQL implementation.
 Keep the directory layout `backend/{dispatcher,interfaces,mysql_persistent}`,
 with `interfaces/{access,store}` for common contracts and utilities, and

@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 
+from backend.dispatcher.dispatcher import BackendDispatcher
 from dispatcher_backend_config import load_backend_config
 from utils import get_impl_procedure_name
 
@@ -50,17 +51,18 @@ def main():
     args = parser.parse_args(_normalize_assignment_args(sys.argv[1:]))
 
     backend_config = load_backend_config()
-    command = backend_config.create_executable_command_prefix(get_impl_procedure_name(__file__))
+    backend_dispatcher = BackendDispatcher(backend_config)
+    command = backend_dispatcher.create_executable_command_prefix(get_impl_procedure_name(__file__))
     command.extend(["-ids", ",".join(str(record_id) for record_id in args.ids)])
     if args.metadata is not None:
         command.extend(["-m", args.metadata])
 
-    exec_status = backend_config.delegate_query(
+    exec_status = backend_dispatcher.delegate_query(
         command,
         text=False
     )
 
-    return_data = backend_config.get_formatted_response(exec_status,
+    return_data = backend_dispatcher.get_formatted_response(exec_status,
                                                         get_impl_procedure_name(__file__),
                                                         text=False)
     print(json.dumps(return_data))
