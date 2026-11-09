@@ -12,7 +12,7 @@ from interfaces_impl.access.mysql.models import FileRecord
 
 
 from interfaces_impl.access.mysql.mysql import apply_storage_fields_to_db_record
-from interfaces.store.models import StorageRecord
+from interfaces.schema import RecordSchema
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
@@ -48,10 +48,10 @@ def db_session():
 
     db.close()
 
-def convert_to_StorageRecord(req_name, db_record: FileRecord):
-    ret = StorageRecord(file_uri = db_record.file_path, unique_id = db_record.id, offset = db_record.offset, size = db_record.size, parent_id = db_record.parent_id, metadata = db_record.metadata_json, doc_type=db_record.doc_type)
+def convert_to_record_schema(req_name, db_record: FileRecord):
+    ret = RecordSchema(file_uri = db_record.file_path, id=db_record.id, offset = db_record.offset, size = db_record.size, parent_id = db_record.parent_id, metadata = db_record.metadata_json, doc_type=db_record.doc_type)
     if req_name == "id_mismatch":
-        ret.unique_id = db_record.id * 98765431
+        ret.id = db_record.id * 98765431
     if req_name == "id_absent":
         ret = {}
     if req_name == "offset_to_fix":
@@ -61,9 +61,9 @@ def convert_to_StorageRecord(req_name, db_record: FileRecord):
     return ret
 
 def test_amend_db_records(db_session):
-    all_storage_records = { req.id: convert_to_StorageRecord(name, req) for name, req in stub_db_data.items() if convert_to_StorageRecord(name, req) != {}}
+    all_storage_records = { req.id: convert_to_record_schema(name, req) for name, req in stub_db_data.items() if convert_to_record_schema(name, req) != {}}
     new_added_id = 9999
-    all_storage_records[new_added_id] = StorageRecord(file_uri=f"file_id_{new_added_id}", unique_id = new_added_id, offset = 0, size=new_added_id, parent_id = new_added_id, metadata={"comment": "new"}, doc_type="pdf")
+    all_storage_records[new_added_id] = RecordSchema(file_uri=f"file_id_{new_added_id}", id=new_added_id, offset = 0, size=new_added_id, parent_id = new_added_id, metadata={"comment": "new"}, doc_type="pdf")
     all_db_records = MysqlAccessRecordEntry(db_session).get_all_records()
     MysqlAccessRecordEntry(db_session).synchronize_records(all_db_records, all_storage_records)
 
@@ -91,9 +91,9 @@ def test_apply_storage_fields_updates_doc_type():
         parent_id=1,
         doc_type="txt",
     )
-    storage_record = StorageRecord(
+    storage_record = RecordSchema(
         file_uri="document.txt",
-        unique_id=1,
+        id=1,
         offset=0,
         size=10,
         parent_id=1,

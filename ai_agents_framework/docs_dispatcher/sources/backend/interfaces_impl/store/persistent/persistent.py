@@ -1,12 +1,13 @@
-from pathlib import Path
-
-from interfaces.access.utils import canonize_file_uri
-from interfaces.store.entry import StorageRecordEntryInterface
-from interfaces.store import StorageRecord
-from interfaces.access import AccessRecordEntryInterface, AccessRecord
-from interfaces import RuntimeConfig
-from typing import Iterable
+from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable
+
+from interfaces import RuntimeConfig
+from interfaces.access import AccessRecordEntryInterface
+from interfaces.access.utils import canonize_file_uri
+from interfaces.schema import RecordSchema
+from interfaces.store import StorageRecordEntryInterface
 
 
 class PersistentStorageRecordEntry(StorageRecordEntryInterface):
@@ -39,31 +40,32 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
         return self.document_path(file_uri).stat().st_size
 
     @classmethod
-    def from_config(cls, config: RuntimeConfig):
+    @contextmanager
+    def create_instance(cls, config: RuntimeConfig):
         value = config.options.get("storage_uri")
         if not value:
             raise ValueError("Persistent storage requires storage_uri")
-        return cls(Path(value))
+        yield cls(Path(value))
 
     def _entry(self, unique_id: int):
         return type(self)(self.record_path(self.directory, unique_id))
 
-    def get_all_records(self) -> dict[int, StorageRecord]:
+    def get_all_records(self) -> dict[int, RecordSchema]:
         records = {}
         for directory in self.directories(self.directory):
-            record = StorageRecord(**type(self)(directory).read_fields())
-            records[record.unique_id] = record
+            record = RecordSchema(**type(self)(directory).read_fields())
+            records[record.id] = record
         return records
 
-    def get_record(self, unique_id: int) -> StorageRecord | None:
+    def get_record(self, unique_id: int) -> RecordSchema | None:
         entry = self._entry(unique_id)
-        return StorageRecord(**entry.read_fields()) if entry.exists() else None
+        return RecordSchema(**entry.read_fields()) if entry.exists() else None
 
     def delete_record(self, unique_id: int) -> bool:
         return self._entry(unique_id).delete()
 
     def add_document(self, file_uri: str | Path, unique_id: int, data: bytes, *,
-                     offset: int = 0, metadata_text: str = "", doc_type: str = "") -> StorageRecord:
+                     offset: int = 0, metadata_text: str = "", doc_type: str = "") -> RecordSchema:
         if not self.exists():
             raise RuntimeError(f"Cannot add the main document: {file_uri}, the storage path doesn't exist: {self.directory}")
         entry = self._entry(unique_id)
@@ -72,26 +74,26 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
         size = entry.document_size(file_uri)
         entry.write_fields(offset=offset, size=size, parent_id=unique_id,
                            metadata=metadata_text, doc_type=doc_type)
-        return StorageRecord(file_uri=file_uri, unique_id=unique_id, offset=offset, size=size,
+        return RecordSchema(file_uri=file_uri, id=unique_id, offset=offset, size=size,
                              parent_id=unique_id, metadata={"comment": metadata_text} if metadata_text else {},
                              doc_type=doc_type)
 
-    def add_chunk(self, file_uri: str | Path, unique_id: int, *, metadata_text: str = "") -> StorageRecord:
+    def add_chunk(self, file_uri: str | Path, unique_id: int, *, metadata_text: str = "") -> RecordSchema:
         if not self.exists():
             raise RuntimeError(f"Cannot add a chunk: {file_uri}, the storage path doesn't exist: {self.directory}")
         entry = self._entry(unique_id)
         entry.create()
         entry.create_chunk(file_uri)
         entry.write_fields(offset=0, size=0, parent_id=0, metadata=metadata_text)
-        return StorageRecord(file_uri=file_uri, unique_id=unique_id, offset=0, size=0,
+        return RecordSchema(file_uri=file_uri, id=unique_id, offset=0, size=0,
                              metadata={"comment": metadata_text} if metadata_text else {})
 
     def update_record(self, unique_id: int, *, parent_id: int, offset_size: tuple[int, int]) -> None:
         offset, size = offset_size
         self._entry(unique_id).write_fields(offset=offset, size=size, parent_id=parent_id)
 
-    def get_chunk_bounds(self, document: StorageRecord, data: bytes) -> tuple[int, int]:
-        parent_data = self._entry(document.unique_id).read_document(document.file_uri)
+    def get_chunk_bounds(self, document: RecordSchema, data: bytes) -> tuple[int, int]:
+        parent_data = self._entry(document.id).read_document(document.file_uri)
         offset = parent_data.find(data)
         if offset < 0:
             raise ValueError("chunk does not belong to the parent document")
@@ -145,12 +147,12 @@ class ResolvedRecord:
 def _unique_ids(record_ids: Iterable[int]) -> list[int]:
     return list(dict.fromkeys(record_ids))
 
-def _record_fields(record: AccessRecord | StorageRecord) -> tuple[int, int, int]:
+def _record_fields(record: RecordSchema) -> tuple[int, int, int]:
     return int(record.parent_id), int(record.offset), int(record.size)
 
 def _resolve_records(
     access: AccessRecordEntryInterface,
-    storage_records: dict[int, StorageRecord],
+    storage_records: dict[int, RecordSchema],
     record_ids: Iterable[int],
 ) -> tuple[dict[int, ResolvedRecord], dict[int, str]]:
     requested_ids = _unique_ids(record_ids)
@@ -200,7 +202,7 @@ def _resolve_records(
 
 def _read_document_payloads(
     store: StorageRecordEntryInterface,
-    storage_records: dict[int, StorageRecord],
+    storage_records: dict[int, RecordSchema],
     document_ids: Iterable[int],
 ) -> tuple[dict[int, bytes], dict[int, str]]:
     payloads: dict[int, bytes] = {}
@@ -213,14 +215,14 @@ def _read_document_payloads(
                 f"Parent document id={document_id} does not exist in file storage"
             )
             continue
-        if document.parent_id != document.unique_id:
+        if document.parent_id != document.id:
             errors[document_id] = (
                 f"Parent id={document_id} does not identify a full document in file storage"
             )
             continue
 
         try:
-            payloads[document_id] = store._entry(document.unique_id).read_document(document.file_uri)
+            payloads[document_id] = store._entry(document.id).read_document(document.file_uri)
         except OSError as exc:
             errors[document_id] = (
                 f"Cannot read parent document id={document_id} from file storage: {exc}"

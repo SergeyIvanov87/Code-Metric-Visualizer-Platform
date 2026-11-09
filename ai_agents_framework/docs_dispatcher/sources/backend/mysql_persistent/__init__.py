@@ -1,7 +1,7 @@
-"""Default composition: MySQL record access and persistent file storage."""
+"""MySQL and persistent-storage backend package."""
 
-from interfaces import Backend
-from interfaces_impl.access.mysql import MysqlAccessRecordEntry
-from interfaces_impl.store.persistent import PersistentStorageRecordEntry
+from .backend import MysqlPersistentBackend
 
-backend = Backend(access=MysqlAccessRecordEntry, store=PersistentStorageRecordEntry)
+backend = MysqlPersistentBackend
+
+__all__ = ["MysqlPersistentBackend", "backend"]

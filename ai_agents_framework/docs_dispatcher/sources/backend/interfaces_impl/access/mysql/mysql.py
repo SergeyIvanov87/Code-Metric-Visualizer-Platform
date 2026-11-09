@@ -3,16 +3,16 @@
 import base64
 import os
 from contextlib import contextmanager
-from dataclasses import fields
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
 from sqlalchemy import func, or_, text
 
 from interfaces import RuntimeConfig
-from interfaces.access import AccessRecord, AccessRecordEntryInterface
+from interfaces.access import AccessRecordEntryInterface
 from interfaces.access.utils import decanonize_file_uri, file_uris_equal, prepare_doc_data
-from interfaces.store import StorageRecord, StorageRecordEntryInterface
+from interfaces.schema import RecordSchema
+from interfaces.store import StorageRecordEntryInterface
 from . import database
 from .models import FileRecord
 
@@ -25,7 +25,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
 
     @classmethod
     @contextmanager
-    def open(cls, config: RuntimeConfig):
+    def create_instance(cls, config: RuntimeConfig):
         options = config.options
         db_uri = options.get("mysql_db_uri", options.get("db_uri"))
         if not db_uri:
@@ -43,10 +43,18 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
             engine.dispose()
 
     @staticmethod
-    def _record(row) -> AccessRecord | None:
+    def _record(row) -> RecordSchema | None:
         if row is None:
             return None
-        return AccessRecord(**{field.name: getattr(row, field.name) for field in fields(AccessRecord)})
+        return RecordSchema(
+            file_uri=row.file_path,
+            id=row.id,
+            offset=row.offset,
+            size=row.size,
+            parent_id=row.parent_id,
+            metadata=row.metadata_json,
+            doc_type=row.doc_type,
+        )
 
     def create_file_record(
         self,
@@ -56,7 +64,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         parent_id: int,
         metadata_json: Optional[dict[str, Any]] = None,
         doc_type: str = "",
-    ) -> AccessRecord:
+    ) -> RecordSchema:
 
         record = FileRecord(
             file_path=decanonize_file_uri(file_path),
@@ -80,7 +88,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         parent_id: int,
         metadata_json: Optional[dict[str, Any]] = None,
         doc_type: str = "",
-    ) -> AccessRecord:
+    ) -> RecordSchema:
         existing = self.session.query(FileRecord).filter(FileRecord.id == uid).first()
         if existing:
             raise ValueError(f"Record with id={uid} already exists")
@@ -99,9 +107,17 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         self.session.refresh(record)
         return self._record(record)
 
-    def create_file_record_ext(self, record: FileRecord) -> AccessRecord:
+    def create_file_record_ext(self, record: FileRecord | RecordSchema) -> RecordSchema:
         record.file_path = decanonize_file_uri(record.file_path)
-        record = FileRecord(**{field.name: getattr(record, field.name) for field in fields(AccessRecord)})
+        record = FileRecord(
+            id=record.id,
+            file_path=record.file_path,
+            offset=record.offset,
+            size=record.size,
+            parent_id=record.parent_id,
+            metadata_json=record.metadata_json,
+            doc_type=record.doc_type,
+        )
         self.session.add(record)
         self.session.commit()
         self.session.refresh(record)
@@ -110,7 +126,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
     def _get_row(self, record_id: int) -> Optional[FileRecord]:
         return self.session.query(FileRecord).filter(FileRecord.id == record_id).first()
 
-    def get_all_records(self) -> list[AccessRecord]:
+    def get_all_records(self) -> list[RecordSchema]:
         return [self._record(row) for row in self.session.query(FileRecord).all()]
 
     def execute_query(self, query_str: str):
@@ -130,7 +146,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         parent_id: Optional[int] = None,
         metadata_json: Optional[dict[str, Any]] = None,
         doc_type: Optional[str] = None,
-    ) -> Optional[AccessRecord]:
+    ) -> Optional[RecordSchema]:
         record = self._get_row(record_id)
         if not record:
             return None
@@ -155,8 +171,8 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
     def update_file_record_ext(
         self,
         record_id: int,
-        new_record: FileRecord,
-    ) -> Optional[AccessRecord]:
+        new_record: FileRecord | RecordSchema,
+    ) -> Optional[RecordSchema]:
         record = self._get_row(record_id)
         if not record:
             return None
@@ -180,14 +196,14 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         self.session.commit()
         return True
 
-    def get_file_record(self, record_id: int) -> AccessRecord | None:
+    def get_file_record(self, record_id: int) -> RecordSchema | None:
         return self._record(self._get_row(record_id))
 
-    def get_records(self, record_ids) -> list[AccessRecord]:
+    def get_records(self, record_ids) -> list[RecordSchema]:
         rows = self.session.query(FileRecord).filter(FileRecord.id.in_(list(record_ids))).all()
         return [self._record(row) for row in rows]
 
-    def _document_page(self, offset: int, limit: int) -> tuple[int, list[AccessRecord]]:
+    def _document_page(self, offset: int, limit: int) -> tuple[int, list[RecordSchema]]:
         total = self.session.query(func.count(FileRecord.id)).filter(FileRecord.id == FileRecord.parent_id).scalar()
         if offset < 0 or limit < -1:
             raise ValueError("Invalid document pagination")
@@ -205,7 +221,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
                 .order_by(FileRecord.id).all())
         return [int(record_id) for (record_id,) in rows]
 
-    def _get_related_records(self, record_ids) -> list[AccessRecord]:
+    def _get_related_records(self, record_ids) -> list[RecordSchema]:
         ids = list(record_ids)
         rows = self.session.query(FileRecord).filter(
             or_(FileRecord.id.in_(ids), FileRecord.parent_id.in_(ids))).all()
@@ -295,8 +311,8 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
 
     def synchronize_records(
         self,
-        all_db_records: list[AccessRecord],
-        storage_records: dict[int, StorageRecord],
+        all_db_records: list[RecordSchema],
+        storage_records: dict[int, RecordSchema],
     ) -> dict:
         remaining_storage = dict(storage_records)
 
@@ -304,7 +320,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         updated = 0
         untouched = len(remaining_storage)
 
-        db_records_to_update: list[AccessRecord] = []
+        db_records_to_update: list[RecordSchema] = []
         for db_record in all_db_records:
             if db_record.id not in remaining_storage:
                 self.delete_file_record(db_record.id)
@@ -328,7 +344,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         untouched = untouched - updated - created
 
         for storage_record in remaining_storage.values():
-            self.create_file_record_with_uid(storage_record.unique_id,
+            self.create_file_record_with_uid(storage_record.id,
                 decanonize_file_uri(str(storage_record.file_uri)),
                 storage_record.offset,
                 storage_record.size,
@@ -383,9 +399,9 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
                                            doc_type=doc_type)
         stored = store.add_document(file_uri, document.id, data, offset=document.offset,
                                     metadata_text=metadata_text, doc_type=doc_type)
-        document.parent_id = stored.unique_id
+        document.parent_id = stored.id
         self.update_file_record_ext(document.id, document)
-        return {"unique_id": stored.unique_id}
+        return {"unique_id": stored.id}
 
     def attach_doc_chunk(self, store: StorageRecordEntryInterface, document_id: int,
                          data: bytes, *, metadata_text: str = "") -> dict:
@@ -397,7 +413,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
             raise ValueError(f"Parent document id={document_id} does not exist in storage")
         if parent.parent_id != parent.id:
             raise ValueError(f"Record id={document_id} is not a full document")
-        if stored_parent.parent_id != stored_parent.unique_id:
+        if stored_parent.parent_id != stored_parent.id:
             raise ValueError(f"Storage record id={document_id} is not a full document")
         data = prepare_doc_data(data)
         if "base64" in parent.doc_type.split(','):
@@ -456,15 +472,15 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
 def _unique_ids(doc_ids: list[int]) -> list[int]:
     return list(dict.fromkeys(doc_ids))
 
-def _is_db_document(record: AccessRecord | None, doc_id: int) -> bool:
+def _is_db_document(record: RecordSchema | None, doc_id: int) -> bool:
     return record is not None and int(record.parent_id) == doc_id
 
-def _is_storage_document(record: StorageRecord | None, doc_id: int) -> bool:
+def _is_storage_document(record: RecordSchema | None, doc_id: int) -> bool:
     return record is not None and record.parent_id == doc_id
 
 def _db_info(
     access,
-    document: AccessRecord,
+    document: RecordSchema,
 ) -> dict[str, object]:
     chunks = access._get_chunk_ids(document.id)
     return {
@@ -474,13 +490,13 @@ def _db_info(
     }
 
 def _storage_info(
-    document: StorageRecord,
-    storage_records: dict[int, StorageRecord],
+    document: RecordSchema,
+    storage_records: dict[int, RecordSchema],
 ) -> dict[str, object]:
     chunk_ids = sorted(
         record_id
         for record_id, record in storage_records.items()
-        if record_id != document.unique_id and record.parent_id == document.unique_id
+        if record_id != document.id and record.parent_id == document.id
     )
     return {
         "file_uri": decanonize_file_uri(document.file_uri),
@@ -489,9 +505,9 @@ def _storage_info(
     }
 
 def apply_storage_fields_to_db_record(
-    db_record: AccessRecord,
-    storage_record: StorageRecord,
-) -> tuple[bool, AccessRecord]:
+    db_record: RecordSchema,
+    storage_record: RecordSchema,
+) -> tuple[bool, RecordSchema]:
     changed = False
 
     storage_path = decanonize_file_uri(str(storage_record.file_uri))

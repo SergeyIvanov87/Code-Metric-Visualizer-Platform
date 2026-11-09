@@ -1,11 +1,12 @@
-"""Filesystem entries shared by storage backends and persistent payload handling."""
-
-from dataclasses import dataclass, field
-from typing import Any, ClassVar, Iterable, TYPE_CHECKING
-import shutil
-from pathlib import Path
+"""Storage contract and shared filesystem record utilities."""
 
 from abc import ABC, abstractmethod
+from contextlib import AbstractContextManager
+from pathlib import Path
+import shutil
+from typing import ClassVar, Iterable, TYPE_CHECKING
+
+from interfaces.schema import RecordSchema
 
 
 if TYPE_CHECKING:
@@ -13,23 +14,10 @@ if TYPE_CHECKING:
     from interfaces.access import AccessRecordEntryInterface
 
 
-@dataclass
-class StorageRecordSchema:
-    """Logical storage schema, independent of payload persistence policy."""
-
-    file_uri: str | Path
-    unique_id: int
-    offset: int = -1
-    size: int = -1
-    parent_id: int = 0
-    metadata: dict[str, Any] = field(default_factory=dict)
-    doc_type: str = ""
-
-
 class StorageRecordEntryInterface(ABC):
     """Manage record directories and fields independently of document payloads."""
 
-    record_schema: ClassVar[type[StorageRecordSchema]] = StorageRecordSchema
+    record_schema: ClassVar[type[RecordSchema]] = RecordSchema
 
     parent_id = "parentId"
     offset = "offset"
@@ -64,10 +52,10 @@ class StorageRecordEntryInterface(ABC):
         return True
 
     def require_directory(self) -> None:
-        assert self.exists(), f"StorageRecord must describe a valid directory: {self.directory}"
+        assert self.exists(), f"A storage record must describe a valid directory: {self.directory}"
 
     def read_fields(self) -> dict:
-        fields = {"unique_id": int(self.directory.name)}
+        fields = {"id": int(self.directory.name)}
         for name, filename in (("parent_id", self.parent_id), ("offset", self.offset),
                                ("size", self.size), ("metadata", self.metadata),
                                ("doc_type", self.doc_type)):
@@ -109,15 +97,15 @@ class StorageRecordEntryInterface(ABC):
 
     @classmethod
     @abstractmethod
-    def from_config(cls, config: "RuntimeConfig") -> "StorageRecordEntryInterface":
-        """Construct a store from backend-specific runtime options."""
+    def create_instance(cls, config: "RuntimeConfig") -> AbstractContextManager["StorageRecordEntryInterface"]:
+        """Create a configured store context from backend-specific runtime options."""
 
     @abstractmethod
-    def get_all_records(self) -> dict[int, StorageRecordSchema]:
+    def get_all_records(self) -> dict[int, RecordSchema]:
         """Read all document and chunk metadata."""
 
     @abstractmethod
-    def get_record(self, unique_id: int) -> StorageRecordSchema | None:
+    def get_record(self, unique_id: int) -> RecordSchema | None:
         """Read a record's metadata, if present."""
 
     @abstractmethod
@@ -126,11 +114,11 @@ class StorageRecordEntryInterface(ABC):
 
     @abstractmethod
     def add_document(self, file_uri, unique_id: int, data: bytes, *,
-                     offset: int = 0, metadata_text: str = "", doc_type: str = "") -> StorageRecordSchema:
+                     offset: int = 0, metadata_text: str = "", doc_type: str = "") -> RecordSchema:
         """Create a full document and its metadata."""
 
     @abstractmethod
-    def add_chunk(self, file_uri, unique_id: int, *, metadata_text: str = "") -> StorageRecordSchema:
+    def add_chunk(self, file_uri, unique_id: int, *, metadata_text: str = "") -> RecordSchema:
         """Create a chunk placeholder and its metadata."""
 
     @abstractmethod
@@ -138,7 +126,7 @@ class StorageRecordEntryInterface(ABC):
         """Set a chunk's parent and byte range."""
 
     @abstractmethod
-    def get_chunk_bounds(self, document: StorageRecordSchema, data: bytes) -> tuple[int, int]:
+    def get_chunk_bounds(self, document: RecordSchema, data: bytes) -> tuple[int, int]:
         """Locate chunk data in its parent document."""
 
     @abstractmethod

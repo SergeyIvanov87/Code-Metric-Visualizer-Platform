@@ -1,6 +1,6 @@
-"""Storage schema, interface, and common record model."""
+"""Storage interface."""
 
-from .entry import StorageRecordEntryInterface, StorageRecordSchema
-from .models import StorageRecord
+from interfaces.schema import RecordSchema
+from .interface import StorageRecordEntryInterface
 
-__all__ = ["StorageRecordEntryInterface", "StorageRecordSchema", "StorageRecord"]
+__all__ = ["StorageRecordEntryInterface", "RecordSchema"]

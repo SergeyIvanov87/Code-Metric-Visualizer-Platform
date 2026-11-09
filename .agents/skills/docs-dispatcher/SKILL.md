@@ -12,10 +12,17 @@ or access configuration. They obtain opened access and store instances with
 `with BackendDispatcher().get_backend() as backend` and call their interfaces.
 Keep scripts limited to arguments, input, output, and exit-status handling.
 
-Keep common contracts and schema declarations under `interfaces/{access,store}`.
+Keep each access and store contract in `interfaces/{access,store}/interface.py`,
+re-export it from the package `__init__.py`, and keep shared record schemas under
+`interfaces/schema`.
+Keep the abstract backend contract in `interfaces/backend/interface.py`. A
+composition package such as `mysql_persistent` implements `Backend.create_instance()`
+and owns creation and cleanup of its access and store instances. Dispatcher runtime
+selects that concrete class and delegates to its factory; it must not instantiate
+access or store interfaces itself.
+
 Reusable concrete implementations belong in `interfaces_impl/access/mysql` and
-`interfaces_impl/store/persistent`, as peers of `interfaces`. `mysql_persistent`
-is only an aggregator binding these implementations. Do not introduce backend
+`interfaces_impl/store/persistent`, as peers of `interfaces`. Do not introduce backend
 command modules, concrete imports in scripts, a storage operations module, or a
 separate CRUD forwarding module. Implement application operations in the two
 concrete interface classes. Keep only required operations in the contracts;

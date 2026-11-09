@@ -86,7 +86,7 @@ def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_sess
         ],
     )
     monkeypatch.setattr("backend.dispatcher.runtime.load_runtime_config", lambda config=None: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
+    monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.create_instance", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
 
     assert attach_chunk_main() == 0
     capsys.readouterr()
@@ -129,7 +129,7 @@ def test_attach_chunk_rejects_missing_offset(monkeypatch, tmp_path, db_session, 
         ],
     )
     monkeypatch.setattr("backend.dispatcher.runtime.load_runtime_config", lambda config=None: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
+    monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.create_instance", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
 
     assert attach_chunk_main() == -1
 
@@ -164,7 +164,7 @@ def test_delete_doc_removes_multiple_documents_and_chunks(
             ],
         )
         monkeypatch.setattr("backend.dispatcher.runtime.load_runtime_config", lambda config=None: _mysql_backend_config(tmp_path, storage_root))
-        monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
+        monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.create_instance", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
         assert attach_chunk_main() == 0
 
     second_parent = _create_parent_document(
@@ -181,7 +181,7 @@ def test_delete_doc_removes_multiple_documents_and_chunks(
         f"{parent.id},{first_chunk.id},{second_parent.id},{parent.id}",
     ])
     monkeypatch.setattr("backend.dispatcher.runtime.load_runtime_config", lambda config=None: _mysql_backend_config(tmp_path, storage_root))
-    monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.open", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
+    monkeypatch.setattr("interfaces_impl.access.mysql.MysqlAccessRecordEntry.create_instance", lambda config: nullcontext(MysqlAccessRecordEntry(db_session)))
 
     assert delete_doc_main() == 0
     result = json.loads(capsys.readouterr().out)
@@ -215,7 +215,7 @@ def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
         lambda config=None: _mysql_backend_config(tmp_path, storage_root),
     )
     monkeypatch.setattr(
-        "interfaces_impl.access.mysql.MysqlAccessRecordEntry.open",
+        "interfaces_impl.access.mysql.MysqlAccessRecordEntry.create_instance",
         lambda config: nullcontext(MysqlAccessRecordEntry(db_session)),
     )
 
