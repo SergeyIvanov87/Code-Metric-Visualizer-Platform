@@ -21,14 +21,20 @@ def main():
             if args.URI is None:
                 stream = getattr(sys.stdin, "buffer", sys.stdin)
                 data = stream.read()
-                result = backend.put_doc_by_data(args.URI, data,
-                                     metadata_text=args.metadata or "", doc_type=args.doc_type or "")
-            if isinstance(data, str):
-                data = data.encode("utf-8")
+                if isinstance(data, str):
+                    data = data.encode("utf-8")
+                result = backend.put_doc_by_data(
+                    None,
+                    data,
+                    metadata_text=args.metadata or "",
+                    doc_type=args.doc_type or "",
+                )
             else:
-                result = backend.put_doc_by_uri(args.URI,
-                                     metadata_text=args.metadata or "", doc_type=args.doc_type or "")
-                #data = args.URI.read_bytes()
+                result = backend.put_doc_by_uri(
+                    args.URI,
+                    metadata_text=args.metadata or "",
+                    doc_type=args.doc_type or "",
+                )
         result = {"error_code": 0, **result}
     except Exception as ex:
         result = {"error_code": -1, "error_msg": str(ex)}

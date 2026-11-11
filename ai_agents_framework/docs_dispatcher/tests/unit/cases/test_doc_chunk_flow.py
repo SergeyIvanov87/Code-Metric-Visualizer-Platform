@@ -18,6 +18,7 @@ from interfaces_impl.access.mysql.database import Base
 
 from attach_doc_chunk import main as attach_chunk_main
 from delete_doc import main as delete_doc_main
+from put_doc import main as put_doc_main
 
 
 @pytest.fixture()
@@ -59,20 +60,61 @@ def _mysql_backend_config(tmp_path: Path, storage_root: Path) -> RuntimeConfig:
 
 
 
-def test_document_storage_round_trips_metadata_and_doc_type(tmp_path, db_session):
+def test_document_storage_round_trips_metadata_and_doc_type(
+    monkeypatch,
+    tmp_path,
+    db_session,
+    capsys,
+):
     storage_root = tmp_path / "storage"
     storage_root.mkdir()
-    parent = _create_parent_document(db_session, storage_root, "parent.txt", "abcdefghij")
+    monkeypatch.setattr("sys.stdin", io.BytesIO(b"abcdefghij"))
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "put_doc.py",
+            "-metadata",
+            "document metadata",
+            "-doc_type",
+            "txt",
+        ],
+    )
+    monkeypatch.setattr(
+        "backend.dispatcher.runtime.load_runtime_config",
+        lambda config=None: _mysql_backend_config(tmp_path, storage_root),
+    )
+    monkeypatch.setattr(
+        "interfaces_impl.access.mysql.MysqlAccessRecordEntry.create_instance",
+        lambda config: nullcontext(MysqlAccessRecordEntry(db_session)),
+    )
 
-    storage_record = PersistentStorageRecordEntry(storage_root).get_records(
-        [parent.id]
-    )[0]
+    assert put_doc_main() == 0
+    result = json.loads(capsys.readouterr().out)
+    parent_id = int(result["unique_id"])
 
-    assert storage_record is not None
+    access = MysqlAccessRecordEntry(db_session)
+    records = access.get_all_records()
+    assert [int(record.id) for record in records] == [parent_id]
+
+    store = PersistentStorageRecordEntry(storage_root)
+    storage_record = store.get_records([parent_id])[0]
     assert storage_record.metadata == {"comment": "document metadata"}
     assert storage_record.doc_type == "txt"
-    assert (storage_root / str(parent.id) / "metadata").read_text() == "document metadata"
-    assert (storage_root / str(parent.id) / "doc_type").read_text() == "txt"
+    assert (storage_root / str(parent_id) / "metadata").read_text() == "document metadata"
+    assert (storage_root / str(parent_id) / "doc_type").read_text() == "txt"
+
+    def fail_after_directory_creation(file_uri, unique_id, data, **fields):
+        (storage_root / str(unique_id)).mkdir()
+        raise RuntimeError("simulated storage failure")
+
+    monkeypatch.setattr(store, "init_record_from_data", fail_after_directory_creation)
+    backend = MysqlPersistentBackend(access=access, store=store)
+
+    with pytest.raises(RuntimeError, match="simulated storage failure"):
+        backend.put_doc_by_data(Path("failed.txt"), b"failed data")
+
+    assert [int(record.id) for record in access.get_all_records()] == [parent_id]
+    assert set(store.get_all_records()) == {parent_id}
 
 
 def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_session, db_engine, capsys):

@@ -151,6 +151,12 @@ column containing document text.
 
 ### Failure behavior during ingestion
 
+After the SQL layer allocates an ID, the dispatcher compensates for a document
+or chunk creation failure by deleting partial filesystem state first and then
+the SQL placeholder. It verifies that neither record remains and includes any
+cleanup failure in the operation error. Validating URI input before allocation
+also prevents invalid URI requests from reserving an ID.
+
 The agent treats the filesystem/metadata write and Chroma indexing as one
 logical operation. If attaching chunks or inserting into Chroma fails after the
 document has been created, it requests deletion of the document through

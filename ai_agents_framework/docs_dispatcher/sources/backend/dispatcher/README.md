@@ -59,10 +59,12 @@ directory, remain with MySQL access.
 Cross-store operations receive the other interface explicitly. MySQL access
 never imports a concrete store. Persistent retrieval obtains access records
 through `AccessRecordEntryInterface`, validates consistency, and reads each
-parent payload once for multiple requested chunks. Chunk creation preserves
-existing rollback behavior. Existing cross-store transaction limits remain:
-a document write failure can leave an allocated database record, and deletion
-is not atomic across database and filesystem.
+parent payload once for multiple requested chunks. Document and chunk creation
+compensates for failures after ID allocation by removing partial file storage
+first and then the database placeholder. Cleanup
+failures are included in the operation error. This is still not a distributed
+transaction: a process interruption can leave partial state, and deletion is
+not atomic across database and filesystem.
 
 Payload naming, creation, reading, writing, sizing, and mutable directory or
 metadata operations belong to the persistent implementation. The store
