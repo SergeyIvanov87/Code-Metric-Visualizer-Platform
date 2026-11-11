@@ -313,16 +313,16 @@ def test_put_documents_as_uri_create_matching_storage_records(created_record_ids
     doc_0_dispatcher_available_uri = STORAGE_ROOT / "doc_0.txt"
     shutil.copy(doc_0_uri, doc_0_dispatcher_available_uri)
     doc_0_id = _put_doc_by_uri(doc_0_dispatcher_available_uri)
-    os.remove(doc_0_dispatcher_available_uri)
     created_record_ids.append(doc_0_id)
+    doc_0_dispatcher_available_uri.unlink(missing_ok=True)
     _assert_document_storage(doc_0_id, doc_0)
     _assert_sync_is_clean(len(before_ids) + 1)
 
     doc_1_dispatcher_available_uri = STORAGE_ROOT / "doc_1.txt"
     shutil.copy(doc_1_uri, doc_1_dispatcher_available_uri)
     doc_1_id = _put_doc_by_uri(doc_1_dispatcher_available_uri)
-    os.remove(doc_1_dispatcher_available_uri)
     created_record_ids.append(doc_1_id)
+    doc_1_dispatcher_available_uri.unlink(missing_ok=True)
     _assert_document_storage(doc_1_id, doc_1)
     _assert_sync_is_clean(len(before_ids) + 2)
 

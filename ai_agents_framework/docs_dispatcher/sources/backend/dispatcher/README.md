@@ -15,7 +15,7 @@ backend/
 │   ├── backend/interface.py           # abstract Backend contract
 │   ├── access/interface.py            # access contract
 │   ├── schema/record.py                # shared RecordSchema
-│   └── store/interface.py             # storage contract and static path helpers
+│   └── store/interface.py             # backend-neutral storage contract
 ├── interfaces_impl/
 │   ├── access/mysql/                   # MysqlAccessRecordEntry and SQL models
 │   └── store/persistent/               # PersistentStorageRecordEntry
@@ -61,17 +61,17 @@ never imports a concrete store. Persistent retrieval obtains access records
 through `AccessRecordEntryInterface`, validates consistency, and reads each
 parent payload once for multiple requested chunks. Document and chunk creation
 compensates for failures after ID allocation by removing partial file storage
-first and then the database placeholder. Cleanup
-failures are included in the operation error. This is still not a distributed
+first and then the database placeholder. Cleanup failures are included in the
+operation error. This is still not a distributed
 transaction: a process interruption can leave partial state, and deletion is
 not atomic across database and filesystem.
 
 Payload naming, creation, reading, writing, sizing, and mutable directory or
 metadata operations belong to the persistent implementation. The store
-interface contains only abstract operations and static path helpers. Storage
-records are data-only; they do not select a backend or perform filesystem
-operations. Unused model operations and duplicate interface convenience methods
-have been removed. No nonpersistent implementation is added.
+interface contains only backend-neutral operations and its directory iteration
+helper. Storage records are data-only; they do not select a backend or perform
+filesystem operations. Unused model operations and duplicate interface
+convenience methods have been removed. No nonpersistent implementation is added.
 
 ## Schemas
 

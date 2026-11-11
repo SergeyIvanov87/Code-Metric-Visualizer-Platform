@@ -94,27 +94,57 @@ def test_document_storage_round_trips_metadata_and_doc_type(
 
     access = MysqlAccessRecordEntry(db_session)
     records = access.get_all_records()
-    assert [int(record.id) for record in records] == [parent_id]
+    assert {int(record.id) for record in records} == {parent_id}
 
     store = PersistentStorageRecordEntry(storage_root)
     storage_record = store.get_records([parent_id])[0]
     assert storage_record.metadata == {"comment": "document metadata"}
     assert storage_record.doc_type == "txt"
-    assert (storage_root / str(parent_id) / "metadata").read_text() == "document metadata"
+    assert (
+        storage_root / str(parent_id) / "metadata"
+    ).read_text() == "document metadata"
     assert (storage_root / str(parent_id) / "doc_type").read_text() == "txt"
 
-    def fail_after_directory_creation(file_uri, unique_id, data, **fields):
-        (storage_root / str(unique_id)).mkdir()
+    uri_path = tmp_path / "uri_document.txt"
+    uri_path.write_bytes(b"URI document")
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "put_doc.py",
+            "-URI",
+            str(uri_path),
+            "-doc_type",
+            "txt",
+        ],
+    )
+
+    assert put_doc_main() == 0
+    uri_result = json.loads(capsys.readouterr().out)
+    uri_id = int(uri_result["unique_id"])
+    assert not uri_path.exists()
+    assert {int(record.id) for record in access.get_all_records()} == {
+        parent_id,
+        uri_id,
+    }
+
+    def fail_after_payload_write(record_entry, **fields):
         raise RuntimeError("simulated storage failure")
 
-    monkeypatch.setattr(store, "init_record_from_data", fail_after_directory_creation)
+    monkeypatch.setattr(
+        PersistentStorageRecordEntry,
+        "write_fields",
+        fail_after_payload_write,
+    )
     backend = MysqlPersistentBackend(access=access, store=store)
 
     with pytest.raises(RuntimeError, match="simulated storage failure"):
         backend.put_doc_by_data(Path("failed.txt"), b"failed data")
 
-    assert [int(record.id) for record in access.get_all_records()] == [parent_id]
-    assert set(store.get_all_records()) == {parent_id}
+    assert {int(record.id) for record in access.get_all_records()} == {
+        parent_id,
+        uri_id,
+    }
+    assert set(store.get_all_records()) == {parent_id, uri_id}
 
 
 def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_session, db_engine, capsys):

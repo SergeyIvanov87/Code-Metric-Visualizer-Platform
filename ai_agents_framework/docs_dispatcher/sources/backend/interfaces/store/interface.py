@@ -1,4 +1,4 @@
-"""Storage contract and static path helpers."""
+"""Storage contract."""
 
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
@@ -62,22 +62,6 @@ class StorageRecordEntryInterface(ABC):
     @abstractmethod
     def create_instance(cls, config: "RuntimeConfig") -> AbstractContextManager["StorageRecordEntryInterface"]:
         """Create a configured store context from backend-specific runtime options."""
-
-    @abstractmethod
-    def document_path(self, file_uri: str | Path) -> Path:
-        """Return the backend-specific document location."""
-
-    @abstractmethod
-    def write_document(self, file_uri: str | Path, data: bytes | bytearray) -> int:
-        """Store document content and return its byte count."""
-
-    @abstractmethod
-    def document_size(self, file_uri: str | Path) -> int:
-        """Return the document size in bytes."""
-
-    @staticmethod
-    def record_path(storage_uri: Path, unique_id: int) -> Path:
-        return storage_uri / str(unique_id)
 
     @staticmethod
     def directories(storage_uri: Path):

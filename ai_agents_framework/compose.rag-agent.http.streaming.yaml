@@ -3,7 +3,7 @@
 services:
   rag-agent:
     extends:
-      file: ./ai_agent/compose-default.prod.nvidia.yaml
+      file: ./ai_agent/compose-default.prod.yaml
       service: ai_agent
     environment:
       VECTORDB_HOST: rag-db

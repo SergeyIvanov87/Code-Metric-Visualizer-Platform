@@ -30,14 +30,18 @@ class MysqlPersistentBackend(Backend):
         self,
         unique_id: int,
         original_error: Exception,
+        *,
+        cleanup_storage: bool,
     ) -> None:
         rollback_errors = []
-        # Remove storage first. If the process stops between cleanup steps,
-        # synchronization can safely remove the remaining database-only row.
-        for layer_name, records in (
-            ("file storage", self.store),
-            ("database", self.access),
-        ):
+        layers = []
+        if cleanup_storage:
+            # Remove storage first. If the process stops between cleanup steps,
+            # synchronization can safely remove the remaining database-only row.
+            layers.append(("file storage", self.store))
+        layers.append(("database", self.access))
+
+        for layer_name, records in layers:
             try:
                 records.delete_records([unique_id], cascade_delete=False)
                 if records.get_records([unique_id]):
@@ -62,6 +66,7 @@ class MysqlPersistentBackend(Backend):
         unique_id_candidates = self.access.create_unique_ids(count_of_docs_to_insert)
         uid = next(iter(unique_id_candidates))
 
+        stored_record = None
         try:
             stored_record = self.store.init_record_from_path(
                 file_uri,
@@ -74,7 +79,11 @@ class MysqlPersistentBackend(Backend):
             if self.access.update_record_by_id(uid, stored_record) != 1:
                 raise RuntimeError(f"Allocated record id={uid} disappeared from DB")
         except Exception as error:
-            self._cleanup_failed_record(uid, error)
+            self._cleanup_failed_record(
+                uid,
+                error,
+                cleanup_storage=stored_record is not None,
+            )
             raise
 
         return {"unique_id": uid}
@@ -88,6 +97,7 @@ class MysqlPersistentBackend(Backend):
         unique_id_candidates = self.access.create_unique_ids(count_of_docs_to_insert)
         uid = next(iter(unique_id_candidates))
 
+        stored_record = None
         try:
             stored_record = self.store.init_record_from_data(
                 file_uri,
@@ -101,7 +111,11 @@ class MysqlPersistentBackend(Backend):
             if self.access.update_record_by_id(uid, stored_record) != 1:
                 raise RuntimeError(f"Allocated record id={uid} disappeared from DB")
         except Exception as error:
-            self._cleanup_failed_record(uid, error)
+            self._cleanup_failed_record(
+                uid,
+                error,
+                cleanup_storage=stored_record is not None,
+            )
             raise
 
         return {"unique_id": uid}
@@ -142,6 +156,7 @@ class MysqlPersistentBackend(Backend):
         unique_id_candidates = self.access.create_unique_ids(count_of_docs_to_insert)
         uid = next(iter(unique_id_candidates))
 
+        stored_record_chunk = None
         try:
             stored_record_chunk = self.store.init_record_from_data(
                 stored_parent.file_uri,
@@ -154,7 +169,11 @@ class MysqlPersistentBackend(Backend):
             if self.access.update_record_by_id(uid, stored_record_chunk) != 1:
                 raise RuntimeError(f"Allocated record id={uid} disappeared from DB")
         except Exception as error:
-            self._cleanup_failed_record(uid, error)
+            self._cleanup_failed_record(
+                uid,
+                error,
+                cleanup_storage=stored_record_chunk is not None,
+            )
             raise
 
         return {"unique_id": uid}

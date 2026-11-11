@@ -44,16 +44,29 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
         shutil.rmtree(self.directory)
         return True
 
+    def _cleanup_incomplete_entry(self, original_error: Exception) -> None:
+        try:
+            self.delete()
+        except OSError as cleanup_error:
+            raise RuntimeError(
+                f"{original_error}; cleanup of incomplete storage entry "
+                f"{self.directory} failed: {cleanup_error}"
+            ) from original_error
+
     def init_record_from_path(self, file_uri: str | Path, unique_id: int, *,
                               parent_id: int = 0, offset: int = 0, metadata_text: str = "", doc_type: str = "") -> RecordSchema:
         if not self.exists():
             raise RuntimeError(f"Cannot add the main document: {file_uri}, the storage path doesn't exist: {self.directory}")
         entry = self._entry(unique_id)
         entry.create()
-        entry.rename_document(file_uri)
-        size = entry.document_size(file_uri)
-        entry.write_fields(offset=offset, size=size, parent_id=parent_id,
-                           metadata=metadata_text, doc_type=doc_type)
+        try:
+            entry.rename_document(file_uri)
+            size = entry.document_size(file_uri)
+            entry.write_fields(offset=offset, size=size, parent_id=parent_id,
+                               metadata=metadata_text, doc_type=doc_type)
+        except Exception as error:
+            entry._cleanup_incomplete_entry(error)
+            raise
 
         return RecordSchema(file_uri=file_uri, id=unique_id, offset=offset, size=size,
                              parent_id=parent_id, metadata={"comment": metadata_text} if metadata_text else {},
@@ -67,11 +80,15 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
             raise RuntimeError(f"Cannot add the main document: {file_uri}, the storage path doesn't exist: {self.directory}")
         entry = self._entry(unique_id)
         entry.create()
-        size = len(data)
-        payload = data if parent_id == unique_id else b""
-        entry.write_document(file_uri, payload)
-        entry.write_fields(offset=offset, size=size, parent_id=parent_id,
-                           metadata=metadata_text, doc_type=doc_type)
+        try:
+            size = len(data)
+            payload = data if parent_id == unique_id else b""
+            entry.write_document(file_uri, payload)
+            entry.write_fields(offset=offset, size=size, parent_id=parent_id,
+                               metadata=metadata_text, doc_type=doc_type)
+        except Exception as error:
+            entry._cleanup_incomplete_entry(error)
+            raise
 
         return RecordSchema(file_uri=file_uri, id=unique_id, offset=offset, size=size,
                              parent_id=parent_id, metadata={"comment": metadata_text} if metadata_text else {},
@@ -177,6 +194,10 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
 
     def _entry(self, unique_id: int):
         return type(self)(self.record_path(self.directory, unique_id))
+
+    @staticmethod
+    def record_path(storage_uri: Path, unique_id: int) -> Path:
+        return storage_uri / str(unique_id)
 
     def rename_document(self, file_uri: str | Path) -> None:
         src_path = Path(file_uri)
