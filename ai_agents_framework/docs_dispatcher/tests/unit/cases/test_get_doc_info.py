@@ -1,5 +1,6 @@
 from interfaces_impl.store.persistent import PersistentStorageRecordEntry
 from interfaces_impl.access.mysql import MysqlAccessRecordEntry
+from interfaces.schema import RecordSchema
 from mysql_persistent.backend import MysqlPersistentBackend
 from pathlib import Path
 
@@ -12,13 +13,33 @@ from interfaces_impl.access.mysql.database import Base
 
 
 def _db_document(session, doc_id: int, file_uri: str, doc_type: str = "txt"):
-    document = MysqlAccessRecordEntry(session).create_file_record(file_uri, 0, 10, 0, doc_type=doc_type)
-    assert document.id == doc_id
-    return MysqlAccessRecordEntry(session).update_file_record(document.id, parent_id=document.id)
+    access = MysqlAccessRecordEntry(session)
+    record_id = next(iter(access.create_unique_ids()))
+    assert record_id == doc_id
+    document = RecordSchema(
+        file_uri=file_uri,
+        id=record_id,
+        offset=0,
+        size=10,
+        parent_id=record_id,
+        doc_type=doc_type,
+    )
+    assert access.update_record_by_id(record_id, document) == 1
+    return document
 
 
 def _db_chunk(session, document_id: int, file_uri: str):
-    return MysqlAccessRecordEntry(session).create_file_record(file_uri, 0, 5, document_id)
+    access = MysqlAccessRecordEntry(session)
+    record_id = next(iter(access.create_unique_ids()))
+    chunk = RecordSchema(
+        file_uri=file_uri,
+        id=record_id,
+        offset=0,
+        size=5,
+        parent_id=document_id,
+    )
+    assert access.update_record_by_id(record_id, chunk) == 1
+    return chunk
 
 
 def _storage_record(
@@ -43,9 +64,9 @@ def test_get_document_info_reports_complete_partial_and_absent_documents(tmp_pat
     session = sessionmaker(bind=engine)()
 
     complete = _db_document(session, 1, "%slash%docs%slash%complete.txt", "markdown")
-    complete_chunk = _db_chunk(session, complete.id, complete.file_path)
+    complete_chunk = _db_chunk(session, complete.id, complete.file_uri)
     db_only = _db_document(session, 3, "%slash%docs%slash%db-only.txt")
-    db_only_chunk = _db_chunk(session, db_only.id, db_only.file_path)
+    db_only_chunk = _db_chunk(session, db_only.id, db_only.file_uri)
 
     _storage_record(tmp_path, complete.id, complete.id, "%slash%docs%slash%complete.txt", "markdown")
     _storage_record(tmp_path, complete_chunk.id, complete.id, "%slash%docs%slash%complete.txt")
@@ -102,7 +123,7 @@ def test_chunk_id_is_not_mistaken_for_a_document(tmp_path):
     session = sessionmaker(bind=engine)()
 
     document = _db_document(session, 1, "/docs/document.txt")
-    chunk = _db_chunk(session, document.id, document.file_path)
+    chunk = _db_chunk(session, document.id, document.file_uri)
     _storage_record(tmp_path, chunk.id, document.id, "chunk.txt")
 
     backend = MysqlPersistentBackend(

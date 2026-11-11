@@ -13,14 +13,3 @@ class FileRecord(Base):
     parent_id = Column(BigInteger, nullable=False, default=0)
     metadata_json = Column(JSON, nullable=True)
     doc_type = Column(String(255), nullable=False, default="")
-
-    def __repr__(self) -> str:
-        return (
-            f"FileRecord("
-            f"id={self.id}, "
-            f"path='{self.file_path}', "
-            f"offset={self.offset}, "
-            f"size={self.size}, "
-            f"parent_id={self.parent_id}, "
-            f"doc_type='{self.doc_type}')"
-        )

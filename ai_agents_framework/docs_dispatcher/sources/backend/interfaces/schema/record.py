@@ -34,30 +34,3 @@ class RecordSchema:
             if getattr(self, schema_field.name)
             != getattr(other, schema_field.name)
         }
-
-    @property
-    def file_path(self) -> str | Path:
-        """Compatibility name used by database-facing code."""
-        return self.file_uri
-
-    @file_path.setter
-    def file_path(self, value: str | Path) -> None:
-        self.file_uri = value
-
-    @property
-    def unique_id(self) -> int | None:
-        """Compatibility name used by storage-facing code."""
-        return self.id
-
-    @unique_id.setter
-    def unique_id(self, value: int | None) -> None:
-        self.id = value
-
-    @property
-    def metadata_json(self) -> dict[str, Any] | None:
-        """Compatibility name used by database-facing code."""
-        return self.metadata
-
-    @metadata_json.setter
-    def metadata_json(self, value: dict[str, Any] | None) -> None:
-        self.metadata = value

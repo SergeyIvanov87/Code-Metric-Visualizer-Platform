@@ -1,15 +1,10 @@
-from interfaces_impl.access.mysql import MysqlAccessRecordEntry
-import tempfile
-from pathlib import Path
-
 import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
+from interfaces.schema import RecordSchema
+from interfaces_impl.access.mysql import MysqlAccessRecordEntry
 from interfaces_impl.access.mysql.database import Base, initialize_schema
-from interfaces_impl.access.mysql.models import FileRecord
-
-
 
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -17,48 +12,94 @@ TEST_DATABASE_URL = "sqlite:///:memory:"
 
 @pytest.fixture()
 def db_session():
-
     engine = create_engine(TEST_DATABASE_URL)
-
-    TestingSessionLocal = sessionmaker(
+    testing_session = sessionmaker(
         autoflush=False,
         autocommit=False,
-        bind=engine
+        bind=engine,
     )
-
     Base.metadata.create_all(bind=engine)
-
-    db = TestingSessionLocal()
-
+    db = testing_session()
     yield db
-
     db.close()
 
 
-def test_create_record(db_session):
+def _create_record(
+    db_session,
+    *,
+    file_uri: str,
+    offset: int,
+    size: int,
+    parent_id: int,
+    metadata: dict | None = None,
+    doc_type: str = "",
+) -> RecordSchema:
+    access = MysqlAccessRecordEntry(db_session)
+    record_id = next(iter(access.create_unique_ids()))
+    record = RecordSchema(
+        file_uri=file_uri,
+        id=record_id,
+        offset=offset,
+        size=size,
+        parent_id=parent_id,
+        metadata=metadata,
+        doc_type=doc_type,
+    )
+    assert access.update_record_by_id(record_id, record) == 1
+    return record
 
-    record = MysqlAccessRecordEntry(db_session).create_file_record(file_path='/tmp/test.bin', offset=0, size=100, parent_id=0, metadata_json={'key': 'value'}, doc_type='txt')
+
+def test_create_record(db_session):
+    record = _create_record(
+        db_session,
+        file_uri="/tmp/test.bin",
+        offset=0,
+        size=100,
+        parent_id=0,
+        metadata={"key": "value"},
+        doc_type="txt",
+    )
 
     assert record.id is not None
-    assert record.file_path == "/tmp/test.bin"
+    assert record.file_uri == "/tmp/test.bin"
     assert record.doc_type == "txt"
 
 
 def test_get_record(db_session):
+    created = _create_record(
+        db_session,
+        file_uri="/tmp/file.bin",
+        offset=0,
+        size=123,
+        parent_id=0,
+    )
 
-    created = MysqlAccessRecordEntry(db_session).create_file_record(file_path='/tmp/file.bin', offset=0, size=123, parent_id=0)
+    fetched = MysqlAccessRecordEntry(db_session).get_records([created.id])
 
-    fetched = MysqlAccessRecordEntry(db_session).get_file_record(created.id)
-
-    assert fetched is not None
-    assert fetched.id == created.id
+    assert len(fetched) == 1
+    assert fetched[0].id == created.id
 
 
 def test_update_record(db_session):
+    created = _create_record(
+        db_session,
+        file_uri="/tmp/old.bin",
+        offset=0,
+        size=100,
+        parent_id=0,
+    )
+    replacement = RecordSchema(
+        file_uri=created.file_uri,
+        id=created.id,
+        offset=500,
+        size=999,
+        parent_id=123,
+        doc_type="markdown",
+    )
+    access = MysqlAccessRecordEntry(db_session)
 
-    created = MysqlAccessRecordEntry(db_session).create_file_record(file_path='/tmp/old.bin', offset=0, size=100, parent_id=0)
-
-    updated = MysqlAccessRecordEntry(db_session).update_file_record(created.id, offset=500, size=999, parent_id=123, doc_type='markdown')
+    assert access.update_record_by_id(created.id, replacement) == 1
+    updated = access.get_records([created.id])[0]
 
     assert updated.offset == 500
     assert updated.size == 999
@@ -67,39 +108,49 @@ def test_update_record(db_session):
 
 
 def test_delete_record(db_session):
-
-    created = MysqlAccessRecordEntry(db_session).create_file_record(file_path='/tmp/delete.bin', offset=0, size=100, parent_id=123)
-
+    created = _create_record(
+        db_session,
+        file_uri="/tmp/delete.bin",
+        offset=0,
+        size=100,
+        parent_id=123,
+    )
     access = MysqlAccessRecordEntry(db_session)
-    deleted_count, missing_ids = access.delete_records([created.id], cascade_delete=False)
+
+    deleted_count, missing_ids = access.delete_records(
+        [created.id],
+        cascade_delete=False,
+    )
 
     assert deleted_count == 1
     assert missing_ids == []
     assert access.get_records([created.id]) == []
 
 
-def test_rebuild_table_from_directory(db_session):
+def test_create_records_by_ids(db_session):
+    records = {
+        10: RecordSchema(
+            file_uri="/tmp/a.txt",
+            id=10,
+            offset=0,
+            size=5,
+            parent_id=10,
+        ),
+        11: RecordSchema(
+            file_uri="/tmp/b.txt",
+            id=11,
+            offset=0,
+            size=8,
+            parent_id=11,
+        ),
+    }
+    access = MysqlAccessRecordEntry(db_session)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    assert access.create_records_by_ids(records) == 2
 
-        file1 = Path(tmpdir) / "a.txt"
-        file2 = Path(tmpdir) / "b.txt"
-
-        file1.write_text("hello")
-        file2.write_text("world!!!")
-
-        MysqlAccessRecordEntry(db_session).rebuild_table_from_directory(tmpdir)
-
-        records = db_session.query(FileRecord).all()
-
-        assert len(records) == 2
-
-        sizes = sorted([r.size for r in records])
-
-        assert sizes == [5, 8]
-
-        for record in records:
-            assert record.offset == 0
+    created = sorted(access.get_all_records(), key=lambda record: record.id)
+    assert [record.id for record in created] == [10, 11]
+    assert [record.size for record in created] == [5, 8]
 
 
 def test_initialize_schema_adds_doc_type_to_existing_table():
@@ -116,5 +167,8 @@ def test_initialize_schema_adds_doc_type_to_existing_table():
 
     initialize_schema(engine)
 
-    columns = {column["name"] for column in inspect(engine).get_columns("file_records")}
+    columns = {
+        column["name"]
+        for column in inspect(engine).get_columns("file_records")
+    }
     assert "doc_type" in columns

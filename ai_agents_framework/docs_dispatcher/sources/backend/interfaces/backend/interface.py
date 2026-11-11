@@ -2,12 +2,11 @@
 
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import Iterable, TYPE_CHECKING
 
 from interfaces.access import AccessRecordEntryInterface
 from interfaces.store import StorageRecordEntryInterface
-from interfaces.schema import RecordSchema
-
 if TYPE_CHECKING:
     from interfaces import RuntimeConfig
 

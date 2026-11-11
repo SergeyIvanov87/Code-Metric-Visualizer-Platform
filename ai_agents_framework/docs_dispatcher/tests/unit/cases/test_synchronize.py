@@ -1,109 +1,170 @@
-from interfaces_impl.access.mysql import MysqlAccessRecordEntry
-from pathlib import Path
+from dataclasses import replace
 
-import json
 import pytest
-import sys
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from interfaces_impl.access.mysql.database import Base
-from interfaces_impl.access.mysql.models import FileRecord
-
-
-from interfaces_impl.access.mysql.mysql import apply_storage_fields_to_db_record
 from interfaces.schema import RecordSchema
+from interfaces_impl.access.mysql import MysqlAccessRecordEntry
+from interfaces_impl.access.mysql.database import Base
+from interfaces_impl.store.persistent import PersistentStorageRecordEntry
+from mysql_persistent.backend import MysqlPersistentBackend
+
 
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
-stub_db_data = {"equal" : FileRecord(id=10, file_path="file_id_10", offset=0, size=1000,parent_id=10, doc_type="txt"),
-                "id_mismatch" : FileRecord(id=1000, file_path="file_id_1000", offset=0, size=1000,parent_id=10, doc_type="txt"),
-                "id_absent" : FileRecord(id=3000, file_path="file_id_3000", offset=0, size=1000,parent_id=10, doc_type="txt"),
-                "offset_to_fix" : FileRecord(id=11, file_path="file_id_11", offset=3000, size=1000,parent_id=10, doc_type="txt"),
-                "size_to_fix" : FileRecord(id=12, file_path="file_id_12", offset=0, size=3000,parent_id=10, doc_type="txt"),
-                }
+STUB_DB_DATA = {
+    "equal": RecordSchema(
+        file_uri="file_id_10",
+        id=10,
+        offset=0,
+        size=1000,
+        parent_id=10,
+        doc_type="txt",
+    ),
+    "id_mismatch": RecordSchema(
+        file_uri="file_id_1000",
+        id=1000,
+        offset=0,
+        size=1000,
+        parent_id=10,
+        doc_type="txt",
+    ),
+    "id_absent": RecordSchema(
+        file_uri="file_id_3000",
+        id=3000,
+        offset=0,
+        size=1000,
+        parent_id=10,
+        doc_type="txt",
+    ),
+    "offset_to_fix": RecordSchema(
+        file_uri="file_id_11",
+        id=11,
+        offset=3000,
+        size=1000,
+        parent_id=10,
+        doc_type="txt",
+    ),
+    "size_to_fix": RecordSchema(
+        file_uri="file_id_12",
+        id=12,
+        offset=0,
+        size=3000,
+        parent_id=10,
+        doc_type="txt",
+    ),
+}
+
 
 @pytest.fixture()
 def db_session():
     engine = create_engine(TEST_DATABASE_URL)
-
-    TestingSessionLocal = sessionmaker(
+    testing_session = sessionmaker(
         autoflush=False,
         autocommit=False,
-        bind=engine
+        bind=engine,
     )
-
     Base.metadata.create_all(bind=engine)
-
-    db = TestingSessionLocal()
-    global stub_db_data
-    stmt = select(FileRecord)
-
-    for user in db.scalars(stmt):
-        print(user, flush = True)
-
-    for req in stub_db_data.values():
-        MysqlAccessRecordEntry(db).create_file_record_ext(req)
+    db = testing_session()
+    MysqlAccessRecordEntry(db).create_records_by_ids(
+        {record.id: record for record in STUB_DB_DATA.values()}
+    )
     yield db
-
     db.close()
 
-def convert_to_record_schema(req_name, db_record: FileRecord):
-    ret = RecordSchema(file_uri = db_record.file_path, id=db_record.id, offset = db_record.offset, size = db_record.size, parent_id = db_record.parent_id, metadata = db_record.metadata_json, doc_type=db_record.doc_type)
-    if req_name == "id_mismatch":
-        ret.id = db_record.id * 98765431
-    if req_name == "id_absent":
-        ret = {}
-    if req_name == "offset_to_fix":
-        ret.offset = db_record.offset + 100
-    if req_name == "size_to_fix":
-        ret.size = db_record.size + 100
-    return ret
 
-def test_amend_db_records(db_session):
-    all_storage_records = { req.id: convert_to_record_schema(name, req) for name, req in stub_db_data.items() if convert_to_record_schema(name, req) != {}}
+def _storage_version(name: str, db_record: RecordSchema) -> RecordSchema | None:
+    if name == "id_mismatch":
+        new_id = db_record.id * 98765431
+        return replace(db_record, id=new_id)
+    if name == "id_absent":
+        return None
+    if name == "offset_to_fix":
+        return replace(db_record, offset=db_record.offset + 100)
+    if name == "size_to_fix":
+        return replace(db_record, size=db_record.size + 100)
+    return replace(db_record)
+
+
+def _write_storage_record(storage_root, record: RecordSchema) -> None:
+    record_dir = storage_root / str(record.id)
+    record_dir.mkdir()
+    (record_dir / f"{record.file_uri}.storage_bin").touch()
+    (record_dir / "parentId").write_text(str(record.parent_id))
+    (record_dir / "offset").write_text(str(record.offset))
+    (record_dir / "size").write_text(str(record.size))
+    (record_dir / "doc_type").write_text(record.doc_type)
+    metadata = (record.metadata or {}).get("comment")
+    if metadata is not None:
+        (record_dir / "metadata").write_text(metadata)
+
+
+def test_amend_db_records(db_session, tmp_path):
+    storage_records = {}
+    for name, db_record in STUB_DB_DATA.items():
+        storage_record = _storage_version(name, db_record)
+        if storage_record is not None:
+            storage_records[storage_record.id] = storage_record
+
     new_added_id = 9999
-    all_storage_records[new_added_id] = RecordSchema(file_uri=f"file_id_{new_added_id}", id=new_added_id, offset = 0, size=new_added_id, parent_id = new_added_id, metadata={"comment": "new"}, doc_type="pdf")
-    all_db_records = MysqlAccessRecordEntry(db_session).get_all_records()
-    MysqlAccessRecordEntry(db_session).synchronize_records(all_db_records, all_storage_records)
-
-    updated_db_records = MysqlAccessRecordEntry(db_session).get_all_records()
-    sorted_updated_db_records = sorted(updated_db_records, key = lambda x : x.id)
-
-    assert len(updated_db_records) == len(all_storage_records), "sizes of colelctions must be equal"
-    for db_record, (storage_record_id, storage_record_data) in zip(updated_db_records, dict(sorted(all_storage_records.items())).items()):
-        assert db_record.id == storage_record_id, "Unique Ids must be equal"
-        assert db_record.file_path == storage_record_data.file_uri, "File URI and path must be equal"
-        assert db_record.offset == storage_record_data.offset, "Offsets must be equal"
-        assert db_record.size == storage_record_data.size, "Sized must be equal"
-        assert db_record.parent_id == storage_record_data.parent_id, "Parent Ids must be equal"
-        assert db_record.doc_type == storage_record_data.doc_type, "Document types must be equal"
-        if db_record.id == new_added_id:
-            assert db_record.metadata_json == storage_record_data.metadata, "Metadatas must be equal"
-
-
-def test_apply_storage_fields_updates_doc_type():
-    db_record = FileRecord(
-        id=1,
-        file_path="document.txt",
+    storage_records[new_added_id] = RecordSchema(
+        file_uri=f"file_id_{new_added_id}",
+        id=new_added_id,
         offset=0,
-        size=10,
-        parent_id=1,
-        doc_type="txt",
+        size=new_added_id,
+        parent_id=new_added_id,
+        metadata={"comment": "new"},
+        doc_type="pdf",
     )
-    storage_record = RecordSchema(
+    for storage_record in storage_records.values():
+        _write_storage_record(tmp_path, storage_record)
+
+    backend = MysqlPersistentBackend(
+        access=MysqlAccessRecordEntry(db_session),
+        store=PersistentStorageRecordEntry(tmp_path),
+    )
+    assert backend.synchronize() == {
+        "created": 2,
+        "updated": 2,
+        "deleted": 2,
+        "not_changed": 1,
+        "initial DB records": 5,
+        "storage size": 5,
+    }
+
+    updated_db_records = {
+        record.id: record
+        for record in MysqlAccessRecordEntry(db_session).get_all_records()
+    }
+    assert set(updated_db_records) == set(storage_records)
+    for record_id, storage_record in storage_records.items():
+        assert updated_db_records[record_id].get_difference(storage_record) == {}
+
+
+def test_synchronize_updates_doc_type(tmp_path):
+    engine = create_engine(TEST_DATABASE_URL)
+    Base.metadata.create_all(bind=engine)
+    session = sessionmaker(bind=engine)()
+    access = MysqlAccessRecordEntry(session)
+    db_record = RecordSchema(
         file_uri="document.txt",
         id=1,
         offset=0,
         size=10,
         parent_id=1,
-        doc_type="markdown",
+        doc_type="txt",
     )
+    access.create_records_by_ids({1: db_record})
+    storage_record = replace(db_record, doc_type="markdown")
+    _write_storage_record(tmp_path, storage_record)
 
-    changed, updated_record = apply_storage_fields_to_db_record(
-        db_record,
-        storage_record,
+    backend = MysqlPersistentBackend(
+        access=access,
+        store=PersistentStorageRecordEntry(tmp_path),
     )
+    result = backend.synchronize()
 
-    assert changed is True
-    assert updated_record.doc_type == "markdown"
+    assert result["updated"] == 1
+    assert access.get_records([1])[0].doc_type == "markdown"
+    session.close()

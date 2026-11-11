@@ -1,5 +1,6 @@
 from interfaces_impl.store.persistent import PersistentStorageRecordEntry
 from interfaces_impl.access.mysql import MysqlAccessRecordEntry
+from interfaces.schema import RecordSchema
 from mysql_persistent.backend import MysqlPersistentBackend
 from pathlib import Path
 
@@ -12,12 +13,32 @@ from interfaces_impl.access.mysql.database import Base
 
 
 def _db_document(session, content: bytes):
-    document = MysqlAccessRecordEntry(session).create_file_record('/docs/document.txt', 0, len(content), 0, doc_type='txt')
-    return MysqlAccessRecordEntry(session).update_file_record(document.id, parent_id=document.id)
+    access = MysqlAccessRecordEntry(session)
+    record_id = next(iter(access.create_unique_ids()))
+    document = RecordSchema(
+        file_uri="/docs/document.txt",
+        id=record_id,
+        offset=0,
+        size=len(content),
+        parent_id=record_id,
+        doc_type="txt",
+    )
+    assert access.update_record_by_id(record_id, document) == 1
+    return document
 
 
 def _db_chunk(session, document_id: int, offset: int, size: int):
-    return MysqlAccessRecordEntry(session).create_file_record('/docs/document.txt', offset, size, document_id)
+    access = MysqlAccessRecordEntry(session)
+    record_id = next(iter(access.create_unique_ids()))
+    chunk = RecordSchema(
+        file_uri="/docs/document.txt",
+        id=record_id,
+        offset=offset,
+        size=size,
+        parent_id=document_id,
+    )
+    assert access.update_record_by_id(record_id, chunk) == 1
+    return chunk
 
 
 def _storage_record(

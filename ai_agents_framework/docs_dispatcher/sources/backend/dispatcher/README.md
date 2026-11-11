@@ -15,7 +15,7 @@ backend/
 │   ├── backend/interface.py           # abstract Backend contract
 │   ├── access/interface.py            # access contract
 │   ├── schema/record.py                # shared RecordSchema
-│   └── store/interface.py             # storage contract and filesystem utilities
+│   └── store/interface.py             # storage contract and static path helpers
 ├── interfaces_impl/
 │   ├── access/mysql/                   # MysqlAccessRecordEntry and SQL models
 │   └── store/persistent/               # PersistentStorageRecordEntry
@@ -64,11 +64,12 @@ existing rollback behavior. Existing cross-store transaction limits remain:
 a document write failure can leave an allocated database record, and deletion
 is not atomic across database and filesystem.
 
-Payload naming, creation, reading, writing, and sizing belong to the persistent
-implementation. Shared directory and metadata utilities stay in the store
-interface. Storage records are data-only; they do not select a backend or
-perform filesystem operations. Unused model operations and duplicate interface
-convenience methods have been removed. No nonpersistent implementation is added.
+Payload naming, creation, reading, writing, sizing, and mutable directory or
+metadata operations belong to the persistent implementation. The store
+interface contains only abstract operations and static path helpers. Storage
+records are data-only; they do not select a backend or perform filesystem
+operations. Unused model operations and duplicate interface convenience methods
+have been removed. No nonpersistent implementation is added.
 
 ## Schemas
 

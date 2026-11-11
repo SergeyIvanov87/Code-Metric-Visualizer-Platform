@@ -1,4 +1,7 @@
 from interfaces_impl.access.mysql import MysqlAccessRecordEntry
+from interfaces.schema import RecordSchema
+from interfaces_impl.store.persistent import PersistentStorageRecordEntry
+from mysql_persistent.backend import MysqlPersistentBackend
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
@@ -8,16 +11,42 @@ from interfaces_impl.access.mysql.database import Base
 
 
 def _document(session, file_uri: str, doc_type: str = "txt"):
-    document = MysqlAccessRecordEntry(session).create_file_record(file_uri, 0, 10, 0, doc_type=doc_type)
-    MysqlAccessRecordEntry(session).update_file_record(document.id, parent_id=document.id)
+    access = MysqlAccessRecordEntry(session)
+    record_id = next(iter(access.create_unique_ids()))
+    document = RecordSchema(
+        file_uri=file_uri,
+        id=record_id,
+        offset=0,
+        size=10,
+        parent_id=record_id,
+        doc_type=doc_type,
+    )
+    assert access.update_record_by_id(record_id, document) == 1
     return document
 
 
 def _chunk(session, document_id: int, file_uri: str):
-    return MysqlAccessRecordEntry(session).create_file_record(file_uri, 0, 5, document_id)
+    access = MysqlAccessRecordEntry(session)
+    record_id = next(iter(access.create_unique_ids()))
+    chunk = RecordSchema(
+        file_uri=file_uri,
+        id=record_id,
+        offset=0,
+        size=5,
+        parent_id=document_id,
+    )
+    assert access.update_record_by_id(record_id, chunk) == 1
+    return chunk
 
 
-def test_get_documents_returns_decanonized_uris_and_chunk_ids_with_limit_pagination():
+def _backend(session, storage_root):
+    return MysqlPersistentBackend(
+        access=MysqlAccessRecordEntry(session),
+        store=PersistentStorageRecordEntry(storage_root),
+    )
+
+
+def test_get_documents_returns_decanonized_uris_and_chunk_ids_with_limit_pagination(tmp_path):
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
@@ -30,11 +59,11 @@ def test_get_documents_returns_decanonized_uris_and_chunk_ids_with_limit_paginat
 
     first = _document(session, "%slash%docs%slash%first.txt")
     second = _document(session, "%slash%docs%slash%second.txt", "markdown")
-    first_chunk = _chunk(session, first.id, first.file_path)
-    second_chunk_1 = _chunk(session, second.id, second.file_path)
-    second_chunk_2 = _chunk(session, second.id, second.file_path)
+    first_chunk = _chunk(session, first.id, first.file_uri)
+    second_chunk_1 = _chunk(session, second.id, second.file_uri)
+    second_chunk_2 = _chunk(session, second.id, second.file_uri)
 
-    assert MysqlAccessRecordEntry(session).get_documents(offset=1, limit=1) == {
+    assert _backend(session, tmp_path).get_documents(offset=1, limit=1) == {
         "offset": 1,
         "limit": 1,
         "remaining": 0,
@@ -51,13 +80,13 @@ def test_get_documents_returns_decanonized_uris_and_chunk_ids_with_limit_paginat
     session.close()
 
 
-def test_get_documents_limit_zero_returns_empty_docs_array():
+def test_get_documents_limit_zero_returns_empty_docs_array(tmp_path):
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
     _document(session, "/docs/first.txt")
 
-    assert MysqlAccessRecordEntry(session).get_documents(offset=0, limit=0) == {
+    assert _backend(session, tmp_path).get_documents(offset=0, limit=0) == {
         "offset": 0,
         "limit": 0,
         "remaining": 1,
@@ -67,13 +96,13 @@ def test_get_documents_limit_zero_returns_empty_docs_array():
     session.close()
 
 
-def test_get_documents_remaining_never_becomes_negative():
+def test_get_documents_remaining_never_becomes_negative(tmp_path):
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
     _document(session, "/docs/first.txt")
 
-    assert MysqlAccessRecordEntry(session).get_documents(offset=5, limit=1) == {
+    assert _backend(session, tmp_path).get_documents(offset=5, limit=1) == {
         "offset": 5,
         "limit": 0,
         "remaining": 0,

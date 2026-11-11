@@ -30,13 +30,17 @@ class MysqlPersistentBackend(Backend):
     def put_doc_by_uri(self, file_uri: str | Path, metadata_text: str = "", doc_type: str = "txt") -> dict:
         count_of_docs_to_insert = 1
         unique_id_candidates = self.access.create_unique_ids(count_of_docs_to_insert)
-        uid = iter(unique_id_candidates)
+        uid = next(iter(unique_id_candidates))
 
-        stored_record = self.store.init_record_from_path(file_uri, uid, offset=0,
-                                                metadata_json={"comment": metadata_text} if metadata_text else {},
-                                                doc_type=doc_type)
+        stored_record = self.store.init_record_from_path(
+            file_uri,
+            uid,
+            parent_id=uid,
+            offset=0,
+            metadata_text=metadata_text,
+            doc_type=doc_type,
+        )
 
-        stored_record.parent_id = uid
         self.access.update_record_by_id(uid, stored_record)
         return {"unique_id": uid}
 
@@ -47,13 +51,18 @@ class MysqlPersistentBackend(Backend):
 
         count_of_docs_to_insert = 1
         unique_id_candidates = self.access.create_unique_ids(count_of_docs_to_insert)
-        uid = iter(unique_id_candidates)
+        uid = next(iter(unique_id_candidates))
 
-        stored_record = self.store.init_record_from_data(file_uri, uid, data, offset=0,
-                                                metadata_json={"comment": metadata_text} if metadata_text else {},
-                                                doc_type=doc_type)
+        stored_record = self.store.init_record_from_data(
+            file_uri,
+            uid,
+            data,
+            parent_id=uid,
+            offset=0,
+            metadata_text=metadata_text,
+            doc_type=doc_type,
+        )
 
-        stored_record.parent_id = uid
         self.access.update_record_by_id(uid, stored_record)
         return {"unique_id": uid}
 
@@ -81,38 +90,44 @@ class MysqlPersistentBackend(Backend):
         parent_data = self.store.read_record_data(stored_parent)
         offset = parent_data.find(data)
         if offset < 0:
-            raise ValueError(f"chunk does not belong to the parent document by ID: {document.id}, the chunk content cannot be found")
+            raise ValueError(
+                f"chunk does not belong to the parent document by ID: "
+                f"{parent.id}, the chunk content cannot be found"
+            )
         size = len(data)
         if stored_parent.size >= 0 and offset + size > stored_parent.size:
             raise ValueError(f"chunk with offset: {offset} and size: {size} does not fit into the parent document of size: {stored_parent.size}, type: {stored_parent.doc_type}")
 
         count_of_docs_to_insert = 1
         unique_id_candidates = self.access.create_unique_ids(count_of_docs_to_insert)
-        uid = iter(unique_id_candidates)
+        uid = next(iter(unique_id_candidates))
 
         stored_record_chunk = None
         try:
             stored_record_chunk = self.store.init_record_from_data(
-                                                    stored_parent.file_uri, uid, data, offset=offset,
-                                                    parent_id = stored_parent.id,
-                                                    metadata_json={"comment": metadata_text} if metadata_text else {},
-                                                    doc_type=doc_type)
-
-            stored_record_chunk.parent_id = stored_parent.id
-            self.access.update_record_by_id(uid, stored_record)
+                stored_parent.file_uri,
+                uid,
+                data,
+                offset=offset,
+                parent_id=stored_parent.id,
+                metadata_text=metadata_text,
+            )
+            self.access.update_record_by_id(uid, stored_record_chunk)
         except Exception:
-            self.access.delete_records([stored_record_chunk.id], False)
-
+            self.access.delete_records([uid], False)
             if stored_record_chunk is not None:
-                self.store.delete_records([stored_record_chunk.id], False)
+                self.store.delete_records([uid], False)
             raise
-        return {"unique_id": chunk.id}
+        return {"unique_id": uid}
 
 
     def delete_records(self, record_ids: Iterable[int]) -> tuple[int, int, list[int]]:
         store_deleted_count, store_non_deleted_id = self.store.delete_records(record_ids, True)
         access_deleted_count, access_non_deleted_id = self.access.delete_records(record_ids, True)
-        return access_deleted_count, store_deleted_count, [*(set(store_non_deleted_id).update(access_non_deleted_id))]
+        missing_ids = list(
+            dict.fromkeys([*store_non_deleted_id, *access_non_deleted_id])
+        )
+        return access_deleted_count, store_deleted_count, missing_ids
 
     def get_document_info(self, doc_ids: list[int]) -> dict[str, object]:
         unique_doc_ids = self._unique_ids(doc_ids)
@@ -204,7 +219,7 @@ class MysqlPersistentBackend(Backend):
         documents = [
             {
                 "id": int(document.id),
-                "file_uri": decanonize_file_uri(document.file_path),
+                "file_uri": decanonize_file_uri(document.file_uri),
                 "type": document.doc_type,
                 "chunks": chunk_ids_by_document[int(document.id)],
             }

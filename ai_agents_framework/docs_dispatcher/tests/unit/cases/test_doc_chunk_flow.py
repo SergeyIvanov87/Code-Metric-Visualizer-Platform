@@ -1,6 +1,7 @@
 from __future__ import annotations
 from interfaces_impl.store.persistent import PersistentStorageRecordEntry
 from interfaces import RuntimeConfig
+from mysql_persistent.backend import MysqlPersistentBackend
 
 import io
 from contextlib import nullcontext
@@ -39,13 +40,18 @@ def db_session(db_engine):
 
 
 def _create_parent_document(db_session, storage_root: Path, file_name: str, content: str):
-    parent = MysqlAccessRecordEntry(db_session).create_file_record(file_path=file_name, offset=0, size=len(content), parent_id=0, metadata_json={'comment': 'document metadata'}, doc_type='txt')
-    PersistentStorageRecordEntry(storage_root).add_document(
-        Path(file_name), parent.id, content.encode('utf-8'), offset=parent.offset,
-        metadata_text="document metadata", doc_type="txt")
-    parent.parent_id = parent.id
-    MysqlAccessRecordEntry(db_session).update_file_record_ext(parent.id, parent)
-    return parent
+    access = MysqlAccessRecordEntry(db_session)
+    backend = MysqlPersistentBackend(
+        access=access,
+        store=PersistentStorageRecordEntry(storage_root),
+    )
+    parent_id = backend.put_doc_by_data(
+        Path(file_name),
+        content.encode("utf-8"),
+        metadata_text="document metadata",
+        doc_type="txt",
+    )["unique_id"]
+    return access.get_records([parent_id])[0]
 
 
 def _mysql_backend_config(tmp_path: Path, storage_root: Path) -> RuntimeConfig:
@@ -58,7 +64,9 @@ def test_document_storage_round_trips_metadata_and_doc_type(tmp_path, db_session
     storage_root.mkdir()
     parent = _create_parent_document(db_session, storage_root, "parent.txt", "abcdefghij")
 
-    storage_record = PersistentStorageRecordEntry(storage_root).get_record(parent.id)
+    storage_record = PersistentStorageRecordEntry(storage_root).get_records(
+        [parent.id]
+    )[0]
 
     assert storage_record is not None
     assert storage_record.metadata == {"comment": "document metadata"}
@@ -98,10 +106,12 @@ def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_sess
     assert chunk.parent_id == parent.id
     assert chunk.offset == 3
     assert chunk.size == 4
-    assert chunk.file_path == parent.file_path
-    assert chunk.metadata_json == {"comment": "chunk comment"}
+    assert chunk.file_uri == parent.file_uri
+    assert chunk.metadata == {"comment": "chunk comment"}
 
-    storage_chunk = PersistentStorageRecordEntry(storage_root).get_record(chunk.id)
+    storage_chunk = PersistentStorageRecordEntry(storage_root).get_records(
+        [chunk.id]
+    )[0]
     assert storage_chunk is not None
     assert storage_chunk.parent_id == parent.id
     assert storage_chunk.offset == 3
@@ -225,6 +235,6 @@ def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
     assert result["deleted from DB"] == 1
     assert result["deleted from storage"] == 1
     assert result["error_code"] == 1
-    assert result["error_msg"] == "Record id=999 does not exist"
+    assert result["error_msg"] == "Docs id=999 does not exist"
     assert MysqlAccessRecordEntry(db_session).get_all_records() == []
     assert PersistentStorageRecordEntry(storage_root).get_all_records() == {}
