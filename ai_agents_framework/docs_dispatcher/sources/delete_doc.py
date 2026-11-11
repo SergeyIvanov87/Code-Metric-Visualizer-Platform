@@ -53,8 +53,8 @@ def main():
     try:
         read_metadata_text(args.metadata)
         with BackendDispatcher().get_backend() as backend:
-            deleted_db, deleted_storage, missing_ids = backend.access.delete_records(backend.store, args.ids)
-        errors = [f"Record id={record_id} does not exist" for record_id in missing_ids]
+            deleted_db, deleted_storage, missing_ids = backend.delete_records(args.ids)
+        errors = [f"Docs id={record_id} does not exist" for record_id in missing_ids]
     except Exception as ex:
         errors = [str(ex)]
     result = {"deleted from DB": deleted_db, "deleted from storage": deleted_storage,

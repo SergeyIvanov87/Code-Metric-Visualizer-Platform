@@ -15,17 +15,20 @@ def main():
     parser.add_argument("-doc_type", "--doc_type", type=str, default="txt", help="document type")
 
     args = parser.parse_args()
+    result = {}
     try:
-        if args.URI is None:
-            stream = getattr(sys.stdin, "buffer", sys.stdin)
-            data = stream.read()
+        with BackendDispatcher().get_backend() as backend:
+            if args.URI is None:
+                stream = getattr(sys.stdin, "buffer", sys.stdin)
+                data = stream.read()
+                result = backend.put_doc_by_data(args.URI, data,
+                                     metadata_text=args.metadata or "", doc_type=args.doc_type or "")
             if isinstance(data, str):
                 data = data.encode("utf-8")
-        else:
-            data = args.URI.read_bytes()
-        with BackendDispatcher().get_backend() as backend:
-            result = backend.access.put_doc(backend.store, args.URI, data,
-                                            metadata_text=args.metadata or "", doc_type=args.doc_type or "")
+            else:
+                result = backend.put_doc_by_uri(args.URI,
+                                     metadata_text=args.metadata or "", doc_type=args.doc_type or "")
+                #data = args.URI.read_bytes()
         result = {"error_code": 0, **result}
     except Exception as ex:
         result = {"error_code": -1, "error_msg": str(ex)}

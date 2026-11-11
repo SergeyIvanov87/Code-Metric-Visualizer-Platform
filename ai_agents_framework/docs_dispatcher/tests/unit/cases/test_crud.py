@@ -70,13 +70,12 @@ def test_delete_record(db_session):
 
     created = MysqlAccessRecordEntry(db_session).create_file_record(file_path='/tmp/delete.bin', offset=0, size=100, parent_id=123)
 
-    result = MysqlAccessRecordEntry(db_session).delete_file_record(created.id)
+    access = MysqlAccessRecordEntry(db_session)
+    deleted_count, missing_ids = access.delete_records([created.id], cascade_delete=False)
 
-    assert result is True
-
-    deleted = MysqlAccessRecordEntry(db_session).get_file_record(created.id)
-
-    assert deleted is None
+    assert deleted_count == 1
+    assert missing_ids == []
+    assert access.get_records([created.id]) == []
 
 
 def test_rebuild_table_from_directory(db_session):

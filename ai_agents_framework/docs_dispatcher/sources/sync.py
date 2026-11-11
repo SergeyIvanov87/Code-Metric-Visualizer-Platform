@@ -12,7 +12,7 @@ def main():
 
     try:
         with BackendDispatcher().get_backend() as backend:
-            result = backend.access.synchronize(backend.store)
+            result = backend.synchronize()
         result = {"error_code": 0, **result}
     except Exception as ex:
         result = {"error_code": -1, "error_msg": str(ex)}

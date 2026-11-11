@@ -29,7 +29,7 @@ def main():
 
     try:
         with BackendDispatcher().get_backend() as backend:
-            result = backend.access.get_documents(offset, limit)
+            result = backend.get_documents(offset, limit)
         result = {"error_code": 0, **result}
     except Exception as ex:
         result = {"error_code": -1, "error_msg": str(ex)}

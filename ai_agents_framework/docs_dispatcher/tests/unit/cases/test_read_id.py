@@ -1,5 +1,6 @@
 from interfaces_impl.store.persistent import PersistentStorageRecordEntry
 from interfaces_impl.access.mysql import MysqlAccessRecordEntry
+from mysql_persistent.backend import MysqlPersistentBackend
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -81,7 +82,11 @@ def test_read_ids_reads_document_once_for_document_and_multiple_chunks(tmp_path,
 
     monkeypatch.setattr(Path, "read_bytes", counted_read_bytes)
 
-    assert PersistentStorageRecordEntry(tmp_path).read_ids(MysqlAccessRecordEntry(session), [document.id, db_only_chunk.id, storage_only_chunk_id, document.id]) == {
+    backend = MysqlPersistentBackend(
+        access=MysqlAccessRecordEntry(session),
+        store=PersistentStorageRecordEntry(tmp_path),
+    )
+    assert backend.read_ids([document.id, db_only_chunk.id, storage_only_chunk_id, document.id]) == {
         document.id: {
             "id": document.id,
             "parent_id": document.id,
@@ -145,7 +150,11 @@ def test_read_ids_reports_missing_inconsistent_and_out_of_bounds_records(tmp_pat
         1,
     )
 
-    result = PersistentStorageRecordEntry(tmp_path).read_ids(MysqlAccessRecordEntry(session), [999, inconsistent_chunk.id, out_of_bounds_id])
+    backend = MysqlPersistentBackend(
+        access=MysqlAccessRecordEntry(session),
+        store=PersistentStorageRecordEntry(tmp_path),
+    )
+    result = backend.read_ids([999, inconsistent_chunk.id, out_of_bounds_id])
 
     assert result[999] == {
         "id": 999,

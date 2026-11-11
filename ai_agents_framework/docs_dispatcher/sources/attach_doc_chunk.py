@@ -19,7 +19,7 @@ def main():
         chunk_data = chunk_data.encode("utf-8")
     try:
         with BackendDispatcher().get_backend() as backend:
-            result = backend.access.attach_doc_chunk(backend.store, args.doc_id, chunk_data, metadata_text=read_metadata_text(args.metadata))
+            result = backend.attach_doc_chunk(args.doc_id, chunk_data, metadata_text=read_metadata_text(args.metadata))
         result = {"error_code": 0, **result}
     except Exception as ex:
         result = {"error_code": -1, "error_msg": str(ex)}

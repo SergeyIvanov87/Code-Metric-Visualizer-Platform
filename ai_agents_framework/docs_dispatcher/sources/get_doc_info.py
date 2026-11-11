@@ -27,7 +27,7 @@ def main() -> int:
 
     try:
         with BackendDispatcher().get_backend() as backend:
-            result = backend.access.get_document_info(backend.store, args.doc_ids)
+            result = backend.get_document_info(args.doc_ids)
         result = {"error_code": 0, **result}
     except Exception as ex:
         result = {"error_code": -1, "error_msg": str(ex)}

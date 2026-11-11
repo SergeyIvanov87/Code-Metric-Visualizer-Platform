@@ -28,6 +28,37 @@ class StorageRecordEntryInterface(ABC):
     def __init__(self, directory: Path):
         self.directory = Path(directory)
 
+
+    @abstractmethod
+    def init_record_from_path(self, file_uri : str, Path, unique_id: int, *,
+                              parent_id: int = 0,
+                              offset: int = 0, metadata_text: str = "", doc_type: str = "") -> RecordSchema:
+        """Create a full document and its metadata."""
+
+    @abstractmethod
+    def init_record_from_data(self, file_uri : str | Path | None, Path, unique_id: int, data = bytes, *,
+                              parent_id: int = 0,
+                              offset: int = 0, metadata_text: str = "", doc_type: str = "") -> RecordSchema:
+        """Create a full document and its metadata."""
+
+    @abstractmethod
+    def delete_records(self, record_ids: Iterable[int], cascade_delete: bool = True) -> tuple[int, list[int]]:
+        """Delete documents and their chunks. Returns [number ids to delete, list of non deleted ids]
+            cascade_delete if enabled, reap the orphant nodes as well if a parent node was deleted
+        """
+
+    @abstractmethod
+    def get_records(self, record_ids: Iterable[int]) -> list[RecordSchema]:
+        """Read records needed to resolve document and chunk content."""
+
+    @abstractmethod
+    def get_all_records(self) -> dict[int, RecordSchema]:
+        """Read every stored document and chunk record by ID."""
+
+    @abstractmethod
+    def read_record_data(self, record: RecordSchema) -> bytes:
+        """Read document content using the selected persistence policy."""
+
     @staticmethod
     def record_path(storage_uri: Path, unique_id: int) -> Path:
         return storage_uri / str(unique_id)
@@ -45,11 +76,11 @@ class StorageRecordEntryInterface(ABC):
     def create(self) -> None:
         self.directory.mkdir(mode=0o777, parents=True, exist_ok=False)
 
-    def delete(self) -> bool:
-        if not self.directory.exists():
-            return False
-        shutil.rmtree(self.directory)
-        return True
+    def write_fields(self, **fields) -> None:
+        self.require_directory()
+        # Codex TODO: don't create a separate file for the name, put them all into a single JSON or YAML file
+        for name, value in fields.items():
+            (self.directory / getattr(self, name)).write_text(str(value), encoding="utf-8")
 
     def require_directory(self) -> None:
         assert self.exists(), f"A storage record must describe a valid directory: {self.directory}"
@@ -70,10 +101,15 @@ class StorageRecordEntryInterface(ABC):
             fields[name] = value
         return fields
 
-    def write_fields(self, **fields) -> None:
-        self.require_directory()
-        for name, value in fields.items():
-            (self.directory / getattr(self, name)).write_text(str(value), encoding="utf-8")
+    ############# the rest must be reconsidered
+    def delete(self) -> bool:
+        if not self.directory.exists():
+            return False
+        shutil.rmtree(self.directory)
+        return True
+
+
+
 
     @abstractmethod
     def document_path(self, file_uri: str | Path) -> Path:
@@ -88,10 +124,6 @@ class StorageRecordEntryInterface(ABC):
         """Create the backend-specific chunk entry."""
 
     @abstractmethod
-    def read_document(self, file_uri: str | Path) -> bytes:
-        """Read document content using the selected persistence policy."""
-
-    @abstractmethod
     def document_size(self, file_uri: str | Path) -> int:
         """Return the document size in bytes."""
 
@@ -99,18 +131,6 @@ class StorageRecordEntryInterface(ABC):
     @abstractmethod
     def create_instance(cls, config: "RuntimeConfig") -> AbstractContextManager["StorageRecordEntryInterface"]:
         """Create a configured store context from backend-specific runtime options."""
-
-    @abstractmethod
-    def get_all_records(self) -> dict[int, RecordSchema]:
-        """Read all document and chunk metadata."""
-
-    @abstractmethod
-    def get_record(self, unique_id: int) -> RecordSchema | None:
-        """Read a record's metadata, if present."""
-
-    @abstractmethod
-    def delete_record(self, unique_id: int) -> bool:
-        """Remove a record and its stored data."""
 
     @abstractmethod
     def add_document(self, file_uri, unique_id: int, data: bytes, *,
@@ -124,11 +144,3 @@ class StorageRecordEntryInterface(ABC):
     @abstractmethod
     def update_record(self, unique_id: int, *, parent_id: int, offset_size: tuple[int, int]) -> None:
         """Set a chunk's parent and byte range."""
-
-    @abstractmethod
-    def get_chunk_bounds(self, document: RecordSchema, data: bytes) -> tuple[int, int]:
-        """Locate chunk data in its parent document."""
-
-    @abstractmethod
-    def read_ids(self, access: "AccessRecordEntryInterface", record_ids: Iterable[int]) -> dict[int, dict[str, object]]:
-        """Resolve record consistency and retrieve document or chunk content."""

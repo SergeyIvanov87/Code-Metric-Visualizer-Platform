@@ -24,7 +24,7 @@ def main() -> int:
     record_id = int(parameters["id"])
     try:
         with BackendDispatcher().get_backend() as backend:
-            result = backend.store.read_ids(backend.access, [record_id])[record_id]
+            result = backend.read_ids([record_id])[record_id]
     except Exception:
         result = {"error_code": -1}
     sys.stdout.write(result.get("context", "<Not found ID>"))

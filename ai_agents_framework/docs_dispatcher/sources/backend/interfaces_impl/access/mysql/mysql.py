@@ -4,13 +4,13 @@ import base64
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Mapping, Optional
 
-from sqlalchemy import func, or_, text
+from sqlalchemy import func, text
 
 from interfaces import RuntimeConfig
 from interfaces.access import AccessRecordEntryInterface
-from interfaces.access.utils import decanonize_file_uri, file_uris_equal, prepare_doc_data
+from interfaces.store.utils import decanonize_file_uri, file_uris_equal, prepare_doc_data
 from interfaces.schema import RecordSchema
 from interfaces.store import StorageRecordEntryInterface
 from . import database
@@ -42,6 +42,142 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         finally:
             engine.dispose()
 
+    def create_unique_ids(self, count: int = 1) -> Iterable[int]:
+        if count < 0:
+            raise ValueError("count must be greater than or equal to 0")
+
+        records = [FileRecord(file_path="") for _ in range(count)]
+        if not records:
+            return ()
+
+        try:
+            self.session.add_all(records)
+            self.session.flush()
+            unique_ids = tuple(int(record.id) for record in records)
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+
+        return unique_ids
+
+    def create_records_by_ids(
+        self,
+        records_by_id: Mapping[int, RecordSchema],
+    ) -> int:
+        if not records_by_id:
+            return 0
+
+        record_ids = tuple(int(record_id) for record_id in records_by_id)
+        try:
+            existing_ids = [
+                int(record_id)
+                for (record_id,) in (
+                    self.session.query(FileRecord.id)
+                    .filter(FileRecord.id.in_(record_ids))
+                    .all()
+                )
+            ]
+            if existing_ids:
+                raise ValueError(
+                    f"Records with ids={existing_ids} already exist"
+                )
+
+            rows = [
+                FileRecord(
+                    id=record_id,
+                    file_path=decanonize_file_uri(str(record.file_uri)),
+                    offset=record.offset,
+                    size=record.size,
+                    parent_id=record.parent_id,
+                    metadata_json=record.metadata,
+                    doc_type=record.doc_type,
+                )
+                for record_id, record in records_by_id.items()
+            ]
+            self.session.add_all(rows)
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+
+        return len(rows)
+
+    def update_record_by_id(self, unique_id: int, record: RecordSchema) -> int:
+        return self.update_records_by_ids({unique_id: record})
+
+    def update_records_by_ids(self, records_by_id: Mapping[int, RecordSchema]) -> int:
+        if not records_by_id:
+            return 0
+
+        try:
+            rows = (
+                self.session.query(FileRecord)
+                .filter(FileRecord.id.in_(tuple(records_by_id)))
+                .all()
+            )
+            for row in rows:
+                record = records_by_id[int(row.id)]
+                row.file_path = decanonize_file_uri(record.file_uri)
+                row.offset = record.offset
+                row.size = record.size
+                row.parent_id = record.parent_id
+                row.metadata_json = record.metadata
+                row.doc_type = record.doc_type
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+
+        return len(rows)
+
+    def get_records(self, record_ids) -> list[RecordSchema]:
+        rows = self.session.query(FileRecord).filter(FileRecord.id.in_(list(record_ids))).all()
+        return [self._record(row) for row in rows]
+
+    def get_all_records(self) -> list[RecordSchema]:
+        return [self._record(row) for row in self.session.query(FileRecord).all()]
+
+    def delete_records(
+        self,
+        record_ids: Iterable[int],
+        cascade_delete: bool = True,
+    ) -> tuple[int, list[int]]:
+        requested_ids = _unique_ids(record_ids)
+        requested_records = self.get_records(requested_ids)
+        records_by_id = {
+            int(record.id): record
+            for record in requested_records
+        }
+        missing_ids = [
+            record_id
+            for record_id in requested_ids
+            if record_id not in records_by_id
+        ]
+        target_ids = list(records_by_id)
+
+        if cascade_delete:
+            deleted_parent_ids = [
+                record_id
+                for record_id, record in records_by_id.items()
+                if record.id == record.parent_id
+            ]
+            if deleted_parent_ids:
+                chunk_rows = (
+                    self.session.query(FileRecord.id)
+                    .filter(
+                        FileRecord.parent_id.in_(deleted_parent_ids),
+                        FileRecord.id != FileRecord.parent_id,
+                    )
+                    .all()
+                )
+                target_ids.extend(int(record_id) for (record_id,) in chunk_rows)
+
+        target_ids = _unique_ids(target_ids)
+        deleted_count = self._delete_records(target_ids) if target_ids else 0
+
+        return deleted_count, missing_ids
+
     @staticmethod
     def _record(row) -> RecordSchema | None:
         if row is None:
@@ -56,6 +192,27 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
             doc_type=row.doc_type,
         )
 
+    def _get_chunk_ids(self, document_ids: Iterable[int]) -> dict[int, list[int]]:
+        requested_ids = _unique_ids(document_ids)
+        chunk_ids_by_document = {document_id: [] for document_id in requested_ids}
+        if not requested_ids:
+            return chunk_ids_by_document
+
+        rows = (
+            self.session.query(FileRecord.parent_id, FileRecord.id)
+            .filter(
+                FileRecord.parent_id.in_(requested_ids),
+                FileRecord.id != FileRecord.parent_id,
+            )
+            .order_by(FileRecord.parent_id, FileRecord.id)
+            .all()
+        )
+        for parent_id, chunk_id in rows:
+            chunk_ids_by_document[int(parent_id)].append(int(chunk_id))
+
+        return chunk_ids_by_document
+
+    ####### recondider the rest
     def create_file_record(
         self,
         file_path: str,
@@ -126,9 +283,6 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
     def _get_row(self, record_id: int) -> Optional[FileRecord]:
         return self.session.query(FileRecord).filter(FileRecord.id == record_id).first()
 
-    def get_all_records(self) -> list[RecordSchema]:
-        return [self._record(row) for row in self.session.query(FileRecord).all()]
-
     def execute_query(self, query_str: str):
         result = self.session.execute(text(query_str))
         normalized = query_str.lstrip().lower()
@@ -187,23 +341,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         self.session.refresh(record)
         return self._record(record)
 
-    def delete_file_record(self, record_id: int) -> bool:
-        record = self._get_row(record_id)
-        if not record:
-            return False
-
-        self.session.delete(record)
-        self.session.commit()
-        return True
-
-    def get_file_record(self, record_id: int) -> RecordSchema | None:
-        return self._record(self._get_row(record_id))
-
-    def get_records(self, record_ids) -> list[RecordSchema]:
-        rows = self.session.query(FileRecord).filter(FileRecord.id.in_(list(record_ids))).all()
-        return [self._record(row) for row in rows]
-
-    def _document_page(self, offset: int, limit: int) -> tuple[int, list[RecordSchema]]:
+    def document_page(self, offset: int, limit: int) -> tuple[int, list[RecordSchema]]:
         total = self.session.query(func.count(FileRecord.id)).filter(FileRecord.id == FileRecord.parent_id).scalar()
         if offset < 0 or limit < -1:
             raise ValueError("Invalid document pagination")
@@ -215,99 +353,16 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         rows = self.session.query(FileRecord).from_statement(text(statement)).all()
         return int(total), [self._record(row) for row in rows]
 
-    def _get_chunk_ids(self, document_id: int) -> list[int]:
-        rows = (self.session.query(FileRecord.id)
-                .filter(FileRecord.parent_id == document_id, FileRecord.id != document_id)
-                .order_by(FileRecord.id).all())
-        return [int(record_id) for (record_id,) in rows]
-
-    def _get_related_records(self, record_ids) -> list[RecordSchema]:
-        ids = list(record_ids)
-        rows = self.session.query(FileRecord).filter(
-            or_(FileRecord.id.in_(ids), FileRecord.parent_id.in_(ids))).all()
-        return [self._record(row) for row in rows]
-
-    def _delete_records(self, record_ids) -> None:
-        self.session.query(FileRecord).filter(FileRecord.id.in_(list(record_ids))).delete(synchronize_session=False)
-        self.session.commit()
-
-    def get_documents(self, offset: int = 0, limit: int = -1) -> dict[str, object]:
-        if offset < 0:
-            raise ValueError("offset must be greater than or equal to 0")
-        if limit < -1:
-            raise ValueError("limit must be -1 or greater")
-
-        total_documents, document_rows = self._document_page(offset, limit)
-        documents = [
-            {
-                "id": int(document.id),
-                "file_uri": decanonize_file_uri(document.file_path),
-                "type": document.doc_type,
-                "chunks": self._get_chunk_ids(document.id),
-            }
-            for document in document_rows
-        ]
-        returned_limit = len(documents)
-        return {
-            "offset": offset,
-            "limit": returned_limit,
-            "remaining": max(0, total_documents - offset - returned_limit),
-            "docs": documents,
-        }
-
-    def get_document_info(
-        self,
-        store: StorageRecordEntryInterface,
-        doc_ids: list[int],
-    ) -> dict[str, object]:
-        requested_ids = _unique_ids(doc_ids)
-        storage_records = store.get_all_records()
-        found: list[int] = []
-        inconsistent: list[int] = []
-        not_found: list[int] = []
-        result: dict[str, object] = {
-            "found": found,
-            "inconsistent": inconsistent,
-            "not_found": not_found,
-        }
-
-        for doc_id in requested_ids:
-            db_record = self.get_file_record(doc_id)
-            storage_record = storage_records.get(doc_id)
-            in_database = _is_db_document(db_record, doc_id)
-            in_file_storage = _is_storage_document(storage_record, doc_id)
-
-            if in_database and in_file_storage:
-                found.append(doc_id)
-                result[str(doc_id)] = {
-                    "error_code": 0,
-                    "status": SUCCESS,
-                    "info": _db_info(self, db_record),
-                }
-                continue
-
-            if in_database:
-                inconsistent.append(doc_id)
-                result[str(doc_id)] = {
-                    "error_code": 1,
-                    "status": MISSING_FILE_STORAGE,
-                    "info": _db_info(self, db_record),
-                }
-            elif in_file_storage:
-                inconsistent.append(doc_id)
-                result[str(doc_id)] = {
-                    "error_code": 1,
-                    "status": MISSING_DATABASE,
-                    "info": _storage_info(storage_record, storage_records),
-                }
-            else:
-                not_found.append(doc_id)
-                result[str(doc_id)] = {
-                    "error_code": -1,
-                    "status": ABSENT_OR_INVALID,
-                }
-
-        return result
+    def _delete_records(self, record_ids) -> int:
+        try:
+            deleted_count = self.session.query(FileRecord).filter(
+                FileRecord.id.in_(list(record_ids))
+            ).delete(synchronize_session=False)
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            raise
+        return deleted_count
 
     def synchronize_records(
         self,
@@ -316,17 +371,21 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
     ) -> dict:
         remaining_storage = dict(storage_records)
 
-        deleted = 0
         updated = 0
         untouched = len(remaining_storage)
 
+        record_ids_to_delete = []
         db_records_to_update: list[RecordSchema] = []
         for db_record in all_db_records:
             if db_record.id not in remaining_storage:
-                self.delete_file_record(db_record.id)
-                deleted += 1
+                record_ids_to_delete.append(db_record.id)
                 continue
             db_records_to_update.append(db_record)
+
+        deleted, _ = self.delete_records(
+            record_ids_to_delete,
+            cascade_delete=False,
+        )
 
         for db_record in db_records_to_update:
             storage_record = remaining_storage[db_record.id]
@@ -360,6 +419,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
             "not_changed": untouched,
         }
 
+    #removing TODO
     def synchronize(self, store: StorageRecordEntryInterface) -> dict:
         store.ensure_root()
         db_records = self.get_all_records()
@@ -367,74 +427,6 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         return {**self.synchronize_records(db_records, storage_records),
                 "initial DB records": len(db_records), "storage size": len(storage_records)}
 
-    def delete_records(
-        self,
-        store: StorageRecordEntryInterface,
-        record_ids: Iterable[int],
-    ) -> tuple[int, int, list[int]]:
-        requested_ids = _unique_ids(record_ids)
-        target_records = self._get_related_records(requested_ids)
-        target_ids = _unique_ids(int(record.id) for record in target_records)
-        target_id_set = set(target_ids)
-        missing_ids = [record_id for record_id in requested_ids if record_id not in target_id_set]
-
-        deleted_from_storage = 0
-        for record_id in target_ids:
-            if store.delete_record(record_id):
-                deleted_from_storage += 1
-
-        if target_ids:
-            self._delete_records(target_ids)
-
-        return len(target_ids), deleted_from_storage, missing_ids
-
-
-    def put_doc(self, store: StorageRecordEntryInterface, file_uri, data: bytes, *,
-                metadata_text: str = "", doc_type: str = "txt") -> dict:
-        if file_uri is None and "base64" in doc_type:
-            data = base64.b64decode(data)
-        data = prepare_doc_data(data)
-        document = self.create_file_record(str(file_uri), 0, len(data), 0,
-                                           metadata_json={"comment": metadata_text} if metadata_text else {},
-                                           doc_type=doc_type)
-        stored = store.add_document(file_uri, document.id, data, offset=document.offset,
-                                    metadata_text=metadata_text, doc_type=doc_type)
-        document.parent_id = stored.id
-        self.update_file_record_ext(document.id, document)
-        return {"unique_id": stored.id}
-
-    def attach_doc_chunk(self, store: StorageRecordEntryInterface, document_id: int,
-                         data: bytes, *, metadata_text: str = "") -> dict:
-        parent = self.get_file_record(document_id)
-        stored_parent = store.get_record(document_id)
-        if parent is None:
-            raise ValueError(f"Parent document id={document_id} does not exist in DB")
-        if stored_parent is None:
-            raise ValueError(f"Parent document id={document_id} does not exist in storage")
-        if parent.parent_id != parent.id:
-            raise ValueError(f"Record id={document_id} is not a full document")
-        if stored_parent.parent_id != stored_parent.id:
-            raise ValueError(f"Storage record id={document_id} is not a full document")
-        data = prepare_doc_data(data)
-        if "base64" in parent.doc_type.split(','):
-            data = base64.b64decode(data)
-        offset, size = store.get_chunk_bounds(stored_parent, data)
-        if parent.size >= 0 and offset + size > parent.size:
-            raise ValueError(f"chunk with offset: {offset} and size: {size} does not fit into the parent document of size: {parent.size}, type: {parent.doc_type}")
-        chunk = self.create_file_record(parent.file_path, 0, 0, 0,
-                                        metadata_json={"comment": metadata_text})
-        stored = None
-        try:
-            stored = store.add_chunk(stored_parent.file_uri, chunk.id, metadata_text=metadata_text)
-            store.update_record(chunk.id, parent_id=document_id, offset_size=(offset, size))
-            chunk.offset, chunk.size, chunk.parent_id = offset, size, document_id
-            self.update_file_record_ext(chunk.id, chunk)
-        except Exception:
-            if stored is not None:
-                store.delete_record(chunk.id)
-            self.delete_file_record(chunk.id)
-            raise
-        return {"unique_id": chunk.id}
 
     def rebuild_table_from_directory(
         self,
@@ -469,7 +461,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
         self.session.commit()
 
 
-def _unique_ids(doc_ids: list[int]) -> list[int]:
+def _unique_ids(doc_ids: Iterable[int]) -> list[int]:
     return list(dict.fromkeys(doc_ids))
 
 def _is_db_document(record: RecordSchema | None, doc_id: int) -> bool:
@@ -482,7 +474,8 @@ def _db_info(
     access,
     document: RecordSchema,
 ) -> dict[str, object]:
-    chunks = access._get_chunk_ids(document.id)
+    document_id = int(document.id)
+    chunks = access._get_chunk_ids([document_id])[document_id]
     return {
         "file_uri": decanonize_file_uri(document.file_path),
         "type": document.doc_type,
