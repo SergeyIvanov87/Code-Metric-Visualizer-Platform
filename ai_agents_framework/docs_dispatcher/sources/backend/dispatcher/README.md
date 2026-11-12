@@ -57,7 +57,11 @@ utilities used by existing tests, such as rebuilding SQL metadata from a
 directory, remain with MySQL access.
 
 Cross-store operations receive the other interface explicitly. MySQL access
-never imports a concrete store. Persistent retrieval obtains access records
+never imports a concrete store. URI insertion reads and normalizes a copy of the source through `prepare_doc_data()`;
+the caller-owned source remains unchanged on success and failure. Stored sizes
+and chunk byte ranges refer to the normalized UTF-8 payload, as for inline input.
+
+Persistent retrieval obtains access records
 through `AccessRecordEntryInterface`, validates consistency, and reads each
 parent payload once for multiple requested chunks. Document and chunk creation
 compensates for failures after ID allocation by removing partial file storage
@@ -119,8 +123,8 @@ under `interfaces_impl/access/mysql/`.
 
 ## Existing tests
 
-The same 20 backend cases now live under `tests/unit/cases`, registered through
-`tests/unit/Dockerfile` and `init.sh`. No new test cases are added. Run from the
+Backend cases live under `tests/unit/cases`, registered through
+`tests/unit/Dockerfile` and `init.sh`. URI regression cases also cover metadata/SQL failures and normalization. Run from the
 repository root:
 
 ```sh

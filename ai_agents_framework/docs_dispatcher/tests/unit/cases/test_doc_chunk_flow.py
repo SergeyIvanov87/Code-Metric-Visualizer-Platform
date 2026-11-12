@@ -106,7 +106,8 @@ def test_document_storage_round_trips_metadata_and_doc_type(
     assert (storage_root / str(parent_id) / "doc_type").read_text() == "txt"
 
     uri_path = tmp_path / "uri_document.txt"
-    uri_path.write_bytes(b"URI document")
+    uri_payload = " \n\tURI документ\u2003\n".encode("utf-8")
+    uri_path.write_bytes(uri_payload)
     monkeypatch.setattr(
         "sys.argv",
         [
@@ -121,7 +122,12 @@ def test_document_storage_round_trips_metadata_and_doc_type(
     assert put_doc_main() == 0
     uri_result = json.loads(capsys.readouterr().out)
     uri_id = int(uri_result["unique_id"])
-    assert not uri_path.exists()
+    assert uri_path.read_bytes() == uri_payload
+    uri_record = PersistentStorageRecordEntry(storage_root).get_records([uri_id])[0]
+    expected_payload = "URI документ".encode("utf-8")
+    assert PersistentStorageRecordEntry(storage_root).read_record_data(uri_record) == expected_payload
+    assert uri_record.size == len(expected_payload)
+    assert access.get_records([uri_id])[0].size == len(expected_payload)
     assert {int(record.id) for record in access.get_all_records()} == {
         parent_id,
         uri_id,
@@ -310,3 +316,30 @@ def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
     assert result["error_msg"] == "Docs id=999 does not exist"
     assert MysqlAccessRecordEntry(db_session).get_all_records() == []
     assert PersistentStorageRecordEntry(storage_root).get_all_records() == {}
+
+
+@pytest.mark.parametrize("failure_stage", ["metadata", "database"])
+def test_uri_insertion_failure_preserves_source(monkeypatch, tmp_path, db_session, failure_stage):
+    storage_root = tmp_path / "storage"
+    storage_root.mkdir()
+    source = tmp_path / "source.txt"
+    original = " \nисходный документ\t\n".encode("utf-8")
+    source.write_bytes(original)
+    access = MysqlAccessRecordEntry(db_session)
+    store = PersistentStorageRecordEntry(storage_root)
+    backend = MysqlPersistentBackend(access=access, store=store)
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("simulated insertion failure")
+
+    if failure_stage == "metadata":
+        monkeypatch.setattr(PersistentStorageRecordEntry, "write_fields", fail)
+    else:
+        monkeypatch.setattr(access, "update_record_by_id", fail)
+
+    with pytest.raises(RuntimeError, match="simulated insertion failure"):
+        backend.put_doc_by_uri(source)
+
+    assert source.read_bytes() == original
+    assert list(storage_root.iterdir()) == []
+    assert access.get_all_records() == []
