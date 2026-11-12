@@ -24,4 +24,3 @@ def split_document(doc_data, doc_type, max_chunk_size, max_chunk_overlap_count):
         # TODO move creation of hugging face embeddings here
         #
     return chunks
-
