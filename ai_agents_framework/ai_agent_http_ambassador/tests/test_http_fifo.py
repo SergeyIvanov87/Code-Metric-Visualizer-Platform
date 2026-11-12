@@ -71,14 +71,13 @@ def chat_payload(filesystem_api, message, system=None):
 
 
 def document_parameter(filesystem_api):
-    params = filesystem_api[1]["rag_add"]["Params"]
-    return next(name for name, value in params.items() if not name.startswith("-") and value == "")
+    return "-URI"
 
 
 def upload_payload(filesystem_api, content):
-    return {
-        document_parameter(filesystem_api): base64.b64encode(content).decode("ascii")
-    }
+    source = filesystem_api[0] / ("source-" + __import__("uuid").uuid4().hex + ".txt")
+    source.write_bytes(content)
+    return {"-URI": str(source), "-doc_type": "txt"}
 
 
 def configured_schema_dir(filesystem_api):
@@ -135,7 +134,7 @@ def test_schema_driven_pages_load(app, filesystem_api):
     chat_link = f'<a href="{path(filesystem_api, "chat")}">Chat with the knowledge base</a>'.encode()
     assert upload_page.data.index(main_menu_link) < upload_page.data.index(chat_link)
     assert document_parameter(filesystem_api).encode() in upload_page.data
-    assert b"application/json" in upload_page.data
+    assert b"application/octet-stream" in upload_page.data
 
     help_page = client.get("/help/")
     assert help_page.status_code == 200
@@ -193,7 +192,7 @@ def test_rejects_query_not_supported_by_server(filesystem_api):
         create_app(filesystem_api[2])
 
 
-def test_upload_passes_inline_document_parameter_to_filesystem_api(app, filesystem_api):
+def test_upload_passes_uri_to_filesystem_api(app, filesystem_api):
     document = "A UTF-8 document.\nSecond line: 日本語\n".encode()
     response = app.test_client().put(
         path(filesystem_api, "rag_add"),
@@ -417,7 +416,7 @@ def test_bulk_page_has_multi_file_folder_and_collapsed_schema_settings(
     visible_parameters = {
         name: default
         for name, default in filesystem_api[1][schema_name]["Params"].items()
-        if name != "SESSION_ID"
+        if name not in ("SESSION_ID", "-preserveOriginal")
     }
     visible_parameters.update(
         SUPPORTED_SCHEMAS[schema_name].get("page_parameter_defaults", {})
@@ -457,7 +456,7 @@ def test_bulk_upload_starts_query_forwards_settings_and_publishes_files_in_paral
     url = "/" + schema["Query"]
     settings = {
         name: default for name, default in schema["Params"].items()
-        if name != "SESSION_ID"
+        if name not in ("SESSION_ID", "-preserveOriginal")
     }
     settings[next(name for name in settings if name.startswith("-"))] = "team=docs"
     settings["WaitQueryUpdateTimeoutSec"] = "1"

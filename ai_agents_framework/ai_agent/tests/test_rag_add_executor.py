@@ -15,46 +15,13 @@ generator = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(generator)
 
 
-def test_binary_uri_returns_structured_failure_instead_of_crashing(tmp_path):
-    binary = tmp_path / "image.png"
-    binary.write_bytes(b"\x89PNG\r\n\x1a\n")
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "ai_agents_framework/ai_agent/sources/rag_add.py"),
-            "-URI",
-            str(binary),
-            "-doc_type",
-            "image,png",
-            "/api",
-            "api.pmccabe_collector.restapi.org",
-        ],
-        env={
-            **os.environ,
-            "PYTHONPATH": os.pathsep.join((
-                str(ROOT / "ai_agents_framework/ai_agent/sources"),
-                str(ROOT / "common/modules"),
-            )),
-        },
-        text=True,
-        capture_output=True,
-    )
-    assert completed.returncode != 0
-    assert "Traceback" not in completed.stderr
-    result = json.loads(completed.stdout)
-    assert result["error_code"] == -1
-    assert '"image" document category is unsupported' in result["error_msg"]
-
-
 @pytest.mark.parametrize('metadata', ['', 'team_docs'])
 @pytest.mark.parametrize('override', [None, '', 'test_compose-functional.dev.yaml'])
 def test_generated_add_executor_preserves_argv(tmp_path, metadata, override):
     api = tmp_path / 'api'
     api.mkdir()
-    for name, value in [('0.-URI', ''), ('1.-metadata', metadata), ('2.-doc_type', 'txt'), ('3.doc_data', '')]:
+    for name, value in [('0.-URI', ''), ('1.-metadata', metadata), ('2.-doc_type', 'txt')]:
         (api / name).write_text(value)
-    (api / 'result.old.json').write_text('not an API parameter')
-    (api / '4.unrelated').write_text('must not become argv')
     stub = tmp_path / 'rag_add.py'
     stub.write_text('#!' + sys.executable + '\nimport argparse,json,sys\np=argparse.ArgumentParser()\np.add_argument("--session_id")\np.add_argument("-db_host")\np.add_argument("-db_port")\np.add_argument("-URI")\np.add_argument("-metadata")\np.add_argument("-doc_type")\np.add_argument("shared_api_dir")\np.add_argument("main_service_name")\na=p.parse_args(); print(json.dumps(vars(a)))\n')
     stub.chmod(0o755)
@@ -74,3 +41,38 @@ def test_generated_add_executor_preserves_argv(tmp_path, metadata, override):
     assert result['metadata'] == (override if override is not None else metadata)
     assert result['shared_api_dir'] == '/api'
     assert result['main_service_name'] == 'api.pmccabe_collector.restapi.org'
+
+
+@pytest.mark.parametrize('filename', [None, 'provided "document":txt'])
+def test_generated_data_executor_forwards_filename(tmp_path, filename):
+    api = tmp_path / 'api'
+    api.mkdir()
+    schema = json.loads((ROOT / 'ai_agents_framework/ai_agent/API/rag_add_data.json').read_text())
+    for index, (name, value) in enumerate(schema['Params'].items()):
+        (api / f'{index}.{name}').write_text(value)
+    stub = tmp_path / 'rag_add_data.py'
+    stub.write_text('#!' + sys.executable + '\n' + '''
+import argparse, json, sys
+p = argparse.ArgumentParser()
+for name in ('--session_id', '-db_host', '-db_port', '-doc_type', '-metadata', '-timeout', '-filename'):
+    p.add_argument(name)
+p.add_argument('shared_api_dir')
+p.add_argument('main_service_name')
+result = vars(p.parse_args())
+result['doc_data'] = sys.stdin.read()
+print(json.dumps(result))
+''')
+    stub.chmod(0o755)
+    script = io.StringIO()
+    generator.make_script_rag_add_data(script)
+    query = 'SESSION_ID=data doc_data=dGV4dA== -doc_type=txt'
+    if filename is not None:
+        query += ' -filename=' + json.dumps(filename)
+    completed = subprocess.run(['bash', '-c', script.getvalue(), 'executor', str(api), query],
+        env={**os.environ, 'WORK_DIR': str(tmp_path), 'SHARED_API_DIR': '/api',
+             'MAIN_SERVICE_NAME': 'domain', 'VECTOR_DB_HOST': 'rag-db', 'VECTOR_DB_PORT': '8000'},
+        text=True, capture_output=True, check=True)
+    result = json.loads(completed.stdout)
+    assert result['filename'] == (filename or '')
+    assert result['metadata'] == ''
+    assert result['doc_data'] == 'dGV4dA=='

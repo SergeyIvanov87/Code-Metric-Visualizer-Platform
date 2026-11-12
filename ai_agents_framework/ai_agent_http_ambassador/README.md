@@ -38,11 +38,8 @@ verify FIFO presence, not model or database readiness.
 
 The chat page derives its editable fields from the chat schema. Browser history
 is tab-local and is placed in the schema-defined message parameter before the
-request is sent. The upload page derives the document parameter from the
-`rag_add` schema and base64-encodes the selected file into that parameter.
-The ambassador forwards every received JSON key and value unchanged apart from
-filesystem FIFO quoting and its internal `SESSION_ID`. The filesystem API owns
-parameter validation, defaults, decoding, and operation semantics.
+request is sent. The upload page sends the selected file as an `application/octet-stream` body with its filename. The ambassador stages it under the shared API mount, then invokes `rag_add` with `-URI` and `-preserveOriginal=0`. Staging remains available when a timeout or invalid result leaves completion unknown; known completed requests remove their temporary upload directory.
+JSON requests may supply a server-accessible `-URI`; `doc_data` is not accepted by the ambassador. Both single and bulk requests explicitly force `-preserveOriginal=0`. The filesystem API owns document processing, defaults, and operation semantics.
 
 The bulk page accumulates repeated file and folder selections, preserves each
 browser-provided relative path, and uploads files concurrently. Its collapsed
@@ -203,7 +200,7 @@ The `rag_bulk_add` processor reads the uploader's JSON-Line event stream.
 Every `ready` event is assigned to one of the configured RAG workers. The
 worker invokes the ordinary `rag_add` filesystem query with:
 
-- the staged file path as `-URI`;
+- the staged file path as `URI`;
 - caller metadata augmented with every component of the relative path; and
 - a document type derived from the filename extension.
 
@@ -332,3 +329,18 @@ timeouts, result validation, single and parallel bulk upload forwarding,
 atomic relative-path publication, sealing, filter defaults, discovery, and
 unavailable queries. Envoy forwarding tests run when `ENVOY_BINARY` is
 configured.
+
+
+HTTP bulk ingestion always forwards `-preserveOriginal=0`; clients cannot override that policy. The single-file picker stages its file and uses the URI-only `rag_add` endpoint, also with `-preserveOriginal=0`. The parameter is omitted from both rendered pages
+and their embedded parameter definitions. Direct filesystem API clients retain
+the default of `1` (copy the original).
+
+The isolated HTTP upload contract suite runs the real ambassador with generated
+FIFO servers and lightweight model/uploader stand-ins:
+
+```sh
+docker compose -f ai_agents_framework/ai_agent_http_ambassador/tests/functional/compose.yaml up --build --abort-on-container-exit --exit-code-from http-upload-tester
+```
+
+This suite verifies HTTP-to-FIFO preservation policy and page rendering; it does
+not establish live model, Chroma, Envoy, or bulk-stream completion behavior.

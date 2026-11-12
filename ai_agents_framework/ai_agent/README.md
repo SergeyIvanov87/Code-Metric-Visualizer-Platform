@@ -111,3 +111,26 @@ backend and variant, and supports manual dispatch. Automatic runs cover pull
 requests to `main` and pushes to `main` affecting agent sources, shared `common`
 files, or the corresponding workflow. These checks require no GPU and do not
 validate hardware access or model offloading.
+
+
+### Separate URI and inline ingestion
+
+`rag_add.json` (`rag/add_doc/v1`) accepts required `-URI`, optional `-doc_type`,
+`-metadata`, `-timeout`, and `-preserveOriginal=1`. `rag_add.py` reads the source for
+chunking, infers its semantic text category from the filename when needed, and
+passes only the URI to dispatcher `put_doc`. Bulk ingestion uses this endpoint.
+
+`rag_add_data.json` (`rag/add_doc_data/v1`) accepts base64 UTF-8 `doc_data`, required
+`-doc_type`, optional `-metadata`, `-timeout`, and `-filename`. Its `rag_add_data.py` script sends
+encoded data through `execute_put_doc_data_query` to dispatcher `put_doc_data`.
+An explicit filename is preserved as `file_uri` in persistent storage and SQL.
+When omitted, it defaults to the execution time in UTC as
+`YYYY-MM-DD:HH:MM:SS_<doc_type>`.
+The HTTP ambassador stages file-picker uploads and invokes the URI endpoint. Both HTTP single-file and bulk ingestion explicitly force `-preserveOriginal=0`.
+
+CLI option names retain their leading hyphens; `doc_data` is a stdin payload.
+Generated executors use the standard argument reader and invoke separate scripts.
+Each script owns its CLI and ingestion/rollback control flow.
+`document_splitter.py` provides `split_document`; `rag_chroma.py` provides Chroma
+insertion; `rag_chunks.py` provides chunk attachment. Recreate the
+agent and ambassador together to load the new schemas and HTTP upload route.

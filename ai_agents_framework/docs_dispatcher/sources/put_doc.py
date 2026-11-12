@@ -10,31 +10,24 @@ from backend.dispatcher.dispatcher import BackendDispatcher
 
 def main():
     parser = argparse.ArgumentParser(prog="Insert document using assigned backend")
-    parser.add_argument("-URI", "--URI", type=Path, help="file URI")
+    parser.add_argument("-URI", "--URI", type=str, help="required file URI")
     parser.add_argument("-metadata", "--metadata", type=str, default=None, help="file metadata")
-    parser.add_argument("-doc_type", "--doc_type", type=str, default="txt", help="document type")
+    parser.add_argument("-doc_type", "--doc_type", type=str, default=None, help="document type (defaults to filename extension)")
+    parser.add_argument("-preserveOriginal", "--preserveOriginal", type=int, default=1)
 
     args = parser.parse_args()
     result = {}
     try:
+        if not args.URI:
+            raise ValueError("URI is required")
+        uri = Path(args.URI)
         with BackendDispatcher().get_backend() as backend:
-            if args.URI is None:
-                stream = getattr(sys.stdin, "buffer", sys.stdin)
-                data = stream.read()
-                if isinstance(data, str):
-                    data = data.encode("utf-8")
-                result = backend.put_doc_by_data(
-                    None,
-                    data,
-                    metadata_text=args.metadata or "",
-                    doc_type=args.doc_type or "",
-                )
-            else:
-                result = backend.put_doc_by_uri(
-                    args.URI,
-                    metadata_text=args.metadata or "",
-                    doc_type=args.doc_type or "",
-                )
+            result = backend.put_doc_by_uri(
+                uri,
+                metadata_text=args.metadata or "",
+                doc_type=args.doc_type or uri.suffix.lower().lstrip(".") or "txt",
+                preserveOriginal=args.preserveOriginal,
+            )
         result = {"error_code": 0, **result}
     except Exception as ex:
         result = {"error_code": -1, "error_msg": str(ex)}

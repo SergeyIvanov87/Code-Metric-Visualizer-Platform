@@ -1,48 +1,21 @@
 #!/usr/bin/env python
 
 import argparse
-import base64
 import json
 import re
 import sys
-
-
 from pathlib import Path
 
+from document_splitter import split_document
+from rag_chroma import insert_embeddings
+from rag_chunks import attach_chunks
 from fs_api_wrappers import (
-    create_api_query_interruptible,
-    get_normalized_api_queries,
+    create_api_query_interruptible, get_normalized_api_queries,
     generate_inner_session_id,
-    execute_put_doc_query,
-    execute_attach_doc_chunks_query,
     execute_delete_doc_query,
+    execute_put_doc_query,
 )
-
-def split_document(doc_data, doc_type, max_chunk_size, max_chunk_overlap_count):
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-    chunks = []
-    if "txt" in doc_type:
-        splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-            encoding_name="cl100k_base",
-            chunk_size=max_chunk_size,  # tokens
-            chunk_overlap=max_chunk_overlap_count,  # around 15%
-            separators=[
-                "\n\n",  # paragraphs
-                "\n",  # lines
-                ". ",  # sentences
-                " ",  # words
-                "",
-            ],
-        )
-        chunks = splitter.create_documents(
-            texts=[doc_data],
-            metadatas=[],
-        )
-        # TODO move creation of hugging face embeddings here
-        #
-    return chunks
-
+from doc_type_association import document_type
 
 def main(
     shared_api_dir: str,
@@ -53,11 +26,11 @@ def main(
     doc_uri: str,
     doc_metadata: str,
     doc_type: str,
-    doc_data: str,
     timeout: int,
+    preserveOriginal: int = 1,
 ):
-    import chromadb
-    from langchain_chroma import Chroma
+    doc_type = doc_type or document_type(doc_uri)
+    doc_data = Path(doc_uri).read_bytes().decode("utf-8")
 
     from embedding_model import get_embedding_model
 
@@ -82,7 +55,7 @@ def main(
         shared_api_dir,
         main_service_name,
         {
-            "put_doc": re.compile(r".*ai_agent_rag_dispatcher.*put_doc.*"),
+            "put_doc": re.compile(r".*[/_]ai_agent_rag_dispatcher[/_]put_doc[/_]v[0-9]+(?:[/_]PUT)?/?$"),
             "attach_doc_chunk": re.compile(
                 ".*ai_agent_rag_dispatcher.*attach_doc_chunk.*"
             ),
@@ -102,16 +75,14 @@ def main(
 
     # insert the main doc
     timeout_elapsed = timeout
-    doc_data_bytes = doc_data.encode("utf-8")
-    encoded_doc_data = base64.b64encode(doc_data_bytes).decode("ascii")
     put_doc_result = execute_put_doc_query(
         put_doc_query,
         session_id,
         timeout_elapsed,
         doc_uri,
-        encoded_doc_data,
         doc_type_for_dispatcher,
         doc_metadata,
+        preserveOriginal=preserveOriginal,
     )
     doc_unique_id = put_doc_result["unique_id"]
 
@@ -120,38 +91,18 @@ def main(
     chunk_metadata = []
 
     try:
-        try:
-            chunk_bytes = [base64.b64encode(c.encode('utf-8')).decode('utf-8') for c in chunk_texts]
-
-            timeout_elapsed = 10 * len(chunk_bytes)
-            chunk_unique_ids, chunk_metadata = execute_attach_doc_chunks_query(
-                attach_doc_chunk_query,
-                session_id,
-                timeout_elapsed,
-                doc_unique_id,
-                doc_type_for_dispatcher,
-                doc_metadata,
-                chunk_bytes,
-            )
-        except Exception as ex:
-            raise RuntimeError(
-                f"Cannot attach chunks: {len(chunk_texts)} to the doc id: {doc_unique_id}, session: {session_id}, exception: {ex}"
-            ) from ex
+        chunk_unique_ids, chunk_metadata = attach_chunks(
+            attach_doc_chunk_query, session_id, doc_unique_id,
+            doc_type_for_dispatcher, doc_metadata, chunk_texts,
+        )
 
         # eventually push doc & chunks into chroma
         my_collection_name = main_service_name
         try:
 
-            chromadb_client = chromadb.HttpClient(host=db_host, port=db_port)
-            vectordb_client = Chroma(client=chromadb_client)  # not realy needed.
-
-            collection = chromadb_client.get_or_create_collection(
-                name=my_collection_name
-            )
-            collection.add(
-                ids=chunk_unique_ids,
-                embeddings=chunk_embeddings,
-                metadatas=chunk_metadata,
+            insert_embeddings(
+                db_host, db_port, my_collection_name,
+                chunk_unique_ids, chunk_embeddings, chunk_metadata,
             )
         except Exception as ex:
             raise RuntimeError(
@@ -175,40 +126,6 @@ def main(
             f"The error had happened:\n{ex}\nRollback was finished. Records are consistent"
         ) from ex
     return doc_unique_id, chunk_unique_ids
-    """
-    use this to retrive
-    ~$ chroma browse api.pmccabe_collector.restapi.org --host http://rag-db:8000
-
-    the complete list of REST API can be obtained by
-    ~$ curl -sS http://rag-db:8000/openapi.json | jq -r '.paths | keys[]'
-
-
-    OR
-    ~$ curl -sS   http://rag-db:8000/api/v2/tenants/default_tenant/databases/default_database/collections
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=5,
-        include=["distances"],
-    )
-
-    OR
-
-    curl -sS   -X POST   "http://rag-db:8000/api/v2/tenants/default_tenant/databases/default_database/collections/<YOUR-COLLECTION-ID>/get"   -H "Content-Type: application/json"   -d '{
-    "limit": 100,
-    "offset": 0,
-    "include": ["embeddings"]
-  }' | jq
-
-  OR
-
-    matches = list(zip(
-        results["ids"][0],
-        results["distances"][0],
-    ))
-
-    for chunk_id, distance in matches:
-        print(chunk_id, distance)
-    """
 
 
 if __name__ == "__main__":
@@ -232,23 +149,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "-session_id", "--session_id", type=str, help="Session identifier"
     )
-    parser.add_argument("-URI", "--uri", type=str, help="The URi of a document")
+    parser.add_argument("-URI", "--URI", dest="uri", type=str, required=True, help="Document URI")
     parser.add_argument("-metadata", "--metadata", type=str, default=None, help="document metadata")
-    parser.add_argument("-doc_type", "--doc_type", type=str, default="txt", help="document type")
+    parser.add_argument("-doc_type", "--doc_type", type=str, default=None, help="document type")
     parser.add_argument("-timeout", "--timeout", type=int, default=20, help="dispatcher timeout in seconds")
+
+    parser.add_argument("-preserveOriginal", "--preserveOriginal", type=int, default=1)
 
     args = parser.parse_args()
     doc_type = args.doc_type
     error_code = 0
     return_data = {"error_code": error_code, "error_msg": "success", "doc_id": "", "chunk_ids": []}
     try:
-        if doc_type.split(",", 1)[0] == "image":
-            raise ValueError('The "image" document category is unsupported')
-        if args.uri is None:
-            document_data_bytes = sys.stdin.read().encode("utf-8")
-            document_data = base64.b64decode(document_data_bytes).decode("utf-8")
-        else:
-            document_data = Path(args.uri).read_bytes().decode("utf-8")
         doc_id, chunk_ids = main(
             args.shared_api_dir,
             args.main_service_name,
@@ -258,8 +170,8 @@ if __name__ == "__main__":
             args.uri,
             args.metadata,
             doc_type,
-            document_data,
             args.timeout,
+            preserveOriginal=args.preserveOriginal,
         )
         return_data["doc_id"] = doc_id
         return_data["chunk_ids"] = chunk_ids

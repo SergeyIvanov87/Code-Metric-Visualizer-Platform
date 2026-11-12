@@ -1,0 +1,16 @@
+FROM alpine:3.20.6
+RUN --mount=type=secret,id=proxy_ca,required=false \
+    if [ -s /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca; fi; \
+    apk add --no-cache python3 bash coreutils inotify-tools
+COPY common/*.py /opt/
+COPY common/modules /opt/modules
+COPY ai_agents_framework/ai_agent/API /schemas
+COPY ai_agents_framework/ai_agent/sources/api_generator.py /agent/api_generator.py
+COPY ai_agents_framework/ai_agent_http_ambassador/tests/functional/provider.py /provider.py
+COPY ai_agents_framework/ai_agent_http_ambassador/tests/functional/stub.py /stub.py
+RUN adduser -D -u 1535 provider && mkdir /api /work \
+    && chmod -R a+rX /opt /schemas /agent /provider.py /stub.py \
+    && chmod 0777 /api && chown provider /work
+USER provider
+ENV PYTHONPATH=/opt:/opt/modules:/agent SHARED_API_DIR=/api WORK_DIR=/work
+ENTRYPOINT ["python3", "/provider.py"]

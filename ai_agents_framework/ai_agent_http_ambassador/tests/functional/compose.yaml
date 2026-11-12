@@ -1,0 +1,34 @@
+include:
+  - ../../../../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
+services:
+  provider:
+    build:
+      context: ../../../..
+      dockerfile: ai_agents_framework/ai_agent_http_ambassador/tests/functional/Dockerfile.provider
+      secrets: [proxy_ca]
+    volumes:
+      - api:/api
+  ambassador:
+    build:
+      context: ../../../..
+      dockerfile: ai_agents_framework/ai_agent_http_ambassador/Dockerfile
+      secrets: [proxy_ca]
+    environment:
+      HTTP_BIND: 0.0.0.0:8081
+    volumes:
+      - api:/api
+    depends_on: [provider]
+  http-upload-tester:
+    build:
+      context: ../../../..
+      dockerfile: ai_agents_framework/ai_agent_http_ambassador/tests/functional/Dockerfile
+    environment:
+      NO_PROXY: ambassador
+      no_proxy: ambassador
+    volumes:
+      - api:/api:ro
+    depends_on: [ambassador]
+
+volumes:
+  api:

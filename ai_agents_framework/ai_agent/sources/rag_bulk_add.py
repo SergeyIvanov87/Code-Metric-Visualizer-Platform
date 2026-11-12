@@ -24,7 +24,7 @@ from fs_api_wrappers import (
 )
 
 DEFAULTS = {
-    "metadata": "", "WaitInitialQueryTimeoutSec": "60",
+    "metadata": "", "preserveOriginal": "1", "WaitInitialQueryTimeoutSec": "60",
     "WaitQueryUpdateTimeoutSec": "10", "WaitResultConsumptionTimeoutSec": "60",
     "SESSION_ID": "default", "workers": "4",
     "file_allow_regex": ".*", "file_skip_regex": r"(?!)",
@@ -40,7 +40,7 @@ API_QUERY_PATTERNS = {
     "streaming_directory_events": re.compile(
         r".*file-uploader_streaming_directory_events.*"
     ),
-    "rag_add": re.compile(r".*ai_agent_rag_add_doc.*"),
+    "rag_add": re.compile(r".*[/_]ai_agent[/_]rag[/_]add_doc[/_]v[0-9]+(?:[/_]PUT)?/?$"),
 }
 
 stopping = False

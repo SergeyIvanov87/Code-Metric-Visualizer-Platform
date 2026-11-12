@@ -62,33 +62,39 @@ def make_delete_doc_help():
 
 
 def make_put_doc(script, desired_file_ext=""):
-    if len(desired_file_ext) == 0:
-        file_extension = ".json"
-    else:
-        file_extension = "." + desired_file_ext
-
+    file_extension = "." + desired_file_ext if desired_file_ext else ".json"
     body = (
-        *api_fs_exec_utils.generate_exec_header(), r"",
-        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
-        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
-        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
-        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
-        *api_fs_exec_utils.generate_api_node_env_init(), r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
-        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"-URI\" \"${2}\" \"\" '=' URI_VALUE", r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"doc_data\" \"${2}\" \"\" '=' DOC_DATA_VALUE", r"",
-        r'if [ -z "${URI_VALUE}" ]; then',
-        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/-URI}" )',
-        r'fi',
-        r'document_data="${DOC_DATA_VALUE}"',
-        r'OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/doc_data}" )',
-        r'if [ ! -z "${document_data}" ]; then',
-        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/$document_data}" )',
-        r'fi',
-        "echo \"${OVERRIDEN_CMD_ARGS[@]}\" | xargs -I% -- sh -c \"echo '${document_data}' | ${WORK_DIR}/put_doc.py %\""
+        *api_fs_exec_utils.generate_exec_header(), "",
+        *api_fs_exec_utils.generate_get_result_type(file_extension), "",
+        *api_fs_exec_utils.generate_api_node_env_init(), "",
+        *api_fs_exec_utils.generate_read_api_fs_args(preserve_empty_named_values=True), "",
+        '"${WORK_DIR}/put_doc.py" "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
+
+
+def make_put_doc_data(script, desired_file_ext=""):
+    file_extension = "." + desired_file_ext if desired_file_ext else ".json"
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), "",
+        *api_fs_exec_utils.generate_get_result_type(file_extension), "",
+        *api_fs_exec_utils.generate_api_node_env_init(), "",
+        *api_fs_exec_utils.generate_read_api_fs_args(preserve_empty_named_values=True), "",
+        # doc_data is consumed on stdin; all other standardized arguments are
+        # passed through unchanged, including new options declared in the schema.
+        'declare -a PUT_DOC_ARGS=()',
+        'document_data=""',
+        'for ((i=0; i<${#OVERRIDEN_CMD_ARGS[@]}; i+=2)); do',
+        '  if [[ "${OVERRIDEN_CMD_ARGS[i]}" == doc_data ]]; then',
+        '    document_data="${OVERRIDEN_CMD_ARGS[i+1]}"',
+        '  else',
+        '    PUT_DOC_ARGS+=("${OVERRIDEN_CMD_ARGS[i]}" "${OVERRIDEN_CMD_ARGS[i+1]}")',
+        '  fi',
+        'done',
+        'printf "%s" "$document_data" | "${WORK_DIR}/put_doc_data.py" "${PUT_DOC_ARGS[@]}"',
+    )
+    script.writelines(line + "\n" for line in body)
+
 
 def make_put_doc_help():
     return "make_put_doc_help"
@@ -195,6 +201,7 @@ def get():
         "get_doc_info": make_get_doc_info,
         "get_docs": make_get_docs,
         "put_doc": make_put_doc,
+        "put_doc_data": make_put_doc_data,
         "read_id": make_read_id,
         "sync": make_sync
     }
@@ -205,6 +212,7 @@ def get():
         "get_doc_info": make_get_doc_info_help,
         "get_docs": make_get_docs_help,
         "put_doc": make_put_doc_help,
+        "put_doc_data": make_put_doc_help,
         "read_id": make_read_id_help,
         "sync": make_sync_help
     }

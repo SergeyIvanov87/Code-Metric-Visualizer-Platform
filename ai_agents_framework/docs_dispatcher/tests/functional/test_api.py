@@ -13,7 +13,8 @@ from uuid import uuid4
 
 import pytest
 
-from api_fs_query import APIQuery
+from api_fs_query import APIQuery, APIQueryInterruptible
+from fs_api_wrappers import execute_put_doc_query
 from api_schema_utils import compose_api_queries_pipe_names
 from settings import Settings
 from utils import get_api_queries
@@ -176,28 +177,25 @@ def _assert_sync_is_clean(expected_storage_records: int | None = None, expected_
     return payload
 
 
-def _put_doc_by_uri(file_uri: str, metadata: str = "test_metadata", doc_type: str = "txt") -> int:
-    payload = _execute_json_api(
-        "put_doc",
-        {
-            "-URI": file_uri,
-            "-metadata": metadata,
-            "-doc_type": doc_type,
-        },
+def _put_doc_by_uri(file_uri: str, metadata: str = "test_metadata", doc_type: str | None = None, preserveOriginal: int = 1) -> int:
+    session_id = _session_id("put_doc")
+    query = APIQueryInterruptible(
+        compose_api_queries_pipe_names(global_settings.api_dir, _query("put_doc"))
     )
+    assert query.wait_until_valid(0.1, 100, True)
+    payload = execute_put_doc_query(query, session_id, 30, file_uri, doc_type, metadata, preserveOriginal=preserveOriginal)
     assert payload["error_code"] == 0, payload
     assert "unique_id" in payload
     return int(payload["unique_id"])
 
 
-def _put_doc_as_doc_data(document_data: str, metadata: str = "test_metadata", doc_type: str = "txt") -> int:
+def _put_doc_as_doc_data(document_data: str, metadata: str = "test_metadata", doc_type: str = "txt", filename=None) -> int:
+    parameters = {"-metadata": metadata, "doc_data": document_data, "-doc_type": doc_type}
+    if filename is not None:
+        parameters["-filename"] = json.dumps(filename, ensure_ascii=False)
     payload = _execute_json_api(
-        "put_doc",
-        {
-            "-metadata": metadata,
-            "doc_data": document_data,
-            "-doc_type": doc_type,
-        },
+        "put_doc_data",
+        parameters,
     )
     assert payload["error_code"] == 0, payload
     assert "unique_id" in payload
@@ -274,9 +272,11 @@ def test_put_documents_create_matching_storage_records_use_doc_data(created_reco
 
     before_ids = _storage_record_ids()
     # need to shield each " with \"
-    doc_0_id = _put_doc_as_doc_data(shield_special_symbols(doc_0))
+    doc_0_id = _put_doc_as_doc_data(shield_special_symbols(doc_0), filename='provided "document":txt')
     created_record_ids.append(doc_0_id)
     _assert_document_storage(doc_0_id, doc_0)
+    documents = _execute_json_api("get_docs")["docs"]
+    assert any(doc["id"] == doc_0_id and doc["file_uri"] == 'provided "document":txt' for doc in documents), documents
     _assert_sync_is_clean(len(before_ids) + 1)
 
     # need to shield each " with \". Probably I need to put that into _put_doc_as_doc_data
@@ -301,6 +301,12 @@ def test_put_document_stores_metadata_unchanged_and_doc_type(created_record_ids)
         metadata=metadata,
         doc_type=doc_type,
     )
+    invalid = _execute_json_api("put_doc_data", {"doc_data": "inline_without_type"})
+    assert invalid["error_code"] == -1
+    assert "doc_type is required" in invalid["error_msg"]
+    missing_uri = _execute_json_api("put_doc")
+    assert missing_uri["error_code"] == -1
+    assert "URI is required" in missing_uri["error_msg"]
 
 
 def test_put_documents_as_uri_create_matching_storage_records(created_record_ids):
@@ -310,19 +316,20 @@ def test_put_documents_as_uri_create_matching_storage_records(created_record_ids
     doc_1_uri = _data_text_path("doc_1.txt")
 
     before_ids = _storage_record_ids()
-    doc_0_dispatcher_available_uri = STORAGE_ROOT / "doc_0.txt"
+    doc_0_dispatcher_available_uri = STORAGE_ROOT / "doc 0 with spaces.MD"
     shutil.copy(doc_0_uri, doc_0_dispatcher_available_uri)
     doc_0_id = _put_doc_by_uri(doc_0_dispatcher_available_uri)
     created_record_ids.append(doc_0_id)
+    assert doc_0_dispatcher_available_uri.read_text() == doc_0
     doc_0_dispatcher_available_uri.unlink(missing_ok=True)
-    _assert_document_storage(doc_0_id, doc_0)
+    _assert_document_storage(doc_0_id, doc_0, doc_type="md")
     _assert_sync_is_clean(len(before_ids) + 1)
 
-    doc_1_dispatcher_available_uri = STORAGE_ROOT / "doc_1.txt"
+    doc_1_dispatcher_available_uri = STORAGE_ROOT / 'doc 1 "quoted" \\ path.txt'
     shutil.copy(doc_1_uri, doc_1_dispatcher_available_uri)
-    doc_1_id = _put_doc_by_uri(doc_1_dispatcher_available_uri)
+    doc_1_id = _put_doc_by_uri(doc_1_dispatcher_available_uri, preserveOriginal=0)
     created_record_ids.append(doc_1_id)
-    doc_1_dispatcher_available_uri.unlink(missing_ok=True)
+    assert not doc_1_dispatcher_available_uri.exists()
     _assert_document_storage(doc_1_id, doc_1)
     _assert_sync_is_clean(len(before_ids) + 2)
 
@@ -357,7 +364,7 @@ def test_put_documents_with_chunks_create_matching_storage_records(created_recor
 
 def test_get_docs_returns_decanonized_uris_chunk_ids_and_document_pagination(created_record_ids):
     suffix = uuid4().hex
-    doc_0_uri = STORAGE_ROOT / f"get_docs_{suffix}_0.txt"
+    doc_0_uri = STORAGE_ROOT / f'get docs {suffix} "quoted" \\ 0.txt'
     doc_1_uri = STORAGE_ROOT / f"get_docs_{suffix}_1.txt"
     doc_0_data = "prefix_first_chunk_suffix"
     doc_1_data = "prefix_second_chunk_suffix"

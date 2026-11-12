@@ -37,7 +37,9 @@ def get_normalized_api_queries(
     normalized_api_queries = {}
     for non_normalized_query_name, api_query in api_queries.items():
         for query_name, query_re in query_normalizarion_map.items():
-            if query_re.match(non_normalized_query_name):
+            # Discovery keys normalize path separators to underscores; also
+            # match the schema path so endpoint expressions work with either.
+            if query_re.match(non_normalized_query_name) or query_re.match(api_query["Query"]):
                 normalized_api_queries[query_name] = (
                     get_last_query_version(
                         normalized_api_queries[query_name], api_query
@@ -139,6 +141,7 @@ def rag_add_file(query, session_id, config, stage, relative, sequence, timeout=3
         f"-URI={json.dumps(str(uri), ensure_ascii=False)}",
         f"-metadata={json.dumps(metadata, ensure_ascii=False)}",
         f"-doc_type={resolved_doc_type}",
+        f"-preserveOriginal={config.get('preserveOriginal', '1')}",
     ))
     result = _execute_json_query(
         query,
@@ -163,31 +166,25 @@ def execute_put_doc_query(
     session_id,
     timeout_elapsed,
     doc_uri,
-    doc_data,
     doc_type,
     doc_metadata,
+    preserveOriginal=1,
 ):
-    if doc_data is not None and not isinstance(doc_data, str):
-        raise TypeError("doc_data must be textual data")
-
     exec_args_array = [
         f"SESSION_ID={session_id}",
-        f"-doc_type={doc_type}",
     ]
+    if doc_type:
+        exec_args_array.append(f"-doc_type={doc_type}")
 
-    if doc_data is None:
-        exec_args_array.append(f"-URI={doc_uri}")
+    # The filesystem API tokenizer removes these transport quotes before
+    # the dispatcher passes the complete path to argparse and storage.
+    escaped_doc_uri = str(doc_uri).replace("\\", "\\\\").replace('"', '\\"')
+    exec_args_array.append(f'-URI="{escaped_doc_uri}"')
+    exec_args_array.append(f"-preserveOriginal={preserveOriginal}")
 
     if doc_metadata is not None:
-        exec_args_array.append(f"-metadata={doc_metadata}")
+        exec_args_array.append(f"-metadata={json.dumps(doc_metadata, ensure_ascii=False)}")
 
-    if doc_data is not None:
-        # Keep inline data as one explicitly quoted filesystem-API value.  Apart
-        # from preserving whitespace, the quotes prevent the generated shell
-        # dispatcher from interpreting characters in a long base64 payload
-        # while it extracts doc_data from the argument list.
-        escaped_doc_data = doc_data.replace("\\", "\\\\").replace('"', '\\"')
-        exec_args_array.append(f'doc_data="{escaped_doc_data}"')
     exec_args = " ".join(exec_args_array)
 
     status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
@@ -214,6 +211,65 @@ def execute_put_doc_query(
     assert (
         "unique_id" in put_doc_result.keys()
     ), "put_doc must return the 'unique_id' of the inserted document"
+    return put_doc_result
+
+
+def execute_put_doc_data_query(
+    query: APIQueryInterruptible,
+    session_id,
+    timeout_elapsed,
+    doc_data,
+    doc_type,
+    doc_metadata,
+    filename=None,
+):
+    if doc_data is not None and not isinstance(doc_data, str):
+        raise TypeError("doc_data must be textual data")
+
+    exec_args_array = [
+        f"SESSION_ID={session_id}",
+    ]
+    if doc_type:
+        exec_args_array.append(f"-doc_type={doc_type}")
+
+    if doc_metadata is not None:
+        exec_args_array.append(f"-metadata={json.dumps(doc_metadata, ensure_ascii=False)}")
+
+    if doc_data is not None:
+        # Keep document data as one explicitly quoted filesystem-API value.  Apart
+        # from preserving whitespace, the quotes prevent the generated shell
+        # dispatcher from interpreting characters in a long base64 payload
+        # while it extracts doc_data from the argument list.
+        escaped_doc_data = doc_data.replace("\\", "\\\\").replace('"', '\\"')
+        exec_args_array.append(f'doc_data="{escaped_doc_data}"')
+    if filename is not None:
+        exec_args_array.append(f"-filename={json.dumps(str(filename), ensure_ascii=False)}")
+    exec_args = " ".join(exec_args_array)
+
+    status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
+    if not status:
+        raise RuntimeError(
+            f"Cannot put the entire doc from document data into the rag_doc_dispater, status: {status}, elapsed timeout: {timeout_elapsed}"
+        )
+
+    # TODO Reconsile timeout_elapsed and wait for pipe creation sleep duration and cycles
+    status, result, timeout_elapsed = query.wait_result(
+        timeout_elapsed, session_id, 0.1, timeout_elapsed / 0.1, False
+    )
+    if not status:
+        raise RuntimeError(
+            f"Cannot put the entire doc from document data into the rag_doc_dispater: waiting of result failed, status: {status}, result: {result}, elapsed timeout: {timeout_elapsed}"
+        )
+
+    put_doc_result = json.loads(result)
+    if put_doc_result["error_code"] != 0:
+        raise RuntimeError(
+            f"Cannot put the entire doc from document data into the rag_doc_dispater, error: {put_doc_result['error_msg']}"
+        )
+
+    assert (
+        "unique_id" in put_doc_result.keys()
+    ), "put_doc_data must return the 'unique_id' of the inserted document"
     return put_doc_result
 
 

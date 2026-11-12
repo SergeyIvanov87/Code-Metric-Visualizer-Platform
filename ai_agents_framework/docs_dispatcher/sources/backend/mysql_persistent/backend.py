@@ -58,7 +58,7 @@ class MysqlPersistentBackend(Backend):
             ) from original_error
 
 
-    def put_doc_by_uri(self, file_uri: str | Path, metadata_text: str = "", doc_type: str = "txt") -> dict:
+    def put_doc_by_uri(self, file_uri: str | Path, metadata_text: str = "", doc_type: str = "txt", preserveOriginal: int = 1) -> dict:
         if file_uri is None:
             raise ValueError("file_uri is required when adding a document by URI")
 
@@ -75,6 +75,7 @@ class MysqlPersistentBackend(Backend):
                 offset=0,
                 metadata_text=metadata_text,
                 doc_type=doc_type,
+                preserveOriginal=preserveOriginal,
             )
             if self.access.update_record_by_id(uid, stored_record) != 1:
                 raise RuntimeError(f"Allocated record id={uid} disappeared from DB")
@@ -89,7 +90,7 @@ class MysqlPersistentBackend(Backend):
         return {"unique_id": uid}
 
     def put_doc_by_data(self, file_uri: str | Path | None, data: bytes, *, metadata_text: str = "", doc_type: str = "txt") -> dict:
-        if file_uri is None and "base64" in doc_type:
+        if "base64" in doc_type:
             data = base64.b64decode(data)
         data = prepare_doc_data(data)
 

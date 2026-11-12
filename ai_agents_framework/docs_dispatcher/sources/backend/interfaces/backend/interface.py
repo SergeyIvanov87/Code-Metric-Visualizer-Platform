@@ -23,7 +23,7 @@ class Backend(ABC):
         """Create a configured backend and own its component lifecycles."""
 
     @abstractmethod
-    def put_doc_by_uri(self, file_uri: str | Path, metadata_text: str = "", doc_type: str = "txt") -> dict:
+    def put_doc_by_uri(self, file_uri: str | Path, metadata_text: str = "", doc_type: str = "txt", preserveOriginal: int = 1) -> dict:
         """Allocate a document ID and store a complete document."""
 
     @abstractmethod

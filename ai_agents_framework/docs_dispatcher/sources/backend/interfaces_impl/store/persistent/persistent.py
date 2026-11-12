@@ -54,13 +54,13 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
             ) from original_error
 
     def init_record_from_path(self, file_uri: str | Path, unique_id: int, *,
-                              parent_id: int = 0, offset: int = 0, metadata_text: str = "", doc_type: str = "") -> RecordSchema:
+                              parent_id: int = 0, offset: int = 0, metadata_text: str = "", doc_type: str = "", preserveOriginal: int = 1) -> RecordSchema:
         if not self.exists():
             raise RuntimeError(f"Cannot add the main document: {file_uri}, the storage path doesn't exist: {self.directory}")
         entry = self._entry(unique_id)
         entry.create()
         try:
-            entry.copy_document(file_uri)
+            entry.copy_document(file_uri, preserveOriginal=preserveOriginal)
             size = entry.document_size(file_uri)
             entry.write_fields(offset=offset, size=size, parent_id=parent_id,
                                metadata=metadata_text, doc_type=doc_type)
@@ -199,8 +199,12 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
     def record_path(storage_uri: Path, unique_id: int) -> Path:
         return storage_uri / str(unique_id)
 
-    def copy_document(self, file_uri: str | Path) -> None:
-        shutil.copyfile(file_uri, self.document_path(file_uri))
+    def copy_document(self, file_uri: str | Path, preserveOriginal: int = 1) -> None:
+        if preserveOriginal != 0:
+            shutil.copyfile(file_uri, self.document_path(file_uri))
+        else:
+            # shutil.move uses rename where possible and handles cross-mount uploads.
+            shutil.move(str(file_uri), str(self.document_path(file_uri)))
 
     def document_size(self, file_uri: str | Path) -> int:
         return self.document_path(file_uri).stat().st_size
