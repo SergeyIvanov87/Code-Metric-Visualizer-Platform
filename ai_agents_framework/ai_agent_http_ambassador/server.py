@@ -36,7 +36,7 @@ SUPPORTED_SCHEMAS = {
         "script": "chat.js",
         "navigation_label": "Chat with the knowledge base",
     },
-    "rag_add": {
+    "rag_add_data": {
         "method": "PUT",
         "template": "rag_add.html",
         "script": "rag_add.js",

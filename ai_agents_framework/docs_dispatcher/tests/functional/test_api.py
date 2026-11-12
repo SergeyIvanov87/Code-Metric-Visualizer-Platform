@@ -183,9 +183,7 @@ def _put_doc_by_uri(file_uri: str, metadata: str = "test_metadata", doc_type: st
         compose_api_queries_pipe_names(global_settings.api_dir, _query("put_doc"))
     )
     assert query.wait_until_valid(0.1, 100, True)
-    payload = execute_put_doc_query(
-        query, session_id, 30, file_uri, None, doc_type, metadata, preserveOriginal=preserveOriginal,
-    )
+    payload = execute_put_doc_query(query, session_id, 30, file_uri, doc_type, metadata, preserveOriginal=preserveOriginal)
     assert payload["error_code"] == 0, payload
     assert "unique_id" in payload
     return int(payload["unique_id"])

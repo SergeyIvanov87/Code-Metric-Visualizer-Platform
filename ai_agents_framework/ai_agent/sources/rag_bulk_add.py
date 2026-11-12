@@ -40,7 +40,7 @@ API_QUERY_PATTERNS = {
     "streaming_directory_events": re.compile(
         r".*file-uploader_streaming_directory_events.*"
     ),
-    "rag_add": re.compile(r".*ai_agent_rag_add_doc.*"),
+    "rag_add": re.compile(r".*ai_agent_rag_add_doc_v[0-9]+$"),
 }
 
 stopping = False

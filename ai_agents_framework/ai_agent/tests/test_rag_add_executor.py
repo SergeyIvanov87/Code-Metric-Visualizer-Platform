@@ -51,19 +51,19 @@ def test_binary_uri_returns_structured_failure_instead_of_crashing(tmp_path):
 def test_generated_add_executor_preserves_argv(tmp_path, metadata, override):
     api = tmp_path / 'api'
     api.mkdir()
-    for name, value in [('0.-URI', ''), ('1.-metadata', metadata), ('2.-doc_type', 'txt'), ('3.doc_data', '')]:
+    for name, value in [('0.URI', ''), ('1.metadata', metadata), ('2.doc_type', 'txt')]:
         (api / name).write_text(value)
     (api / 'result.old.json').write_text('not an API parameter')
     (api / '4.unrelated').write_text('must not become argv')
     stub = tmp_path / 'rag_add.py'
-    stub.write_text('#!' + sys.executable + '\nimport argparse,json,sys\np=argparse.ArgumentParser()\np.add_argument("--session_id")\np.add_argument("-db_host")\np.add_argument("-db_port")\np.add_argument("-URI")\np.add_argument("-metadata")\np.add_argument("-doc_type")\np.add_argument("shared_api_dir")\np.add_argument("main_service_name")\na=p.parse_args(); print(json.dumps(vars(a)))\n')
+    stub.write_text('#!' + sys.executable + '\nimport argparse,json,sys\np=argparse.ArgumentParser()\np.add_argument("--session_id")\np.add_argument("-db_host")\np.add_argument("-db_port")\np.add_argument("--URI")\np.add_argument("--metadata")\np.add_argument("--doc_type")\np.add_argument("shared_api_dir")\np.add_argument("main_service_name")\na=p.parse_args(); print(json.dumps(vars(a)))\n')
     stub.chmod(0o755)
     script = io.StringIO()
     generator.make_script_rag_add(script)
     uri = str(tmp_path / 'file with spaces.yaml')
-    query = 'SESSION_ID=bulk -URI=' + json.dumps(uri)
+    query = 'SESSION_ID=bulk URI=' + json.dumps(uri)
     if override is not None:
-        query += ' -metadata=' + json.dumps(override)
+        query += ' metadata=' + json.dumps(override)
     completed = subprocess.run(['bash', '-c', script.getvalue(), 'executor', str(api), query],
         env={**os.environ, 'WORK_DIR': str(tmp_path), 'SHARED_API_DIR': '/api',
              'MAIN_SERVICE_NAME': 'api.pmccabe_collector.restapi.org',

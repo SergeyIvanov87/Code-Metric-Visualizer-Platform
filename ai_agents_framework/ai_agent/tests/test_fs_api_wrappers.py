@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parents[3] / "common/modules"))
 from fs_api_wrappers import (
     execute_delete_doc_query,
     execute_put_doc_query,
+    execute_put_doc_data_query,
     rag_add_file,
     start_uploader,
 )
@@ -43,15 +44,7 @@ class JsonQuery(FakeQuery):
 def test_execute_put_doc_query_omits_uri_when_doc_data_is_specified():
     query = FakeQuery()
 
-    execute_put_doc_query(
-        query,
-        "session",
-        10,
-        None,
-        "encoded-document",
-        "base64,txt",
-        "metadata",
-    )
+    execute_put_doc_data_query(query, 'session', 10, 'encoded-document', 'base64,txt', 'metadata')
 
     assert query.exec_args == (
         'SESSION_ID=session doc_type="base64,txt" '
@@ -63,48 +56,24 @@ def test_execute_put_doc_query_omits_uri_when_doc_data_is_specified():
 def test_execute_put_doc_query_passes_uri_when_doc_data_is_not_specified():
     query = FakeQuery()
 
-    execute_put_doc_query(
-        query,
-        "session",
-        10,
-        "/documents/example.txt",
-        None,
-        "txt",
-        None,
-    )
+    execute_put_doc_query(query, 'session', 10, '/documents/example.txt', 'txt', None)
 
     assert query.exec_args == (
-        'SESSION_ID=session doc_type="txt" URI="/documents/example.txt" preserveOriginal=1'
+        'SESSION_ID=session URI="/documents/example.txt" preserveOriginal="1" doc_type="txt"'
     )
     assert "doc_data=" not in query.exec_args
 
 
 def test_execute_put_doc_query_rejects_binary_doc_data():
     with pytest.raises(TypeError, match="doc_data must be textual data"):
-        execute_put_doc_query(
-            FakeQuery(),
-            "session",
-            10,
-            None,
-            b"encoded-document",
-            "base64,txt",
-            "metadata",
-        )
+        execute_put_doc_data_query(FakeQuery(), 'session', 10, b'encoded-document', 'base64,txt', 'metadata')
 
 
 def test_execute_put_doc_query_quotes_doc_data_for_dispatcher():
     query = FakeQuery()
     encoded_document = "prefix/with+shell-sensitive=base64"
 
-    execute_put_doc_query(
-        query,
-        "session",
-        10,
-        None,
-        encoded_document,
-        "base64,txt",
-        "metadata",
-    )
+    execute_put_doc_data_query(query, 'session', 10, encoded_document, 'base64,txt', 'metadata')
 
     assert query.exec_args.endswith(f'doc_data="{encoded_document}"')
 

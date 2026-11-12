@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 
 arguments = sys.argv[1:]
-if Path(sys.argv[0]).name == "rag_add.py":
+if Path(sys.argv[0]).name == "rag_add_data.py":
     result = {"error_code": 0, "arguments": arguments, "data": sys.stdin.read()}
 elif arguments[0] == "rag_bulk_add":
     Path("/api/bulk-arguments.json").write_text(json.dumps(arguments[1:]))

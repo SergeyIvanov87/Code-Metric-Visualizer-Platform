@@ -53,7 +53,7 @@ def filesystem_api(tmp_path, monkeypatch):
         name for name, default in chat_schema["Params"].items() if default != ""
     )
     document_type_parameter = next(
-        name for name, default in upload_schema["Params"].items() if default == "txt"
+        name for name, default in upload_schema["Params"].items() if name == "doc_type"
     )
     stub = (
         f"#!{sys.executable}\n"
@@ -81,11 +81,11 @@ else:
         "doc_id": "fixture-document",
         "chunk_ids": ["fixture-chunk"],
         "document": document,
-        "doc_type": value(DOCUMENT_TYPE_PARAMETER),
+        "doc_type": value("--" + DOCUMENT_TYPE_PARAMETER),
     }))
 '''
     )
-    for filename in ("agentic_rag.py", "rag_add.py"):
+    for filename in ("agentic_rag.py", "rag_add_data.py"):
         path = scripts / filename
         path.write_text(stub)
         path.chmod(0o755)

@@ -47,3 +47,8 @@ and endpoint-selection checks without models:
 ```sh
 docker compose -f ai_agents_framework/ai_agent/test/unit/compose.yaml up --build --abort-on-container-exit --exit-code-from agent-ingestion-unit-tester
 ```
+
+Agent insertion is likewise split into `rag_add`/`rag_add.py` for URI input and
+`rag_add_data`/`rag_add_data.py` for inline data. Their shared ingestion and
+rollback logic lives in `rag_add_utils.py`; keep bulk query discovery restricted
+to the URI endpoint. HTTP file uploads use the inline endpoint.
