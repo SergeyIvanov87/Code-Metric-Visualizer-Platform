@@ -6,8 +6,13 @@ from pathlib import Path
 import sys
 
 arguments = sys.argv[1:]
-if Path(sys.argv[0]).name == "rag_add_data.py":
-    result = {"error_code": 0, "arguments": arguments, "data": sys.stdin.read()}
+if Path(sys.argv[0]).name == "rag_add.py":
+    uri = arguments[arguments.index("--URI") + 1]
+    if Path(uri).name == "bad-result.txt":
+        print("not-json")
+        sys.exit(0)
+    result = {"error_code": -1 if Path(uri).name == "failed.txt" else 0,
+              "arguments": arguments, "data": Path(uri).read_text(), "URI": uri}
 elif arguments[0] == "rag_bulk_add":
     Path("/api/bulk-arguments.json").write_text(json.dumps(arguments[1:]))
     result = {

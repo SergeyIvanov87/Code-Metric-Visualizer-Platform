@@ -21,7 +21,37 @@ def make_script_rag_bulk_add(script, desired_file_ext=""):
 Provides a functions set which manages to generate API executor scripts
 """
 
-def _make_rag_add(script, desired_file_ext, inline):
+def make_script_rag_add(script, desired_file_ext=""):
+    extension = "." + desired_file_ext if desired_file_ext else ""
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), "",
+        *api_fs_exec_utils.generate_get_result_type(extension), "",
+        *api_fs_exec_utils.generate_api_node_env_init(), "",
+        *api_fs_exec_utils.generate_read_api_fs_args(
+            preserve_empty_named_values=True
+        ), "",
+        'SESSION_ID_VALUE="default"',
+        'for arg in "${IN_SERVER_REQUEST_ARGS[@]}"; do',
+        '  [[ "$arg" == SESSION_ID=* ]] && SESSION_ID_VALUE="${arg#SESSION_ID=}"',
+        'done',
+        'declare -a RAG_ARGS=()',
+        'for ((i=0; i<${#OVERRIDEN_CMD_ARGS[@]}; i+=2)); do',
+        '  name="${OVERRIDEN_CMD_ARGS[i]}"',
+        '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
+        '  case "$name" in',
+        '    URI|doc_type) [[ -z "$value" ]] || RAG_ARGS+=("--$name" "$value") ;;',
+        '    metadata|timeout) RAG_ARGS+=("--$name" "$value") ;;',
+        '    preserveOriginal) RAG_ARGS+=("--preserveOriginal" "$value") ;;',
+        '  esac',
+        'done',
+        '"${WORK_DIR}/rag_add.py" ' +
+        '--session_id="${SESSION_ID_VALUE}" -db_host="${VECTOR_DB_HOST}" '
+        '-db_port="${VECTOR_DB_PORT}" "${RAG_ARGS[@]}" '
+        '"${SHARED_API_DIR}" "${MAIN_SERVICE_NAME}"',
+    )
+    script.writelines(line + "\n" for line in body)
+
+def make_script_rag_add_data(script, desired_file_ext=""):
     extension = "." + desired_file_ext if desired_file_ext else ""
     body = (
         *api_fs_exec_utils.generate_exec_header(), "",
@@ -41,25 +71,16 @@ def _make_rag_add(script, desired_file_ext, inline):
         '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
         '  case "$name" in',
         '    doc_data) document_data="$value" ;;',
-        '    URI|doc_type) [[ -z "$value" ]] || RAG_ARGS+=("--$name" "$value") ;;',
+        '    doc_type) [[ -z "$value" ]] || RAG_ARGS+=("--$name" "$value") ;;',
         '    metadata|timeout) RAG_ARGS+=("--$name" "$value") ;;',
-        '    preserveOriginal) RAG_ARGS+=("--preserveOriginal" "$value") ;;',
         '  esac',
         'done',
-        ('printf "%s" "$document_data" | "${WORK_DIR}/rag_add_data.py" ' if inline else '"${WORK_DIR}/rag_add.py" ') +
+        'printf "%s" "$document_data" | "${WORK_DIR}/rag_add_data.py" ' +
         '--session_id="${SESSION_ID_VALUE}" -db_host="${VECTOR_DB_HOST}" '
         '-db_port="${VECTOR_DB_PORT}" "${RAG_ARGS[@]}" '
         '"${SHARED_API_DIR}" "${MAIN_SERVICE_NAME}"',
     )
     script.writelines(line + "\n" for line in body)
-
-def make_script_rag_add(script, desired_file_ext=""):
-    _make_rag_add(script, desired_file_ext, inline=False)
-
-
-def make_script_rag_add_data(script, desired_file_ext=""):
-    _make_rag_add(script, desired_file_ext, inline=True)
-
 
 def make_script_rag_add_help():
     return "make_script_rag_add_help"

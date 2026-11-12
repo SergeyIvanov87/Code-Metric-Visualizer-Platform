@@ -9,6 +9,8 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
+import shutil
+import tempfile
 import threading
 from uuid import uuid4
 
@@ -36,7 +38,7 @@ SUPPORTED_SCHEMAS = {
         "script": "chat.js",
         "navigation_label": "Chat with the knowledge base",
     },
-    "rag_add_data": {
+    "rag_add": {
         "method": "PUT",
         "template": "rag_add.html",
         "script": "rag_add.js",
@@ -262,6 +264,34 @@ def create_app(config_path=None, query_factory=None):
         if not isinstance(result, dict):
             raise InvalidAPIResult("Filesystem API returned a non-object result")
         return result
+
+    def upload_document(schema):
+        filename = request.args.get("filename", "")
+        if not filename or filename in (".", "..") or "/" in filename or "\0" in filename:
+            raise ValueError("filename must be a nonempty file name")
+        staging_root = api_mount / ".http-document-uploads"
+        staging_root.mkdir(mode=0o755, exist_ok=True)
+        directory = Path(tempfile.mkdtemp(prefix="document-", dir=staging_root))
+        directory.chmod(0o777)
+        source = directory / filename
+        retain_source = False
+        try:
+            with source.open("wb") as stream:
+                shutil.copyfileobj(request.stream, stream)
+            source.chmod(0o644)
+            arguments = {"URI": str(source)}
+            for name in ("metadata", "doc_type", "timeout"):
+                if name in request.args:
+                    arguments[name] = request.args[name]
+            result = execute(schema, arguments)
+            return jsonify(result), 502 if result_failed(result) else 200
+        except (APIQueryTimeout, InvalidAPIResult):
+            # The processor may still consume the source after the HTTP request.
+            retain_source = True
+            raise
+        finally:
+            if not retain_source:
+                shutil.rmtree(directory)
 
     def bulk_request_paths(schema, upload_id):
         if not re.fullmatch(r"deferred-[A-Za-z0-9_-]+", upload_id or ""):
@@ -514,7 +544,11 @@ def create_app(config_path=None, query_factory=None):
                 if request.method == "PATCH":
                     return bulk_finish(schema)
 
+            if name == "rag_add" and request.mimetype == "application/octet-stream":
+                return upload_document(schema)
             arguments = request.get_json(silent=True)
+            if name == "rag_add" and isinstance(arguments, dict) and "doc_data" in arguments:
+                raise ValueError("Document uploads require a file body or a URI")
             if not isinstance(arguments, dict):
                 return jsonify(error="Expected a JSON object of filesystem API parameters"), 400
             try:
