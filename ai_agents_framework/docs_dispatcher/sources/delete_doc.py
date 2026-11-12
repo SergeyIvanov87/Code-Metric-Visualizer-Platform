@@ -2,11 +2,10 @@
 
 import argparse
 import json
-import subprocess
 import sys
 
-from dispatcher_backend_config import load_backend_config
-
+from backend.dispatcher.dispatcher import BackendDispatcher
+from utils import read_metadata_text
 
 def _parse_ids(value: str) -> list[int]:
     values = value.split(",")
@@ -50,39 +49,20 @@ def main():
 
     args = parser.parse_args(_normalize_assignment_args(sys.argv[1:]))
 
-    backend_config = load_backend_config()
-    backends_path = backend_config.backends_code_dir
-
-    sys.path.insert(0, str(backends_path))
-    command = [
-        "python",
-        "-m",
-        backend_config.command_module("delete_doc"),
-        "-ids",
-        ",".join(str(record_id) for record_id in args.ids),
-    ]
-    if args.metadata is not None:
-        command.extend(["-m", args.metadata])
-
-    exec_status = subprocess.run(
-        command,
-        capture_output=True,
-        cwd=backends_path,
-        text=False,
-        shell=False,
-    )
-    return_data = {}
-    err_str = exec_status.stderr.decode('utf-8')
-    if err_str:
-        return_data["error_msg"] = err_str
-
-    output_str = exec_status.stdout.decode('utf-8')
-    output = {}
-    if output_str:
-        output = json.loads(output_str)
-
-    return_data = return_data | output
-    print(json.dumps(return_data))
+    deleted_db = deleted_storage = 0
+    try:
+        read_metadata_text(args.metadata)
+        with BackendDispatcher().get_backend() as backend:
+            deleted_db, deleted_storage, missing_ids = backend.delete_records(args.ids)
+        errors = [f"Docs id={record_id} does not exist" for record_id in missing_ids]
+    except Exception as ex:
+        errors = [str(ex)]
+    result = {"deleted from DB": deleted_db, "deleted from storage": deleted_storage,
+              "error_code": 1 if errors else 0}
+    if errors:
+        result["error_msg"] = "\n".join(errors)
+    print(json.dumps(result))
+    return result["error_code"]
 
 
 if __name__ == "__main__":

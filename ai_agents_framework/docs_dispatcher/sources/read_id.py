@@ -2,11 +2,9 @@
 
 import argparse
 import json
-import subprocess
 import sys
 
-from dispatcher_backend_config import load_backend_config
-
+from backend.dispatcher.dispatcher import BackendDispatcher
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="Read an ID using assigned backend")
@@ -24,36 +22,13 @@ def main() -> int:
         parser.error("id parameter is required")
 
     record_id = int(parameters["id"])
-    backend_config = load_backend_config()
-    command = [
-        "python",
-        "-m",
-        backend_config.command_module("read_id"),
-        "--id",
-        str(record_id),
-    ]
-    exec_status = subprocess.run(
-        command,
-        capture_output=True,
-        cwd=backend_config.backends_code_dir,
-        text=True,
-        shell=False,
-    )
-
-    if exec_status.stdout:
-        try:
-            result = json.loads(exec_status.stdout)
-        except json.JSONDecodeError:
-            result = {"id": record_id, "error_code": -1, "error_msg": exec_status.stdout}
-    else:
-        result = {"id": record_id, "error_code": -1, "error_msg": exec_status.stderr}
-
-    if exec_status.stderr and isinstance(result, dict) and "error_msg" not in result:
-        result["error_msg"] = exec_status.stderr
-
-    context = result.get("context", "<Not found ID>")
-    sys.stdout.write(context)
-    return exec_status.returncode
+    try:
+        with BackendDispatcher().get_backend() as backend:
+            result = backend.read_ids([record_id])[record_id]
+    except Exception:
+        result = {"error_code": -1}
+    sys.stdout.write(result.get("context", "<Not found ID>"))
+    return 0 if result["error_code"] == 0 else -1
 
 
 if __name__ == "__main__":

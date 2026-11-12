@@ -134,8 +134,8 @@ currently guaranteed.
 
 Relevant implementation:
 
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql/sync.py`
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql/doc_storage/models.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/interfaces_impl/access/mysql/mysql.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/interfaces/store/models.py`
 
 **Impact:** metadata search can return stale values even after a successful
 sync, and the effective metadata authority becomes ambiguous.
@@ -146,7 +146,7 @@ metadata. The former is consistent with the documented design.
 
 ### 2. The active backend is SQLite, not an independent MySQL service
 
-Both the active dispatcher backend configuration and `backends/mysql.yaml`
+Both the active dispatcher backend configuration and `backends/mysql_persistent.yaml`
 currently use:
 
 ```text
@@ -160,8 +160,8 @@ the documents.
 Relevant configuration and implementation:
 
 - `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/current`
-- `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/backends/mysql.yaml`
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql/app/database.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/backends/mysql_persistent.yaml`
+- `ai_agents_framework/docs_dispatcher/sources/backend/interfaces_impl/access/mysql/database.py`
 
 **Impact:** the configured SQL index and document storage do not have
 independent failure domains, and the MySQL-centered operational description can
@@ -174,30 +174,38 @@ it.
 
 ### 3. Full-document ingestion is not atomic
 
+**Implementation update:** the dispatcher now validates URI input before ID
+allocation and compensates for failures after allocation by removing partial
+filesystem state followed by the SQL placeholder. It also reports cleanup
+failures without hiding the original operation error. This closes the ordinary
+exception path described below, but it does not provide atomicity across a
+process crash or host outage.
+
 The dispatcher commits the initial SQL record before it creates the filesystem
 directory and writes the document and sidecars. It subsequently updates the SQL
-parent relationship. Failures can therefore leave:
+parent relationship. If the process stops during those steps or compensation
+itself fails, partial state can still include:
 
 - a SQL row without a filesystem record;
 - an incomplete filesystem directory;
 - filesystem content without the final SQL fields; or
 - an error response before the RAG agent receives an ID it can roll back.
 
-The agent's rollback protects failures that happen after `put_doc` returns, but
-it cannot delete an allocation whose `put_doc` operation failed without
-returning its ID. Synchronization eventually repairs some partial states, but
-that is recovery rather than atomicity.
+The agent's rollback protects failures that happen after `put_doc` returns, and
+the dispatcher now handles ordinary exceptions before an ID is returned.
+Neither layer can compensate after abrupt process termination. Synchronization
+eventually repairs some partial states, but that is recovery rather than
+atomicity.
 
 Relevant implementation:
 
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql/put_doc.py`
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql/app/crud.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/mysql_persistent/backend.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/interfaces_impl/access/mysql/mysql.py`
 - `ai_agents_framework/ai_agent/sources/rag_add.py`
 
 **Recommended direction:** use explicit ingestion states, idempotent steps, and
 a transaction or operation ID. A temporary filesystem directory followed by an
-atomic rename can also reduce visible partial state. The dispatcher should
-clean up SQL and filesystem artifacts when its own insertion fails.
+atomic rename can also reduce visible partial state after a process crash.
 
 ### 4. A database outage prevents new ingestion
 
@@ -224,7 +232,7 @@ occurrence.
 
 Relevant implementation:
 
-- `ai_agents_framework/docs_dispatcher/sources/backend/mysql/attach_doc_chunk.py`
+- `ai_agents_framework/docs_dispatcher/sources/backend/interfaces_impl/access/mysql/mysql.py`
 
 The retrieved text may still look correct because the repeated passages are
 identical, but provenance, ordering, citations, and surrounding-context

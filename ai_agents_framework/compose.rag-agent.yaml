@@ -189,9 +189,9 @@ networks:
 
 secrets:
    backend_mysql_db_login:
-     file: ./docs_dispatcher/sources/backend/mysql/default_user.txt
+     file: ./docs_dispatcher/sources/backend/interfaces_impl/access/mysql/default_user.txt
    backend_mysql_db_password:
-     file: ./docs_dispatcher/sources/backend/mysql/default_pwd.txt
+     file: ./docs_dispatcher/sources/backend/interfaces_impl/access/mysql/default_pwd.txt
 
 
 volumes:

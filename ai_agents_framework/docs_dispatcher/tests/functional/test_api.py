@@ -164,12 +164,12 @@ def _sync_counter(payload: dict, *names: str) -> int:
 def _assert_sync_is_clean(expected_storage_records: int | None = None, expected_to_delete: int = 0) -> dict:
     payload = _sync()
 
-    assert _sync_counter(payload["output"], "created", "not_changed") == 0
-    assert _sync_counter(payload["output"], "updated") == 0
-    assert _sync_counter(payload["output"], "deleted") == expected_to_delete
+    assert _sync_counter(payload, "created", "not_changed") == 0
+    assert _sync_counter(payload, "updated") == 0
+    assert _sync_counter(payload, "deleted") == expected_to_delete
 
-    storage_size = _sync_counter(payload["output"], "storage size")
-    initial_db_records = _sync_counter(payload["output"], "initial DB records")
+    storage_size = _sync_counter(payload, "storage size")
+    initial_db_records = _sync_counter(payload, "initial DB records")
     assert initial_db_records == storage_size
     if expected_storage_records is not None:
         assert storage_size == expected_storage_records
@@ -304,8 +304,8 @@ def test_put_document_stores_metadata_unchanged_and_doc_type(created_record_ids)
 
 
 def test_put_documents_as_uri_create_matching_storage_records(created_record_ids):
-    doc_0 = _data_text("doc_0.txt").strip()
-    doc_1 = _data_text("doc_1.txt").strip()
+    doc_0 = _data_text("doc_0.txt")
+    doc_1 = _data_text("doc_1.txt")
     doc_0_uri = _data_text_path("doc_0.txt")
     doc_1_uri = _data_text_path("doc_1.txt")
 
@@ -313,16 +313,16 @@ def test_put_documents_as_uri_create_matching_storage_records(created_record_ids
     doc_0_dispatcher_available_uri = STORAGE_ROOT / "doc_0.txt"
     shutil.copy(doc_0_uri, doc_0_dispatcher_available_uri)
     doc_0_id = _put_doc_by_uri(doc_0_dispatcher_available_uri)
-    os.remove(doc_0_dispatcher_available_uri)
     created_record_ids.append(doc_0_id)
+    doc_0_dispatcher_available_uri.unlink(missing_ok=True)
     _assert_document_storage(doc_0_id, doc_0)
     _assert_sync_is_clean(len(before_ids) + 1)
 
     doc_1_dispatcher_available_uri = STORAGE_ROOT / "doc_1.txt"
     shutil.copy(doc_1_uri, doc_1_dispatcher_available_uri)
     doc_1_id = _put_doc_by_uri(doc_1_dispatcher_available_uri)
-    os.remove(doc_1_dispatcher_available_uri)
     created_record_ids.append(doc_1_id)
+    doc_1_dispatcher_available_uri.unlink(missing_ok=True)
     _assert_document_storage(doc_1_id, doc_1)
     _assert_sync_is_clean(len(before_ids) + 2)
 
@@ -398,12 +398,14 @@ def test_get_docs_returns_decanonized_uris_chunk_ids_and_document_pagination(cre
         "limit": 1,
         "remaining": len(all_documents) - doc_0_position - 1,
         "docs": [expected_doc_0],
+        'error_code': 0,
     }
     assert _execute_json_api("get_docs", {"offset": 0, "limit": 0}) == {
         "offset": 0,
         "limit": 0,
         "remaining": len(all_documents),
         "docs": [],
+        'error_code': 0,
     }
 
 
@@ -432,6 +434,7 @@ def test_get_doc_info_returns_complete_info_and_classifies_invalid_ids(created_r
     )
 
     assert result == {
+        "error_code": 0,
         "found": [document_id],
         "inconsistent": [],
         "not_found": [chunk_id, absent_id],
@@ -511,6 +514,7 @@ def test_get_doc_info_recovers_info_for_inconsistent_documents(created_record_id
         db_only_backup_dir.rename(db_only_record_dir)
 
     assert result == {
+        "error_code": 0,
         "found": [],
         "inconsistent": [db_only_id, storage_only_id],
         "not_found": [],
@@ -615,7 +619,7 @@ def test_sync_recreates_db_records_added_to_storage(created_record_ids):
     created_record_ids.extend([doc_id, chunk_id])
 
     sync_result = _sync()
-    assert _sync_counter(sync_result["output"], "created") == 2
+    assert _sync_counter(sync_result, "created") == 2
     _assert_document_storage(doc_id, document_data)
     _assert_chunk_storage(chunk_id, doc_id, document_data, chunk_data, "")
     _assert_sync_is_clean(len(before_ids) + 2)

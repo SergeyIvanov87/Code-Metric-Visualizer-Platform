@@ -249,12 +249,7 @@ def _validate_dispatcher_sync_result(sync_result: Any) -> dict[str, Any]:
             "The rag_doc_dispatcher sync failed: "
             f"{sync_result.get('error_msg', sync_result)}"
         )
-    output = sync_result.get("output")
-    if not isinstance(output, dict):
-        raise RuntimeError(
-            "The rag_doc_dispatcher sync response does not contain an output object"
-        )
-    return output
+    return sync_result
 
 
 def main(

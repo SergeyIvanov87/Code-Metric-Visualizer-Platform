@@ -2,11 +2,9 @@
 
 import argparse
 import json
-import subprocess
 import sys
 
-from dispatcher_backend_config import load_backend_config
-
+from backend.dispatcher.dispatcher import BackendDispatcher
 
 def _parse_doc_ids(value: str) -> list[int]:
     values = value.split(",")
@@ -27,35 +25,14 @@ def main() -> int:
     parser.add_argument("-doc_ids", "--doc_ids", required=True, type=_parse_doc_ids)
     args = parser.parse_args()
 
-    backend_config = load_backend_config()
-    command = [
-        "python",
-        "-m",
-        backend_config.command_module("get_doc_info"),
-        "--doc-ids",
-        ",".join(str(doc_id) for doc_id in args.doc_ids),
-    ]
-    exec_status = subprocess.run(
-        command,
-        capture_output=True,
-        cwd=backend_config.backends_code_dir,
-        text=True,
-        shell=False,
-    )
-
-    if exec_status.stdout:
-        try:
-            result = json.loads(exec_status.stdout)
-        except json.JSONDecodeError:
-            result = {"error_code": -1, "error_msg": exec_status.stdout}
-    else:
-        result = {"error_code": -1, "error_msg": exec_status.stderr}
-
-    if exec_status.stderr and isinstance(result, dict) and "error_msg" not in result:
-        result["error_msg"] = exec_status.stderr
-
+    try:
+        with BackendDispatcher().get_backend() as backend:
+            result = backend.get_document_info(args.doc_ids)
+        result = {"error_code": 0, **result}
+    except Exception as ex:
+        result = {"error_code": -1, "error_msg": str(ex)}
     print(json.dumps(result))
-    return exec_status.returncode
+    return result["error_code"]
 
 
 if __name__ == "__main__":

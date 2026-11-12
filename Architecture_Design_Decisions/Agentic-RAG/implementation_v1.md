@@ -151,6 +151,12 @@ column containing document text.
 
 ### Failure behavior during ingestion
 
+After the SQL layer allocates an ID, the dispatcher compensates for a document
+or chunk creation failure by deleting partial filesystem state first and then
+the SQL placeholder. It verifies that neither record remains and includes any
+cleanup failure in the operation error. Validating URI input before allocation
+also prevents invalid URI requests from reserving an ID.
+
 The agent treats the filesystem/metadata write and Chroma indexing as one
 logical operation. If attaching chunks or inserting into Chroma fails after the
 document has been created, it requests deletion of the document through
@@ -302,9 +308,9 @@ these properties:
 | End-to-end filesystem/MySQL and Chroma reconciliation | `ai_agents_framework/ai_agent/sources/rag_sync.py` |
 | Vector lookup, thresholding, context assembly | `ai_agents_framework/ai_agent/sources/rag_answer_question.py` |
 | Chunk reads through the dispatcher | `ai_agents_framework/ai_agent/sources/docs_retriever.py` |
-| Dispatcher backend selection | `ai_agents_framework/docs_dispatcher/sources/dispatcher_backend_config.py` and `sources/backend/dispatcher/current` |
-| Filesystem record model | `ai_agents_framework/docs_dispatcher/sources/backend/mysql/doc_storage/` |
-| MySQL metadata model and ID generation | `ai_agents_framework/docs_dispatcher/sources/backend/mysql/app/models.py` |
-| Filesystem-to-MySQL synchronization | `ai_agents_framework/docs_dispatcher/sources/backend/mysql/sync.py` |
+| Dispatcher backend selection | `ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/config.py` and `sources/backend/dispatcher/current` |
+| Filesystem record model | `ai_agents_framework/docs_dispatcher/sources/backend/interfaces/store/` |
+| MySQL metadata model and ID generation | `ai_agents_framework/docs_dispatcher/sources/backend/interfaces_impl/access/mysql/models.py` |
+| Filesystem-to-MySQL synchronization | `ai_agents_framework/docs_dispatcher/sources/backend/interfaces_impl/access/mysql/mysql.py` |
 
 <!-- markdownlint-enable MD013 -->

@@ -47,7 +47,7 @@ Directory events and directory uploads have deliberately different data ownershi
 
 ## Agentic RAG
 
-Start with [wrappers](../ai_agents_framework/ai_agent/sources/fs_api_wrappers.py), then the matching dispatcher entrypoint and backend command. The dispatcher selects its backend through [configuration code](../ai_agents_framework/docs_dispatcher/sources/dispatcher_backend_config.py) and [backend specs](../ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/README.md). The `mysql` package name does not imply a live MySQL server: its default URI is SQLite.
+Start with [wrappers](../ai_agents_framework/ai_agent/sources/fs_api_wrappers.py), then the matching dispatcher entrypoint and backend command. The dispatcher selects its backend through [configuration code](../ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/config.py) and [backend specs](../ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/README.md). The `mysql_persistent` composition binds the access and store interfaces to MySQL access and persistent file storage. Top-level scripts call the selected access/store interface methods directly; schemas and utilities live in `backend/interfaces/{access,store}`; concrete implementations live in `backend/interfaces_impl/{access/mysql,store/persistent}`. Its default database URI is SQLite.
 
 [Reconciliation](../ai_agents_framework/ai_agent/sources/rag_sync.py) maps dispatcher chunk records to Chroma IDs and metadata. Keep stale-ID deletion after successful source enumeration, including all pages. Focused tests exercise fake collections; service tests are still needed for live storage integration.
 
@@ -75,6 +75,7 @@ tester before execution.
 | RRD | `rrd_analytic/compose-functional.test.yaml` | `rrd-functional-tester` |
 | REST | `rest_api/compose-functional.test.yaml` | `rest-api-functional-service-tester` |
 | Broker | `service_broker/compose-functional.test.yaml` | `service-broker-functional-tester` |
+| Dispatcher interfaces | `ai_agents_framework/docs_dispatcher/compose-unit.test.yaml` | `docs-dispatcher-unit-tester` |
 | Dispatcher | `ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml` | `docs-dispatcher-functional-tester` |
 | Vector store | `ai_agents_framework/RAG/compose-functional.test.yaml` | `rag-functional-tester` |
 | All isolated services | `compose-functional.test.yaml` | `test_aggregator` |

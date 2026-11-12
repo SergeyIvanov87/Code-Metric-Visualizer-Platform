@@ -6,7 +6,7 @@
     },
     "Description": {
         "header": "Sync persistent storage",
-        "body": "Returns a number of synchronized objects",
+        "body": "Returns one JSON object with error_code and the created, updated, deleted, not_changed, initial DB records, and storage size synchronization fields at the top level.",
         "footer": ""
     }
 }

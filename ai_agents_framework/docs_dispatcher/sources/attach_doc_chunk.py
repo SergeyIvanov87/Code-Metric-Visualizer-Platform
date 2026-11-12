@@ -2,11 +2,10 @@
 
 import argparse
 import json
-import subprocess
 import sys
 
-from dispatcher_backend_config import load_backend_config
-
+from backend.dispatcher.dispatcher import BackendDispatcher
+from utils import read_metadata_text
 
 def main():
     parser = argparse.ArgumentParser(prog="Attach document chunk using assigned backend")
@@ -14,47 +13,18 @@ def main():
     parser.add_argument("-metadata", "--metadata", type=str, default=None, help="chunk metadata")
 
     args = parser.parse_args()
-    chunk_data = sys.stdin.read()
-    chunk_data = chunk_data.encode('utf-8')
-
-    backend_config = load_backend_config()
-    backends_path = backend_config.backends_code_dir
-    sys.path.insert(0, str(backends_path))
-
-    command = [
-        "python",
-        "-m",
-        backend_config.command_module("attach_doc_chunk"),
-        str(args.doc_id),
-    ]
-    if args.metadata is not None:
-        command.extend(["-m", args.metadata])
-
-    exec_status = subprocess.run(
-        command,
-        input=chunk_data,
-        capture_output=True,
-        cwd=backends_path,
-        text=False,
-        shell=False,
-    )
-
-    return_data = {}
-    err_str = exec_status.stderr.decode('utf-8')
-    if err_str:
-        return_data["error_msg"] = err_str
-
-    output_str = exec_status.stdout.decode('utf-8')
-    output = {}
-    if output_str:
-        try:
-            output = json.loads(output_str)
-        except Exception as ex:
-            return_data["error_msg"] = f"Attach document chunk using assigned backend couldn't decode string as a valid JSON obj: {output_str}"
-
-    return_data = return_data | output
-    print(json.dumps(return_data))
-
+    stream = getattr(sys.stdin, "buffer", sys.stdin)
+    chunk_data = stream.read()
+    if isinstance(chunk_data, str):
+        chunk_data = chunk_data.encode("utf-8")
+    try:
+        with BackendDispatcher().get_backend() as backend:
+            result = backend.attach_doc_chunk(args.doc_id, chunk_data, metadata_text=read_metadata_text(args.metadata))
+        result = {"error_code": 0, **result}
+    except Exception as ex:
+        result = {"error_code": -1, "error_msg": str(ex)}
+    print(json.dumps(result))
+    return result["error_code"]
 
 
 if __name__ == "__main__":
