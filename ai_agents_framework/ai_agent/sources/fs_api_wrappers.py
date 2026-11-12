@@ -139,6 +139,7 @@ def rag_add_file(query, session_id, config, stage, relative, sequence, timeout=3
         f"-URI={json.dumps(str(uri), ensure_ascii=False)}",
         f"-metadata={json.dumps(metadata, ensure_ascii=False)}",
         f"-doc_type={resolved_doc_type}",
+        f"preserveOriginal={config.get('preserveOriginal', '1')}",
     ))
     result = _execute_json_query(
         query,
@@ -166,23 +167,26 @@ def execute_put_doc_query(
     doc_data,
     doc_type,
     doc_metadata,
+    preserveOriginal=1,
 ):
     if doc_data is not None and not isinstance(doc_data, str):
         raise TypeError("doc_data must be textual data")
 
     exec_args_array = [
         f"SESSION_ID={session_id}",
-        f"-doc_type={doc_type}",
     ]
+    if doc_type:
+        exec_args_array.append(f"doc_type={json.dumps(doc_type, ensure_ascii=False)}")
 
     if doc_data is None:
         # The filesystem API tokenizer removes these transport quotes before
         # the dispatcher passes the complete path to argparse and storage.
         escaped_doc_uri = str(doc_uri).replace("\\", "\\\\").replace('"', '\\"')
-        exec_args_array.append(f'-URI="{escaped_doc_uri}"')
+        exec_args_array.append(f'URI="{escaped_doc_uri}"')
+        exec_args_array.append(f"preserveOriginal={preserveOriginal}")
 
     if doc_metadata is not None:
-        exec_args_array.append(f"-metadata={doc_metadata}")
+        exec_args_array.append(f"metadata={json.dumps(doc_metadata, ensure_ascii=False)}")
 
     if doc_data is not None:
         # Keep inline data as one explicitly quoted filesystem-API value.  Apart

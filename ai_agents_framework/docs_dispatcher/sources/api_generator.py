@@ -61,19 +61,13 @@ def make_delete_doc_help():
 
 
 
-def make_put_doc(script, desired_file_ext=""):
-    if len(desired_file_ext) == 0:
-        file_extension = ".json"
-    else:
-        file_extension = "." + desired_file_ext
-
+def _make_put_document(script, desired_file_ext, inline):
+    file_extension = "." + desired_file_ext if desired_file_ext else ".json"
     body = (
         *api_fs_exec_utils.generate_exec_header(), "",
         *api_fs_exec_utils.generate_get_result_type(file_extension), "",
         *api_fs_exec_utils.generate_api_node_env_init(), "",
-        *api_fs_exec_utils.generate_read_api_fs_args(
-            preserve_empty_named_values=True
-        ), "",
+        *api_fs_exec_utils.generate_read_api_fs_args(preserve_empty_named_values=True), "",
         'declare -a PUT_DOC_ARGS=()',
         'document_data=""',
         'for ((i=0; i<${#OVERRIDEN_CMD_ARGS[@]}; i+=2)); do',
@@ -81,14 +75,23 @@ def make_put_doc(script, desired_file_ext=""):
         '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
         '  case "$name" in',
         '    doc_data) document_data="$value" ;;',
-        '    -URI) [[ -z "$value" ]] || PUT_DOC_ARGS+=("$name" "$value") ;;',
-        '    -metadata|-doc_type) PUT_DOC_ARGS+=("$name" "$value") ;;',
+        '    URI|doc_type) [[ -z "$value" ]] || PUT_DOC_ARGS+=("--$name" "$value") ;;',
+        '    metadata|preserveOriginal) PUT_DOC_ARGS+=("--$name" "$value") ;;',
         '  esac',
         'done',
-        # Keep parsed arguments as array elements through the Python handoff.
-        'printf "%s" "$document_data" | "${WORK_DIR}/put_doc.py" "${PUT_DOC_ARGS[@]}"',
+        ('printf "%s" "$document_data" | "${WORK_DIR}/put_doc_data.py" "${PUT_DOC_ARGS[@]}"'
+         if inline else '"${WORK_DIR}/put_doc.py" "${PUT_DOC_ARGS[@]}"'),
     )
     script.writelines(line + "\n" for line in body)
+
+
+def make_put_doc(script, desired_file_ext=""):
+    _make_put_document(script, desired_file_ext, inline=False)
+
+
+def make_put_doc_data(script, desired_file_ext=""):
+    _make_put_document(script, desired_file_ext, inline=True)
+
 
 def make_put_doc_help():
     return "make_put_doc_help"
@@ -195,6 +198,7 @@ def get():
         "get_doc_info": make_get_doc_info,
         "get_docs": make_get_docs,
         "put_doc": make_put_doc,
+        "put_doc_data": make_put_doc_data,
         "read_id": make_read_id,
         "sync": make_sync
     }
@@ -205,6 +209,7 @@ def get():
         "get_doc_info": make_get_doc_info_help,
         "get_docs": make_get_docs_help,
         "put_doc": make_put_doc_help,
+        "put_doc_data": make_put_doc_help,
         "read_id": make_read_id_help,
         "sync": make_sync_help
     }

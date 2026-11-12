@@ -332,3 +332,19 @@ timeouts, result validation, single and parallel bulk upload forwarding,
 atomic relative-path publication, sealing, filter defaults, discovery, and
 unavailable queries. Envoy forwarding tests run when `ENVOY_BINARY` is
 configured.
+
+
+HTTP single and bulk ingestion always forward `preserveOriginal=0`; clients
+cannot override that policy. The parameter is omitted from both rendered pages
+and their embedded parameter definitions. Direct filesystem API clients retain
+the default of `1` (copy the original).
+
+The isolated HTTP upload contract suite runs the real ambassador with generated
+FIFO servers and lightweight model/uploader stand-ins:
+
+```sh
+docker compose -f ai_agents_framework/ai_agent_http_ambassador/tests/functional/compose.yaml up --build --abort-on-container-exit --exit-code-from http-upload-tester
+```
+
+This suite verifies HTTP-to-FIFO preservation policy and page rendering; it does
+not establish live model, Chroma, Envoy, or bulk-stream completion behavior.

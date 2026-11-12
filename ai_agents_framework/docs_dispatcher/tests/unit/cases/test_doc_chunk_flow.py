@@ -19,6 +19,7 @@ from interfaces_impl.access.mysql.database import Base
 from attach_doc_chunk import main as attach_chunk_main
 from delete_doc import main as delete_doc_main
 from put_doc import main as put_doc_main
+from put_doc_data import main as put_doc_data_main
 
 
 @pytest.fixture()
@@ -72,10 +73,10 @@ def test_document_storage_round_trips_metadata_and_doc_type(
     monkeypatch.setattr(
         "sys.argv",
         [
-            "put_doc.py",
-            "-metadata",
+            "put_doc_data.py",
+            "--metadata",
             "document metadata",
-            "-doc_type",
+            "--doc_type",
             "txt",
         ],
     )
@@ -88,7 +89,7 @@ def test_document_storage_round_trips_metadata_and_doc_type(
         lambda config: nullcontext(MysqlAccessRecordEntry(db_session)),
     )
 
-    assert put_doc_main() == 0
+    assert put_doc_data_main() == 0
     result = json.loads(capsys.readouterr().out)
     parent_id = int(result["unique_id"])
 
@@ -105,7 +106,7 @@ def test_document_storage_round_trips_metadata_and_doc_type(
     ).read_text() == "document metadata"
     assert (storage_root / str(parent_id) / "doc_type").read_text() == "txt"
 
-    uri_path = tmp_path / "uri_document.txt"
+    uri_path = tmp_path / 'uri document "quoted".MD'
     uri_payload = " \n\tURI документ\u2003\n".encode("utf-8")
     uri_path.write_bytes(uri_payload)
     monkeypatch.setattr(
@@ -114,8 +115,6 @@ def test_document_storage_round_trips_metadata_and_doc_type(
             "put_doc.py",
             "-URI",
             str(uri_path),
-            "-doc_type",
-            "txt",
         ],
     )
 
@@ -126,6 +125,7 @@ def test_document_storage_round_trips_metadata_and_doc_type(
     uri_record = PersistentStorageRecordEntry(storage_root).get_records([uri_id])[0]
     expected_payload = uri_payload
     assert PersistentStorageRecordEntry(storage_root).read_record_data(uri_record) == expected_payload
+    assert uri_record.doc_type == "md"
     assert uri_record.size == len(expected_payload)
     assert access.get_records([uri_id])[0].size == len(expected_payload)
     assert {int(record.id) for record in access.get_all_records()} == {
@@ -318,8 +318,9 @@ def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
     assert PersistentStorageRecordEntry(storage_root).get_all_records() == {}
 
 
+@pytest.mark.parametrize("preserveOriginal", [0, 1])
 @pytest.mark.parametrize("failure_stage", ["metadata", "database"])
-def test_uri_insertion_failure_preserves_source(monkeypatch, tmp_path, db_session, failure_stage):
+def test_uri_insertion_failure_preserves_source(monkeypatch, tmp_path, db_session, failure_stage, preserveOriginal):
     storage_root = tmp_path / "storage"
     storage_root.mkdir()
     source = tmp_path / "source.txt"
@@ -338,7 +339,7 @@ def test_uri_insertion_failure_preserves_source(monkeypatch, tmp_path, db_sessio
         monkeypatch.setattr(access, "update_record_by_id", fail)
 
     with pytest.raises(RuntimeError, match="simulated insertion failure"):
-        backend.put_doc_by_uri(source)
+        backend.put_doc_by_uri(source, preserveOriginal=preserveOriginal)
 
     assert source.read_bytes() == original
     assert list(storage_root.iterdir()) == []

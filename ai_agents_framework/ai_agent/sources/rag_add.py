@@ -55,6 +55,7 @@ def main(
     doc_type: str,
     doc_data: str,
     timeout: int,
+    preserveOriginal: int = 1,
 ):
     import chromadb
     from langchain_chroma import Chroma
@@ -82,7 +83,8 @@ def main(
         shared_api_dir,
         main_service_name,
         {
-            "put_doc": re.compile(r".*ai_agent_rag_dispatcher.*put_doc.*"),
+            "put_doc": re.compile(r".*ai_agent_rag_dispatcher.*put_doc_v[0-9]+$"),
+            "put_doc_data": re.compile(r".*ai_agent_rag_dispatcher.*put_doc_data_v[0-9]+$"),
             "attach_doc_chunk": re.compile(
                 ".*ai_agent_rag_dispatcher.*attach_doc_chunk.*"
             ),
@@ -91,7 +93,7 @@ def main(
     )
     session_id = generate_inner_session_id(sess_id)
     put_doc_query = create_api_query_interruptible(
-        shared_api_dir, normalized_api_queries["put_doc"], session_id
+        shared_api_dir, normalized_api_queries["put_doc" if doc_uri is not None else "put_doc_data"], session_id
     )
     attach_doc_chunk_query = create_api_query_interruptible(
         shared_api_dir, normalized_api_queries["attach_doc_chunk"], session_id
@@ -114,6 +116,7 @@ def main(
         encoded_doc_data,
         doc_type_for_dispatcher,
         doc_metadata,
+        preserveOriginal=preserveOriginal,
     )
     doc_unique_id = put_doc_result["unique_id"]
 
@@ -239,6 +242,8 @@ if __name__ == "__main__":
     parser.add_argument("-doc_type", "--doc_type", type=str, default="txt", help="document type")
     parser.add_argument("-timeout", "--timeout", type=int, default=20, help="dispatcher timeout in seconds")
 
+    parser.add_argument("--preserveOriginal", type=int, choices=(0, 1), default=1)
+
     args = parser.parse_args()
     doc_type = args.doc_type
     error_code = 0
@@ -262,6 +267,7 @@ if __name__ == "__main__":
             doc_type,
             document_data,
             args.timeout,
+            preserveOriginal=args.preserveOriginal,
         )
         return_data["doc_id"] = doc_id
         return_data["chunk_ids"] = chunk_ids

@@ -54,8 +54,8 @@ def test_execute_put_doc_query_omits_uri_when_doc_data_is_specified():
     )
 
     assert query.exec_args == (
-        "SESSION_ID=session -doc_type=base64,txt "
-        '-metadata=metadata doc_data="encoded-document"'
+        'SESSION_ID=session doc_type="base64,txt" '
+        'metadata="metadata" doc_data="encoded-document"'
     )
     assert "-URI" not in query.exec_args
 
@@ -74,7 +74,7 @@ def test_execute_put_doc_query_passes_uri_when_doc_data_is_not_specified():
     )
 
     assert query.exec_args == (
-        'SESSION_ID=session -doc_type=txt -URI="/documents/example.txt"'
+        'SESSION_ID=session doc_type="txt" URI="/documents/example.txt" preserveOriginal=1'
     )
     assert "doc_data=" not in query.exec_args
 

@@ -17,6 +17,10 @@ jobs:
       run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
     - name: Test docs dispatcher backend interfaces
       run: docker compose -f ai_agents_framework/docs_dispatcher/compose-unit.test.yaml up --build --abort-on-container-exit --exit-code-from docs-dispatcher-unit-tester
+    - name: Test agent ingestion routing and workers
+      run: docker compose -f ai_agents_framework/ai_agent/test/unit/compose.yaml up --build --abort-on-container-exit --exit-code-from agent-ingestion-unit-tester
+    - name: Test HTTP ingestion preservation policy
+      run: docker compose -f ai_agents_framework/ai_agent_http_ambassador/tests/functional/compose.yaml up --build --abort-on-container-exit --exit-code-from http-upload-tester
     - name: Build AI RAG docs dispatcher services[prod]
       run: docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml build
     - name: Test AI RAG docs dispatcher Docker image[prod]
@@ -33,6 +37,8 @@ jobs:
         diagnostics="${RUNNER_TEMP}/agentic-rag-diagnostics"
         mkdir -p "${diagnostics}"
         for compose_file in \
+          ai_agents_framework/ai_agent/test/unit/compose.yaml \
+          ai_agents_framework/ai_agent_http_ambassador/tests/functional/compose.yaml \
           ai_agents_framework/docs_dispatcher/compose-unit.test.yaml \
           ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml \
           ai_agents_framework/RAG/compose-functional.test.yaml; do
