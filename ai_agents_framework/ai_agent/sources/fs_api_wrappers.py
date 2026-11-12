@@ -176,7 +176,10 @@ def execute_put_doc_query(
     ]
 
     if doc_data is None:
-        exec_args_array.append(f"-URI={doc_uri}")
+        # The filesystem API tokenizer removes these transport quotes before
+        # the dispatcher passes the complete path to argparse and storage.
+        escaped_doc_uri = str(doc_uri).replace("\\", "\\\\").replace('"', '\\"')
+        exec_args_array.append(f'-URI="{escaped_doc_uri}"')
 
     if doc_metadata is not None:
         exec_args_array.append(f"-metadata={doc_metadata}")

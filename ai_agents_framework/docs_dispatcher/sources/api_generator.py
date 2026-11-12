@@ -68,25 +68,25 @@ def make_put_doc(script, desired_file_ext=""):
         file_extension = "." + desired_file_ext
 
     body = (
-        *api_fs_exec_utils.generate_exec_header(), r"",
-        *api_fs_bash_utils.generate_extract_attr_value_from_string(), r"",
-        *api_fs_bash_utils.generate_add_suffix_if_exist(), r"",
-        *api_fs_bash_utils.generate_wait_until_pipe_exist(), r"",
-        *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
-        *api_fs_exec_utils.generate_api_node_env_init(), r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
-        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"-URI\" \"${2}\" \"\" '=' URI_VALUE", r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"doc_data\" \"${2}\" \"\" '=' DOC_DATA_VALUE", r"",
-        r'if [ -z "${URI_VALUE}" ]; then',
-        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/-URI}" )',
-        r'fi',
-        r'document_data="${DOC_DATA_VALUE}"',
-        r'OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/doc_data}" )',
-        r'if [ ! -z "${document_data}" ]; then',
-        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/$document_data}" )',
-        r'fi',
-        "echo \"${OVERRIDEN_CMD_ARGS[@]}\" | xargs -I% -- sh -c \"echo '${document_data}' | ${WORK_DIR}/put_doc.py %\""
+        *api_fs_exec_utils.generate_exec_header(), "",
+        *api_fs_exec_utils.generate_get_result_type(file_extension), "",
+        *api_fs_exec_utils.generate_api_node_env_init(), "",
+        *api_fs_exec_utils.generate_read_api_fs_args(
+            preserve_empty_named_values=True
+        ), "",
+        'declare -a PUT_DOC_ARGS=()',
+        'document_data=""',
+        'for ((i=0; i<${#OVERRIDEN_CMD_ARGS[@]}; i+=2)); do',
+        '  name="${OVERRIDEN_CMD_ARGS[i]}"',
+        '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
+        '  case "$name" in',
+        '    doc_data) document_data="$value" ;;',
+        '    -URI) [[ -z "$value" ]] || PUT_DOC_ARGS+=("$name" "$value") ;;',
+        '    -metadata|-doc_type) PUT_DOC_ARGS+=("$name" "$value") ;;',
+        '  esac',
+        'done',
+        # Keep parsed arguments as array elements through the Python handoff.
+        'printf "%s" "$document_data" | "${WORK_DIR}/put_doc.py" "${PUT_DOC_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
