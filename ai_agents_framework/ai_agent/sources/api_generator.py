@@ -100,7 +100,7 @@ def make_script_rag_delete(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_get_result_type(file_extension), r"",
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
-        *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        *api_fs_exec_utils.generate_read_api_fs_args(preserve_empty_named_values=True), r"",
         r'${WORK_DIR}/rag_delete.py "${OVERRIDEN_CMD_ARGS[@]}" --session_id="${SESSION_ID_VALUE}" -db_host="${VECTOR_DB_HOST}" -db_port="${VECTOR_DB_PORT}" "${SHARED_API_DIR}" "${MAIN_SERVICE_NAME}"'
     )
     script.writelines(line + "\n" for line in body)
