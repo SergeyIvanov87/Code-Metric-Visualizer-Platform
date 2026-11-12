@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Insert inline document bytes through the configured backend."""
+"""Insert document bytes through the configured backend."""
 
 import argparse
 import json
@@ -9,13 +9,13 @@ from backend.dispatcher.dispatcher import BackendDispatcher
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="Insert inline document data")
+    parser = argparse.ArgumentParser(prog="Insert document data")
     parser.add_argument("--doc_type", help="required encoding and document type")
     parser.add_argument("--metadata", default="", help="document metadata")
     args = parser.parse_args()
     try:
         if not args.doc_type:
-            raise ValueError("doc_type is required for inline document data")
+            raise ValueError("doc_type is required for document data")
         stream = getattr(sys.stdin, "buffer", sys.stdin)
         data = stream.read()
         if isinstance(data, str):

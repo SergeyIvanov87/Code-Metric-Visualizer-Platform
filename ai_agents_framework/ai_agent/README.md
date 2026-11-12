@@ -123,10 +123,8 @@ passes only the URI to dispatcher `put_doc`. Bulk ingestion uses this endpoint.
 `rag_add_data.json` (`rag/add_doc_data/v1`) accepts base64 UTF-8 `doc_data`, required
 `doc_type`, optional `metadata` and `timeout`. Its `rag_add_data.py` script sends
 encoded data through `execute_put_doc_data_query` to dispatcher `put_doc_data`.
-The HTTP file picker uses this inline endpoint, which has no source-preservation
-parameter. HTTP bulk ingestion continues to force `preserveOriginal=0`.
+The HTTP ambassador stages file-picker uploads and invokes the URI endpoint. Both HTTP single-file and bulk ingestion explicitly force `preserveOriginal=0`.
 
 All parameters on these two agent queries have no leading hyphens. Generated
-executors invoke separate scripts. `rag_add_utils.py` owns shared parsing,
-chunking, embedding, attachment, indexing, and rollback behavior. Recreate the
+executors invoke separate scripts. Each script owns its own CLI, embedding, document insertion, chunk attachment, and rollback control flow. `document_splitter.py` provides `split_document`; `rag_chroma.py` provides Chroma insertion. Recreate the
 agent and ambassador together to load the new schemas and HTTP upload route.

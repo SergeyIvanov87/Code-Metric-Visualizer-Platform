@@ -61,7 +61,28 @@ def make_delete_doc_help():
 
 
 
-def _make_put_document(script, desired_file_ext, inline):
+def make_put_doc(script, desired_file_ext=""):
+    file_extension = "." + desired_file_ext if desired_file_ext else ".json"
+    body = (
+        *api_fs_exec_utils.generate_exec_header(), "",
+        *api_fs_exec_utils.generate_get_result_type(file_extension), "",
+        *api_fs_exec_utils.generate_api_node_env_init(), "",
+        *api_fs_exec_utils.generate_read_api_fs_args(preserve_empty_named_values=True), "",
+        'declare -a PUT_DOC_ARGS=()',
+        'for ((i=0; i<${#OVERRIDEN_CMD_ARGS[@]}; i+=2)); do',
+        '  name="${OVERRIDEN_CMD_ARGS[i]}"',
+        '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
+        '  case "$name" in',
+        '    URI|doc_type) [[ -z "$value" ]] || PUT_DOC_ARGS+=("--$name" "$value") ;;',
+        '    metadata|preserveOriginal) PUT_DOC_ARGS+=("--$name" "$value") ;;',
+        '  esac',
+        'done',
+        '"${WORK_DIR}/put_doc.py" "${PUT_DOC_ARGS[@]}"',
+    )
+    script.writelines(line + "\n" for line in body)
+
+
+def make_put_doc_data(script, desired_file_ext=""):
     file_extension = "." + desired_file_ext if desired_file_ext else ".json"
     body = (
         *api_fs_exec_utils.generate_exec_header(), "",
@@ -75,22 +96,13 @@ def _make_put_document(script, desired_file_ext, inline):
         '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
         '  case "$name" in',
         '    doc_data) document_data="$value" ;;',
-        '    URI|doc_type) [[ -z "$value" ]] || PUT_DOC_ARGS+=("--$name" "$value") ;;',
-        '    metadata|preserveOriginal) PUT_DOC_ARGS+=("--$name" "$value") ;;',
+        '    doc_type) [[ -z "$value" ]] || PUT_DOC_ARGS+=("--$name" "$value") ;;',
+        '    metadata) PUT_DOC_ARGS+=("--$name" "$value") ;;',
         '  esac',
         'done',
-        ('printf "%s" "$document_data" | "${WORK_DIR}/put_doc_data.py" "${PUT_DOC_ARGS[@]}"'
-         if inline else '"${WORK_DIR}/put_doc.py" "${PUT_DOC_ARGS[@]}"'),
+        'printf "%s" "$document_data" | "${WORK_DIR}/put_doc_data.py" "${PUT_DOC_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
-
-
-def make_put_doc(script, desired_file_ext=""):
-    _make_put_document(script, desired_file_ext, inline=False)
-
-
-def make_put_doc_data(script, desired_file_ext=""):
-    _make_put_document(script, desired_file_ext, inline=True)
 
 
 def make_put_doc_help():

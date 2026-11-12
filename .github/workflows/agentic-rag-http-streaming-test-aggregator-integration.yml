@@ -103,7 +103,8 @@ jobs:
 
         probe "/api.pmccabe_collector.restapi.org" "<body>"
         probe "/api.pmccabe_collector.restapi.org/ai_agent/chat/v1" "<h1>AI agent chat</h1>"
-        probe "/api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc_data/v1" "<h1>Add a document</h1>"
+        probe "/api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1" "<h1>Add a document</h1>"
+        probe "/api.pmccabe_collector.restapi.org/ai_agent/rag/bulk_add/v1" "<h1>Add files and folders</h1>"
 
     - name: Test AI agent RAG filesystem API
       id: functional-tests

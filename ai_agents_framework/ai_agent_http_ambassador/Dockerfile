@@ -5,7 +5,7 @@ COPY ai_agents_framework/ai_agent_http_ambassador/requirements.txt .
 RUN --mount=type=secret,id=proxy_ca \
     if [ -s /run/secrets/proxy_ca ]; then export PIP_CERT=/run/secrets/proxy_ca; fi; \
     pip install --no-cache-dir -r requirements.txt
-COPY ai_agents_framework/ai_agent/API/chat.json ai_agents_framework/ai_agent/API/rag_add_data.json ai_agents_framework/ai_agent/API/rag_bulk_add.json /app/API/
+COPY ai_agents_framework/ai_agent/API/chat.json ai_agents_framework/ai_agent/API/rag_add.json ai_agents_framework/ai_agent/API/rag_bulk_add.json /app/API/
 COPY common/modules/api_fs_query.py common/modules/api_schema_utils.py common/modules/api_fs_args.py common/modules/filesystem_utils.py /app/
 COPY ai_agents_framework/ai_agent_http_ambassador /app/
 RUN groupadd -g 23456 pmccabe && useradd -u 2002 -g pmccabe --no-create-home ambassador \

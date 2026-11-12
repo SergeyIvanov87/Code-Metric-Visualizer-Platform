@@ -75,7 +75,7 @@ if Path(sys.argv[0]).name == "agentic_rag.py":
         "secondary": value(CHAT_SYSTEM_PARAMETER),
     }))
 else:
-    document = base64.b64decode(sys.stdin.buffer.read()).decode("utf-8")
+    document = Path(value("--URI")).read_bytes().decode("utf-8")
     print(json.dumps({
         "error_code": 0,
         "doc_id": "fixture-document",
@@ -85,7 +85,7 @@ else:
     }))
 '''
     )
-    for filename in ("agentic_rag.py", "rag_add_data.py"):
+    for filename in ("agentic_rag.py", "rag_add.py"):
         path = scripts / filename
         path.write_text(stub)
         path.chmod(0o755)

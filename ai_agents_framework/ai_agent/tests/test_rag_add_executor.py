@@ -43,7 +43,7 @@ def test_binary_uri_returns_structured_failure_instead_of_crashing(tmp_path):
     assert "Traceback" not in completed.stderr
     result = json.loads(completed.stdout)
     assert result["error_code"] == -1
-    assert '"image" document category is unsupported' in result["error_msg"]
+    assert "utf-8" in result["error_msg"]
 
 
 @pytest.mark.parametrize('metadata', ['', 'team_docs'])

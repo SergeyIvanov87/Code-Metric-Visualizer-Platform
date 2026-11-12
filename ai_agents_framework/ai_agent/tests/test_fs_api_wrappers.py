@@ -59,7 +59,7 @@ def test_execute_put_doc_query_passes_uri_when_doc_data_is_not_specified():
     execute_put_doc_query(query, 'session', 10, '/documents/example.txt', 'txt', None)
 
     assert query.exec_args == (
-        'SESSION_ID=session URI="/documents/example.txt" preserveOriginal="1" doc_type="txt"'
+        'SESSION_ID=session doc_type="txt" URI="/documents/example.txt" preserveOriginal=1'
     )
     assert "doc_data=" not in query.exec_args
 

@@ -71,15 +71,13 @@ def chat_payload(filesystem_api, message, system=None):
 
 
 def document_parameter(filesystem_api):
-    params = filesystem_api[1]["rag_add_data"]["Params"]
-    return next(name for name, value in params.items() if not name.startswith("-") and value == "")
+    return "URI"
 
 
 def upload_payload(filesystem_api, content):
-    return {
-        document_parameter(filesystem_api): base64.b64encode(content).decode("ascii"),
-        "doc_type": "txt"
-    }
+    source = filesystem_api[0] / ("source-" + __import__("uuid").uuid4().hex + ".txt")
+    source.write_bytes(content)
+    return {"URI": str(source), "doc_type": "txt"}
 
 
 def configured_schema_dir(filesystem_api):
@@ -120,7 +118,7 @@ def test_schema_driven_pages_load(app, filesystem_api):
     assert page.status_code == 200
     main_menu_link = b'<a href="/api.pmccabe_collector.restapi.org">Return to the main menu</a>'
     help_link = b'<a href="/help">Ambassador help</a>'
-    upload_link = f'<a href="{path(filesystem_api, "rag_add_data")}">Add a document to the knowledge base</a>'.encode()
+    upload_link = f'<a href="{path(filesystem_api, "rag_add")}">Add a document to the knowledge base</a>'.encode()
     assert page.data.index(main_menu_link) < page.data.index(help_link)
     assert page.data.index(help_link) < page.data.index(upload_link)
     assert b"You are a knowledge-base assistant." in page.data
@@ -131,12 +129,12 @@ def test_schema_driven_pages_load(app, filesystem_api):
     assert b'<input id="include-history" type="checkbox" checked>' in page.data
     assert b"/ai-agent-ui/" not in page.data
 
-    upload_page = client.get(path(filesystem_api, "rag_add_data"))
+    upload_page = client.get(path(filesystem_api, "rag_add"))
     assert upload_page.status_code == 200
     chat_link = f'<a href="{path(filesystem_api, "chat")}">Chat with the knowledge base</a>'.encode()
     assert upload_page.data.index(main_menu_link) < upload_page.data.index(chat_link)
     assert document_parameter(filesystem_api).encode() in upload_page.data
-    assert b"application/json" in upload_page.data
+    assert b"application/octet-stream" in upload_page.data
 
     help_page = client.get("/help/")
     assert help_page.status_code == 200
@@ -194,10 +192,10 @@ def test_rejects_query_not_supported_by_server(filesystem_api):
         create_app(filesystem_api[2])
 
 
-def test_upload_passes_inline_document_parameter_to_filesystem_api(app, filesystem_api):
+def test_upload_passes_uri_to_filesystem_api(app, filesystem_api):
     document = "A UTF-8 document.\nSecond line: 日本語\n".encode()
     response = app.test_client().put(
-        path(filesystem_api, "rag_add_data"),
+        path(filesystem_api, "rag_add"),
         json=upload_payload(filesystem_api, document),
     )
     assert response.status_code == 200, response.data
