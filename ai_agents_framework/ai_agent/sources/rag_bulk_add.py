@@ -40,7 +40,7 @@ API_QUERY_PATTERNS = {
     "streaming_directory_events": re.compile(
         r".*file-uploader_streaming_directory_events.*"
     ),
-    "rag_add": re.compile(r".*ai_agent_rag_add_doc_v[0-9]+$"),
+    "rag_add": re.compile(r".*[/_]ai_agent[/_]rag[/_]add_doc[/_]v[0-9]+(?:[/_]PUT)?/?$"),
 }
 
 stopping = False
@@ -76,8 +76,6 @@ def values(arguments):
         raise ValueError(f"MAX_WORKERS must be a positive integer, got: {max_workers}")
     if not 1 <= workers <= max_workers:
         raise ValueError(f"workers must be between 1 and {max_workers}, got: {workers}")
-    if result["preserveOriginal"] not in ("0", "1"):
-        raise ValueError("preserveOriginal must be 0 or 1")
     return result
 
 

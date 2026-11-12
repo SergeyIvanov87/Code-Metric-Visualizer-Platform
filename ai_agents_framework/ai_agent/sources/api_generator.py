@@ -34,19 +34,9 @@ def make_script_rag_add(script, desired_file_ext=""):
         'for arg in "${IN_SERVER_REQUEST_ARGS[@]}"; do',
         '  [[ "$arg" == SESSION_ID=* ]] && SESSION_ID_VALUE="${arg#SESSION_ID=}"',
         'done',
-        'declare -a RAG_ARGS=()',
-        'for ((i=0; i<${#OVERRIDEN_CMD_ARGS[@]}; i+=2)); do',
-        '  name="${OVERRIDEN_CMD_ARGS[i]}"',
-        '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
-        '  case "$name" in',
-        '    URI|doc_type) [[ -z "$value" ]] || RAG_ARGS+=("--$name" "$value") ;;',
-        '    metadata|timeout) RAG_ARGS+=("--$name" "$value") ;;',
-        '    preserveOriginal) RAG_ARGS+=("--preserveOriginal" "$value") ;;',
-        '  esac',
-        'done',
         '"${WORK_DIR}/rag_add.py" ' +
         '--session_id="${SESSION_ID_VALUE}" -db_host="${VECTOR_DB_HOST}" '
-        '-db_port="${VECTOR_DB_PORT}" "${RAG_ARGS[@]}" '
+        '-db_port="${VECTOR_DB_PORT}" "${OVERRIDEN_CMD_ARGS[@]}" '
         '"${SHARED_API_DIR}" "${MAIN_SERVICE_NAME}"',
     )
     script.writelines(line + "\n" for line in body)
@@ -64,16 +54,16 @@ def make_script_rag_add_data(script, desired_file_ext=""):
         'for arg in "${IN_SERVER_REQUEST_ARGS[@]}"; do',
         '  [[ "$arg" == SESSION_ID=* ]] && SESSION_ID_VALUE="${arg#SESSION_ID=}"',
         'done',
+        # doc_data is a stdin payload rather than a CLI option. Forward every
+        # other parsed pair unchanged so new schema options require no whitelist.
         'declare -a RAG_ARGS=()',
         'document_data=""',
         'for ((i=0; i<${#OVERRIDEN_CMD_ARGS[@]}; i+=2)); do',
-        '  name="${OVERRIDEN_CMD_ARGS[i]}"',
-        '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
-        '  case "$name" in',
-        '    doc_data) document_data="$value" ;;',
-        '    doc_type) [[ -z "$value" ]] || RAG_ARGS+=("--$name" "$value") ;;',
-        '    metadata|timeout) RAG_ARGS+=("--$name" "$value") ;;',
-        '  esac',
+        '  if [[ "${OVERRIDEN_CMD_ARGS[i]}" == doc_data ]]; then',
+        '    document_data="${OVERRIDEN_CMD_ARGS[i+1]}"',
+        '  else',
+        '    RAG_ARGS+=("${OVERRIDEN_CMD_ARGS[i]}" "${OVERRIDEN_CMD_ARGS[i+1]}")',
+        '  fi',
         'done',
         'printf "%s" "$document_data" | "${WORK_DIR}/rag_add_data.py" ' +
         '--session_id="${SESSION_ID_VALUE}" -db_host="${VECTOR_DB_HOST}" '

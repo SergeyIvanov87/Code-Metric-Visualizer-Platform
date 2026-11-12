@@ -65,8 +65,8 @@ def add_document_data(document_data: bytes, metadata: str) -> dict:
             os.environ["SHARED_API_DIR"],
             API_SCHEMAS["rag_add_data"],
             {
-                "metadata": metadata,
-                "doc_type": "txt",
+                "-metadata": metadata,
+                "-doc_type": "txt",
                 "doc_data": encoded,
             },
         )

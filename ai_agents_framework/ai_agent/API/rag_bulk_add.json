@@ -13,7 +13,7 @@
         "WaitQueryUpdateTimeoutSec": "10",
         "WaitResultConsumptionTimeoutSec": "60",
         "SESSION_ID": "default",
-        "preserveOriginal": "1"
+        "-preserveOriginal": "1"
     },
     "Description": {
         "header": "Stream a directory of documents into RAG",

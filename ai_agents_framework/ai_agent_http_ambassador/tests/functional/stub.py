@@ -7,7 +7,7 @@ import sys
 
 arguments = sys.argv[1:]
 if Path(sys.argv[0]).name == "rag_add.py":
-    uri = arguments[arguments.index("--URI") + 1]
+    uri = arguments[arguments.index("-URI") + 1]
     if Path(uri).name == "bad-result.txt":
         print("not-json")
         sys.exit(0)

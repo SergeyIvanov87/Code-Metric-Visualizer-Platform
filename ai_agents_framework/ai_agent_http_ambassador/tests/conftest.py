@@ -53,7 +53,7 @@ def filesystem_api(tmp_path, monkeypatch):
         name for name, default in chat_schema["Params"].items() if default != ""
     )
     document_type_parameter = next(
-        name for name, default in upload_schema["Params"].items() if name == "doc_type"
+        name for name, default in upload_schema["Params"].items() if name == "-doc_type"
     )
     stub = (
         f"#!{sys.executable}\n"
@@ -75,13 +75,13 @@ if Path(sys.argv[0]).name == "agentic_rag.py":
         "secondary": value(CHAT_SYSTEM_PARAMETER),
     }))
 else:
-    document = Path(value("--URI")).read_bytes().decode("utf-8")
+    document = Path(value("-URI")).read_bytes().decode("utf-8")
     print(json.dumps({
         "error_code": 0,
         "doc_id": "fixture-document",
         "chunk_ids": ["fixture-chunk"],
         "document": document,
-        "doc_type": value("--" + DOCUMENT_TYPE_PARAMETER),
+        "doc_type": value(DOCUMENT_TYPE_PARAMETER),
     }))
 '''
     )

@@ -10,8 +10,9 @@ from backend.dispatcher.dispatcher import BackendDispatcher
 
 def main():
     parser = argparse.ArgumentParser(prog="Insert document data")
-    parser.add_argument("--doc_type", help="required encoding and document type")
-    parser.add_argument("--metadata", default="", help="document metadata")
+    parser.add_argument("-doc_type", "--doc_type", help="required encoding and document type")
+    parser.add_argument("-metadata", "--metadata", default="", help="document metadata")
+    parser.add_argument("-filename", "--filename", default=None)
     args = parser.parse_args()
     try:
         if not args.doc_type:
@@ -22,7 +23,7 @@ def main():
             data = data.encode("utf-8")
         with BackendDispatcher().get_backend() as backend:
             result = backend.put_doc_by_data(
-                None, data, metadata_text=args.metadata, doc_type=args.doc_type,
+                args.filename or None, data, metadata_text=args.metadata, doc_type=args.doc_type,
             )
         result = {"error_code": 0, **result}
     except Exception as error:

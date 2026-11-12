@@ -213,12 +213,12 @@ def create_app(config_path=None, query_factory=None):
         return query_factory(pipes, remove_session_pipe_on_result_done=False)
 
     def execute(schema, arguments, reuse_session=True):
-        if "preserveOriginal" in schema["Params"]:
+        if "-preserveOriginal" in schema["Params"]:
             # HTTP uploads are staged input owned by this ingestion request.
             # Ignore client overrides and explicitly request transfer of ownership.
-            arguments = {"preserveOriginal": "0", **{
+            arguments = {"-preserveOriginal": "0", **{
                 name: value for name, value in arguments.items()
-                if name != "preserveOriginal"
+                if name.lstrip("-") != "preserveOriginal"
             }}
         query = make_query(schema)
         if not query.is_valid():
@@ -279,8 +279,8 @@ def create_app(config_path=None, query_factory=None):
             with source.open("wb") as stream:
                 shutil.copyfileobj(request.stream, stream)
             source.chmod(0o644)
-            arguments = {"URI": str(source)}
-            for name in ("metadata", "doc_type", "timeout"):
+            arguments = {"-URI": str(source)}
+            for name in ("-metadata", "-doc_type", "-timeout"):
                 if name in request.args:
                     arguments[name] = request.args[name]
             result = execute(schema, arguments)
@@ -491,7 +491,7 @@ def create_app(config_path=None, query_factory=None):
     def render_page(name, schema):
         support = SUPPORTED_SCHEMAS[name]
         request_parameters = dict(schema["Params"])
-        request_parameters.pop("preserveOriginal", None)
+        request_parameters.pop("-preserveOriginal", None)
         request_parameters.update(support.get("page_parameter_defaults", {}))
         navigation = [
             {"path": paths[other_name], "label": support["navigation_label"]}

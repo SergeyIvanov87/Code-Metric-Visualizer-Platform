@@ -5,13 +5,14 @@
     "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc_data/v1",
     "Params": {
         "doc_data": "",
-        "doc_type": "",
-        "metadata": "",
-        "timeout": "20"
+        "-doc_type": "",
+        "-metadata": "",
+        "-timeout": "20",
+        "-filename": ""
     },
     "Description": {
         "header": "Insert inline document data into RAG",
-        "body": "doc_data must be base64 encoded UTF-8 text. doc_type is required; metadata is optional.",
+        "body": "doc_data must be base64 encoded UTF-8 text. doc_type is required; metadata is optional. Optional -filename is preserved as file_uri; rag_add_data generates YYYY-MM-DD:HH:MM:SS_<doc_type> in UTC when omitted.",
         "footer": ""
     }
 }

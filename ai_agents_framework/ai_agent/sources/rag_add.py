@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import argparse
-import base64
 import json
 import re
 import sys
@@ -9,9 +8,10 @@ from pathlib import Path
 
 from document_splitter import split_document
 from rag_chroma import insert_embeddings
+from rag_chunks import attach_chunks
 from fs_api_wrappers import (
     create_api_query_interruptible, get_normalized_api_queries,
-    generate_inner_session_id, execute_attach_doc_chunks_query,
+    generate_inner_session_id,
     execute_delete_doc_query,
     execute_put_doc_query,
 )
@@ -55,7 +55,7 @@ def main(
         shared_api_dir,
         main_service_name,
         {
-            "put_doc": re.compile(r".*ai_agent_rag_dispatcher.*put_doc_v[0-9]+$"),
+            "put_doc": re.compile(r".*[/_]ai_agent_rag_dispatcher[/_]put_doc[/_]v[0-9]+(?:[/_]PUT)?/?$"),
             "attach_doc_chunk": re.compile(
                 ".*ai_agent_rag_dispatcher.*attach_doc_chunk.*"
             ),
@@ -91,23 +91,10 @@ def main(
     chunk_metadata = []
 
     try:
-        try:
-            chunk_bytes = [base64.b64encode(c.encode('utf-8')).decode('utf-8') for c in chunk_texts]
-
-            timeout_elapsed = 10 * len(chunk_bytes)
-            chunk_unique_ids, chunk_metadata = execute_attach_doc_chunks_query(
-                attach_doc_chunk_query,
-                session_id,
-                timeout_elapsed,
-                doc_unique_id,
-                doc_type_for_dispatcher,
-                doc_metadata,
-                chunk_bytes,
-            )
-        except Exception as ex:
-            raise RuntimeError(
-                f"Cannot attach chunks: {len(chunk_texts)} to the doc id: {doc_unique_id}, session: {session_id}, exception: {ex}"
-            ) from ex
+        chunk_unique_ids, chunk_metadata = attach_chunks(
+            attach_doc_chunk_query, session_id, doc_unique_id,
+            doc_type_for_dispatcher, doc_metadata, chunk_texts,
+        )
 
         # eventually push doc & chunks into chroma
         my_collection_name = main_service_name
@@ -167,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument("-doc_type", "--doc_type", type=str, default=None, help="document type")
     parser.add_argument("-timeout", "--timeout", type=int, default=20, help="dispatcher timeout in seconds")
 
-    parser.add_argument("--preserveOriginal", type=int, choices=(0, 1), default=1)
+    parser.add_argument("-preserveOriginal", "--preserveOriginal", type=int, default=1)
 
     args = parser.parse_args()
     doc_type = args.doc_type

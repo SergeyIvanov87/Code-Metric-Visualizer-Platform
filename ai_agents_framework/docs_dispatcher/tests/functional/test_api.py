@@ -189,14 +189,13 @@ def _put_doc_by_uri(file_uri: str, metadata: str = "test_metadata", doc_type: st
     return int(payload["unique_id"])
 
 
-def _put_doc_as_doc_data(document_data: str, metadata: str = "test_metadata", doc_type: str = "txt") -> int:
+def _put_doc_as_doc_data(document_data: str, metadata: str = "test_metadata", doc_type: str = "txt", filename=None) -> int:
+    parameters = {"-metadata": metadata, "doc_data": document_data, "-doc_type": doc_type}
+    if filename is not None:
+        parameters["-filename"] = json.dumps(filename, ensure_ascii=False)
     payload = _execute_json_api(
         "put_doc_data",
-        {
-            "metadata": metadata,
-            "doc_data": document_data,
-            "doc_type": doc_type,
-        },
+        parameters,
     )
     assert payload["error_code"] == 0, payload
     assert "unique_id" in payload
@@ -273,9 +272,11 @@ def test_put_documents_create_matching_storage_records_use_doc_data(created_reco
 
     before_ids = _storage_record_ids()
     # need to shield each " with \"
-    doc_0_id = _put_doc_as_doc_data(shield_special_symbols(doc_0))
+    doc_0_id = _put_doc_as_doc_data(shield_special_symbols(doc_0), filename='provided "document":txt')
     created_record_ids.append(doc_0_id)
     _assert_document_storage(doc_0_id, doc_0)
+    documents = _execute_json_api("get_docs")["docs"]
+    assert any(doc["id"] == doc_0_id and doc["file_uri"] == 'provided "document":txt' for doc in documents), documents
     _assert_sync_is_clean(len(before_ids) + 1)
 
     # need to shield each " with \". Probably I need to put that into _put_doc_as_doc_data
