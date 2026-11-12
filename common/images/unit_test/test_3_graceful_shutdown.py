@@ -120,17 +120,9 @@ def test_filesystem_api_graceful_shutdown_processes(name, query, run_around_test
     print(f"Send signal to pids of {name}_server.sh", file=sys.stdout, flush=True)
     pids = list(ut_utils.get_pids(f"{name}_server.sh"))
     assert len(pids)
-    for p in pids:
-        print(f"Kill {name}_server.sh given pid: {p}")
-        os.killpg(os.getpgid(p), signal.SIGKILL)
-
-    print(f"Wait for termination {name}_server.sh", file=sys.stdout, flush=True)
-    for p in pids:
-        try:
-            os.waitpid(p, 0)
-            print(f"{name}_server.sh finished given pid: {p}")
-        except Exception:
-            pass
+    # Killing one group can also terminate another PID in this snapshot.
+    # The shared helper tolerates disappeared processes and reaps children.
+    kill_process_groups(pids)
 
     print(f"Check pids of {name}_server.sh", file=sys.stdout, flush=True)
     pidds = list()
