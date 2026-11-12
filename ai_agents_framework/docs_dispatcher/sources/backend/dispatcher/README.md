@@ -57,12 +57,11 @@ utilities used by existing tests, such as rebuilding SQL metadata from a
 directory, remain with MySQL access.
 
 Cross-store operations receive the other interface explicitly. MySQL access
-never imports a concrete store. URI insertion defaults to `preserveOriginal=1`,
-which copies the source with `shutil.copyfile()`. Setting it to `0` transfers the
+never imports a concrete store. URI insertion defaults to `preserveOriginal=1`;
+any nonzero value copies the source with `shutil.copyfile()`. Setting it to `0` transfers the
 source into storage using `shutil.move()` (rename when the filesystems permit it).
-Failed metadata writes restore a moved source; non-cascading compensation in the
-same store instance also restores it after a database update failure. Normal
-cascading deletion removes stored documents without restoring source files. Stored sizes
+Failed insertion deletes the stored document without restoring a moved source.
+Normal deletion also removes stored documents without restoring source files. Stored sizes
 and chunk byte ranges refer to the original payload bytes. Inline input continues
 to use `prepare_doc_data()` normalization.
 
@@ -144,14 +143,17 @@ docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.ya
 
 ## Document insertion APIs
 
-- `put_doc/v1` accepts `URI` (required), optional `doc_type` and `metadata`, and
-  `preserveOriginal` (`1` by default, `0` to consume the source). Parameter names
-  have no leading hyphens. The URI script infers a lowercase filename extension
-  when `doc_type` is absent, falling back to `txt` for extensionless files.
+- `put_doc/v1` accepts `-URI` (required), optional `-doc_type` and `-metadata`, and
+  `-preserveOriginal` (`1` by default, `0` to consume the source; any nonzero value copies).
+  The URI script infers a lowercase filename extension
+  when `-doc_type` is absent, falling back to `txt` for extensionless files.
   Previously this endpoint defaulted to `txt` without extension inference.
-- `put_doc_data/v1` accepts inline `doc_data`, required `doc_type` (for example
-  `base64,txt`), and optional `metadata`. `put_doc_data.py` reads the payload from
-  stdin and calls the existing backend `put_doc_by_data` method.
+- `put_doc_data/v1` accepts inline `doc_data`, required `-doc_type` (for example
+  `base64,txt`), and optional `-metadata` and `-filename`. `put_doc_data.py` reads
+  the payload from stdin and calls the existing backend `put_doc_by_data` method.
+  A supplied filename becomes `file_uri` in storage metadata and the SQL record;
+  base64 decoding still follows `doc_type`. The agent's `rag_add_data` supplies
+  a UTC timestamp filename when its caller omits one.
 
 Both schemas are mirrored by the agent's `API/deps/docs_dispatcher` declarations.
 The existing backend and store methods carry `preserveOriginal`; no interface

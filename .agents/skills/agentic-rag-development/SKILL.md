@@ -49,4 +49,4 @@ docker compose -f ai_agents_framework/ai_agent/test/unit/compose.yaml up --build
 ```
 
 Agent insertion is likewise split into `rag_add`/`rag_add.py` for URI input and
-`rag_add_data`/`rag_add_data.py` for inline data. Keep their processors, CLIs, and generated scripts independent. Share only small helpers such as `document_splitter.split_document` and `rag_chroma.insert_embeddings`. Keep bulk query discovery restricted to the URI endpoint. The HTTP ambassador stages single-file uploads and invokes only the URI endpoint.
+`rag_add_data`/`rag_add_data.py` for inline data. Keep their processors, CLIs, and generated scripts independent. Share only small helpers such as `document_splitter.split_document`, `rag_chroma.insert_embeddings`, and `rag_chunks.attach_chunks`. Keep bulk query discovery restricted to the URI endpoint. The HTTP ambassador stages single-file uploads and invokes only the URI endpoint. Insertion CLI options retain the `-` prefix; `doc_data` remains a stdin payload. Optional `-filename` on `rag_add_data` is preserved as storage/SQL `file_uri`, or defaults to UTC `YYYY-MM-DD:HH:MM:SS_<doc_type>` when omitted.

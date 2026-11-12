@@ -44,11 +44,11 @@ class JsonQuery(FakeQuery):
 def test_execute_put_doc_query_omits_uri_when_doc_data_is_specified():
     query = FakeQuery()
 
-    execute_put_doc_data_query(query, 'session', 10, 'encoded-document', 'base64,txt', 'metadata')
+    execute_put_doc_data_query(query, 'session', 10, 'encoded-document', 'base64,txt', 'metadata', filename='provided "document":txt')
 
     assert query.exec_args == (
-        'SESSION_ID=session doc_type="base64,txt" '
-        'metadata="metadata" doc_data="encoded-document"'
+        'SESSION_ID=session -doc_type=base64,txt '
+        '-metadata="metadata" doc_data="encoded-document" -filename="provided \\"document\\":txt"'
     )
     assert "-URI" not in query.exec_args
 
@@ -59,7 +59,7 @@ def test_execute_put_doc_query_passes_uri_when_doc_data_is_not_specified():
     execute_put_doc_query(query, 'session', 10, '/documents/example.txt', 'txt', None)
 
     assert query.exec_args == (
-        'SESSION_ID=session doc_type="txt" URI="/documents/example.txt" preserveOriginal=1'
+        'SESSION_ID=session -doc_type=txt -URI="/documents/example.txt" -preserveOriginal=1'
     )
     assert "doc_data=" not in query.exec_args
 

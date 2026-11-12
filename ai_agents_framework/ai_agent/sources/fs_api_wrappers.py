@@ -37,7 +37,9 @@ def get_normalized_api_queries(
     normalized_api_queries = {}
     for non_normalized_query_name, api_query in api_queries.items():
         for query_name, query_re in query_normalizarion_map.items():
-            if query_re.match(non_normalized_query_name):
+            # Discovery keys normalize path separators to underscores; also
+            # match the schema path so endpoint expressions work with either.
+            if query_re.match(non_normalized_query_name) or query_re.match(api_query["Query"]):
                 normalized_api_queries[query_name] = (
                     get_last_query_version(
                         normalized_api_queries[query_name], api_query
@@ -136,10 +138,10 @@ def rag_add_file(query, session_id, config, stage, relative, sequence, timeout=3
     resolved_doc_type = document_type(relative)
     arguments = " ".join((
         f"SESSION_ID={session_id}",
-        f"URI={json.dumps(str(uri), ensure_ascii=False)}",
-        f"metadata={json.dumps(metadata, ensure_ascii=False)}",
-        f"doc_type={resolved_doc_type}",
-        f"preserveOriginal={config.get('preserveOriginal', '1')}",
+        f"-URI={json.dumps(str(uri), ensure_ascii=False)}",
+        f"-metadata={json.dumps(metadata, ensure_ascii=False)}",
+        f"-doc_type={resolved_doc_type}",
+        f"-preserveOriginal={config.get('preserveOriginal', '1')}",
     ))
     result = _execute_json_query(
         query,
@@ -172,16 +174,16 @@ def execute_put_doc_query(
         f"SESSION_ID={session_id}",
     ]
     if doc_type:
-        exec_args_array.append(f"doc_type={json.dumps(doc_type, ensure_ascii=False)}")
+        exec_args_array.append(f"-doc_type={doc_type}")
 
     # The filesystem API tokenizer removes these transport quotes before
     # the dispatcher passes the complete path to argparse and storage.
     escaped_doc_uri = str(doc_uri).replace("\\", "\\\\").replace('"', '\\"')
-    exec_args_array.append(f'URI="{escaped_doc_uri}"')
-    exec_args_array.append(f"preserveOriginal={preserveOriginal}")
+    exec_args_array.append(f'-URI="{escaped_doc_uri}"')
+    exec_args_array.append(f"-preserveOriginal={preserveOriginal}")
 
     if doc_metadata is not None:
-        exec_args_array.append(f"metadata={json.dumps(doc_metadata, ensure_ascii=False)}")
+        exec_args_array.append(f"-metadata={json.dumps(doc_metadata, ensure_ascii=False)}")
 
     exec_args = " ".join(exec_args_array)
 
@@ -219,6 +221,7 @@ def execute_put_doc_data_query(
     doc_data,
     doc_type,
     doc_metadata,
+    filename=None,
 ):
     if doc_data is not None and not isinstance(doc_data, str):
         raise TypeError("doc_data must be textual data")
@@ -227,10 +230,10 @@ def execute_put_doc_data_query(
         f"SESSION_ID={session_id}",
     ]
     if doc_type:
-        exec_args_array.append(f"doc_type={json.dumps(doc_type, ensure_ascii=False)}")
+        exec_args_array.append(f"-doc_type={doc_type}")
 
     if doc_metadata is not None:
-        exec_args_array.append(f"metadata={json.dumps(doc_metadata, ensure_ascii=False)}")
+        exec_args_array.append(f"-metadata={json.dumps(doc_metadata, ensure_ascii=False)}")
 
     if doc_data is not None:
         # Keep document data as one explicitly quoted filesystem-API value.  Apart
@@ -239,6 +242,8 @@ def execute_put_doc_data_query(
         # while it extracts doc_data from the argument list.
         escaped_doc_data = doc_data.replace("\\", "\\\\").replace('"', '\\"')
         exec_args_array.append(f'doc_data="{escaped_doc_data}"')
+    if filename is not None:
+        exec_args_array.append(f"-filename={json.dumps(str(filename), ensure_ascii=False)}")
     exec_args = " ".join(exec_args_array)
 
     status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)

@@ -68,16 +68,7 @@ def make_put_doc(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_get_result_type(file_extension), "",
         *api_fs_exec_utils.generate_api_node_env_init(), "",
         *api_fs_exec_utils.generate_read_api_fs_args(preserve_empty_named_values=True), "",
-        'declare -a PUT_DOC_ARGS=()',
-        'for ((i=0; i<${#OVERRIDEN_CMD_ARGS[@]}; i+=2)); do',
-        '  name="${OVERRIDEN_CMD_ARGS[i]}"',
-        '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
-        '  case "$name" in',
-        '    URI|doc_type) [[ -z "$value" ]] || PUT_DOC_ARGS+=("--$name" "$value") ;;',
-        '    metadata|preserveOriginal) PUT_DOC_ARGS+=("--$name" "$value") ;;',
-        '  esac',
-        'done',
-        '"${WORK_DIR}/put_doc.py" "${PUT_DOC_ARGS[@]}"',
+        '"${WORK_DIR}/put_doc.py" "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -89,16 +80,16 @@ def make_put_doc_data(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_get_result_type(file_extension), "",
         *api_fs_exec_utils.generate_api_node_env_init(), "",
         *api_fs_exec_utils.generate_read_api_fs_args(preserve_empty_named_values=True), "",
+        # doc_data is consumed on stdin; all other standardized arguments are
+        # passed through unchanged, including new options declared in the schema.
         'declare -a PUT_DOC_ARGS=()',
         'document_data=""',
         'for ((i=0; i<${#OVERRIDEN_CMD_ARGS[@]}; i+=2)); do',
-        '  name="${OVERRIDEN_CMD_ARGS[i]}"',
-        '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
-        '  case "$name" in',
-        '    doc_data) document_data="$value" ;;',
-        '    doc_type) [[ -z "$value" ]] || PUT_DOC_ARGS+=("--$name" "$value") ;;',
-        '    metadata) PUT_DOC_ARGS+=("--$name" "$value") ;;',
-        '  esac',
+        '  if [[ "${OVERRIDEN_CMD_ARGS[i]}" == doc_data ]]; then',
+        '    document_data="${OVERRIDEN_CMD_ARGS[i+1]}"',
+        '  else',
+        '    PUT_DOC_ARGS+=("${OVERRIDEN_CMD_ARGS[i]}" "${OVERRIDEN_CMD_ARGS[i+1]}")',
+        '  fi',
         'done',
         'printf "%s" "$document_data" | "${WORK_DIR}/put_doc_data.py" "${PUT_DOC_ARGS[@]}"',
     )

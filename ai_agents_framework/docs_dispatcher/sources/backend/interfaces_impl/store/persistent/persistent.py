@@ -16,7 +16,6 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
 
     def __init__(self, directory: Path):
         self.directory = Path(directory)
-        self._moved_sources = {}
 
     def exists(self) -> bool:
         return self.directory.is_dir()
@@ -66,13 +65,8 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
             entry.write_fields(offset=offset, size=size, parent_id=parent_id,
                                metadata=metadata_text, doc_type=doc_type)
         except Exception as error:
-            if not preserveOriginal and not Path(file_uri).exists() and entry.document_path(file_uri).exists():
-                shutil.move(str(entry.document_path(file_uri)), str(file_uri))
             entry._cleanup_incomplete_entry(error)
             raise
-
-        if not preserveOriginal:
-            self._moved_sources[unique_id] = Path(file_uri)
 
         return RecordSchema(file_uri=file_uri, id=unique_id, offset=offset, size=size,
                              parent_id=parent_id, metadata={"comment": metadata_text} if metadata_text else {},
@@ -119,13 +113,6 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
 
             entry_to_delete = self._entry(record_id)
             try:
-                # Non-cascading cleanup compensates failed creation in this
-                # backend instance. Return a moved source before deleting it.
-                original = self._moved_sources.get(record_id)
-                if not cascade_delete and original is not None:
-                    if original.exists():
-                        raise FileExistsError(f"Cannot restore moved source: {original}")
-                    shutil.move(str(entry_to_delete.document_path(record.file_uri)), str(original))
                 deleted = entry_to_delete.delete()
             except OSError:
                 deleted = False
@@ -134,7 +121,6 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
                 non_deleted_ids.append(record_id)
                 continue
 
-            self._moved_sources.pop(record_id, None)
             deleted_count += 1
             if record.id == record.parent_id:
                 deleted_parent_ids.add(int(record.id))
@@ -214,9 +200,7 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
         return storage_uri / str(unique_id)
 
     def copy_document(self, file_uri: str | Path, preserveOriginal: int = 1) -> None:
-        if preserveOriginal not in (0, 1):
-            raise ValueError("preserveOriginal must be 0 or 1")
-        if preserveOriginal:
+        if preserveOriginal != 0:
             shutil.copyfile(file_uri, self.document_path(file_uri))
         else:
             # shutil.move uses rename where possible and handles cross-mount uploads.

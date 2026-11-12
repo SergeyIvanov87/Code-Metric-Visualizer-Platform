@@ -41,7 +41,7 @@ Only persistent storage defines `doc_suffix` or performs payload IO. Keep shared
 directory/metadata utilities in the store contract. Storage models are data-only
 and must not select a backend or perform filesystem work.
 
-Document insertion is split between `put_doc` (URI, optional type/metadata, `preserveOriginal=1`) and `put_doc_data` (inline data, required type, optional metadata). Mirror their schemas under agent `API/deps`. Keep the existing backend/store methods, with the preservation parameter controlling copy versus move and rollback restoring moved sources.
+Document insertion is split between `put_doc` (`-URI`, optional `-doc_type`/`-metadata`, `-preserveOriginal=1`) and `put_doc_data` (stdin `doc_data`, required `-doc_type`, optional `-metadata`/`-filename`). Mirror their schemas under agent `API/deps`. A data filename propagates through the existing `file_uri` argument into storage metadata and SQL; it must not bypass base64 decoding. Keep the existing backend/store methods: zero preservation moves, any nonzero value copies. Failed insertion deletes stored artifacts without restoring moved sources.
 
 Preserve database-generated IDs, URI encoding, metadata formats, byte ranges,
 rollback behavior, arguments, JSON/text responses, and exit statuses. Keep

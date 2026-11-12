@@ -148,7 +148,7 @@ def test_envoy_routes_upload_page_and_put(routed_http, filesystem_api):
     assert status == 200 and b"Browse file" in body
     source = filesystem_api[0] / "envoy-document.txt"
     source.write_bytes(b"A document\n")
-    payload = {"URI": str(source), "doc_type": "txt"}
+    payload = {"-URI": str(source), "-doc_type": "txt"}
     status, body = routed_http(
         upload + "/?ignored=true",
         "PUT",

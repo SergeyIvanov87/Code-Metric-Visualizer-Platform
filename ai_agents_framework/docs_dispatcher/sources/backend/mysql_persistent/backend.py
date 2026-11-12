@@ -62,9 +62,6 @@ class MysqlPersistentBackend(Backend):
         if file_uri is None:
             raise ValueError("file_uri is required when adding a document by URI")
 
-        if preserveOriginal not in (0, 1):
-            raise ValueError("preserveOriginal must be 0 or 1")
-
         count_of_docs_to_insert = 1
         unique_id_candidates = self.access.create_unique_ids(count_of_docs_to_insert)
         uid = next(iter(unique_id_candidates))
@@ -93,7 +90,7 @@ class MysqlPersistentBackend(Backend):
         return {"unique_id": uid}
 
     def put_doc_by_data(self, file_uri: str | Path | None, data: bytes, *, metadata_text: str = "", doc_type: str = "txt") -> dict:
-        if file_uri is None and "base64" in doc_type:
+        if "base64" in doc_type:
             data = base64.b64decode(data)
         data = prepare_doc_data(data)
 
