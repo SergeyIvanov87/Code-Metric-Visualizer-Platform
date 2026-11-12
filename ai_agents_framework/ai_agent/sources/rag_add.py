@@ -102,8 +102,10 @@ def main(
 
     # insert the main doc
     timeout_elapsed = timeout
-    doc_data_bytes = doc_data.encode("utf-8")
-    encoded_doc_data = base64.b64encode(doc_data_bytes).decode("ascii")
+    encoded_doc_data = None
+    if doc_uri is None:
+        doc_data_bytes = doc_data.encode("utf-8")
+        encoded_doc_data = base64.b64encode(doc_data_bytes).decode("ascii")
     put_doc_result = execute_put_doc_query(
         put_doc_query,
         session_id,
