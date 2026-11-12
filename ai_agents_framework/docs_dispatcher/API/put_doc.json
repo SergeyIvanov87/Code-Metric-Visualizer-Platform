@@ -5,7 +5,7 @@
     "Query": "api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/put_doc/v1",
     "Params": {
         "-URI": "",
-        "-metadata": "\"\"",
+        "-metadata": "",
         "-doc_type": "txt",
         "doc_data": ""
     },
