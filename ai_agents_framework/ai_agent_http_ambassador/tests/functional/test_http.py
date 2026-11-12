@@ -26,19 +26,20 @@ class HTTPUploadTests(unittest.TestCase):
             time.sleep(0.2)
 
     def test_pages_hide_preservation_control(self):
-        for action in ("add_doc", "bulk_add"):
+        for action in ("add_doc_data", "bulk_add"):
             with self.subTest(action=action), urlopen(BASE + ROOT + f"/{action}/v1") as response:
                 self.assertNotIn(b"preserveOriginal", response.read())
 
-    def test_single_upload_forces_zero_through_generated_executor(self):
+    def test_inline_upload_uses_data_executor_without_preservation(self):
         for supplied in ({}, {"preserveOriginal": "1"}, {"-preserveOriginal": "1"}):
-            payload = {"doc_data": "aGVsbG8=", **supplied}
-            request = Request(BASE + ROOT + "/add_doc/v1", json.dumps(payload).encode(),
+            payload = {"doc_data": "aGVsbG8=", "doc_type": "txt", **supplied}
+            request = Request(BASE + ROOT + "/add_doc_data/v1", json.dumps(payload).encode(),
                               {"Content-Type": "application/json"}, method="PUT")
             with self.subTest(supplied=supplied), urlopen(request, timeout=10) as response:
                 result = json.load(response)
                 args = result["arguments"]
-                self.assertEqual(args[args.index("--preserveOriginal") + 1], "0")
+                self.assertNotIn("--preserveOriginal", args)
+                self.assertEqual(args[args.index("--doc_type") + 1], "txt")
                 self.assertEqual(result["data"], "aGVsbG8=")
 
     def test_bulk_upload_forces_zero_in_filesystem_request(self):

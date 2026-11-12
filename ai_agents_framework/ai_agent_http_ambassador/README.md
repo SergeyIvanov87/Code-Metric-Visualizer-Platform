@@ -10,7 +10,7 @@ service's executors.
 
 ## Schema ownership and endpoints
 
-The image copies exactly `chat.json`, `rag_add.json`, and
+The image copies exactly `chat.json`, `rag_add_data.json`, and
 `rag_bulk_add.json` from the represented service. At startup, the ambassador
 reads every JSON file in `schema_dir`,
 validates query schemas, selects the supported schemas through
@@ -22,8 +22,8 @@ loaded schemas rather than a second hardcoded API contract.
 | --- | --- | --- |
 | GET | `/api.pmccabe_collector.restapi.org/ai_agent/chat/v1` | Schema-driven chat page |
 | POST | Same chat path | Forward the JSON object to the filesystem chat query |
-| GET | `/api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1` | Schema-driven file-selection page |
-| PUT | Same upload path | Forward the JSON object to the filesystem `rag_add` query |
+| GET | `/api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc_data/v1` | Schema-driven file-selection page |
+| PUT | Same upload path | Forward the JSON object to the filesystem `rag_add_data` query |
 | GET | `/api.pmccabe_collector.restapi.org/ai_agent/rag/bulk_add/v1` | Multi-file and folder-selection page |
 | POST | Same bulk path | Start a deferred `rag_bulk_add` request with schema parameters |
 | PUT | Same bulk path | Atomically publish one file into the request's shared staging input |
@@ -39,7 +39,7 @@ verify FIFO presence, not model or database readiness.
 The chat page derives its editable fields from the chat schema. Browser history
 is tab-local and is placed in the schema-defined message parameter before the
 request is sent. The upload page derives the document parameter from the
-`rag_add` schema and base64-encodes the selected file into that parameter.
+`rag_add_data` schema and base64-encodes the selected file into that parameter.
 The ambassador forwards every received JSON key and value unchanged apart from
 filesystem FIFO quoting and its internal `SESSION_ID`. The filesystem API owns
 parameter validation, defaults, decoding, and operation semantics.
@@ -203,7 +203,7 @@ The `rag_bulk_add` processor reads the uploader's JSON-Line event stream.
 Every `ready` event is assigned to one of the configured RAG workers. The
 worker invokes the ordinary `rag_add` filesystem query with:
 
-- the staged file path as `-URI`;
+- the staged file path as `URI`;
 - caller metadata augmented with every component of the relative path; and
 - a document type derived from the filename extension.
 
@@ -334,8 +334,7 @@ unavailable queries. Envoy forwarding tests run when `ENVOY_BINARY` is
 configured.
 
 
-HTTP single and bulk ingestion always forward `preserveOriginal=0`; clients
-cannot override that policy. The parameter is omitted from both rendered pages
+HTTP bulk ingestion always forwards `preserveOriginal=0`; clients cannot override that policy. The single-file picker uses the inline-only `rag_add_data` endpoint, which has no source-preservation parameter. The parameter is omitted from both rendered pages
 and their embedded parameter definitions. Direct filesystem API clients retain
 the default of `1` (copy the original).
 

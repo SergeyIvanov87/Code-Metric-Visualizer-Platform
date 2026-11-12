@@ -26,7 +26,7 @@ fileInput.addEventListener("change", async () => {
   resultBox.textContent = "";
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const parameters = {[documentParameter]: encodeBase64(bytes)};
+    const parameters = {[documentParameter]: encodeBase64(bytes), doc_type: "txt"};
     const response = await fetch(window.location.pathname, {
       method: requestMethod,
       headers: {"Content-Type": "application/json"},

@@ -21,7 +21,7 @@ def make_script_rag_bulk_add(script, desired_file_ext=""):
 Provides a functions set which manages to generate API executor scripts
 """
 
-def make_script_rag_add(script, desired_file_ext=""):
+def _make_rag_add(script, desired_file_ext, inline):
     extension = "." + desired_file_ext if desired_file_ext else ""
     body = (
         *api_fs_exec_utils.generate_exec_header(), "",
@@ -41,17 +41,25 @@ def make_script_rag_add(script, desired_file_ext=""):
         '  value="${OVERRIDEN_CMD_ARGS[i+1]}"',
         '  case "$name" in',
         '    doc_data) document_data="$value" ;;',
-        '    -URI) [[ -z "$value" ]] || RAG_ARGS+=("$name" "$value") ;;',
-        '    -metadata|-doc_type|-timeout) RAG_ARGS+=("$name" "$value") ;;',
+        '    URI|doc_type) [[ -z "$value" ]] || RAG_ARGS+=("--$name" "$value") ;;',
+        '    metadata|timeout) RAG_ARGS+=("--$name" "$value") ;;',
         '    preserveOriginal) RAG_ARGS+=("--preserveOriginal" "$value") ;;',
         '  esac',
         'done',
-        'printf "%s" "$document_data" | "${WORK_DIR}/rag_add.py" '
+        ('printf "%s" "$document_data" | "${WORK_DIR}/rag_add_data.py" ' if inline else '"${WORK_DIR}/rag_add.py" ') +
         '--session_id="${SESSION_ID_VALUE}" -db_host="${VECTOR_DB_HOST}" '
         '-db_port="${VECTOR_DB_PORT}" "${RAG_ARGS[@]}" '
         '"${SHARED_API_DIR}" "${MAIN_SERVICE_NAME}"',
     )
     script.writelines(line + "\n" for line in body)
+
+def make_script_rag_add(script, desired_file_ext=""):
+    _make_rag_add(script, desired_file_ext, inline=False)
+
+
+def make_script_rag_add_data(script, desired_file_ext=""):
+    _make_rag_add(script, desired_file_ext, inline=True)
+
 
 def make_script_rag_add_help():
     return "make_script_rag_add_help"
@@ -155,6 +163,7 @@ def make_script_chat_help():
 def get():
     scripts_generator = {
         "rag_add": make_script_rag_add,
+        "rag_add_data": make_script_rag_add_data,
         "rag_bulk_add": make_script_rag_bulk_add,
         "rag_delete": make_script_rag_delete,
         "rag_get_docs": make_script_rag_get_docs,
@@ -164,6 +173,7 @@ def get():
 
     scripts_help_generator = {
         "rag_add": make_script_rag_add_help,
+        "rag_add_data": make_script_rag_add_help,
         "rag_delete": make_script_rag_delete_help,
         "rag_get_docs": make_script_rag_get_docs_help,
         "rag_sync": make_script_rag_sync_help,

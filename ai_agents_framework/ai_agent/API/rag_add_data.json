@@ -1,0 +1,17 @@
+{
+    "ParallelBySession": true,
+    "Content-Type": "application/json",
+    "Method": "PUT",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc_data/v1",
+    "Params": {
+        "doc_data": "",
+        "doc_type": "",
+        "metadata": "",
+        "timeout": "20"
+    },
+    "Description": {
+        "header": "Insert inline document data into RAG",
+        "body": "doc_data must be base64 encoded UTF-8 text. doc_type is required; metadata is optional.",
+        "footer": ""
+    }
+}
