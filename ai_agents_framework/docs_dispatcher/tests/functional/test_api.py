@@ -304,8 +304,8 @@ def test_put_document_stores_metadata_unchanged_and_doc_type(created_record_ids)
 
 
 def test_put_documents_as_uri_create_matching_storage_records(created_record_ids):
-    doc_0 = _data_text("doc_0.txt").strip()
-    doc_1 = _data_text("doc_1.txt").strip()
+    doc_0 = _data_text("doc_0.txt")
+    doc_1 = _data_text("doc_1.txt")
     doc_0_uri = _data_text_path("doc_0.txt")
     doc_1_uri = _data_text_path("doc_1.txt")
 

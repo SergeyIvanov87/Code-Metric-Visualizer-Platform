@@ -124,7 +124,7 @@ def test_document_storage_round_trips_metadata_and_doc_type(
     uri_id = int(uri_result["unique_id"])
     assert uri_path.read_bytes() == uri_payload
     uri_record = PersistentStorageRecordEntry(storage_root).get_records([uri_id])[0]
-    expected_payload = "URI документ".encode("utf-8")
+    expected_payload = uri_payload
     assert PersistentStorageRecordEntry(storage_root).read_record_data(uri_record) == expected_payload
     assert uri_record.size == len(expected_payload)
     assert access.get_records([uri_id])[0].size == len(expected_payload)
