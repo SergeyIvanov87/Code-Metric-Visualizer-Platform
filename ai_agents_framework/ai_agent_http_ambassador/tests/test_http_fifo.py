@@ -417,7 +417,7 @@ def test_bulk_page_has_multi_file_folder_and_collapsed_schema_settings(
     visible_parameters = {
         name: default
         for name, default in filesystem_api[1][schema_name]["Params"].items()
-        if name != "SESSION_ID"
+        if name not in ("SESSION_ID", "preserveOriginal")
     }
     visible_parameters.update(
         SUPPORTED_SCHEMAS[schema_name].get("page_parameter_defaults", {})
@@ -457,7 +457,7 @@ def test_bulk_upload_starts_query_forwards_settings_and_publishes_files_in_paral
     url = "/" + schema["Query"]
     settings = {
         name: default for name, default in schema["Params"].items()
-        if name != "SESSION_ID"
+        if name not in ("SESSION_ID", "preserveOriginal")
     }
     settings[next(name for name in settings if name.startswith("-"))] = "team=docs"
     settings["WaitQueryUpdateTimeoutSec"] = "1"

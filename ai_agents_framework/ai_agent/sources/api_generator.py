@@ -43,6 +43,7 @@ def make_script_rag_add(script, desired_file_ext=""):
         '    doc_data) document_data="$value" ;;',
         '    -URI) [[ -z "$value" ]] || RAG_ARGS+=("$name" "$value") ;;',
         '    -metadata|-doc_type|-timeout) RAG_ARGS+=("$name" "$value") ;;',
+        '    preserveOriginal) RAG_ARGS+=("--preserveOriginal" "$value") ;;',
         '  esac',
         'done',
         'printf "%s" "$document_data" | "${WORK_DIR}/rag_add.py" '

@@ -24,7 +24,7 @@ from fs_api_wrappers import (
 )
 
 DEFAULTS = {
-    "metadata": "", "WaitInitialQueryTimeoutSec": "60",
+    "metadata": "", "preserveOriginal": "1", "WaitInitialQueryTimeoutSec": "60",
     "WaitQueryUpdateTimeoutSec": "10", "WaitResultConsumptionTimeoutSec": "60",
     "SESSION_ID": "default", "workers": "4",
     "file_allow_regex": ".*", "file_skip_regex": r"(?!)",
@@ -76,6 +76,8 @@ def values(arguments):
         raise ValueError(f"MAX_WORKERS must be a positive integer, got: {max_workers}")
     if not 1 <= workers <= max_workers:
         raise ValueError(f"workers must be between 1 and {max_workers}, got: {workers}")
+    if result["preserveOriginal"] not in ("0", "1"):
+        raise ValueError("preserveOriginal must be 0 or 1")
     return result
 
 
