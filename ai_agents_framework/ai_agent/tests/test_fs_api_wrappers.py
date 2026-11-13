@@ -180,3 +180,14 @@ def test_rag_add_file_uses_precreated_query_and_preserves_unicode(tmp_path):
     ) in query.exec_args
     assert "équipe=δοκιμή,données,résumé-数据.py" in query.exec_args
     assert "\\u" not in query.exec_args
+
+
+def test_delete_doc_passes_ranges_with_whitespace_without_expansion():
+    import shlex
+    query = JsonQuery(json.dumps({"error_code": 0, "not_found": [4, 5]}))
+    result = execute_delete_doc_query(query, "session", 10, "1 - 5, 7", "metadata")
+    assert query.exec_args == 'SESSION_ID=session -ids="1 - 5, 7" -metadata=metadata'
+    assert shlex.split(query.exec_args) == [
+        "SESSION_ID=session", "-ids=1 - 5, 7", "-metadata=metadata",
+    ]
+    assert result["not_found"] == [4, 5]

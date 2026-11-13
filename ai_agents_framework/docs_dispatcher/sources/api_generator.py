@@ -52,7 +52,7 @@ def make_delete_doc(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${WORK_DIR}/delete_doc.py'
+        r'"${WORK_DIR}/delete_doc.py" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -155,7 +155,7 @@ def make_get_doc_info(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${WORK_DIR}/get_doc_info.py'
+        r'"${WORK_DIR}/get_doc_info.py" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -179,7 +179,7 @@ def make_read_id(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${WORK_DIR}/read_id.py'
+        r'"${WORK_DIR}/read_id.py" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
 

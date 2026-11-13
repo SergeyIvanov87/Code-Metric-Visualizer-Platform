@@ -1,3 +1,5 @@
+from id_ranges import IdSelection, expand_ids
+
 """MySQL/SQLite implementation of the database-neutral record access contract."""
 
 from contextlib import contextmanager
@@ -126,8 +128,8 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
 
         return len(rows)
 
-    def get_records(self, record_ids) -> list[RecordSchema]:
-        rows = self.session.query(FileRecord).filter(FileRecord.id.in_(list(record_ids))).all()
+    def get_records(self, record_ids: IdSelection) -> list[RecordSchema]:
+        rows = self.session.query(FileRecord).filter(FileRecord.id.in_(expand_ids(record_ids))).all()
         return [self._record(row) for row in rows]
 
     def get_all_records(self) -> list[RecordSchema]:
@@ -135,10 +137,10 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
 
     def delete_records(
         self,
-        record_ids: Iterable[int],
+        record_ids: IdSelection,
         cascade_delete: bool = True,
     ) -> tuple[int, list[int]]:
-        requested_ids = _unique_ids(record_ids)
+        requested_ids = expand_ids(record_ids)
         requested_records = self.get_records(requested_ids)
         records_by_id = {
             int(record.id): record

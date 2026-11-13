@@ -1,5 +1,7 @@
 """Database-neutral record access contract."""
 
+from id_ranges import IdSelection
+
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from pathlib import Path
@@ -43,7 +45,7 @@ class AccessRecordEntryInterface(ABC):
         """Update found records in one transaction and return the matched count."""
 
     @abstractmethod
-    def get_records(self, record_ids: Iterable[int]) -> list[RecordSchema]:
+    def get_records(self, record_ids: IdSelection) -> list[RecordSchema]:
         """Read records needed to resolve document and chunk content."""
 
     @abstractmethod
@@ -51,7 +53,7 @@ class AccessRecordEntryInterface(ABC):
         """Read every document and chunk record."""
 
     @abstractmethod
-    def delete_records(self, record_ids: Iterable[int], cascade_delete: bool = True) -> tuple[int, list[int]]:
+    def delete_records(self, record_ids: IdSelection, cascade_delete: bool = True) -> tuple[int, list[int]]:
         """ Delete documents and their chunks. Returns [number ids to delete, list of non deleted ids]
             cascade_delete if enabled, reap the orphant nodes as well if a parent node was deleted
         """

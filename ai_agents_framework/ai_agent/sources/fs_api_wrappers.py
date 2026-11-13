@@ -284,10 +284,14 @@ def execute_delete_doc_query(
     doc_id,
     doc_metadata,
 ):
+    ids_value = str(doc_id)
+    if any(character.isspace() for character in ids_value):
+        # The filesystem argument tokenizer supports double-quoted values.
+        ids_value = json.dumps(ids_value)
     exec_args = " ".join(
         [
             f"SESSION_ID={session_id}",
-            f"-ids={doc_id}",
+            f"-ids={ids_value}",
             f"-metadata={doc_metadata}",
         ]
     )
