@@ -5,9 +5,11 @@ import sys
 import pytest
 
 
-SOURCES_DIR = Path(__file__).resolve().parents[1] / "sources"
+SOURCES_DIR = Path("/package")
+if not SOURCES_DIR.is_dir():
+    SOURCES_DIR = Path(__file__).resolve().parents[3] / "sources"
 sys.path.insert(0, str(SOURCES_DIR))
-sys.path.insert(0, str(Path(__file__).parents[3] / "common/modules"))
+
 
 from fs_api_wrappers import (
     execute_delete_doc_query,

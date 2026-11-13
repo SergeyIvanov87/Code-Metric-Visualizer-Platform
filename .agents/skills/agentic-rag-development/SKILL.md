@@ -23,6 +23,12 @@ legacy wrapper, reconciliation, deletion, or inference checks with the owning
 tester before execution. Use the Compose-provided services rather than creating
 an extra web application for HTTP checks.
 
+RAG deletion and filesystem wrapper cases live in `ai_agent/test/unit/cases`
+and run in the `ai-agent-unit-tester` service through
+`ai_agents_framework/ai_agent/compose-unit.test.yaml`, registered in the agentic
+RAG subsystem CI workflow. This suite uses fake dispatcher/HTTP clients and a
+local Chroma collection; it does not validate a live agent stack.
+
 Follow [container test diagnostics](../container-test-diagnostics/SKILL.md) to
 launch the container entrypoint. For an agent-local reproduction, create a
 temporary Python environment, reproduce dependencies and staging from the

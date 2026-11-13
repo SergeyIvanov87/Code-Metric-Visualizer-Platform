@@ -183,11 +183,28 @@ class MysqlPersistentBackend(Backend):
 
     def delete_records(self, record_ids: IdSelection) -> tuple[int, int, list[int]]:
         record_ids = expand_ids(record_ids)
-        store_deleted_count, store_non_deleted_id = self.store.delete_records(record_ids, True)
-        access_deleted_count, access_non_deleted_id = self.access.delete_records(record_ids, True)
-        missing_ids = list(
-            dict.fromkeys([*store_non_deleted_id, *access_non_deleted_id])
-        )
+        present_ids = {
+            int(record.id)
+            for layer in (self.store, self.access)
+            for record in layer.get_records(record_ids)
+        }
+        missing_ids = [record_id for record_id in record_ids if record_id not in present_ids]
+
+        store_deleted_count, store_non_deleted_ids = self.store.delete_records(record_ids, True)
+        failed_storage_ids = [
+            int(record.id) for record in self.store.get_records(store_non_deleted_ids)
+        ]
+        if failed_storage_ids:
+            # Keep SQL metadata and make the caller retain Chroma vectors when
+            # an existing document or a cascaded chunk cannot be removed.
+            raise RuntimeError(f"Could not delete file storage records: {failed_storage_ids}")
+
+        access_deleted_count, access_non_deleted_ids = self.access.delete_records(record_ids, True)
+        failed_access_ids = [
+            int(record.id) for record in self.access.get_records(access_non_deleted_ids)
+        ]
+        if failed_access_ids:
+            raise RuntimeError(f"Could not delete database records: {failed_access_ids}")
         return access_deleted_count, store_deleted_count, missing_ids
 
     def get_document_info(self, doc_ids: IdSelection) -> dict[str, object]:

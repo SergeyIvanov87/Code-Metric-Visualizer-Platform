@@ -1,0 +1,16 @@
+# Paths are relative to the repository-root build context.
+**
+!common/
+!common/modules/
+!common/modules/**
+!common/proxy_setup_image_helpers/
+!common/proxy_setup_image_helpers/with-proxy-ca.sh
+!ai_agents_framework/
+!ai_agents_framework/ai_agent/
+!ai_agents_framework/ai_agent/sources/
+!ai_agents_framework/ai_agent/sources/**
+!ai_agents_framework/ai_agent/test/
+!ai_agents_framework/ai_agent/test/unit/
+!ai_agents_framework/ai_agent/test/unit/**
+**/__pycache__/
+**/*.pyc

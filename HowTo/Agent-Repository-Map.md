@@ -75,6 +75,7 @@ tester before execution.
 | RRD | `rrd_analytic/compose-functional.test.yaml` | `rrd-functional-tester` |
 | REST | `rest_api/compose-functional.test.yaml` | `rest-api-functional-service-tester` |
 | Broker | `service_broker/compose-functional.test.yaml` | `service-broker-functional-tester` |
+| Agent RAG deletion and API wrappers | `ai_agents_framework/ai_agent/compose-unit.test.yaml` | `ai-agent-unit-tester` |
 | Dispatcher interfaces | `ai_agents_framework/docs_dispatcher/compose-unit.test.yaml` | `docs-dispatcher-unit-tester` |
 | Dispatcher | `ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml` | `docs-dispatcher-functional-tester` |
 | Vector store | `ai_agents_framework/RAG/compose-functional.test.yaml` | `rag-functional-tester` |

@@ -4,7 +4,9 @@ import sys
 import pytest
 
 
-SOURCES_DIR = Path(__file__).resolve().parents[1] / "sources"
+SOURCES_DIR = Path("/package")
+if not SOURCES_DIR.is_dir():
+    SOURCES_DIR = Path(__file__).resolve().parents[3] / "sources"
 sys.path.insert(0, str(SOURCES_DIR))
 
 from rag_delete import main, parse_ids
@@ -98,13 +100,17 @@ def test_dispatcher_failure_prevents_vector_deletion(monkeypatch, tmp_path):
     collection = FakeCollection()
     monkeypatch.setattr("rag_delete.get_normalized_api_queries", lambda *args: {"delete_doc": Path("delete")})
     monkeypatch.setattr("rag_delete.generate_inner_session_id", lambda *args: "inner")
-    monkeypatch.setattr("rag_delete.create_api_query_interruptible", lambda *args: object())
-    monkeypatch.setattr("rag_delete.chromadb.HttpClient", lambda **kwargs: FakeClient(collection))
-    def fail(*args, **kwargs):
-        raise RuntimeError("storage failure")
-    monkeypatch.setattr("rag_delete.execute_delete_doc_query", fail)
+    class FailedDeleteQuery:
+        def execute(self, timeout_elapsed, arguments):
+            return True, timeout_elapsed
 
-    with pytest.raises(RuntimeError, match="storage failure"):
+        def wait_result(self, timeout_elapsed, *args):
+            return True, '{"error_code":1,"error_msg":"Could not delete file storage records: [7]","not_found":[]}', timeout_elapsed
+
+    monkeypatch.setattr("rag_delete.create_api_query_interruptible", lambda *args: FailedDeleteQuery())
+    monkeypatch.setattr("rag_delete.chromadb.HttpClient", lambda **kwargs: FakeClient(collection))
+
+    with pytest.raises(RuntimeError, match="Could not delete file storage records"):
         main(tmp_path, "service", "outer", "db", 8000, "7-10", None)
     assert collection.deleted_ids is None
 

@@ -147,7 +147,10 @@ Backends expand and deduplicate them in first occurrence order using
 `common/modules/id_ranges.py`. Open-ended and descending ranges are unsupported.
 The Python storage functions also continue to accept iterables of integer IDs.
 
-Missing IDs do not fail a batch; the output JSON includes `not_found`. Read
+Only IDs absent from both stores are returned in `not_found`, without failing
+the batch. Existing records that remain after a deletion attempt cause an error;
+SQL deletion stops when file removal fails, so callers retain Chroma vectors.
+The deletion return signature remains unchanged. Read
 batches also report storage/consistency failures in `unprocessed`, while keeping
 per-record results. Scalar `read_id` requests retain the public plain text
 response; list/range requests return JSON encoded in that response text.

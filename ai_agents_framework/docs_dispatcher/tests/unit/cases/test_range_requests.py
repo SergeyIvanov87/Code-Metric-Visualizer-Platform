@@ -144,3 +144,54 @@ def test_generated_executor_preserves_ranges_with_spaces(tmp_path, command, opti
         capture_output=True, text=True, check=True,
     )
     assert json.loads(result.stdout) == [option, "1 - 5, 7"]
+
+
+@pytest.mark.parametrize("failure_kind", ["document", "chunk", "database"])
+def test_failed_deletion_is_an_error_not_a_missing_id(
+    document_backend, monkeypatch, capsys, failure_kind,
+):
+    session, storage, _ = document_backend
+    access = MysqlAccessRecordEntry(session)
+    store = PersistentStorageRecordEntry(storage)
+    backend = MysqlPersistentBackend(access, store)
+    failed_id = 1
+    if failure_kind == "chunk":
+        failed_id = backend.attach_doc_chunk(1, b"fir")["unique_id"]
+    if failure_kind == "database":
+        monkeypatch.setattr(access, "delete_records", lambda *args: (0, [failed_id]))
+    else:
+        original_delete = PersistentStorageRecordEntry.delete
+        def deny_delete(entry):
+            if entry.directory.name == str(failed_id):
+                raise PermissionError("simulated removal failure")
+            return original_delete(entry)
+        monkeypatch.setattr(PersistentStorageRecordEntry, "delete", deny_delete)
+
+    spec = importlib.util.spec_from_file_location("dispatcher_delete_failure", SOURCES / "delete_doc.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module, "BackendDispatcher", lambda: SimpleNamespace(get_backend=lambda: nullcontext(backend)))
+    monkeypatch.setattr(sys, "argv", ["delete_doc", "-ids", "1-2,999"])
+
+    assert module.main() == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result["error_code"] == 1
+    assert failed_id not in result["not_found"]
+    assert f"[{failed_id}]" in result["error_msg"]
+    assert access.get_records([failed_id])
+    if failure_kind != "database":
+        assert store.get_records([failed_id])
+
+
+def test_only_ids_absent_from_both_stores_are_not_found(document_backend):
+    session, storage, _ = document_backend
+    access = MysqlAccessRecordEntry(session)
+    store = PersistentStorageRecordEntry(storage)
+    store._entry(1).delete()
+    access.delete_records([2], cascade_delete=False)
+
+    result = MysqlPersistentBackend(access, store).delete_records("1-3")
+
+    assert result == (1, 1, [3])
+    assert access.get_all_records() == []
+    assert store.get_all_records() == {}
