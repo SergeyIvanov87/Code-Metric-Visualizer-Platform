@@ -6,6 +6,8 @@ import re
 import sys
 from pathlib import Path
 
+from cli_argument_parser import ArgumentParsingError, RaisingArgumentParser
+
 from fs_api_wrappers import (
     create_api_query_interruptible,
     execute_get_docs_query,
@@ -61,7 +63,7 @@ def parse_parameters(parameters):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="List RAG documents")
+    parser = RaisingArgumentParser(prog="List RAG documents")
     parser.add_argument(
         "shared_api_dir", type=Path, help="Root path of the mounted API dir"
     )
@@ -70,7 +72,11 @@ if __name__ == "__main__":
         "-session_id", "--session_id", type=str, help="Session identifier"
     )
     parser.add_argument("parameters", nargs="*")
-    args = parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except ArgumentParsingError as error:
+        print(json.dumps({"error_code": -1, "error_msg": f"Invalid arguments: {error}"}))
+        sys.exit(-1)
 
     error_code = 0
     try:

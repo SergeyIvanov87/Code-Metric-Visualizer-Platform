@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from id_ranges import IdSelection, ids_expression, parse_id_ranges
+from cli_argument_parser import ArgumentParsingError, RaisingArgumentParser
 
 import chromadb
 
@@ -99,7 +100,7 @@ def main(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="Delete documents from RAG")
+    parser = RaisingArgumentParser(prog="Delete documents from RAG")
     parser.add_argument("-db_host", "--db_host", required=True)
     parser.add_argument("-db_port", "--db_port", required=True, type=int)
     parser.add_argument("shared_api_dir", type=Path)
@@ -107,7 +108,11 @@ if __name__ == "__main__":
     parser.add_argument("-session_id", "--session_id", required=True)
     parser.add_argument("-ids", "--ids", required=True, type=parse_ids)
     parser.add_argument("-metadata", "--metadata")
-    args = parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except ArgumentParsingError as error:
+        print(json.dumps({"error_code": -1, "error_msg": f"Invalid arguments: {error}"}))
+        sys.exit(-1)
 
     exit_code = 0
     try:

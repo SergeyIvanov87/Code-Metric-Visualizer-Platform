@@ -21,6 +21,8 @@ from llama_cpp.llama_chat_format import Jinja2ChatFormatter
 import requests
 from tqdm import tqdm
 
+from cli_argument_parser import ArgumentParsingError, RaisingArgumentParser
+
 
 from docs_retriever import DocumentStore
 from embedding_model import get_embedding_model
@@ -215,7 +217,7 @@ def search_knowledge_base_impl(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="Agentic RAG")
+    parser = RaisingArgumentParser(prog="Agentic RAG")
     parser.add_argument(
         "-system_prompt",
         "--system_prompt",
@@ -252,7 +254,11 @@ if __name__ == "__main__":
     )
     parser.add_argument("main_service_name", type=str, help="the main service name")
     parser.add_argument("assets_models", help="Path to the root directory with models")
-    args = parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except ArgumentParsingError as error:
+        print(json.dumps({"error_code": -1, "error_msg": f"Invalid arguments: {error}"}))
+        sys.exit(2)
 
     chroma_client = chromadb.HttpClient(host=args.db_host, port=args.db_port)
     collection = None

@@ -6,6 +6,8 @@ import re
 import sys
 from pathlib import Path
 
+from cli_argument_parser import ArgumentParsingError, RaisingArgumentParser
+
 from document_splitter import split_document
 from rag_chroma import insert_embeddings
 from rag_chunks import attach_chunks
@@ -129,7 +131,7 @@ def main(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="Add a document to RAG")
+    parser = RaisingArgumentParser(prog="Add a document to RAG")
     parser.add_argument(
         "-db_host",
         "--db_host",
@@ -156,7 +158,11 @@ if __name__ == "__main__":
 
     parser.add_argument("-preserveOriginal", "--preserveOriginal", type=int, default=1)
 
-    args = parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except ArgumentParsingError as error:
+        print(json.dumps({"error_code": -1, "error_msg": f"Invalid arguments: {error}"}))
+        sys.exit(-1)
     doc_type = args.doc_type
     error_code = 0
     return_data = {"error_code": error_code, "error_msg": "success", "doc_id": "", "chunk_ids": []}
