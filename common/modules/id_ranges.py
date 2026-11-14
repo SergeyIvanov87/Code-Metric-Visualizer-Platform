@@ -10,16 +10,16 @@ from collections.abc import Iterable
 
 
 IdSelection = str | Iterable[int]
-_TOKEN = re.compile(r"([0-9]+)(?:\s*-\s*([0-9]+))?")
+_TOKEN = re.compile(r"([0-9]+)(?:-([0-9]+))?")
 
 
 def parse_id_ranges(value: str) -> list[tuple[int, int]]:
     bounds = []
     for token in value.split(","):
-        match = _TOKEN.fullmatch(token.strip())
+        match = _TOKEN.fullmatch(token)
         if match is None:
             raise argparse.ArgumentTypeError(
-                "IDs must be comma-separated integers or terminated inclusive ranges (e.g. 1-5,7)"
+                "IDs must be comma-separated integers or terminated inclusive ranges (e.g. 1-5,7); only ASCII digits, commas and hyphens are allowed, without whitespace"
             )
         start = int(match[1])
         end = int(match[2]) if match[2] is not None else start

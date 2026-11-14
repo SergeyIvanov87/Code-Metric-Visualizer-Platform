@@ -142,7 +142,8 @@ docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.ya
 
 `delete_doc -ids`, `get_doc_info -doc_ids`, and `read_id id` receive compact
 comma-separated selections, including terminated inclusive ranges such as
-`1-5,7,16-22`. API adapters pass these strings through without expansion.
+`1-5,7,16-22`. ID expressions allow only ASCII digits, commas and hyphens; all whitespace
+is rejected. API adapters pass these strings through without expansion.
 Backends expand and deduplicate them in first occurrence order using
 `common/modules/id_ranges.py`. Open-ended and descending ranges are unsupported.
 The Python storage functions also continue to accept iterables of integer IDs.

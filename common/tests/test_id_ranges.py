@@ -9,7 +9,7 @@ from id_ranges import expand_ids, parse_id_ranges
 
 
 def test_ranges_are_inclusive_ordered_and_deduplicated():
-    assert expand_ids("7, 1 - 3,2-5,7,9-9") == [7, 1, 2, 3, 4, 5, 9]
+    assert expand_ids("7,1-3,2-5,7,9-9") == [7, 1, 2, 3, 4, 5, 9]
     assert expand_ids(iter([7, 1, 7])) == [7, 1]
 
 
@@ -21,3 +21,10 @@ def test_parsing_retains_large_bounds():
 def test_invalid_selections_are_rejected(selection):
     with pytest.raises(argparse.ArgumentTypeError):
         expand_ids(selection)
+
+
+@pytest.mark.parametrize("whitespace", [" ", "\t", "\n", "\r", "\v", "\f", "\u00a0"])
+def test_whitespace_is_rejected_without_normalization(whitespace):
+    for selection in [f"{whitespace}1", f"1{whitespace}", f"1{whitespace}-2", f"1-{whitespace}2", f"1,{whitespace}2"]:
+        with pytest.raises(argparse.ArgumentTypeError, match="without whitespace"):
+            expand_ids(selection)

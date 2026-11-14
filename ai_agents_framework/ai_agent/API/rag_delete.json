@@ -8,7 +8,7 @@
     },
     "Description": {
         "header": "Delete a document from RAG",
-        "body": "Delete documents using -ids as comma-separated IDs and terminated inclusive ranges, for example 1-5,7,16-22. Open-ended ranges are unsupported. Ranges pass through to the dispatcher backend for expansion. Matching Chroma vectors are deleted after successful dispatcher deletion. Returns error_code (0 for success), dispatcher details and a not_found array of absent requested IDs; missing IDs do not fail the request.",
+        "body": "Delete documents using -ids as comma-separated IDs and terminated inclusive ranges, for example 1-5,7,16-22. Open-ended ranges are unsupported. ID expressions may contain only ASCII digits, commas and hyphens; spaces, tabs and other whitespace are rejected. Ranges pass through to the dispatcher backend for expansion. Matching Chroma vectors are deleted after successful dispatcher deletion. Returns error_code (0 for success), dispatcher details and a not_found array of absent requested IDs; missing IDs do not fail the request.",
         "footer": ""
     }
 }

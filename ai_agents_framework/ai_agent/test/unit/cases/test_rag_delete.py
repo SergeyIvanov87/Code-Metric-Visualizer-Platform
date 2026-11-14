@@ -35,7 +35,7 @@ class FakeClient:
 
 
 def test_parse_ids_keeps_selection_compact():
-    assert parse_ids("3-1000000000, 4,3") == "3-1000000000, 4,3"
+    assert parse_ids("3-1000000000,4,3") == "3-1000000000,4,3"
 
 
 def test_parse_ids_rejects_invalid_ids():
@@ -80,12 +80,12 @@ def test_range_deletion_passes_ranges_to_dispatcher_and_reports_missing(monkeypa
     monkeypatch.setattr("rag_delete.generate_inner_session_id", lambda *args: "inner")
     monkeypatch.setattr("rag_delete.create_api_query_interruptible", lambda *args: object())
     def delete_query(*args, **kwargs):
-        assert kwargs["doc_id"] == "7-10, 8,20-21"
+        assert kwargs["doc_id"] == "7-10,8,20-21"
         return {"error_code": 0, "not_found": [9, 10, 20, 21]}
     monkeypatch.setattr("rag_delete.execute_delete_doc_query", delete_query)
     monkeypatch.setattr("rag_delete.chromadb.HttpClient", lambda **kwargs: FakeClient(collection))
 
-    result = main(tmp_path, "service", "outer", "db", 8000, "7-10, 8,20-21", None)
+    result = main(tmp_path, "service", "outer", "db", 8000, "7-10,8,20-21", None)
 
     assert collection.where == {"$or": [
         {"$and": [{"doc_id": {"$gte": 7}}, {"doc_id": {"$lte": 10}}]},

@@ -109,7 +109,7 @@ def test_frontends_pass_large_ranges_without_expansion(monkeypatch, capsys, comm
     spec = importlib.util.spec_from_file_location(f"dispatcher_{command}", SOURCES / f"{command}.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    selection = "2-1000000000, 7"
+    selection = "2-1000000000,7"
     monkeypatch.setattr(sys, "argv", [command, option, selection])
     def operation(value):
         assert value == selection
@@ -125,7 +125,8 @@ def test_frontends_pass_large_ranges_without_expansion(monkeypatch, capsys, comm
 @pytest.mark.parametrize("command,option", [
     ("delete_doc", "-ids"), ("get_doc_info", "-doc_ids"), ("read_id", "id"),
 ])
-def test_generated_executor_preserves_ranges_with_spaces(tmp_path, command, option):
+@pytest.mark.parametrize("selection", ["1-5,7", " 1", "1 ", "1, 2", "1\t"])
+def test_generated_executor_preserves_input_for_backend_validation(tmp_path, command, option, selection):
     import io
     spec = importlib.util.spec_from_file_location("dispatcher_generator", SOURCES / "api_generator.py")
     generator = importlib.util.module_from_spec(spec)
@@ -139,11 +140,11 @@ def test_generated_executor_preserves_ranges_with_spaces(tmp_path, command, opti
     processor.write_text("#!/usr/bin/env python\nimport json, sys\nprint(json.dumps(sys.argv[1:]))\n")
     processor.chmod(0o755)
     result = subprocess.run(
-        ["bash", "-c", script.getvalue(), "executor", str(api_node), f'{option}="1 - 5, 7"'],
+        ["bash", "-c", script.getvalue(), "executor", str(api_node), f'{option}="{selection}"'],
         env=os.environ | {"WORK_DIR": str(tmp_path)},
         capture_output=True, text=True, check=True,
     )
-    assert json.loads(result.stdout) == [option, "1 - 5, 7"]
+    assert json.loads(result.stdout) == [option, selection]
 
 
 @pytest.mark.parametrize("failure_kind", ["document", "chunk", "database"])
@@ -195,3 +196,18 @@ def test_only_ids_absent_from_both_stores_are_not_found(document_backend):
     assert result == (1, 1, [3])
     assert access.get_all_records() == []
     assert store.get_all_records() == {}
+
+
+@pytest.mark.parametrize("command,option", [
+    ("delete_doc", "-ids"), ("get_doc_info", "-doc_ids"), ("read_id", "id"),
+])
+@pytest.mark.parametrize("selection", [" 1", "1 ", "1, 2", "1-\t2"])
+def test_dispatcher_rejects_whitespace_without_processing_ids(document_backend, command, option, selection):
+    session, storage, env = document_backend
+    result = subprocess.run(
+        [sys.executable, str(SOURCES / f"{command}.py"), option, selection],
+        env=env, capture_output=True, text=True,
+    )
+    assert result.returncode != 0
+    assert len(MysqlAccessRecordEntry(session).get_all_records()) == 2
+    assert len(PersistentStorageRecordEntry(storage).get_all_records()) == 2

@@ -184,12 +184,16 @@ def test_rag_add_file_uses_precreated_query_and_preserves_unicode(tmp_path):
     assert "\\u" not in query.exec_args
 
 
-def test_delete_doc_passes_ranges_with_whitespace_without_expansion():
-    import shlex
+def test_delete_doc_passes_compact_ranges_without_expansion():
     query = JsonQuery(json.dumps({"error_code": 0, "not_found": [4, 5]}))
-    result = execute_delete_doc_query(query, "session", 10, "1 - 5, 7", "metadata")
-    assert query.exec_args == 'SESSION_ID=session -ids="1 - 5, 7" -metadata=metadata'
-    assert shlex.split(query.exec_args) == [
-        "SESSION_ID=session", "-ids=1 - 5, 7", "-metadata=metadata",
-    ]
+    result = execute_delete_doc_query(query, "session", 10, "1-5,7", "metadata")
+    assert query.exec_args == "SESSION_ID=session -ids=1-5,7 -metadata=metadata"
     assert result["not_found"] == [4, 5]
+
+
+@pytest.mark.parametrize("selection", [" 1", "1 ", "1, 2", "1-\t2", "1\n"])
+def test_delete_doc_rejects_whitespace_before_sending_request(selection):
+    query = FakeQuery()
+    with pytest.raises(Exception, match="without whitespace"):
+        execute_delete_doc_query(query, "session", 10, selection, "metadata")
+    assert query.exec_args is None
