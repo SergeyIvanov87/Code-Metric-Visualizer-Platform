@@ -7,7 +7,7 @@
     },
     "Description": {
         "header": "Read a document or document chunk by ID",
-        "body": "The required id parameter identifies either a full document or one of its chunks. For a full document, the response is its complete UTF-8 text and offset and size are ignored. For a chunk, the parent document is read and the response is the text extracted using the chunk's byte offset and size. The response is plain text without JSON wrapping. If the ID is not found, the response is <Not found ID>.",
+        "body": "The required id parameter identifies either a full document or one of its chunks. For a full document, the response is its complete UTF-8 text and offset and size are ignored. For a chunk, the parent document is read and the response is the text extracted using the chunk's byte offset and size. The response is plain text without JSON wrapping. If the ID is not found, the response is <Not found ID>. The id parameter also accepts comma-separated IDs and terminated inclusive ranges such as 1-5,7,16-22. The selection passes unchanged to the backend for expansion. Open-ended ranges are unsupported. ID expressions may contain only ASCII digits, commas and hyphens; spaces, tabs and other whitespace are rejected. For lists or ranges the response text contains JSON with records keyed by ID, not_found for absent IDs, unprocessed for IDs that could not be read, and an aggregate error_code. Missing IDs do not fail the request; valid content is still returned. Scalar ID requests retain their plain text response.",
         "footer": ""
     }
 }

@@ -8,7 +8,7 @@
     },
     "Description": {
         "header": "Delete documents or document chunks",
-        "body": "The required -ids parameter is a comma-separated list of document or chunk IDs. Deleting a document also deletes all chunks belonging to it. Duplicate and overlapping IDs are processed once. Valid IDs are deleted even if another requested ID is missing. Returns aggregate deleted from DB and deleted from storage counters. error_code is 0 when every requested ID exists and 1 when one or more IDs are missing or deletion fails.",
+        "body": "The required -ids parameter accepts comma-separated document or chunk IDs and terminated inclusive ranges, for example 1-5,7,16-22. Open-ended ranges are unsupported. ID expressions may contain only ASCII digits, commas and hyphens; spaces, tabs and other whitespace are rejected. Selections pass unchanged to the configured backend, which expands and deduplicates them in request order. Deleting a document also deletes its chunks. Valid IDs are deleted even if other requested IDs are absent. Returns aggregate deleted from DB and deleted from storage counters and a not_found array. Missing IDs do not fail the request: error_code is 0 unless deletion fails.",
         "footer": ""
     }
 }

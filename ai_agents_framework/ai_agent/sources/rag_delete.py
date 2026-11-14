@@ -6,6 +6,8 @@ import re
 import sys
 from pathlib import Path
 
+from id_ranges import IdSelection, ids_expression, parse_id_ranges
+
 import chromadb
 
 from fs_api_wrappers import (
@@ -16,18 +18,23 @@ from fs_api_wrappers import (
 )
 
 
-def parse_ids(value: str) -> list[int]:
-    """Parse a comma-separated document ID list without changing its order."""
-    values = value.split(",")
-    if not value or any(not item.strip() for item in values):
-        raise argparse.ArgumentTypeError("IDs must be comma-separated integers")
-    try:
-        ids = [int(item.strip()) for item in values]
-    except ValueError as error:
-        raise argparse.ArgumentTypeError(
-            "IDs must be comma-separated integers"
-        ) from error
-    return list(dict.fromkeys(ids))
+def parse_ids(value: str) -> str:
+    """Validate a compact selection without expanding its ranges."""
+    parse_id_ranges(value)
+    return value
+
+
+def _document_filter(selection: str) -> dict:
+    predicates = []
+    for start, end in parse_id_ranges(selection):
+        if start == end:
+            predicates.append({"doc_id": {"$eq": start}})
+        else:
+            predicates.append({"$and": [
+                {"doc_id": {"$gte": start}},
+                {"doc_id": {"$lte": end}},
+            ]})
+    return predicates[0] if len(predicates) == 1 else {"$or": predicates}
 
 
 def main(
@@ -36,10 +43,12 @@ def main(
     sess_id: str,
     db_host: str,
     db_port: int,
-    doc_ids: list[int],
+    doc_ids: IdSelection,
     doc_metadata: str | None,
 ) -> dict:
     """Delete documents from the dispatcher and their vectors from Chroma."""
+    if not isinstance(doc_ids, str):
+        doc_ids = list(dict.fromkeys(doc_ids))
     normalized_api_queries = get_normalized_api_queries(
         shared_api_dir,
         main_service_name,
@@ -62,14 +71,18 @@ def main(
     except chromadb.errors.NotFoundError:
         pass
     if collection is not None:
-        records = collection.get(where={"doc_id": {"$in": doc_ids}})
+        where = (
+            _document_filter(doc_ids) if isinstance(doc_ids, str)
+            else {"doc_id": {"$in": list(doc_ids)}}
+        )
+        records = collection.get(where=where)
         chunk_ids = list(dict.fromkeys(records.get("ids", [])))
 
     dispatcher_result = execute_delete_doc_query(
         delete_query,
         session_id,
         timeout_elapsed=10,
-        doc_id=",".join(str(doc_id) for doc_id in doc_ids),
+        doc_id=ids_expression(doc_ids),
         doc_metadata=doc_metadata,
     )
     if collection is not None and chunk_ids:
@@ -81,6 +94,7 @@ def main(
         "document_ids": doc_ids,
         "deleted_chunk_ids": chunk_ids,
         "dispatcher": dispatcher_result,
+        "not_found": dispatcher_result.get("not_found", []),
     }
 
 

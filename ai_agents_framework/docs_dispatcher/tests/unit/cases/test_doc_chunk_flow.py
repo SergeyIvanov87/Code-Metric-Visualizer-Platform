@@ -277,6 +277,7 @@ def test_delete_doc_removes_multiple_documents_and_chunks(
     assert result == {
         "deleted from DB": 4,
         "deleted from storage": 4,
+        "not_found": [],
         "error_code": 0,
     }
     assert MysqlAccessRecordEntry(db_session).get_all_records() == []
@@ -307,13 +308,14 @@ def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
         lambda config: nullcontext(MysqlAccessRecordEntry(db_session)),
     )
 
-    assert delete_doc_main() == 1
+    assert delete_doc_main() == 0
     result = json.loads(capsys.readouterr().out)
 
     assert result["deleted from DB"] == 1
     assert result["deleted from storage"] == 1
-    assert result["error_code"] == 1
-    assert result["error_msg"] == "Docs id=999 does not exist"
+    assert result["error_code"] == 0
+    assert result["not_found"] == [999]
+    assert "error_msg" not in result
     assert MysqlAccessRecordEntry(db_session).get_all_records() == []
     assert PersistentStorageRecordEntry(storage_root).get_all_records() == {}
 

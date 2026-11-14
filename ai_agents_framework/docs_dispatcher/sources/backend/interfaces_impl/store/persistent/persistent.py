@@ -1,3 +1,5 @@
+from id_ranges import IdSelection, expand_ids
+
 from contextlib import contextmanager
 from pathlib import Path
 import shutil
@@ -94,8 +96,8 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
                              parent_id=parent_id, metadata={"comment": metadata_text} if metadata_text else {},
                              doc_type=doc_type)
 
-    def delete_records(self, record_ids: Iterable[int], cascade_delete: bool = True) -> tuple[int, list[int]]:
-        requested_ids = list(dict.fromkeys(record_ids))
+    def delete_records(self, record_ids: IdSelection, cascade_delete: bool = True) -> tuple[int, list[int]]:
+        requested_ids = expand_ids(record_ids)
         requested_id_set = set(requested_ids)
         records_by_id = {
             int(record.id): record
@@ -155,8 +157,8 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
         return deleted_count, non_deleted_ids
 
 
-    def get_records(self, record_ids: Iterable[int]) -> list[RecordSchema]:
-        entries = [self._entry(unique_id) for unique_id in record_ids ]
+    def get_records(self, record_ids: IdSelection) -> list[RecordSchema]:
+        entries = [self._entry(unique_id) for unique_id in expand_ids(record_ids) ]
         return [RecordSchema(**entry.read_fields()) for entry in entries  if entry.exists()]
 
     def get_all_records(self) -> dict[int, RecordSchema]:
@@ -250,5 +252,5 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
             raise ValueError("Persistent storage requires storage_uri")
         yield cls(Path(value))
 
-def _unique_ids(record_ids: Iterable[int]) -> list[int]:
+def _unique_ids(record_ids: IdSelection) -> list[int]:
     return list(dict.fromkeys(record_ids))

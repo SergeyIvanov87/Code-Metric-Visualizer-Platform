@@ -2,6 +2,8 @@ import json
 import re
 import socket
 
+from id_ranges import parse_id_ranges
+
 from distutils.version import StrictVersion
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
@@ -284,6 +286,7 @@ def execute_delete_doc_query(
     doc_id,
     doc_metadata,
 ):
+    parse_id_ranges(str(doc_id))
     exec_args = " ".join(
         [
             f"SESSION_ID={session_id}",

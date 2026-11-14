@@ -1,5 +1,7 @@
 """Contract for configured backend compositions."""
 
+from id_ranges import IdSelection
+
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from pathlib import Path
@@ -39,15 +41,15 @@ class Backend(ABC):
         """List documents with chunk IDs and pagination metadata."""
 
     @abstractmethod
-    def get_document_info(self, doc_ids: list[int]) -> dict:
+    def get_document_info(self, doc_ids: IdSelection) -> dict:
         """Report complete, inconsistent, and absent documents."""
 
     @abstractmethod
-    def delete_records(self, record_ids: Iterable[int]) -> tuple[int, int, list[int]]:
+    def delete_records(self, record_ids: IdSelection) -> tuple[int, int, list[int]]:
         """Delete documents and their chunks from both interfaces."""
 
     @abstractmethod
-    def read_ids(self, record_ids: Iterable[int]) -> dict[int, dict[str, object]]:
+    def read_ids(self, record_ids: IdSelection) -> dict[int, dict[str, object]]:
         """Resolve record consistency and retrieve document or chunk content."""
 
     @abstractmethod

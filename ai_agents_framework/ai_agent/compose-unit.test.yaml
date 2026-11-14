@@ -1,0 +1,10 @@
+include:
+  - ../../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
+services:
+  ai-agent-unit-tester:
+    build:
+      context: ../../
+      dockerfile: ai_agents_framework/ai_agent/test/unit/Dockerfile
+      secrets:
+        - proxy_ca

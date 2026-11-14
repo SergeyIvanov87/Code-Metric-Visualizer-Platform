@@ -21,14 +21,35 @@ def main() -> int:
     if "id" not in parameters:
         parser.error("id parameter is required")
 
-    record_id = int(parameters["id"])
+    selection = parameters["id"]
+    batch = "," in selection or "-" in selection
     try:
         with BackendDispatcher().get_backend() as backend:
-            result = backend.read_ids([record_id])[record_id]
-    except Exception:
-        result = {"error_code": -1}
-    sys.stdout.write(result.get("context", "<Not found ID>"))
-    return 0 if result["error_code"] == 0 else -1
+            records = backend.read_ids(selection)
+        not_found = [
+            record_id for record_id, record in records.items()
+            if record.get("error_msg") == f"Record id={record_id} does not exist"
+        ]
+        missing_ids = set(not_found)
+        unprocessed = [
+            record_id for record_id, record in records.items()
+            if record["error_code"] != 0 and record_id not in missing_ids
+        ]
+        result = {
+            "error_code": -1 if unprocessed else 0,
+            "not_found": not_found,
+            "unprocessed": unprocessed,
+            "records": records,
+        }
+    except Exception as error:
+        result = {"error_code": -1, "error_msg": str(error)}
+    if batch:
+        print(json.dumps(result))
+    else:
+        record = result.get("records", {}).get(int(selection), {})
+        sys.stdout.write(record.get("context", "<Not found ID>"))
+    return result["error_code"]
+
 
 
 if __name__ == "__main__":

@@ -5,9 +5,11 @@ import sys
 import pytest
 
 
-SOURCES_DIR = Path(__file__).resolve().parents[1] / "sources"
+SOURCES_DIR = Path("/package")
+if not SOURCES_DIR.is_dir():
+    SOURCES_DIR = Path(__file__).resolve().parents[3] / "sources"
 sys.path.insert(0, str(SOURCES_DIR))
-sys.path.insert(0, str(Path(__file__).parents[3] / "common/modules"))
+
 
 from fs_api_wrappers import (
     execute_delete_doc_query,
@@ -180,3 +182,18 @@ def test_rag_add_file_uses_precreated_query_and_preserves_unicode(tmp_path):
     ) in query.exec_args
     assert "équipe=δοκιμή,données,résumé-数据.py" in query.exec_args
     assert "\\u" not in query.exec_args
+
+
+def test_delete_doc_passes_compact_ranges_without_expansion():
+    query = JsonQuery(json.dumps({"error_code": 0, "not_found": [4, 5]}))
+    result = execute_delete_doc_query(query, "session", 10, "1-5,7", "metadata")
+    assert query.exec_args == "SESSION_ID=session -ids=1-5,7 -metadata=metadata"
+    assert result["not_found"] == [4, 5]
+
+
+@pytest.mark.parametrize("selection", [" 1", "1 ", "1, 2", "1-\t2", "1\n"])
+def test_delete_doc_rejects_whitespace_before_sending_request(selection):
+    query = FakeQuery()
+    with pytest.raises(Exception, match="without whitespace"):
+        execute_delete_doc_query(query, "session", 10, selection, "metadata")
+    assert query.exec_args is None

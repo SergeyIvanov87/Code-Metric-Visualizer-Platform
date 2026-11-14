@@ -137,3 +137,22 @@ For public filesystem API behavior, run the existing functional tester:
 ```sh
 docker compose -f ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml up --build --abort-on-container-exit --exit-code-from docs-dispatcher-functional-tester
 ```
+
+## ID selections
+
+`delete_doc -ids`, `get_doc_info -doc_ids`, and `read_id id` receive compact
+comma-separated selections, including terminated inclusive ranges such as
+`1-5,7,16-22`. ID expressions allow only ASCII digits, commas and hyphens; all whitespace
+is rejected. API adapters pass these strings through without expansion.
+Backends expand and deduplicate them in first occurrence order using
+`common/modules/id_ranges.py`. Open-ended and descending ranges are unsupported.
+The Python storage functions also continue to accept iterables of integer IDs.
+
+Only IDs absent from both stores are returned in `not_found`, without failing
+the batch. Existing records that remain after a deletion attempt cause an error;
+SQL deletion stops when file removal fails, so callers retain Chroma vectors.
+The deletion return signature remains unchanged. Read
+batches also report storage/consistency failures in `unprocessed`, while keeping
+per-record results. Scalar `read_id` requests retain the public plain text
+response; list/range requests return JSON encoded in that response text.
+`get_docs` keeps its existing `offset`/`limit` pagination contract.
