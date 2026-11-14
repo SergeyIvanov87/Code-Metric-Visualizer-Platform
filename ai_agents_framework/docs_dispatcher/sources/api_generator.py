@@ -52,6 +52,9 @@ def make_delete_doc(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        # ID expressions forbid whitespace. Pass arguments unchanged so the
+        # backend can reject it; xargs would strip leading/trailing whitespace
+        # and could turn an invalid expression such as " 1" into valid "1".
         r'"${WORK_DIR}/delete_doc.py" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
@@ -155,6 +158,9 @@ def make_get_doc_info(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        # ID expressions forbid whitespace. Pass arguments unchanged so the
+        # backend can reject it; xargs would strip leading/trailing whitespace
+        # and could turn an invalid expression such as " 1" into valid "1".
         r'"${WORK_DIR}/get_doc_info.py" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
@@ -179,6 +185,9 @@ def make_read_id(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
+        # ID expressions forbid whitespace. Pass arguments unchanged so the
+        # backend can reject it; xargs would strip leading/trailing whitespace
+        # and could turn an invalid expression such as " 1" into valid "1".
         r'"${WORK_DIR}/read_id.py" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
