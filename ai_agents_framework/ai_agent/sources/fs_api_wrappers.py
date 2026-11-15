@@ -6,6 +6,7 @@ from id_ranges import parse_id_ranges
 
 from distutils.version import StrictVersion
 from pathlib import Path, PurePosixPath
+from urllib.parse import quote
 from uuid import uuid4
 
 from api_schema_utils import (
@@ -14,6 +15,9 @@ from api_schema_utils import (
 )
 from api_fs_query import APIQueryInterruptible
 from doc_type_association import document_type
+
+
+LOGICAL_FILE_URI_METADATA_KEY = "logical_file_uri"
 
 
 def get_doc_dispatcher_queries(
@@ -128,9 +132,33 @@ def start_uploader(query, request, config, session_id, timeout=10):
 
 
 def augmented_metadata(original, relative):
-    """Append each POSIX path component to the caller-provided metadata."""
-    tokens = ",".join(PurePosixPath(relative).parts)
-    return ",".join(value for value in (original.strip(), tokens) if value)
+    """Append path metadata and its reserved logical URI key-value pair."""
+    relative_path = PurePosixPath(relative).as_posix()
+    tokens = ",".join(PurePosixPath(relative_path).parts)
+    logical_file_uri = (
+        f"{LOGICAL_FILE_URI_METADATA_KEY}="
+        f"{quote(relative_path, safe='/')}"
+    )
+    return ",".join(
+        value for value in ((original or "").strip(), tokens, logical_file_uri)
+        if value
+    )
+
+
+def _metadata_for_chunk(metadata, chunk_num):
+    if metadata is None:
+        return str(chunk_num)
+
+    marker = f",{LOGICAL_FILE_URI_METADATA_KEY}="
+    marker_position = metadata.rfind(marker)
+    if marker_position >= 0:
+        return (
+            f"{metadata[:marker_position]}_{chunk_num}"
+            f"{metadata[marker_position:]}"
+        )
+    if metadata.startswith(f"{LOGICAL_FILE_URI_METADATA_KEY}="):
+        return f"{chunk_num},{metadata}"
+    return f"{metadata}_{chunk_num}"
 
 
 def rag_add_file(query, session_id, config, stage, relative, sequence, timeout=300):
@@ -292,9 +320,7 @@ def execute_attach_doc_chunks_query(
             f"SESSION_ID={session_id}",
             f"-doc_id={doc_unique_id}",
         ]
-        single_chunk_metadata = str(chunk_num)
-        if chunks_metadata is not None:
-            single_chunk_metadata = f"{chunks_metadata}_{single_chunk_metadata}"
+        single_chunk_metadata = _metadata_for_chunk(chunks_metadata, chunk_num)
 
         exec_args_array.append(f"-metadata={single_chunk_metadata}")
         exec_args_array.append(f"doc_data={ch}")

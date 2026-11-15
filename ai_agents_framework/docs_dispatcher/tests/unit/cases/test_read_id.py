@@ -51,7 +51,8 @@ def _storage_record(
 ) -> None:
     record_dir = storage_uri / str(record_id)
     record_dir.mkdir()
-    (record_dir / "document.txt.storage_bin").write_bytes(payload)
+    (record_dir / "payload.storage_bin").write_bytes(payload)
+    (record_dir / "file_uri").write_text("/docs/document.txt")
     (record_dir / "parentId").write_text(str(parent_id))
     (record_dir / "offset").write_text(str(offset))
     (record_dir / "size").write_text(str(size))
@@ -91,7 +92,7 @@ def test_read_ids_reads_document_once_for_document_and_multiple_chunks(tmp_path,
         len(second_chunk),
     )
 
-    payload_path = tmp_path / str(document.id) / "document.txt.storage_bin"
+    payload_path = tmp_path / str(document.id) / "payload.storage_bin"
     original_read_bytes = Path.read_bytes
     payload_reads = 0
 

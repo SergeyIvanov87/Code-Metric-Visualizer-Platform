@@ -25,6 +25,8 @@ DISCOVERY_PATH = "/.well-known/http-api-routes/v1"
 HELP_PATH = "/help"
 
 BULK_UPLOAD_TEMPORARY_PREFIX = ".http-ambassador-incoming-"
+SHARED_STAGING_DIRECTORY_MODE = 0o2777
+SHARED_STAGING_FILE_MODE = 0o664
 TRANSPORT_PARAMETERS = {
     "SESSION_ID",
     "WaitInitialQueryTimeoutSec",
@@ -135,6 +137,49 @@ def display_default(params):
 
 def result_failed(result):
     return result.get("error_code") not in (None, 0, "0", False)
+
+
+def safe_upload_relative_path(value):
+    if not isinstance(value, str) or not value or "\\" in value or "\0" in value:
+        raise ValueError("Upload path must be a nonempty POSIX relative path")
+    relative = PurePosixPath(value)
+    if relative.is_absolute() or any(part in ("", ".", "..") for part in relative.parts):
+        raise ValueError("Upload path must remain below the bulk input directory")
+    return relative
+
+
+def bulk_request_paths(api_mount, schema, upload_id):
+    if not re.fullmatch(r"deferred-[A-Za-z0-9_-]+", upload_id or ""):
+        raise FileNotFoundError("Bulk upload session was not found")
+    root = Path(api_mount) / schema["Query"] / schema["Method"]
+    request_directory = root / upload_id
+    report_path = request_directory / "stage.json"
+    if not request_directory.is_dir() or not report_path.is_file():
+        raise FileNotFoundError("Bulk upload session is no longer available")
+    report = json.loads(report_path.read_text())
+    return {
+        "request": request_directory,
+        "input": request_directory / "input",
+        "events": request_directory / "events",
+        "result": request_directory / "async_result",
+        "seal": Path(report["uploader_request"]) / "seal",
+    }
+
+
+def prepare_bulk_upload_destination(api_mount, schema, upload_id, path):
+    relative = safe_upload_relative_path(path)
+    paths_for_request = bulk_request_paths(api_mount, schema, upload_id)
+    stage = paths_for_request["input"].resolve(strict=True)
+    destination = stage.joinpath(*relative.parts)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    resolved_parent = destination.parent.resolve(strict=True)
+    if not resolved_parent.is_relative_to(stage):
+        raise ValueError("Upload path escaped the bulk input directory")
+    shared_parent = stage
+    for component in resolved_parent.relative_to(stage).parts:
+        shared_parent /= component
+        shared_parent.chmod(SHARED_STAGING_DIRECTORY_MODE)
+    return relative, stage, destination
 
 
 def create_app(config_path=None, query_factory=None):
@@ -278,7 +323,7 @@ def create_app(config_path=None, query_factory=None):
         try:
             with source.open("wb") as stream:
                 shutil.copyfileobj(request.stream, stream)
-            source.chmod(0o644)
+            source.chmod(SHARED_STAGING_FILE_MODE)
             arguments = {"-URI": str(source)}
             for name in ("-metadata", "-doc_type", "-timeout"):
                 if name in request.args:
@@ -293,23 +338,6 @@ def create_app(config_path=None, query_factory=None):
             if not retain_source:
                 shutil.rmtree(directory)
 
-    def bulk_request_paths(schema, upload_id):
-        if not re.fullmatch(r"deferred-[A-Za-z0-9_-]+", upload_id or ""):
-            raise FileNotFoundError("Bulk upload session was not found")
-        root = api_mount / schema["Query"] / schema["Method"]
-        request_directory = root / upload_id
-        report_path = request_directory / "stage.json"
-        if not request_directory.is_dir() or not report_path.is_file():
-            raise FileNotFoundError("Bulk upload session is no longer available")
-        report = json.loads(report_path.read_text())
-        return {
-            "request": request_directory,
-            "input": request_directory / "input",
-            "events": request_directory / "events",
-            "result": request_directory / "async_result",
-            "seal": Path(report["uploader_request"]) / "seal",
-        }
-
     def bulk_start(schema):
         arguments = request.get_json(silent=True)
         if not isinstance(arguments, dict):
@@ -323,26 +351,16 @@ def create_app(config_path=None, query_factory=None):
         upload_id = Path(result["input"]).parent.name
         return jsonify(upload_id=upload_id, protocol=result["protocol"])
 
-    def safe_upload_relative_path(value):
-        if not isinstance(value, str) or not value or "\\" in value or "\0" in value:
-            raise ValueError("Upload path must be a nonempty POSIX relative path")
-        relative = PurePosixPath(value)
-        if relative.is_absolute() or any(part in ("", ".", "..") for part in relative.parts):
-            raise ValueError("Upload path must remain below the bulk input directory")
-        return relative
-
     def bulk_upload_file(schema):
         if request.mimetype != "application/octet-stream":
             return jsonify(error="Bulk file uploads require application/octet-stream"), 415
         upload_id = request.args.get("upload_id", "")
-        relative = safe_upload_relative_path(request.args.get("path", ""))
-        paths_for_request = bulk_request_paths(schema, upload_id)
-        stage = paths_for_request["input"].resolve(strict=True)
-        destination = stage.joinpath(*relative.parts)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        resolved_parent = destination.parent.resolve(strict=True)
-        if not resolved_parent.is_relative_to(stage):
-            raise ValueError("Upload path escaped the bulk input directory")
+        relative, stage, destination = prepare_bulk_upload_destination(
+            api_mount,
+            schema,
+            upload_id,
+            request.args.get("path", ""),
+        )
 
         incoming = stage.parent / f"{BULK_UPLOAD_TEMPORARY_PREFIX}{upload_id}"
         try:
@@ -365,6 +383,7 @@ def create_app(config_path=None, query_factory=None):
                     output.write(chunk)
                     written += len(chunk)
                 output.flush()
+                os.fchmod(output.fileno(), SHARED_STAGING_FILE_MODE)
                 os.fsync(output.fileno())
             try:
                 os.link(temporary, destination)
@@ -380,7 +399,7 @@ def create_app(config_path=None, query_factory=None):
 
     def bulk_finish(schema):
         upload_id = request.args.get("upload_id", "")
-        paths_for_request = bulk_request_paths(schema, upload_id)
+        paths_for_request = bulk_request_paths(api_mount, schema, upload_id)
         stage = paths_for_request["input"].resolve(strict=True)
         incoming = stage.parent / f"{BULK_UPLOAD_TEMPORARY_PREFIX}{upload_id}"
         with ThreadPoolExecutor(max_workers=1) as pool:

@@ -51,7 +51,8 @@ def _storage_record(
 ) -> None:
     record_dir = storage_uri / str(record_id)
     record_dir.mkdir()
-    (record_dir / f"{file_uri}.storage_bin").touch()
+    (record_dir / "payload.storage_bin").touch()
+    (record_dir / "file_uri").write_text(file_uri)
     (record_dir / "parentId").write_text(str(parent_id))
     (record_dir / "offset").write_text("0")
     (record_dir / "size").write_text("0")
@@ -63,15 +64,15 @@ def test_get_document_info_reports_complete_partial_and_absent_documents(tmp_pat
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
 
-    complete = _db_document(session, 1, "%slash%docs%slash%complete.txt", "markdown")
+    complete = _db_document(session, 1, "/docs/complete.txt", "markdown")
     complete_chunk = _db_chunk(session, complete.id, complete.file_uri)
-    db_only = _db_document(session, 3, "%slash%docs%slash%db-only.txt")
+    db_only = _db_document(session, 3, "/docs/db-only.txt")
     db_only_chunk = _db_chunk(session, db_only.id, db_only.file_uri)
 
-    _storage_record(tmp_path, complete.id, complete.id, "%slash%docs%slash%complete.txt", "markdown")
-    _storage_record(tmp_path, complete_chunk.id, complete.id, "%slash%docs%slash%complete.txt")
-    _storage_record(tmp_path, 5, 5, "%slash%docs%slash%storage-only.txt", "pdf")
-    _storage_record(tmp_path, 6, 5, "%slash%docs%slash%storage-only.txt")
+    _storage_record(tmp_path, complete.id, complete.id, "/docs/complete.txt", "markdown")
+    _storage_record(tmp_path, complete_chunk.id, complete.id, "/docs/complete.txt")
+    _storage_record(tmp_path, 5, 5, "/docs/storage-only.txt", "pdf")
+    _storage_record(tmp_path, 6, 5, "/docs/storage-only.txt")
 
     backend = MysqlPersistentBackend(
         access=MysqlAccessRecordEntry(session),

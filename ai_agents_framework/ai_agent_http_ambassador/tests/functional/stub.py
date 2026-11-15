@@ -15,9 +15,29 @@ if Path(sys.argv[0]).name == "rag_add.py":
               "arguments": arguments, "data": Path(uri).read_text(), "URI": uri}
 elif arguments[0] == "rag_bulk_add":
     Path("/api/bulk-arguments.json").write_text(json.dumps(arguments[1:]))
+    request = Path(
+        "/api/api.pmccabe_collector.restapi.org/ai_agent/rag/bulk_add/v1/"
+        "POST/deferred-test"
+    )
+    staging_root = Path("/api/.staging")
+    stage = staging_root / "events-functional"
+    uploader_request = Path("/api/uploader-functional")
+    request.mkdir(parents=True, exist_ok=True)
+    staging_root.mkdir(mode=0o2777, parents=True, exist_ok=True)
+    staging_root.chmod(0o2777)
+    stage.mkdir(mode=0o2777, exist_ok=True)
+    stage.chmod(0o2777)
+    uploader_request.mkdir(parents=True, exist_ok=True)
+    input_path = request / "input"
+    if not input_path.exists():
+        input_path.symlink_to(stage)
+    (request / "stage.json").write_text(json.dumps({
+        "uploader_request": str(uploader_request),
+    }))
     result = {
-        "error_code": 0, "input": "/api/deferred-test/input",
-        "events": "/api/deferred-test/events", "result": "/api/deferred-test/async_result",
+        "error_code": 0, "input": str(input_path),
+        "events": str(request / "events"),
+        "result": str(request / "async_result"),
         "protocol": "cmvp.rag-bulk-events.v1",
     }
 else:

@@ -1,14 +1,16 @@
 """Black-box HTTP checks against the Compose-provided ambassador."""
 
 import json
+import os
 from pathlib import Path
+import stat
 import time
 import unittest
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 from urllib.error import HTTPError
 
-BASE = "http://ambassador:8081"
+BASE = os.environ.get("TEST_AMBASSADOR_URL", "http://ambassador:8081")
 ROOT = "/api.pmccabe_collector.restapi.org/ai_agent/rag"
 
 
@@ -56,6 +58,57 @@ class HTTPUploadTests(unittest.TestCase):
                 self.assertIn("-preserveOriginal=0", arguments)
                 self.assertNotIn("-preserveOriginal=1", arguments)
 
+    def test_bulk_upload_publishes_group_writable_nested_file(self):
+        start = Request(
+            BASE + ROOT + "/bulk_add/v1",
+            b"{}",
+            {"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(start, timeout=10) as response:
+            upload_id = json.load(response)["upload_id"]
+
+        relative = "folder/deeper/document.txt"
+        query = urlencode({"upload_id": upload_id, "path": relative})
+        upload = Request(
+            BASE + ROOT + "/bulk_add/v1?" + query,
+            b"group-readable document",
+            {"Content-Type": "application/octet-stream"},
+            method="PUT",
+        )
+        with urlopen(upload, timeout=10) as response:
+            self.assertEqual(json.load(response)["path"], relative)
+
+        stage = Path("/api/.staging/events-functional")
+        destination = stage / relative
+        self.assertEqual(destination.read_bytes(), b"group-readable document")
+        self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o664)
+        self.assertEqual(stat.S_IMODE((stage / "folder").stat().st_mode), 0o2777)
+        self.assertEqual(
+            stat.S_IMODE((stage / "folder/deeper").stat().st_mode), 0o2777
+        )
+
+    def test_bulk_upload_path_cannot_escape_staging(self):
+        start = Request(
+            BASE + ROOT + "/bulk_add/v1",
+            b"{}",
+            {"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(start, timeout=10) as response:
+            upload_id = json.load(response)["upload_id"]
+
+        query = urlencode({"upload_id": upload_id, "path": "../escape.txt"})
+        upload = Request(
+            BASE + ROOT + "/bulk_add/v1?" + query,
+            b"input",
+            {"Content-Type": "application/octet-stream"},
+            method="PUT",
+        )
+        with self.assertRaises(HTTPError) as raised:
+            urlopen(upload, timeout=10)
+        self.assertEqual(raised.exception.code, 400)
+
     def test_failed_upload_cleans_up_known_completed_input(self):
         request = Request(BASE + ROOT + "/add_doc/v1?filename=failed.txt", b"failed input",
                           {"Content-Type": "application/octet-stream"}, method="PUT")
@@ -74,6 +127,7 @@ class HTTPUploadTests(unittest.TestCase):
         retained = list(Path("/api/.http-document-uploads").glob("*/bad-result.txt"))
         self.assertEqual(len(retained), 1)
         self.assertEqual(retained[0].read_bytes(), b"pending input")
+        self.assertEqual(stat.S_IMODE(retained[0].stat().st_mode), 0o664)
 
     def test_upload_filename_cannot_escape_staging(self):
         request = Request(BASE + ROOT + "/add_doc/v1?" + urlencode({"filename": "../escape.txt"}),

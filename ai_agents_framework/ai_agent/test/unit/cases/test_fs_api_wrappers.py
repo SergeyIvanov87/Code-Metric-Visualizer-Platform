@@ -12,6 +12,7 @@ sys.path.insert(0, str(SOURCES_DIR))
 
 
 from fs_api_wrappers import (
+    execute_attach_doc_chunks_query,
     execute_delete_doc_query,
     execute_put_doc_query,
     execute_put_doc_data_query,
@@ -150,7 +151,31 @@ def test_rag_add_file_uses_precreated_query_and_preserves_unicode(tmp_path):
         str(tmp_path / relative), ensure_ascii=False
     ) in query.exec_args
     assert "équipe=δοκιμή,données,résumé-数据.py" in query.exec_args
+    assert (
+        "logical_file_uri=donn%C3%A9es/"
+        "r%C3%A9sum%C3%A9-%E6%95%B0%E6%8D%AE.py"
+    ) in query.exec_args
     assert "\\u" not in query.exec_args
+
+    chunk_query = FakeQuery()
+    execute_attach_doc_chunks_query(
+        chunk_query,
+        "worker-session",
+        10,
+        123,
+        "base64,txt",
+        (
+            "équipe=δοκιμή,données,résumé-数据.py,"
+            "logical_file_uri=donn%C3%A9es/"
+            "r%C3%A9sum%C3%A9-%E6%95%B0%E6%8D%AE.py"
+        ),
+        ["encoded-chunk"],
+    )
+    assert "résumé-数据.py_0" in chunk_query.exec_args
+    assert (
+        "logical_file_uri=donn%C3%A9es/"
+        "r%C3%A9sum%C3%A9-%E6%95%B0%E6%8D%AE.py"
+    ) in chunk_query.exec_args
 
 
 def test_delete_doc_passes_compact_ranges_without_expansion():

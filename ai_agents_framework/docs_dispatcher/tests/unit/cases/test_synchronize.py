@@ -90,7 +90,8 @@ def _storage_version(name: str, db_record: RecordSchema) -> RecordSchema | None:
 def _write_storage_record(storage_root, record: RecordSchema) -> None:
     record_dir = storage_root / str(record.id)
     record_dir.mkdir()
-    (record_dir / f"{record.file_uri}.storage_bin").touch()
+    (record_dir / "payload.storage_bin").touch()
+    (record_dir / "file_uri").write_text(str(record.file_uri))
     (record_dir / "parentId").write_text(str(record.parent_id))
     (record_dir / "offset").write_text(str(record.offset))
     (record_dir / "size").write_text(str(record.size))

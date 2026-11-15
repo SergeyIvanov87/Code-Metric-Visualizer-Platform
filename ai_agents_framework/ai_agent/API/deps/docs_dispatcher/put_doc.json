@@ -11,7 +11,7 @@
     },
     "Description": {
         "header": "Insert a document into persistent storage",
-        "body": "Insert a document from a file URI. URI is required. Optional doc_type defaults to the lowercase filename extension (txt when absent); metadata defaults to empty. preserveOriginal defaults to 1; any nonzero value copies the source, and 0 moves it into storage. Returns unique_id.",
+        "body": "Insert a document from a file URI. URI is required. Optional doc_type defaults to the lowercase filename extension (txt when absent); metadata defaults to empty. A reserved logical_file_uri=<percent-encoded URI> metadata pair controls the persisted URI while URI remains the physical source; without a valid pair, URI is persisted unchanged. preserveOriginal defaults to 1; any nonzero value copies the source, and 0 moves it into storage. Returns unique_id.",
         "footer": ""
     }
 }

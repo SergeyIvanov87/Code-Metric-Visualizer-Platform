@@ -118,7 +118,11 @@ validate hardware access or model offloading.
 `rag_add.json` (`rag/add_doc/v1`) accepts required `-URI`, optional `-doc_type`,
 `-metadata`, `-timeout`, and `-preserveOriginal=1`. `rag_add.py` reads the source for
 chunking, infers its semantic text category from the filename when needed, and
-passes only the URI to dispatcher `put_doc`. Bulk ingestion uses this endpoint.
+passes the URI and metadata unchanged to dispatcher `put_doc`. Bulk ingestion
+uses this endpoint and augments metadata with
+`logical_file_uri=<percent-encoded relative path>`, allowing the dispatcher to
+persist the upload-relative path while still reading or moving the physical
+staging URI. The public API parameter list is unchanged.
 
 `rag_add_data.json` (`rag/add_doc_data/v1`) accepts base64 UTF-8 `doc_data`, required
 `-doc_type`, optional `-metadata`, `-timeout`, and `-filename`. Its `rag_add_data.py` script sends

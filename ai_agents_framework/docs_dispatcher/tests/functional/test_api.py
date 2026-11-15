@@ -85,9 +85,9 @@ def _record_dir(record_id: int) -> Path:
 
 
 def _storage_file(record_dir: Path) -> Path:
-    files = list(record_dir.glob("*.storage_bin"))
-    assert len(files) == 1, f"Expected one storage payload file in {record_dir}, got {files}"
-    return files[0]
+    payload = record_dir / "payload.storage_bin"
+    assert payload.is_file(), f"Expected storage payload file {payload}"
+    return payload
 
 
 def _read_int(path: Path) -> int:
@@ -232,7 +232,8 @@ def _delete_docs(record_ids: int | list[int]) -> dict:
 def _create_storage_document(record_id: int, file_uri: str, content: str) -> None:
     record_dir = _record_dir(record_id)
     record_dir.mkdir(mode=0o777,parents=True, exist_ok=False)
-    (record_dir / f"{Path(file_uri).name}.storage_bin").write_text(content, encoding="utf-8")
+    (record_dir / "payload.storage_bin").write_text(content, encoding="utf-8")
+    (record_dir / "file_uri").write_text(file_uri, encoding="utf-8")
     (record_dir / "parentId").write_text(str(record_id), encoding="utf-8")
     (record_dir / "offset").write_text("0", encoding="utf-8")
     (record_dir / "size").write_text(str(len(content.encode("utf-8"))), encoding="utf-8")
@@ -241,7 +242,8 @@ def _create_storage_document(record_id: int, file_uri: str, content: str) -> Non
 def _create_storage_chunk(record_id: int, parent_id: int, parent_file_uri: str, parent_data: str, chunk_data: str) -> None:
     record_dir = _record_dir(record_id)
     record_dir.mkdir(mode=0o777, parents=True, exist_ok=False)
-    (record_dir / f"{Path(parent_file_uri).name}.storage_bin").touch()
+    (record_dir / "payload.storage_bin").touch()
+    (record_dir / "file_uri").write_text(parent_file_uri, encoding="utf-8")
     (record_dir / "parentId").write_text(str(parent_id), encoding="utf-8")
     (record_dir / "offset").write_text(str(parent_data.find(chunk_data)), encoding="utf-8")
     (record_dir / "size").write_text(str(len(chunk_data.encode("utf-8"))), encoding="utf-8")
@@ -362,7 +364,7 @@ def test_put_documents_with_chunks_create_matching_storage_records(created_recor
     _assert_sync_is_clean(len(before_ids) + 6)
 
 
-def test_get_docs_returns_decanonized_uris_chunk_ids_and_document_pagination(created_record_ids):
+def test_get_docs_returns_original_uris_chunk_ids_and_document_pagination(created_record_ids):
     suffix = uuid4().hex
     doc_0_uri = STORAGE_ROOT / f'get docs {suffix} "quoted" \\ 0.txt'
     doc_1_uri = STORAGE_ROOT / f"get_docs_{suffix}_1.txt"

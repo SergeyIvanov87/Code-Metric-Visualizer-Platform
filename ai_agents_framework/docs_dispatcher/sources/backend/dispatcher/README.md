@@ -60,6 +60,11 @@ Cross-store operations receive the other interface explicitly. MySQL access
 never imports a concrete store. URI insertion defaults to `preserveOriginal=1`;
 any nonzero value copies the source with `shutil.copyfile()`. Setting it to `0` transfers the
 source into storage using `shutil.move()` (rename when the filesystems permit it).
+Bulk ingestion appends a reserved `logical_file_uri=<percent-encoded URI>` pair
+to metadata. The backend uses that decoded value only as the persisted
+`file_uri`; the `-URI` value remains the physical copy/move source. Without a
+nonempty decodable pair, the physical URI is persisted unchanged. Metadata,
+including the reserved pair, remains otherwise unchanged.
 Failed insertion deletes the stored document without restoring a moved source.
 Normal deletion also removes stored documents without restoring source files. Stored sizes
 and chunk byte ranges refer to the original payload bytes. Inline input continues
@@ -95,10 +100,14 @@ Both interfaces declare the shared `RecordSchema` through `record_schema`.
 | Type | `doc_type` |
 
 Access allocates IDs. A full document's parent ID equals its own ID; chunks
-refer to a parent and byte range. The persistent layout is unchanged: numeric
-record directories, `parentId`, `offset`, `size`, `metadata`, and `doc_type`
-files, encoded payload filenames ending in `.storage_bin`, and empty chunk
-payload placeholders. Existing documents require no migration.
+refer to a parent and byte range. The persistent layout uses numeric record
+directories containing `file_uri`, `parentId`, `offset`, `size`, `metadata`, and
+`doc_type` property files. Document bytes are stored under the fixed name
+`payload.storage_bin`; chunk records use an empty file with that same name.
+`file_uri` contains the unencoded logical path selected from metadata, or the
+physical source path when no logical override exists. This format intentionally
+does not read the former URI-encoded payload filenames, so pre-existing storage
+must be recreated.
 
 ## Configuration
 
@@ -163,6 +172,8 @@ response; list/range requests return JSON encoded in that response text.
 
 - `put_doc/v1` accepts `-URI` (required), optional `-doc_type` and `-metadata`, and
   `-preserveOriginal` (`1` by default, `0` to consume the source; any nonzero value copies).
+  Metadata may contain the reserved, percent-encoded `logical_file_uri` pair
+  described above; this does not add an API parameter.
   The URI script infers a lowercase filename extension
   when `-doc_type` is absent, falling back to `txt` for extensionless files.
   Previously this endpoint defaulted to `txt` without extension inference.

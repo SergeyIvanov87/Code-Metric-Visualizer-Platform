@@ -46,7 +46,7 @@ def _backend(session, storage_root):
     )
 
 
-def test_get_documents_returns_decanonized_uris_and_chunk_ids_with_limit_pagination(tmp_path):
+def test_get_documents_returns_original_uris_and_chunk_ids_with_limit_pagination(tmp_path):
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
@@ -57,8 +57,8 @@ def test_get_documents_returns_decanonized_uris_and_chunk_ids_with_limit_paginat
         lambda conn, cursor, statement, parameters, context, executemany: statements.append(statement),
     )
 
-    first = _document(session, "%slash%docs%slash%first.txt")
-    second = _document(session, "%slash%docs%slash%second.txt", "markdown")
+    first = _document(session, "/docs/first.txt")
+    second = _document(session, "/docs/second.txt", "markdown")
     first_chunk = _chunk(session, first.id, first.file_uri)
     second_chunk_1 = _chunk(session, second.id, second.file_uri)
     second_chunk_2 = _chunk(session, second.id, second.file_uri)

@@ -16,6 +16,10 @@ services:
       secrets: [proxy_ca]
     environment:
       HTTP_BIND: 0.0.0.0:8081
+    command:
+      - /bin/sh
+      - -ec
+      - umask 077; exec gunicorn --config gunicorn.conf.py 'server:create_app()'
     volumes:
       - api:/api
     depends_on: [provider]

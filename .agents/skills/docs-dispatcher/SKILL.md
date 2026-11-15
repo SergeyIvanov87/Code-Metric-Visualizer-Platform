@@ -37,14 +37,15 @@ Preserve the logical schema: document path, ID, offset, size, parent ID, metadat
 and document type. Return plain access/storage records rather than ORM objects.
 Cross-store operations receive the other interface explicitly; MySQL access may
 not import a concrete store, and persistent storage may not import MySQL access.
-Only persistent storage defines `doc_suffix` or performs payload IO. Keep shared
-directory/metadata utilities in the store contract. Storage models are data-only
+Only persistent storage defines the fixed payload filename or performs payload
+IO. Keep shared directory/metadata utilities in the store contract. Storage models are data-only
 and must not select a backend or perform filesystem work.
 
 Document insertion is split between `put_doc` (`-URI`, optional `-doc_type`/`-metadata`, `-preserveOriginal=1`) and `put_doc_data` (stdin `doc_data`, required `-doc_type`, optional `-metadata`/`-filename`). Mirror their schemas under agent `API/deps`. A data filename propagates through the existing `file_uri` argument into storage metadata and SQL; it must not bypass base64 decoding. Keep the existing backend/store methods: zero preservation moves, any nonzero value copies. Failed insertion deletes stored artifacts without restoring moved sources.
 
-Preserve database-generated IDs, URI encoding, metadata formats, byte ranges,
-rollback behavior, arguments, JSON/text responses, and exit statuses. Keep
+Preserve database-generated IDs, the `payload.storage_bin` and `file_uri`
+record layout, the reserved percent-encoded `logical_file_uri` metadata pair,
+byte ranges, rollback behavior, arguments, JSON/text responses, and exit statuses. Keep
 Compose credential paths, documentation, CI registration, and other skills
 consistent with moves. Do not rename MySQL protocol names or external secrets.
 Do not add a nonpersistent backend unless requested.

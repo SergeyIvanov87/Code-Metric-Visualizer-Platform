@@ -7,13 +7,38 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+from urllib.parse import unquote
 
 from interfaces import Backend, RuntimeConfig
 from interfaces.access import AccessRecordEntryInterface
 from interfaces.store import StorageRecordEntryInterface
 from interfaces_impl.access.mysql import MysqlAccessRecordEntry
 from interfaces_impl.store.persistent import PersistentStorageRecordEntry
-from interfaces.store.utils import decanonize_file_uri, file_uris_equal, prepare_doc_data
+from interfaces.store.utils import prepare_doc_data
+
+
+LOGICAL_FILE_URI_METADATA_KEY = "logical_file_uri"
+
+
+def _logical_file_uri(file_uri: str | Path, metadata_text: str) -> str | Path:
+    prefix = f"{LOGICAL_FILE_URI_METADATA_KEY}="
+    for token in reversed((metadata_text or "").split(",")):
+        if not token.startswith(prefix):
+            continue
+        encoded_uri = token[len(prefix):]
+        if not encoded_uri:
+            continue
+        try:
+            logical_file_uri = unquote(
+                encoded_uri,
+                encoding="utf-8",
+                errors="strict",
+            )
+        except UnicodeDecodeError:
+            continue
+        if logical_file_uri:
+            return logical_file_uri
+    return file_uri
 
 
 @dataclass(frozen=True)
@@ -63,6 +88,7 @@ class MysqlPersistentBackend(Backend):
     def put_doc_by_uri(self, file_uri: str | Path, metadata_text: str = "", doc_type: str = "txt", preserveOriginal: int = 1) -> dict:
         if file_uri is None:
             raise ValueError("file_uri is required when adding a document by URI")
+        logical_file_uri = _logical_file_uri(file_uri, metadata_text)
 
         count_of_docs_to_insert = 1
         unique_id_candidates = self.access.create_unique_ids(count_of_docs_to_insert)
@@ -73,6 +99,7 @@ class MysqlPersistentBackend(Backend):
             stored_record = self.store.init_record_from_path(
                 file_uri,
                 uid,
+                logical_file_uri=logical_file_uri,
                 parent_id=uid,
                 offset=0,
                 metadata_text=metadata_text,
@@ -248,7 +275,7 @@ class MysqlPersistentBackend(Backend):
                     "error_code": 0,
                     "status": "success",
                     "info": {
-                        "file_uri": decanonize_file_uri(access_record.file_uri),
+                        "file_uri": str(access_record.file_uri),
                         "type": access_record.doc_type,
                         "chunks": access_chunk_ids[uid],
                     },
@@ -261,7 +288,7 @@ class MysqlPersistentBackend(Backend):
                     "error_code": 1,
                     "status": "Not found in the doc storage: file storage",
                     "info": {
-                        "file_uri": decanonize_file_uri(access_record.file_uri),
+                        "file_uri": str(access_record.file_uri),
                         "type": access_record.doc_type,
                         "chunks": access_chunk_ids[uid],
                     },
@@ -272,7 +299,7 @@ class MysqlPersistentBackend(Backend):
                     "error_code": 1,
                     "status": "Not found in the doc storage: database",
                     "info": {
-                        "file_uri": decanonize_file_uri(store_record.file_uri),
+                        "file_uri": str(store_record.file_uri),
                         "type": store_record.doc_type,
                         "chunks": store_chunk_ids[uid],
                     },
@@ -298,7 +325,7 @@ class MysqlPersistentBackend(Backend):
         documents = [
             {
                 "id": int(document.id),
-                "file_uri": decanonize_file_uri(document.file_uri),
+                "file_uri": str(document.file_uri),
                 "type": document.doc_type,
                 "chunks": chunk_ids_by_document[int(document.id)],
             }
@@ -480,16 +507,8 @@ class MysqlPersistentBackend(Backend):
             differences = access_record.get_difference(storage_record)
             changed = False
 
-            if (
-                "file_uri" in differences
-                and not file_uris_equal(
-                    access_record.file_uri,
-                    storage_record.file_uri,
-                )
-            ):
-                access_record.file_uri = decanonize_file_uri(
-                    str(storage_record.file_uri)
-                )
+            if "file_uri" in differences:
+                access_record.file_uri = str(storage_record.file_uri)
                 changed = True
 
             for field_name in ("offset", "size", "parent_id", "doc_type"):

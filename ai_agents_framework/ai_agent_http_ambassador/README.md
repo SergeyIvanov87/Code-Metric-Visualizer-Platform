@@ -180,6 +180,10 @@ final destination with a hard link and removes the temporary name. The final
 pathname therefore appears in one filesystem operation instead of growing while
 the HTTP request is still arriving. The temporary directory is outside the
 uploader's watched session tree, so it needs no special file-uploader filter.
+Before publication, regular files are set to `0664` and newly created nested
+staging directories are set to `02777`. This makes the staged payload readable
+and removable by consumers that use a different UID, including when the
+ambassador inherits a restrictive process umask.
 
 ### 6. The file uploader discovers stable files
 
@@ -202,9 +206,11 @@ worker invokes the ordinary `rag_add` filesystem query with:
 
 - the staged file path as `URI`;
 - caller metadata augmented with every component of the relative path; and
+- a reserved `logical_file_uri=<percent-encoded relative path>` metadata pair;
 - a document type derived from the filename extension.
 
-`rag_add` reads the file directly from shared staging. The content is not
+`rag_add` reads the file directly from shared staging. The dispatcher stores the
+decoded logical URI while retaining the metadata pair unchanged. The content is not
 copied through the file-uploader service or embedded into the nested query.
 Each worker publishes an `added` or `failed` RAG outcome. A per-file failure
 is recorded without stopping other workers.
