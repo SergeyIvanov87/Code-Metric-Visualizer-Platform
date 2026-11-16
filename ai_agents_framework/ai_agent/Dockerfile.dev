@@ -42,7 +42,6 @@ EOF
 RUN <<EOF
     mkdir -p /opt /package
     mkdir -p /assets/rag
-    mkdir -p /assets/models
 EOF
 
 COPY common/modules /opt/modules
@@ -54,9 +53,6 @@ RUN <<EOF
     dos2unix /opt/modules*
 EOF
 
-#TODO COPY ["ai_agent/*.sh", "ai_agent/*.py", "/package/"]
-COPY ai_agents_framework/ai_agent/config /config
-ENV AI_AGENT_INFERENCE_CONFIG=/config/inference.cpu.json
 ENV MAX_WORKERS=32
 
 ARG SKIP_API_DEPS_CHECK=false
@@ -65,7 +61,7 @@ ARG TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30
 ENV TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=$TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC
 COPY ai_agents_framework/ai_agent/API /API
 
-VOLUME ["/api", "/mnt", "/assets/rag", "/assets/models", "/package"]
+VOLUME ["/api", "/mnt", "/assets/rag", "/package"]
 
 # user creation
 ARG UID=1501 GID=23456 USER=ai_agent
@@ -91,4 +87,4 @@ EOF
 
 
 USER ${USER}
-ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/opt", "/api", "/assets/models"]
+ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/opt", "/api"]

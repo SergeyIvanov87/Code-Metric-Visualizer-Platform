@@ -4,10 +4,12 @@ ARG LLM_BACKEND=cpu
 
 SHELL ["/bin/bash", "-c"]
 
-RUN <<EOF
+COPY --chmod=0755 common/proxy_setup_image_helpers/with-proxy-ca.sh /usr/local/bin/with-proxy-ca.sh
+
+RUN --mount=type=secret,id=proxy_ca,mode=0444 <<EOF
     set -e
-    apt-get update
-    apt-get install -y --no-install-recommends coreutils python3 python3-pip python-is-python3 dos2unix inotify-tools bash doas cmake libgomp1 gcc g++
+    /usr/local/bin/with-proxy-ca.sh apt-get update
+    /usr/local/bin/with-proxy-ca.sh apt-get install -y --no-install-recommends coreutils python3 python3-pip python-is-python3 dos2unix inotify-tools bash doas cmake libgomp1 gcc g++
 EOF
 
 # Keep CMake, GCC/G++, and libgomp1 for llama-cpp-python source builds, including
@@ -23,26 +25,25 @@ ENV PYTHONNOUSERSITE=1
 
 RUN <<EOF
     set -e
-    pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain-text-splitters tiktoken sentence-transformers
+    /usr/local/bin/with-proxy-ca.sh pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain-text-splitters tiktoken sentence-transformers
     case "$LLM_BACKEND" in
       cpu) export CMAKE_ARGS="-DGGML_CUDA=OFF -DGGML_VULKAN=OFF" ;;
       nvidia) export CMAKE_ARGS="-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=all-major" ;;
       intel)
-        apt-get install -y --no-install-recommends libvulkan-dev mesa-vulkan-drivers vulkan-tools glslc
+        /usr/local/bin/with-proxy-ca.sh apt-get install -y --no-install-recommends libvulkan-dev mesa-vulkan-drivers vulkan-tools glslc
         export CMAKE_ARGS="-DGGML_VULKAN=ON" ;;
       *) echo "Unsupported LLM_BACKEND: $LLM_BACKEND" >&2; exit 1 ;;
     esac
     # This agent uses text-only inference. In 0.3.16, LLAVA_BUILD also adds
     # llama-mtmd-cli independently of LLAMA_BUILD_TOOLS.
     export CMAKE_ARGS="$CMAKE_ARGS -DLLAVA_BUILD=OFF"
-    FORCE_CMAKE=1 pip install --break-system-packages --no-cache-dir --no-binary=llama-cpp-python llama-cpp-python==0.3.16
-    pip install --break-system-packages chromadb pypdf requests pydantic tqdm
+    FORCE_CMAKE=1 /usr/local/bin/with-proxy-ca.sh pip install --break-system-packages --no-cache-dir --no-binary=llama-cpp-python llama-cpp-python==0.3.16
+    /usr/local/bin/with-proxy-ca.sh pip install --break-system-packages chromadb pypdf requests pydantic tqdm
 EOF
 
 RUN <<EOF
     mkdir -p /opt /package
     mkdir -p /assets/rag
-    mkdir -p /assets/models
 EOF
 
 COPY common/modules /opt/modules
@@ -54,9 +55,6 @@ RUN <<EOF
     dos2unix /opt/modules*
 EOF
 
-#TODO COPY ["ai_agent/*.sh", "ai_agent/*.py", "/package/"]
-COPY ai_agents_framework/ai_agent/config /config
-ENV AI_AGENT_INFERENCE_CONFIG=/config/inference.cpu.json
 ENV MAX_WORKERS=32
 
 ARG SKIP_API_DEPS_CHECK=false
@@ -67,7 +65,7 @@ COPY ai_agents_framework/ai_agent/API /API
 COPY ai_agents_framework/ai_agent/sources /package
 RUN dos2unix /package/*
 
-VOLUME ["/api", "/mnt", "/assets/rag", "/assets/models"]
+VOLUME ["/api", "/mnt", "/assets/rag"]
 
 # user creation
 ARG UID=1501 GID=23456 USER=ai_agent
@@ -75,14 +73,14 @@ ENV UID=$UID GID=$GID USER=$USER GROUPNAME=pmccabe
 
 
 RUN <<EOF
-    apt-get install adduser
+    /usr/local/bin/with-proxy-ca.sh apt-get install adduser
     groupadd --gid "$GID" "$GROUPNAME"
     adduser --disabled-password --gecos "" --home "$(pwd)" -u $UID --ingroup "$GROUPNAME" --no-create-home $USER
     adduser ${USER} sudo
 EOF
 
 
-RUN <<EOF
+RUN --mount=type=secret,id=proxy_ca,mode=0444 <<EOF
 echo "permit nopass :${GROUPNAME}" >> /etc/doas.conf
 mkdir -p -m 777 /mnt && mkdir -p -m 777 /api
 chown -R ${USER}:${GROUPNAME} /mnt && chown -R ${USER}:${GROUPNAME} /api && chown -R ${USER}:${GROUPNAME} /assets && chown -R ${USER}:${GROUPNAME} /api
