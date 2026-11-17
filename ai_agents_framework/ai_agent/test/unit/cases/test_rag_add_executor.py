@@ -8,9 +8,16 @@ import sys
 
 import pytest
 
-ROOT = Path(__file__).parents[3]
-sys.path.insert(0, str(ROOT / 'common/modules'))
-spec = importlib.util.spec_from_file_location('generator', ROOT / 'ai_agents_framework/ai_agent/sources/api_generator.py')
+PACKAGE_ROOT = Path("/package")
+MODULES_ROOT = Path("/opt/modules")
+if not PACKAGE_ROOT.is_dir():
+    REPOSITORY_ROOT = Path(__file__).resolve().parents[5]
+    PACKAGE_ROOT = REPOSITORY_ROOT / "ai_agents_framework/ai_agent/sources"
+    MODULES_ROOT = REPOSITORY_ROOT / "common/modules"
+sys.path.insert(0, str(MODULES_ROOT))
+spec = importlib.util.spec_from_file_location(
+    "generator", PACKAGE_ROOT / "api_generator.py"
+)
 generator = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(generator)
 
@@ -47,8 +54,11 @@ def test_generated_add_executor_preserves_argv(tmp_path, metadata, override):
 def test_generated_data_executor_forwards_filename(tmp_path, filename):
     api = tmp_path / 'api'
     api.mkdir()
-    schema = json.loads((ROOT / 'ai_agents_framework/ai_agent/API/rag_add_data.json').read_text())
-    for index, (name, value) in enumerate(schema['Params'].items()):
+    params = {
+        "doc_data": "", "-doc_type": "", "-metadata": "",
+        "-timeout": "20", "-filename": "",
+    }
+    for index, (name, value) in enumerate(params.items()):
         (api / f'{index}.{name}').write_text(value)
     stub = tmp_path / 'rag_add_data.py'
     stub.write_text('#!' + sys.executable + '\n' + '''

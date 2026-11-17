@@ -10,9 +10,16 @@ import threading
 import pytest
 
 
-MODULE_PATH = Path(__file__).parents[1] / "sources/rag_bulk_add.py"
-sys.path.insert(0, str(MODULE_PATH.parent))
-sys.path.insert(0, str(Path(__file__).parents[3] / "common/modules"))
+PACKAGE_ROOT = Path("/package")
+MODULES_ROOT = Path("/opt/modules")
+REPOSITORY_ROOT = None
+if not PACKAGE_ROOT.is_dir():
+    REPOSITORY_ROOT = Path(__file__).resolve().parents[5]
+    PACKAGE_ROOT = REPOSITORY_ROOT / "ai_agents_framework/ai_agent/sources"
+    MODULES_ROOT = REPOSITORY_ROOT / "common/modules"
+MODULE_PATH = PACKAGE_ROOT / "rag_bulk_add.py"
+sys.path.insert(0, str(PACKAGE_ROOT))
+sys.path.insert(0, str(MODULES_ROOT))
 from doc_type_association import IMAGE_EXTENSIONS
 
 spec = importlib.util.spec_from_file_location("rag_bulk_add", MODULE_PATH)
@@ -26,12 +33,13 @@ def test_bulk_input_survives_api_volume_mount_relocation(monkeypatch, tmp_path):
     request.mkdir(parents=True)
     uploader_request = api / "api.pmccabe_collector.restapi.org/file-uploader/streaming_directory_events/POST/deferred-upload"
     uploader_request.mkdir(parents=True)
-    uploader_path = Path(__file__).parents[3] / "utility/file-uploader/streaming_directory_events_processor.py"
-    uploader_spec = importlib.util.spec_from_file_location("uploader", uploader_path)
-    uploader = importlib.util.module_from_spec(uploader_spec)
-    uploader_spec.loader.exec_module(uploader)
-    monkeypatch.setenv("STAGING_ROOT", str(api / ".staging"))
-    report = uploader.prepare(uploader_request, ["SESSION_ID", "bulk"])
+    staging = api / ".staging/bulk"
+    staging.mkdir(parents=True)
+    staging.chmod(0o777)
+    report = {
+        "staging": str(staging),
+        "events": str(uploader_request / "events"),
+    }
     monkeypatch.setattr(rag_bulk_add, "start_uploader", lambda *_: report)
     previous = os.umask(0o077)
     try:
@@ -327,7 +335,9 @@ def test_start_workers_cleans_up_started_threads_after_partial_failure():
 
 
 def test_bulk_schema_filter_defaults_match_streaming_directory_events():
-    root = Path(__file__).parents[3]
+    if REPOSITORY_ROOT is None:
+        pytest.skip("schema sources are not part of the canonical unit image")
+    root = REPOSITORY_ROOT
     bulk_schema = json.loads(
         (root / "ai_agents_framework/ai_agent/API/rag_bulk_add.json").read_text()
     )
