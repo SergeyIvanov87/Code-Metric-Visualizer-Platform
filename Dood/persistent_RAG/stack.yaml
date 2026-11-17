@@ -1,0 +1,150 @@
+name: persistent-rag
+services:
+  api-init:
+    image: persistent-rag/dispatcher:local
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["chgrp 23456 /api; chmod g+rwx /api; chown 2001:23456 /uploads; chmod 2770 /uploads"]
+    volumes: ["fs-api:/api", "file-uploads:/uploads"]
+    network_mode: none
+    restart: "no"
+  rag-db:
+    image: persistent-rag/rag:local
+    volumes: ["rag-db:/mnt"]
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "--noproxy", "*", "http://127.0.0.1:8000/api/v2/heartbeat"]
+      interval: 10s
+      timeout: 6s
+      retries: 30
+      start_period: 30s
+  docs-dispatcher:
+    image: persistent-rag/dispatcher:local
+    depends_on:
+      api-init: {condition: service_completed_successfully}
+    volumes:
+      - fs-api:/api
+      - documents:/mnt/file_storage
+      - dispatcher-config:/etc/dispatcher
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /api/api.pmccabe_collector.restapi.org/ai_agent_rag_dispatcher/README-API-DOCS-DISPATCHER.md"]
+      interval: 10s
+      retries: 30
+      start_period: 30s
+  ai-agent:
+    image: persistent-rag/agent:local
+    environment:
+      VECTORDB_HOST: rag-db
+      VECTORDB_PORT: 8000
+      AI_AGENT_INFERENCE_CONFIG: /config/inference.cpu.json
+    depends_on:
+      api-init: {condition: service_completed_successfully}
+      rag-db: {condition: service_healthy}
+      docs-dispatcher: {condition: service_healthy}
+    volumes:
+      - fs-api:/api
+      - models:/assets/models
+      - agent-work:/mnt
+      - agent-rag:/assets/rag
+      - agent-package:/package
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /api/api.pmccabe_collector.restapi.org/ai_agent/README-API-STATISTIC.md"]
+      interval: 10s
+      retries: 30
+      start_period: 30s
+  file-uploader:
+    image: persistent-rag/file-uploader:local
+    depends_on:
+      api-init: {condition: service_completed_successfully}
+    volumes:
+      - fs-api:/api
+      - file-uploads:/uploads
+    networks: [backend]
+    restart: unless-stopped
+  rest-api:
+    image: persistent-rag/rest-api:local
+    hostname: rest-api
+    environment:
+      FLASK_RUN_PORT: 5000
+      FLASK_RUN_HOST: 0.0.0.0
+    depends_on:
+      api-init: {condition: service_completed_successfully}
+      ai-agent: {condition: service_healthy}
+      file-uploader: {condition: service_started}
+    volumes: ["fs-api:/api"]
+    ports: ["5000:5000"]
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "--noproxy", "*", "http://127.0.0.1:5000/.well-known/http-api-routes/v1"]
+      interval: 10s
+      timeout: 6s
+      retries: 30
+      start_period: 30s
+  ai-agent-http-ambassador:
+    image: persistent-rag/ai-agent-http-ambassador:local
+    environment:
+      AI_AGENT_HTTP_CONFIG: /app/config.json
+      HTTP_BIND: 0.0.0.0:8081
+      MAIN_MENU_PATH: /api.pmccabe_collector.restapi.org
+    depends_on:
+      ai-agent: {condition: service_healthy}
+      file-uploader: {condition: service_started}
+    volumes: ["fs-api:/api"]
+    expose: ["8081"]
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:8081/healthz', timeout=5)"]
+      interval: 15s
+      timeout: 6s
+      retries: 30
+  http-api-gateway-controller:
+    image: persistent-rag/http-api-gateway-controller:local
+    environment:
+      BACKENDS_FOR_FRONTENDS: http://rest-api:5000,http://ai-agent-http-ambassador:8081
+      HTTP_API_CONNECT_TIMEOUT_SECONDS: 5
+      HTTP_API_DEFAULT_ROUTE_TIMEOUT_SECONDS: 60
+      HTTP_API_DISCOVERY_POLL_INTERVAL_SECONDS: 15
+      HTTP_API_DISCOVERY_TIMEOUT_SECONDS: 5
+      HTTP_API_FALLBACK_TIMEOUT_SECONDS: 0
+      HTTP_API_GATEWAY_LISTEN_PORT: 8080
+    depends_on:
+      rest-api: {condition: service_healthy}
+      ai-agent-http-ambassador: {condition: service_healthy}
+    volumes: ["http-api-gateway-config:/var/lib/http-api-gateway"]
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "from pathlib import Path; assert Path('/var/lib/http-api-gateway/ready').is_file()"]
+      interval: 5s
+      timeout: 2s
+      retries: 30
+  http-api-gateway:
+    image: envoyproxy/envoy:v1.36.0
+    command: ["envoy", "-c", "/var/lib/http-api-gateway/bootstrap.json", "--log-level", "info"]
+    depends_on:
+      http-api-gateway-controller: {condition: service_healthy}
+    volumes: ["http-api-gateway-config:/var/lib/http-api-gateway:ro"]
+    ports: ["8080:8080"]
+    networks: [backend]
+    restart: unless-stopped
+networks:
+  backend: {}
+volumes:
+  fs-api:
+    name: ${FS_API_VOLUME:-persistent-rag-api}
+  rag-db: {}
+  documents: {}
+  dispatcher-config: {}
+  models: {}
+  agent-work: {}
+  agent-rag: {}
+  agent-package: {}
+  file-uploads: {}
+  http-api-gateway-config: {}

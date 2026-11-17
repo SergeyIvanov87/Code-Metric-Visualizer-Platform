@@ -1,0 +1,4 @@
+listen_address: "0.0.0.0"
+port: 8000
+persist_path: /mnt/chroma
+allow_reset: false
