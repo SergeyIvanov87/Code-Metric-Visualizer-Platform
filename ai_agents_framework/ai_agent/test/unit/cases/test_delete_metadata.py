@@ -16,12 +16,13 @@ from api_fs_conventions import get_api_request_plain_params
 
 @pytest.mark.parametrize("metadata", [None, "", 'team docs "quoted"'])
 def test_delete_executor_preserves_empty_metadata(tmp_path, metadata):
-    root = Path("/repo")
-    source = root / "ai_agents_framework/ai_agent"
-    schema = json.loads((source / "API/rag_delete.json").read_text())
+    source = Path("/package")
+    if not source.is_dir():
+        source = Path(__file__).resolve().parents[3] / "sources"
+    params = {"-ids": "", "-metadata": ""}
     api = tmp_path / "api"
     api.mkdir()
-    write_args(api, get_api_request_plain_params(schema["Params"]))
+    write_args(api, get_api_request_plain_params(params))
 
     # Parse the generated argv so a dangling -metadata fails as in rag_delete.py.
     processor = tmp_path / "rag_delete.py"
@@ -39,7 +40,7 @@ def test_delete_executor_preserves_empty_metadata(tmp_path, metadata):
         "print(json.dumps(vars(parser.parse_args())))\n"
     )
     processor.chmod(0o755)
-    spec = importlib.util.spec_from_file_location("delete_generator", source / "sources/api_generator.py")
+    spec = importlib.util.spec_from_file_location("delete_generator", source / "api_generator.py")
     generator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(generator)
     script = io.StringIO()

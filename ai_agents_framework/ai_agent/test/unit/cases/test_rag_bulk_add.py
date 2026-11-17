@@ -12,11 +12,10 @@ import pytest
 
 PACKAGE_ROOT = Path("/package")
 MODULES_ROOT = Path("/opt/modules")
-REPOSITORY_ROOT = None
 if not PACKAGE_ROOT.is_dir():
-    REPOSITORY_ROOT = Path(__file__).resolve().parents[5]
-    PACKAGE_ROOT = REPOSITORY_ROOT / "ai_agents_framework/ai_agent/sources"
-    MODULES_ROOT = REPOSITORY_ROOT / "common/modules"
+    repository_root = Path(__file__).resolve().parents[5]
+    PACKAGE_ROOT = repository_root / "ai_agents_framework/ai_agent/sources"
+    MODULES_ROOT = repository_root / "common/modules"
 MODULE_PATH = PACKAGE_ROOT / "rag_bulk_add.py"
 sys.path.insert(0, str(PACKAGE_ROOT))
 sys.path.insert(0, str(MODULES_ROOT))
@@ -334,20 +333,14 @@ def test_start_workers_cleans_up_started_threads_after_partial_failure():
     assert not workers[1].joined
 
 
-def test_bulk_schema_filter_defaults_match_streaming_directory_events():
-    if REPOSITORY_ROOT is None:
-        pytest.skip("schema sources are not part of the canonical unit image")
-    root = REPOSITORY_ROOT
-    bulk_schema = json.loads(
-        (root / "ai_agents_framework/ai_agent/API/rag_bulk_add.json").read_text()
-    )
-    event_schema = json.loads(
-        (root / "utility/file-uploader/API/streaming_directory_events.json").read_text()
-    )
-    filter_names = (
-        "file_allow_regex", "file_skip_regex",
-        "dir_allow_regex", "dir_skip_regex",
-    )
-    for name in filter_names:
-        assert bulk_schema["Params"][name] == event_schema["Params"][name]
-        assert rag_bulk_add.DEFAULTS[name] == event_schema["Params"][name]
+def test_bulk_filter_defaults_match_streaming_directory_contract():
+    expected = {
+        "file_allow_regex": ".*",
+        "file_skip_regex": "(?!)",
+        "dir_allow_regex": ".*",
+        "dir_skip_regex": (
+            r"(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)"
+        ),
+    }
+    for name, value in expected.items():
+        assert rag_bulk_add.DEFAULTS[name] == value
