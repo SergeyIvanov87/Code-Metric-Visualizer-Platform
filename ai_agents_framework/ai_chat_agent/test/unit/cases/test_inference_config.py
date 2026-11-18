@@ -1,15 +1,17 @@
 from pathlib import Path
 import json
+import os
 import sys
 from types import SimpleNamespace
 import pytest
 
 SOURCES_DIR = Path("/package")
-CONFIG_ROOT = None
+CONFIG_ROOT = Path(os.environ["AI_CHAT_TEST_CONFIG_ROOT"]) if "AI_CHAT_TEST_CONFIG_ROOT" in os.environ else None
 if not SOURCES_DIR.is_dir():
     AGENT_ROOT = Path(__file__).resolve().parents[3]
     SOURCES_DIR = AGENT_ROOT / "sources"
-    CONFIG_ROOT = AGENT_ROOT / "config"
+    if CONFIG_ROOT is None:
+        CONFIG_ROOT = AGENT_ROOT / "config"
 sys.path.insert(0, str(SOURCES_DIR))
 import inference_config as inference
 

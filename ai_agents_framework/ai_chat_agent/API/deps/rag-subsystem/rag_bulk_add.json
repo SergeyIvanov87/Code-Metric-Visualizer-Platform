@@ -12,11 +12,12 @@
         "WaitInitialQueryTimeoutSec": "60",
         "WaitQueryUpdateTimeoutSec": "10",
         "WaitResultConsumptionTimeoutSec": "60",
-        "SESSION_ID": "default"
+        "SESSION_ID": "default",
+        "-preserveOriginal": "1"
     },
     "Description": {
         "header": "Stream a directory of documents into RAG",
         "body": "Returns a deferred request with an input directory link, an events FIFO, and an async_result FIFO. Copy completed files through input. Each file is passed to rag_add and reported through events. Read async_result for the final added and failed file report. Per-file failures are statistics and do not fail the bulk request; request-level failures still return a nonzero error_code.",
-        "footer": "Metadata is augmented with every component of each uploaded file path. File and directory allow/skip expressions are forwarded to streaming_directory_events. The request seals explicitly or after the uploader idle timeout."
+        "footer": "Metadata is augmented with every component of each uploaded file path and a reserved logical_file_uri=<percent-encoded relative path> pair. File and directory allow/skip expressions are forwarded to streaming_directory_events. The request seals explicitly or after the uploader idle timeout."
     }
 }

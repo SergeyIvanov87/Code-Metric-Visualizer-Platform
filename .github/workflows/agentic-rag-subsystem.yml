@@ -17,6 +17,8 @@ jobs:
       run: docker image prune -f && docker container prune -f && docker image ls -a && docker container ls -a
     - name: Test agent RAG unit cases
       run: docker compose -f ai_agents_framework/ai_agent/compose-unit.test.yaml up --build --abort-on-container-exit --exit-code-from ai-agent-unit-tester
+    - name: Test chat inference configuration
+      run: docker compose -f ai_agents_framework/ai_chat_agent/compose-unit.test.yaml up --build --abort-on-container-exit --exit-code-from ai-chat-agent-unit-tester
     - name: Test docs dispatcher backend interfaces
       run: docker compose -f ai_agents_framework/docs_dispatcher/compose-unit.test.yaml up --build --abort-on-container-exit --exit-code-from docs-dispatcher-unit-tester
     - name: Test HTTP ingestion preservation policy
@@ -38,6 +40,7 @@ jobs:
         mkdir -p "${diagnostics}"
         for compose_file in \
           ai_agents_framework/ai_agent/compose-unit.test.yaml \
+          ai_agents_framework/ai_chat_agent/compose-unit.test.yaml \
           ai_agents_framework/ai_agent_http_ambassador/tests/functional/compose.yaml \
           ai_agents_framework/docs_dispatcher/compose-unit.test.yaml \
           ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml \
