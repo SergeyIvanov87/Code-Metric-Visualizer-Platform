@@ -6,6 +6,7 @@ from id_ranges import parse_id_ranges
 
 from distutils.version import StrictVersion
 from pathlib import Path, PurePosixPath
+from urllib.parse import quote
 from uuid import uuid4
 
 from api_schema_utils import (
@@ -14,6 +15,9 @@ from api_schema_utils import (
 )
 from api_fs_query import APIQueryInterruptible
 from doc_type_association import document_type
+
+
+LOGICAL_FILE_URI_METADATA_KEY = "logical_file_uri"
 
 
 def get_doc_dispatcher_queries(
@@ -39,7 +43,9 @@ def get_normalized_api_queries(
     normalized_api_queries = {}
     for non_normalized_query_name, api_query in api_queries.items():
         for query_name, query_re in query_normalizarion_map.items():
-            if query_re.match(non_normalized_query_name):
+            # Discovery keys normalize path separators to underscores; also
+            # match the schema path so endpoint expressions work with either.
+            if query_re.match(non_normalized_query_name) or query_re.match(api_query["Query"]):
                 normalized_api_queries[query_name] = (
                     get_last_query_version(
                         normalized_api_queries[query_name], api_query
@@ -126,9 +132,33 @@ def start_uploader(query, request, config, session_id, timeout=10):
 
 
 def augmented_metadata(original, relative):
-    """Append each POSIX path component to the caller-provided metadata."""
-    tokens = ",".join(PurePosixPath(relative).parts)
-    return ",".join(value for value in (original.strip(), tokens) if value)
+    """Append path metadata and its reserved logical URI key-value pair."""
+    relative_path = PurePosixPath(relative).as_posix()
+    tokens = ",".join(PurePosixPath(relative_path).parts)
+    logical_file_uri = (
+        f"{LOGICAL_FILE_URI_METADATA_KEY}="
+        f"{quote(relative_path, safe='/')}"
+    )
+    return ",".join(
+        value for value in ((original or "").strip(), tokens, logical_file_uri)
+        if value
+    )
+
+
+def _metadata_for_chunk(metadata, chunk_num):
+    if metadata is None:
+        return str(chunk_num)
+
+    marker = f",{LOGICAL_FILE_URI_METADATA_KEY}="
+    marker_position = metadata.rfind(marker)
+    if marker_position >= 0:
+        return (
+            f"{metadata[:marker_position]}_{chunk_num}"
+            f"{metadata[marker_position:]}"
+        )
+    if metadata.startswith(f"{LOGICAL_FILE_URI_METADATA_KEY}="):
+        return f"{chunk_num},{metadata}"
+    return f"{metadata}_{chunk_num}"
 
 
 def rag_add_file(query, session_id, config, stage, relative, sequence, timeout=300):
@@ -141,6 +171,7 @@ def rag_add_file(query, session_id, config, stage, relative, sequence, timeout=3
         f"-URI={json.dumps(str(uri), ensure_ascii=False)}",
         f"-metadata={json.dumps(metadata, ensure_ascii=False)}",
         f"-doc_type={resolved_doc_type}",
+        f"-preserveOriginal={config.get('preserveOriginal', '1')}",
     ))
     result = _execute_json_query(
         query,
@@ -165,31 +196,25 @@ def execute_put_doc_query(
     session_id,
     timeout_elapsed,
     doc_uri,
-    doc_data,
     doc_type,
     doc_metadata,
+    preserveOriginal=1,
 ):
-    if doc_data is not None and not isinstance(doc_data, str):
-        raise TypeError("doc_data must be textual data")
-
     exec_args_array = [
         f"SESSION_ID={session_id}",
-        f"-doc_type={doc_type}",
     ]
+    if doc_type:
+        exec_args_array.append(f"-doc_type={doc_type}")
 
-    if doc_data is None:
-        exec_args_array.append(f"-URI={doc_uri}")
+    # The filesystem API tokenizer removes these transport quotes before
+    # the dispatcher passes the complete path to argparse and storage.
+    escaped_doc_uri = str(doc_uri).replace("\\", "\\\\").replace('"', '\\"')
+    exec_args_array.append(f'-URI="{escaped_doc_uri}"')
+    exec_args_array.append(f"-preserveOriginal={preserveOriginal}")
 
     if doc_metadata is not None:
-        exec_args_array.append(f"-metadata={doc_metadata}")
+        exec_args_array.append(f"-metadata={json.dumps(doc_metadata, ensure_ascii=False)}")
 
-    if doc_data is not None:
-        # Keep inline data as one explicitly quoted filesystem-API value.  Apart
-        # from preserving whitespace, the quotes prevent the generated shell
-        # dispatcher from interpreting characters in a long base64 payload
-        # while it extracts doc_data from the argument list.
-        escaped_doc_data = doc_data.replace("\\", "\\\\").replace('"', '\\"')
-        exec_args_array.append(f'doc_data="{escaped_doc_data}"')
     exec_args = " ".join(exec_args_array)
 
     status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
@@ -219,6 +244,65 @@ def execute_put_doc_query(
     return put_doc_result
 
 
+def execute_put_doc_data_query(
+    query: APIQueryInterruptible,
+    session_id,
+    timeout_elapsed,
+    doc_data,
+    doc_type,
+    doc_metadata,
+    filename=None,
+):
+    if doc_data is not None and not isinstance(doc_data, str):
+        raise TypeError("doc_data must be textual data")
+
+    exec_args_array = [
+        f"SESSION_ID={session_id}",
+    ]
+    if doc_type:
+        exec_args_array.append(f"-doc_type={doc_type}")
+
+    if doc_metadata is not None:
+        exec_args_array.append(f"-metadata={json.dumps(doc_metadata, ensure_ascii=False)}")
+
+    if doc_data is not None:
+        # Keep document data as one explicitly quoted filesystem-API value.  Apart
+        # from preserving whitespace, the quotes prevent the generated shell
+        # dispatcher from interpreting characters in a long base64 payload
+        # while it extracts doc_data from the argument list.
+        escaped_doc_data = doc_data.replace("\\", "\\\\").replace('"', '\\"')
+        exec_args_array.append(f'doc_data="{escaped_doc_data}"')
+    if filename is not None:
+        exec_args_array.append(f"-filename={json.dumps(str(filename), ensure_ascii=False)}")
+    exec_args = " ".join(exec_args_array)
+
+    status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
+    if not status:
+        raise RuntimeError(
+            f"Cannot put the entire doc from document data into the rag_doc_dispater, status: {status}, elapsed timeout: {timeout_elapsed}"
+        )
+
+    # TODO Reconsile timeout_elapsed and wait for pipe creation sleep duration and cycles
+    status, result, timeout_elapsed = query.wait_result(
+        timeout_elapsed, session_id, 0.1, timeout_elapsed / 0.1, False
+    )
+    if not status:
+        raise RuntimeError(
+            f"Cannot put the entire doc from document data into the rag_doc_dispater: waiting of result failed, status: {status}, result: {result}, elapsed timeout: {timeout_elapsed}"
+        )
+
+    put_doc_result = json.loads(result)
+    if put_doc_result["error_code"] != 0:
+        raise RuntimeError(
+            f"Cannot put the entire doc from document data into the rag_doc_dispater, error: {put_doc_result['error_msg']}"
+        )
+
+    assert (
+        "unique_id" in put_doc_result.keys()
+    ), "put_doc_data must return the 'unique_id' of the inserted document"
+    return put_doc_result
+
+
 def execute_attach_doc_chunks_query(
     query: APIQueryInterruptible,
     session_id,
@@ -236,9 +320,7 @@ def execute_attach_doc_chunks_query(
             f"SESSION_ID={session_id}",
             f"-doc_id={doc_unique_id}",
         ]
-        single_chunk_metadata = str(chunk_num)
-        if chunks_metadata is not None:
-            single_chunk_metadata = f"{chunks_metadata}_{single_chunk_metadata}"
+        single_chunk_metadata = _metadata_for_chunk(chunks_metadata, chunk_num)
 
         exec_args_array.append(f"-metadata={single_chunk_metadata}")
         exec_args_array.append(f"doc_data={ch}")

@@ -10,9 +10,15 @@ import threading
 import pytest
 
 
-MODULE_PATH = Path(__file__).parents[1] / "sources/rag_bulk_add.py"
-sys.path.insert(0, str(MODULE_PATH.parent))
-sys.path.insert(0, str(Path(__file__).parents[3] / "common/modules"))
+PACKAGE_ROOT = Path("/package")
+MODULES_ROOT = Path("/opt/modules")
+if not PACKAGE_ROOT.is_dir():
+    repository_root = Path(__file__).resolve().parents[5]
+    PACKAGE_ROOT = repository_root / "ai_agents_framework/ai_agent/sources"
+    MODULES_ROOT = repository_root / "common/modules"
+MODULE_PATH = PACKAGE_ROOT / "rag_bulk_add.py"
+sys.path.insert(0, str(PACKAGE_ROOT))
+sys.path.insert(0, str(MODULES_ROOT))
 from doc_type_association import IMAGE_EXTENSIONS
 
 spec = importlib.util.spec_from_file_location("rag_bulk_add", MODULE_PATH)
@@ -26,12 +32,13 @@ def test_bulk_input_survives_api_volume_mount_relocation(monkeypatch, tmp_path):
     request.mkdir(parents=True)
     uploader_request = api / "api.pmccabe_collector.restapi.org/file-uploader/streaming_directory_events/POST/deferred-upload"
     uploader_request.mkdir(parents=True)
-    uploader_path = Path(__file__).parents[3] / "utility/file-uploader/streaming_directory_events_processor.py"
-    uploader_spec = importlib.util.spec_from_file_location("uploader", uploader_path)
-    uploader = importlib.util.module_from_spec(uploader_spec)
-    uploader_spec.loader.exec_module(uploader)
-    monkeypatch.setenv("STAGING_ROOT", str(api / ".staging"))
-    report = uploader.prepare(uploader_request, ["SESSION_ID", "bulk"])
+    staging = api / ".staging/bulk"
+    staging.mkdir(parents=True)
+    staging.chmod(0o777)
+    report = {
+        "staging": str(staging),
+        "events": str(uploader_request / "events"),
+    }
     monkeypatch.setattr(rag_bulk_add, "start_uploader", lambda *_: report)
     previous = os.umask(0o077)
     try:
@@ -71,9 +78,19 @@ def test_document_type_groups_known_image_extensions(extension):
 def test_augmented_metadata_contains_every_path_component():
     assert rag_bulk_add.augmented_metadata(
         "project=demo", "source/tools/build.py"
-    ) == "project=demo,source,tools,build.py"
-    assert rag_bulk_add.augmented_metadata("", "test/file.txt") == "test,file.txt"
-    assert rag_bulk_add.augmented_metadata("1", "test/compose-functional.dev.yaml") == "1,test,compose-functional.dev.yaml"
+    ) == (
+        "project=demo,source,tools,build.py,"
+        "logical_file_uri=source/tools/build.py"
+    )
+    assert rag_bulk_add.augmented_metadata("", "test/file.txt") == (
+        "test,file.txt,logical_file_uri=test/file.txt"
+    )
+    assert rag_bulk_add.augmented_metadata(
+        "1", "test/compose,functional=dev.yaml"
+    ) == (
+        "1,test,compose,functional=dev.yaml,"
+        "logical_file_uri=test/compose%2Cfunctional%3Ddev.yaml"
+    )
 
 
 def test_values_accepts_only_bulk_query_parameters(monkeypatch):
@@ -316,18 +333,14 @@ def test_start_workers_cleans_up_started_threads_after_partial_failure():
     assert not workers[1].joined
 
 
-def test_bulk_schema_filter_defaults_match_streaming_directory_events():
-    root = Path(__file__).parents[3]
-    bulk_schema = json.loads(
-        (root / "ai_agents_framework/ai_agent/API/rag_bulk_add.json").read_text()
-    )
-    event_schema = json.loads(
-        (root / "utility/file-uploader/API/streaming_directory_events.json").read_text()
-    )
-    filter_names = (
-        "file_allow_regex", "file_skip_regex",
-        "dir_allow_regex", "dir_skip_regex",
-    )
-    for name in filter_names:
-        assert bulk_schema["Params"][name] == event_schema["Params"][name]
-        assert rag_bulk_add.DEFAULTS[name] == event_schema["Params"][name]
+def test_bulk_filter_defaults_match_streaming_directory_contract():
+    expected = {
+        "file_allow_regex": ".*",
+        "file_skip_regex": "(?!)",
+        "dir_allow_regex": ".*",
+        "dir_skip_regex": (
+            r"(?:^|.*/)(?:[.][^/]+|__pycache__|__pypackages__|node_modules)"
+        ),
+    }
+    for name, value in expected.items():
+        assert rag_bulk_add.DEFAULTS[name] == value

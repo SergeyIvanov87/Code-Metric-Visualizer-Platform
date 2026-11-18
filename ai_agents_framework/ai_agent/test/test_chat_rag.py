@@ -63,7 +63,7 @@ def add_document_data(document_data: bytes, metadata: str) -> dict:
     result = json.loads(
         execute_api(
             os.environ["SHARED_API_DIR"],
-            API_SCHEMAS["rag_add"],
+            API_SCHEMAS["rag_add_data"],
             {
                 "-metadata": metadata,
                 "-doc_type": "txt",

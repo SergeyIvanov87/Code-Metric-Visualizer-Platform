@@ -27,6 +27,9 @@ another container. No host `/staging` mount is required.
 Producers should copy beneath an excluded
 temporary directory (for example `.incoming`, which the default directory
 filter excludes) and atomically rename completed files to their final paths.
+Producers whose consumers transfer ownership of staged files must also make
+regular files group-readable and their final parent directories group-writable;
+the HTTP ambassador publishes files as `0664` below `02777` directories.
 
 Keep `events` open and parse one JSON document per line. When a reader is
 connected, each new ready event is written immediately. When no reader is

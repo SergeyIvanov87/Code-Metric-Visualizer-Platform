@@ -6,7 +6,6 @@ import shutil
 from typing import Iterable
 
 from interfaces import RuntimeConfig
-from interfaces.store.utils import canonize_file_uri, decanonize_file_uri
 from interfaces.schema import RecordSchema
 from interfaces.store import StorageRecordEntryInterface
 
@@ -14,7 +13,7 @@ from interfaces.store import StorageRecordEntryInterface
 class PersistentStorageRecordEntry(StorageRecordEntryInterface):
     """Own the naming, creation, reading and sizing of stored document data."""
 
-    doc_suffix = ".storage_bin"
+    payload = "payload.storage_bin"
 
     def __init__(self, directory: Path):
         self.directory = Path(directory)
@@ -56,21 +55,23 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
             ) from original_error
 
     def init_record_from_path(self, file_uri: str | Path, unique_id: int, *,
-                              parent_id: int = 0, offset: int = 0, metadata_text: str = "", doc_type: str = "") -> RecordSchema:
+                              logical_file_uri: str | Path | None = None,
+                              parent_id: int = 0, offset: int = 0, metadata_text: str = "", doc_type: str = "", preserveOriginal: int = 1) -> RecordSchema:
         if not self.exists():
             raise RuntimeError(f"Cannot add the main document: {file_uri}, the storage path doesn't exist: {self.directory}")
         entry = self._entry(unique_id)
         entry.create()
+        stored_file_uri = file_uri if logical_file_uri is None else logical_file_uri
         try:
-            entry.copy_document(file_uri)
-            size = entry.document_size(file_uri)
-            entry.write_fields(offset=offset, size=size, parent_id=parent_id,
+            entry.copy_document(file_uri, preserveOriginal=preserveOriginal)
+            size = entry.document_size()
+            entry.write_fields(file_uri=stored_file_uri, offset=offset, size=size, parent_id=parent_id,
                                metadata=metadata_text, doc_type=doc_type)
         except Exception as error:
             entry._cleanup_incomplete_entry(error)
             raise
 
-        return RecordSchema(file_uri=file_uri, id=unique_id, offset=offset, size=size,
+        return RecordSchema(file_uri=stored_file_uri, id=unique_id, offset=offset, size=size,
                              parent_id=parent_id, metadata={"comment": metadata_text} if metadata_text else {},
                              doc_type=doc_type)
 
@@ -85,8 +86,8 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
         try:
             size = len(data)
             payload = data if parent_id == unique_id else b""
-            entry.write_document(file_uri, payload)
-            entry.write_fields(offset=offset, size=size, parent_id=parent_id,
+            entry.write_document(payload)
+            entry.write_fields(file_uri=file_uri, offset=offset, size=size, parent_id=parent_id,
                                metadata=metadata_text, doc_type=doc_type)
         except Exception as error:
             entry._cleanup_incomplete_entry(error)
@@ -201,14 +202,21 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
     def record_path(storage_uri: Path, unique_id: int) -> Path:
         return storage_uri / str(unique_id)
 
-    def copy_document(self, file_uri: str | Path) -> None:
-        shutil.copyfile(file_uri, self.document_path(file_uri))
+    def copy_document(self, file_uri: str | Path, preserveOriginal: int = 1) -> None:
+        if preserveOriginal != 0:
+            shutil.copyfile(file_uri, self.document_path())
+        else:
+            # shutil.move uses rename where possible and handles cross-mount uploads.
+            shutil.move(str(file_uri), str(self.document_path()))
 
-    def document_size(self, file_uri: str | Path) -> int:
-        return self.document_path(file_uri).stat().st_size
+    def document_size(self) -> int:
+        return self.document_path().stat().st_size
 
     def read_fields(self) -> dict:
-        fields = {"id": int(self.directory.name)}
+        fields = {
+            "id": int(self.directory.name),
+            "file_uri": (self.directory / self.file_uri).read_text(encoding="utf-8"),
+        }
         for name, filename in (
             ("parent_id", self.parent_id),
             ("offset", self.offset),
@@ -225,24 +233,18 @@ class PersistentStorageRecordEntry(StorageRecordEntryInterface):
             elif name == "metadata":
                 value = {"comment": value} if value else {}
             fields[name] = value
-
-        fields["file_uri"] = ""
-        for entry in self.directory.iterdir():
-            if entry.suffix == self.doc_suffix:
-                fields["file_uri"] = decanonize_file_uri(entry.stem)
         return fields
 
 
     def read_record_data(self, record: RecordSchema) -> bytes:
         entry = self._entry(record.id)
-        return entry.document_path(record.file_uri).read_bytes()
+        return entry.document_path().read_bytes()
 
-    def document_path(self, file_uri: str | Path) -> Path:
-        uri = self.directory / canonize_file_uri(str(file_uri))
-        return uri.with_name(f"{uri.name}{self.doc_suffix}")
+    def document_path(self) -> Path:
+        return self.directory / self.payload
 
-    def write_document(self, file_uri: str | Path, data: bytes | bytearray) -> int:
-        return self.document_path(file_uri).write_bytes(data)
+    def write_document(self, data: bytes | bytearray) -> int:
+        return self.document_path().write_bytes(data)
 
     @classmethod
     @contextmanager

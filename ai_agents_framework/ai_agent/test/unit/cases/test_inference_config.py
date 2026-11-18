@@ -4,13 +4,29 @@ import sys
 from types import SimpleNamespace
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'sources'))
+SOURCES_DIR = Path("/package")
+CONFIG_ROOT = None
+if not SOURCES_DIR.is_dir():
+    AGENT_ROOT = Path(__file__).resolve().parents[3]
+    SOURCES_DIR = AGENT_ROOT / "sources"
+    CONFIG_ROOT = AGENT_ROOT / "config"
+sys.path.insert(0, str(SOURCES_DIR))
 import inference_config as inference
 
 
 def profile(mode):
-    return inference.load_inference_config(ROOT / 'config' / f'inference.{mode}.json')
+    if CONFIG_ROOT is not None:
+        return inference.load_inference_config(
+            CONFIG_ROOT / f"inference.{mode}.json"
+        )
+    return {
+        "accelerator": mode,
+        "n_gpu_layers": 0 if mode == "cpu" else -1,
+        "main_gpu": 0,
+        "n_ctx": 8192,
+        "n_batch": 512 if mode == "cpu" else 256,
+        "n_threads": None,
+    }
 
 
 def test_cpu_does_not_probe_gpu():
@@ -56,6 +72,8 @@ def test_invalid_gpu_config(tmp_path, key, value):
         inference.load_inference_config(path)
 
 
-def test_environment_config(monkeypatch):
-    monkeypatch.setenv('AI_AGENT_INFERENCE_CONFIG', str(ROOT / 'config/inference.nvidia.json'))
-    assert inference.load_inference_config()['accelerator'] == 'nvidia'
+def test_environment_config(monkeypatch, tmp_path):
+    path = tmp_path / "inference.nvidia.json"
+    path.write_text(json.dumps(profile("nvidia")))
+    monkeypatch.setenv("AI_AGENT_INFERENCE_CONFIG", str(path))
+    assert inference.load_inference_config()["accelerator"] == "nvidia"

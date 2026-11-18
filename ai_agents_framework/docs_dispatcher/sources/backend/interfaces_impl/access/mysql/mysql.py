@@ -10,7 +10,6 @@ from sqlalchemy import func, text
 
 from interfaces import RuntimeConfig
 from interfaces.access import AccessRecordEntryInterface
-from interfaces.store.utils import decanonize_file_uri
 from interfaces.schema import RecordSchema
 from . import database
 from .models import FileRecord
@@ -83,7 +82,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
             rows = [
                 FileRecord(
                     id=record_id,
-                    file_path=decanonize_file_uri(str(record.file_uri)),
+                    file_path=str(record.file_uri),
                     offset=record.offset,
                     size=record.size,
                     parent_id=record.parent_id,
@@ -115,7 +114,7 @@ class MysqlAccessRecordEntry(AccessRecordEntryInterface):
             )
             for row in rows:
                 record = records_by_id[int(row.id)]
-                row.file_path = decanonize_file_uri(record.file_uri)
+                row.file_path = str(record.file_uri)
                 row.offset = record.offset
                 row.size = record.size
                 row.parent_id = record.parent_id

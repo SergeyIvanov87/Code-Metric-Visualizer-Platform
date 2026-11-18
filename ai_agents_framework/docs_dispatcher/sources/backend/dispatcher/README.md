@@ -57,8 +57,16 @@ utilities used by existing tests, such as rebuilding SQL metadata from a
 directory, remain with MySQL access.
 
 Cross-store operations receive the other interface explicitly. MySQL access
-never imports a concrete store. URI insertion copies the source with `shutil.copyfile()`;
-the caller-owned source remains unchanged on success and failure. Stored sizes
+never imports a concrete store. URI insertion defaults to `preserveOriginal=1`;
+any nonzero value copies the source with `shutil.copyfile()`. Setting it to `0` transfers the
+source into storage using `shutil.move()` (rename when the filesystems permit it).
+Bulk ingestion appends a reserved `logical_file_uri=<percent-encoded URI>` pair
+to metadata. The backend uses that decoded value only as the persisted
+`file_uri`; the `-URI` value remains the physical copy/move source. Without a
+nonempty decodable pair, the physical URI is persisted unchanged. Metadata,
+including the reserved pair, remains otherwise unchanged.
+Failed insertion deletes the stored document without restoring a moved source.
+Normal deletion also removes stored documents without restoring source files. Stored sizes
 and chunk byte ranges refer to the original payload bytes. Inline input continues
 to use `prepare_doc_data()` normalization.
 
@@ -92,10 +100,14 @@ Both interfaces declare the shared `RecordSchema` through `record_schema`.
 | Type | `doc_type` |
 
 Access allocates IDs. A full document's parent ID equals its own ID; chunks
-refer to a parent and byte range. The persistent layout is unchanged: numeric
-record directories, `parentId`, `offset`, `size`, `metadata`, and `doc_type`
-files, encoded payload filenames ending in `.storage_bin`, and empty chunk
-payload placeholders. Existing documents require no migration.
+refer to a parent and byte range. The persistent layout uses numeric record
+directories containing `file_uri`, `parentId`, `offset`, `size`, `metadata`, and
+`doc_type` property files. Document bytes are stored under the fixed name
+`payload.storage_bin`; chunk records use an empty file with that same name.
+`file_uri` contains the unencoded logical path selected from metadata, or the
+physical source path when no logical override exists. This format intentionally
+does not read the former URI-encoded payload filenames, so pre-existing storage
+must be recreated.
 
 ## Configuration
 
@@ -156,3 +168,24 @@ batches also report storage/consistency failures in `unprocessed`, while keeping
 per-record results. Scalar `read_id` requests retain the public plain text
 response; list/range requests return JSON encoded in that response text.
 `get_docs` keeps its existing `offset`/`limit` pagination contract.
+## Document insertion APIs
+
+- `put_doc/v1` accepts `-URI` (required), optional `-doc_type` and `-metadata`, and
+  `-preserveOriginal` (`1` by default, `0` to consume the source; any nonzero value copies).
+  Metadata may contain the reserved, percent-encoded `logical_file_uri` pair
+  described above; this does not add an API parameter.
+  The URI script infers a lowercase filename extension
+  when `-doc_type` is absent, falling back to `txt` for extensionless files.
+  Previously this endpoint defaulted to `txt` without extension inference.
+- `put_doc_data/v1` accepts inline `doc_data`, required `-doc_type` (for example
+  `base64,txt`), and optional `-metadata` and `-filename`. `put_doc_data.py` reads
+  the payload from stdin and calls the existing backend `put_doc_by_data` method.
+  A supplied filename becomes `file_uri` in storage metadata and the SQL record;
+  base64 decoding still follows `doc_type`. The agent's `rag_add_data` supplies
+  a UTC timestamp filename when its caller omits one.
+
+Both schemas are mirrored by the agent's `API/deps/docs_dispatcher` declarations.
+The existing backend and store methods carry `preserveOriginal`; no interface
+operations were added. API executors keep values in quoted Bash arrays through
+argument parsing. The HTTP ambassador keeps the preservation policy off upload
+pages and explicitly sends `0` to both single and bulk agent ingestion APIs.

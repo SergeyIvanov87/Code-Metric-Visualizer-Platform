@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from cli_argument_parser import ArgumentParsingError, RaisingArgumentParser
+
 
 _NOT_FOUND_RESPONSE = "<Not found ID>"
 _DELETE_BATCH_SIZE = 1000
@@ -341,7 +343,7 @@ def main(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="Synchronize RAG storage")
+    parser = RaisingArgumentParser(prog="Synchronize RAG storage")
     parser.add_argument(
         "-db_host",
         "--db_host",
@@ -369,7 +371,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "-session_id", "--session_id", required=True, help="Session identifier"
     )
-    args = parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except ArgumentParsingError as error:
+        print(json.dumps({"error_code": -1, "error_msg": f"Invalid arguments: {error}"}))
+        sys.exit(-1)
 
     return_data = {"error_code": 0, "error_msg": "success", "output": {}}
     error_code = 0

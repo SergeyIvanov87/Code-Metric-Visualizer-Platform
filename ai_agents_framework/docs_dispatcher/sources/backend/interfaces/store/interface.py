@@ -21,6 +21,7 @@ class StorageRecordEntryInterface(ABC):
     directory: Path
 
     parent_id = "parentId"
+    file_uri = "file_uri"
     offset = "offset"
     size = "size"
     metadata = "metadata"
@@ -28,8 +29,9 @@ class StorageRecordEntryInterface(ABC):
 
     @abstractmethod
     def init_record_from_path(self, file_uri: str | Path, unique_id: int, *,
+                              logical_file_uri: str | Path | None = None,
                               parent_id: int = 0,
-                              offset: int = 0, metadata_text: str = "", doc_type: str = "") -> RecordSchema:
+                              offset: int = 0, metadata_text: str = "", doc_type: str = "", preserveOriginal: int = 1) -> RecordSchema:
         """Create a full document and its metadata."""
 
     @abstractmethod

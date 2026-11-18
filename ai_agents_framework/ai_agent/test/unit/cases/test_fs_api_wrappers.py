@@ -12,8 +12,10 @@ sys.path.insert(0, str(SOURCES_DIR))
 
 
 from fs_api_wrappers import (
+    execute_attach_doc_chunks_query,
     execute_delete_doc_query,
     execute_put_doc_query,
+    execute_put_doc_data_query,
     rag_add_file,
     start_uploader,
 )
@@ -45,19 +47,11 @@ class JsonQuery(FakeQuery):
 def test_execute_put_doc_query_omits_uri_when_doc_data_is_specified():
     query = FakeQuery()
 
-    execute_put_doc_query(
-        query,
-        "session",
-        10,
-        None,
-        "encoded-document",
-        "base64,txt",
-        "metadata",
-    )
+    execute_put_doc_data_query(query, 'session', 10, 'encoded-document', 'base64,txt', 'metadata', filename='provided "document":txt')
 
     assert query.exec_args == (
-        "SESSION_ID=session -doc_type=base64,txt "
-        '-metadata=metadata doc_data="encoded-document"'
+        'SESSION_ID=session -doc_type=base64,txt '
+        '-metadata="metadata" doc_data="encoded-document" -filename="provided \\"document\\":txt"'
     )
     assert "-URI" not in query.exec_args
 
@@ -65,48 +59,24 @@ def test_execute_put_doc_query_omits_uri_when_doc_data_is_specified():
 def test_execute_put_doc_query_passes_uri_when_doc_data_is_not_specified():
     query = FakeQuery()
 
-    execute_put_doc_query(
-        query,
-        "session",
-        10,
-        "/documents/example.txt",
-        None,
-        "txt",
-        None,
-    )
+    execute_put_doc_query(query, 'session', 10, '/documents/example.txt', 'txt', None)
 
     assert query.exec_args == (
-        "SESSION_ID=session -doc_type=txt -URI=/documents/example.txt"
+        'SESSION_ID=session -doc_type=txt -URI="/documents/example.txt" -preserveOriginal=1'
     )
     assert "doc_data=" not in query.exec_args
 
 
 def test_execute_put_doc_query_rejects_binary_doc_data():
     with pytest.raises(TypeError, match="doc_data must be textual data"):
-        execute_put_doc_query(
-            FakeQuery(),
-            "session",
-            10,
-            None,
-            b"encoded-document",
-            "base64,txt",
-            "metadata",
-        )
+        execute_put_doc_data_query(FakeQuery(), 'session', 10, b'encoded-document', 'base64,txt', 'metadata')
 
 
 def test_execute_put_doc_query_quotes_doc_data_for_dispatcher():
     query = FakeQuery()
     encoded_document = "prefix/with+shell-sensitive=base64"
 
-    execute_put_doc_query(
-        query,
-        "session",
-        10,
-        None,
-        encoded_document,
-        "base64,txt",
-        "metadata",
-    )
+    execute_put_doc_data_query(query, 'session', 10, encoded_document, 'base64,txt', 'metadata')
 
     assert query.exec_args.endswith(f'doc_data="{encoded_document}"')
 
@@ -181,7 +151,31 @@ def test_rag_add_file_uses_precreated_query_and_preserves_unicode(tmp_path):
         str(tmp_path / relative), ensure_ascii=False
     ) in query.exec_args
     assert "équipe=δοκιμή,données,résumé-数据.py" in query.exec_args
+    assert (
+        "logical_file_uri=donn%C3%A9es/"
+        "r%C3%A9sum%C3%A9-%E6%95%B0%E6%8D%AE.py"
+    ) in query.exec_args
     assert "\\u" not in query.exec_args
+
+    chunk_query = FakeQuery()
+    execute_attach_doc_chunks_query(
+        chunk_query,
+        "worker-session",
+        10,
+        123,
+        "base64,txt",
+        (
+            "équipe=δοκιμή,données,résumé-数据.py,"
+            "logical_file_uri=donn%C3%A9es/"
+            "r%C3%A9sum%C3%A9-%E6%95%B0%E6%8D%AE.py"
+        ),
+        ["encoded-chunk"],
+    )
+    assert "résumé-数据.py_0" in chunk_query.exec_args
+    assert (
+        "logical_file_uri=donn%C3%A9es/"
+        "r%C3%A9sum%C3%A9-%E6%95%B0%E6%8D%AE.py"
+    ) in chunk_query.exec_args
 
 
 def test_delete_doc_passes_compact_ranges_without_expansion():

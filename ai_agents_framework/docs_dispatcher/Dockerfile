@@ -50,6 +50,8 @@ RUN addgroup \
 && adduser ${USER} wheel
 
 
+VOLUME ["/api", "/etc/dispatcher", "/mnt/file_storage"]
+
 RUN <<EOF
     mkdir -p /etc/doas.d && chmod -R o+rwx /etc/doas.d && echo "permit nopass :${GROUPNAME}" >> /etc/doas.d/doas.conf
     mkdir -p -m 777 /etc/dispatcher
@@ -62,8 +64,6 @@ RUN <<EOF
     chown -R ${USER}:${GROUPNAME} /var/log
     chown -R ${USER}:${GROUPNAME} /API
 EOF
-
-VOLUME ["/api", "/etc/dispatcher", "/mnt/file_storage"]
 
 USER ${USER}
 ENTRYPOINT ["/package/init.sh", "/package", "/etc/dispatcher", "/opt", "/api"]

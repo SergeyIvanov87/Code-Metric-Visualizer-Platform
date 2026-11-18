@@ -4,10 +4,12 @@ from interfaces import RuntimeConfig
 from mysql_persistent.backend import MysqlPersistentBackend
 
 import io
+import base64
 from contextlib import nullcontext
 from interfaces_impl.access.mysql import MysqlAccessRecordEntry
 import json
 from pathlib import Path
+from urllib.parse import quote
 
 import pytest
 from sqlalchemy import create_engine
@@ -19,6 +21,7 @@ from interfaces_impl.access.mysql.database import Base
 from attach_doc_chunk import main as attach_chunk_main
 from delete_doc import main as delete_doc_main
 from put_doc import main as put_doc_main
+from put_doc_data import main as put_doc_data_main
 
 
 @pytest.fixture()
@@ -68,15 +71,17 @@ def test_document_storage_round_trips_metadata_and_doc_type(
 ):
     storage_root = tmp_path / "storage"
     storage_root.mkdir()
-    monkeypatch.setattr("sys.stdin", io.BytesIO(b"abcdefghij"))
+    monkeypatch.setattr("sys.stdin", io.BytesIO(base64.b64encode(b"abcdefghij")))
     monkeypatch.setattr(
         "sys.argv",
         [
-            "put_doc.py",
-            "-metadata",
+            "put_doc_data.py",
+            "--metadata",
             "document metadata",
             "-doc_type",
-            "txt",
+            "base64,txt",
+            "-filename",
+            "provided document:txt",
         ],
     )
     monkeypatch.setattr(
@@ -88,7 +93,7 @@ def test_document_storage_round_trips_metadata_and_doc_type(
         lambda config: nullcontext(MysqlAccessRecordEntry(db_session)),
     )
 
-    assert put_doc_main() == 0
+    assert put_doc_data_main() == 0
     result = json.loads(capsys.readouterr().out)
     parent_id = int(result["unique_id"])
 
@@ -99,23 +104,41 @@ def test_document_storage_round_trips_metadata_and_doc_type(
     store = PersistentStorageRecordEntry(storage_root)
     storage_record = store.get_records([parent_id])[0]
     assert storage_record.metadata == {"comment": "document metadata"}
-    assert storage_record.doc_type == "txt"
+    assert storage_record.doc_type == "base64,txt"
+    assert str(records[0].file_uri) == "provided document:txt"
+    assert store.read_record_data(storage_record) == b"abcdefghij"
+    assert (
+        storage_root / str(parent_id) / "file_uri"
+    ).read_text() == "provided document:txt"
+    assert (
+        storage_root / str(parent_id) / "payload.storage_bin"
+    ).read_bytes() == b"abcdefghij"
     assert (
         storage_root / str(parent_id) / "metadata"
     ).read_text() == "document metadata"
-    assert (storage_root / str(parent_id) / "doc_type").read_text() == "txt"
+    assert (storage_root / str(parent_id) / "doc_type").read_text() == "base64,txt"
 
-    uri_path = tmp_path / "uri_document.txt"
+    uri_directory = tmp_path.joinpath(*(
+        f"staging-segment-{index}-{'x' * 72}" for index in range(3)
+    ))
+    uri_directory.mkdir(parents=True)
+    uri_path = uri_directory / 'uri document "quoted".MD'
+    assert len(str(uri_path).encode("utf-8")) > 255
     uri_payload = " \n\tURI документ\u2003\n".encode("utf-8")
     uri_path.write_bytes(uri_payload)
+    logical_file_uri = "logical directory/compose,analysis=api.yaml"
+    uri_metadata = (
+        "document metadata,logical_file_uri="
+        f"{quote(logical_file_uri, safe='/')}"
+    )
     monkeypatch.setattr(
         "sys.argv",
         [
             "put_doc.py",
             "-URI",
             str(uri_path),
-            "-doc_type",
-            "txt",
+            "-metadata",
+            uri_metadata,
         ],
     )
 
@@ -126,11 +149,36 @@ def test_document_storage_round_trips_metadata_and_doc_type(
     uri_record = PersistentStorageRecordEntry(storage_root).get_records([uri_id])[0]
     expected_payload = uri_payload
     assert PersistentStorageRecordEntry(storage_root).read_record_data(uri_record) == expected_payload
+    assert str(uri_record.file_uri) == logical_file_uri
+    assert uri_record.metadata == {"comment": uri_metadata}
+    assert uri_record.doc_type == "md"
     assert uri_record.size == len(expected_payload)
+    assert (
+        storage_root / str(uri_id) / "file_uri"
+    ).read_text() == logical_file_uri
+    assert (
+        storage_root / str(uri_id) / "payload.storage_bin"
+    ).read_bytes() == expected_payload
+    assert access.get_records([uri_id])[0].file_uri == logical_file_uri
+    assert access.get_records([uri_id])[0].metadata == {"comment": uri_metadata}
     assert access.get_records([uri_id])[0].size == len(expected_payload)
+
+    fallback_uri = tmp_path / "fallback source.txt"
+    fallback_uri.write_bytes(b"fallback payload")
+    backend = MysqlPersistentBackend(access=access, store=store)
+    fallback_id = backend.put_doc_by_uri(
+        fallback_uri,
+        metadata_text="metadata without the reserved key",
+    )["unique_id"]
+    fallback_record = store.get_records([fallback_id])[0]
+    assert str(fallback_record.file_uri) == str(fallback_uri)
+    assert (
+        storage_root / str(fallback_id) / "file_uri"
+    ).read_text() == str(fallback_uri)
     assert {int(record.id) for record in access.get_all_records()} == {
         parent_id,
         uri_id,
+        fallback_id,
     }
 
     def fail_after_payload_write(record_entry, **fields):
@@ -141,16 +189,15 @@ def test_document_storage_round_trips_metadata_and_doc_type(
         "write_fields",
         fail_after_payload_write,
     )
-    backend = MysqlPersistentBackend(access=access, store=store)
-
     with pytest.raises(RuntimeError, match="simulated storage failure"):
         backend.put_doc_by_data(Path("failed.txt"), b"failed data")
 
     assert {int(record.id) for record in access.get_all_records()} == {
         parent_id,
         uri_id,
+        fallback_id,
     }
-    assert set(store.get_all_records()) == {parent_id, uri_id}
+    assert set(store.get_all_records()) == {parent_id, uri_id, fallback_id}
 
 
 def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_session, db_engine, capsys):
@@ -195,7 +242,8 @@ def test_attach_chunk_sets_parent_offset_and_size(monkeypatch, tmp_path, db_sess
     assert storage_chunk.offset == 3
     assert storage_chunk.size == 4
     assert storage_chunk.metadata == {"comment": "chunk comment"}
-    assert (storage_root / str(chunk.id) / "parent.txt.storage_bin").read_bytes() == b""
+    assert (storage_root / str(chunk.id) / "payload.storage_bin").read_bytes() == b""
+    assert (storage_root / str(chunk.id) / "file_uri").read_text() == "parent.txt"
 
 
 def test_attach_chunk_rejects_missing_offset(monkeypatch, tmp_path, db_session, db_engine):
@@ -320,8 +368,9 @@ def test_delete_doc_deletes_valid_ids_and_reports_missing_ids(
     assert PersistentStorageRecordEntry(storage_root).get_all_records() == {}
 
 
+@pytest.mark.parametrize("preserveOriginal", [0, 1, 2])
 @pytest.mark.parametrize("failure_stage", ["metadata", "database"])
-def test_uri_insertion_failure_preserves_source(monkeypatch, tmp_path, db_session, failure_stage):
+def test_uri_insertion_failure_respects_source_ownership(monkeypatch, tmp_path, db_session, failure_stage, preserveOriginal):
     storage_root = tmp_path / "storage"
     storage_root.mkdir()
     source = tmp_path / "source.txt"
@@ -340,8 +389,11 @@ def test_uri_insertion_failure_preserves_source(monkeypatch, tmp_path, db_sessio
         monkeypatch.setattr(access, "update_record_by_id", fail)
 
     with pytest.raises(RuntimeError, match="simulated insertion failure"):
-        backend.put_doc_by_uri(source)
+        backend.put_doc_by_uri(source, preserveOriginal=preserveOriginal)
 
-    assert source.read_bytes() == original
+    if preserveOriginal != 0:
+        assert source.read_bytes() == original
+    else:
+        assert not source.exists()
     assert list(storage_root.iterdir()) == []
     assert access.get_all_records() == []

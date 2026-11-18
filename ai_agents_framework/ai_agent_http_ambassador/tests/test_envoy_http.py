@@ -146,14 +146,9 @@ def test_envoy_routes_upload_page_and_put(routed_http, filesystem_api):
     upload = "/" + filesystem_api[1]["rag_add"]["Query"]
     status, body = routed_http(upload)
     assert status == 200 and b"Browse file" in body
-    params = filesystem_api[1]["rag_add"]["Params"]
-    document_parameter = next(
-        name for name, value in params.items()
-        if not name.startswith("-") and value == ""
-    )
-    payload = {
-        document_parameter: base64.b64encode(b"A document\n").decode("ascii")
-    }
+    source = filesystem_api[0] / "envoy-document.txt"
+    source.write_bytes(b"A document\n")
+    payload = {"-URI": str(source), "-doc_type": "txt"}
     status, body = routed_http(
         upload + "/?ignored=true",
         "PUT",

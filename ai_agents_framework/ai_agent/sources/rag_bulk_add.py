@@ -13,6 +13,8 @@ from threading import Lock, Thread
 import time
 from uuid import uuid4
 
+from cli_argument_parser import RaisingArgumentParser
+
 from directory_event_protocol import iter_directory_event_stream
 from doc_type_association import document_type
 from fs_api_wrappers import (
@@ -24,7 +26,7 @@ from fs_api_wrappers import (
 )
 
 DEFAULTS = {
-    "metadata": "", "WaitInitialQueryTimeoutSec": "60",
+    "metadata": "", "preserveOriginal": "1", "WaitInitialQueryTimeoutSec": "60",
     "WaitQueryUpdateTimeoutSec": "10", "WaitResultConsumptionTimeoutSec": "60",
     "SESSION_ID": "default", "workers": "4",
     "file_allow_regex": ".*", "file_skip_regex": r"(?!)",
@@ -40,7 +42,7 @@ API_QUERY_PATTERNS = {
     "streaming_directory_events": re.compile(
         r".*file-uploader_streaming_directory_events.*"
     ),
-    "rag_add": re.compile(r".*ai_agent_rag_add_doc.*"),
+    "rag_add": re.compile(r".*[/_]ai_agent[/_]rag[/_]add_doc[/_]v[0-9]+(?:[/_]PUT)?/?$"),
 }
 
 stopping = False
@@ -265,7 +267,7 @@ def run(options, config, rag_add_queries):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser()
+    parser = RaisingArgumentParser()
     parser.add_argument("--request-directory", required=True, type=Path)
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--check-arguments", action="store_true")
@@ -273,9 +275,9 @@ def main(argv=None):
     parser.add_argument("--initial-timeout", type=float)
     parser.add_argument("--update-timeout", type=float)
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
-    options = parser.parse_args(argv)
-    arguments = options.arguments[1:] if options.arguments[:1] == ["--"] else options.arguments
     try:
+        options = parser.parse_args(argv)
+        arguments = options.arguments[1:] if options.arguments[:1] == ["--"] else options.arguments
         config = values(arguments)
         if options.check_arguments:
             print('{"error_code":"0","error_description":""}')
