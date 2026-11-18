@@ -316,6 +316,8 @@ def create_app(config_path=None, query_factory=None):
             raise ValueError("filename must be a nonempty file name")
         staging_root = api_mount / ".http-document-uploads"
         staging_root.mkdir(mode=0o755, exist_ok=True)
+        # The provider needs to traverse this directory even under a restrictive umask.
+        staging_root.chmod(0o755)
         directory = Path(tempfile.mkdtemp(prefix="document-", dir=staging_root))
         directory.chmod(0o777)
         source = directory / filename

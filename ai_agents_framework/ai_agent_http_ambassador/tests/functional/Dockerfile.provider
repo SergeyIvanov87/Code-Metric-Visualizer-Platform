@@ -8,7 +8,9 @@ COPY ai_agents_framework/ai_agent/API /schemas
 COPY ai_agents_framework/ai_agent/sources/api_generator.py /agent/api_generator.py
 COPY ai_agents_framework/ai_agent_http_ambassador/tests/functional/provider.py /provider.py
 COPY ai_agents_framework/ai_agent_http_ambassador/tests/functional/stub.py /stub.py
-RUN adduser -D -u 1535 provider && mkdir /api /work \
+# Use the shared filesystem API group from the production service images.
+RUN addgroup -g 23456 pmccabe && adduser -D -u 1535 -G pmccabe provider \
+    && mkdir /api /work \
     && chmod -R a+rX /opt /schemas /agent /provider.py /stub.py \
     && chmod 0777 /api && chown provider /work
 USER provider
