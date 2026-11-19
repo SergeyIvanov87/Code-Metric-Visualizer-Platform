@@ -1,5 +1,6 @@
 include:
   - ../common/images/test_aggregator_image/compose.yaml
+  - ../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
 
 services:
   syslog-ng:

@@ -40,7 +40,6 @@ def test_all_rag_command_parsers_use_raising_parser():
     assert command_sources == [
         "rag_add.py",
         "rag_add_data.py",
-        "rag_answer_question.py",
         "rag_bulk_add.py",
         "rag_delete.py",
         "rag_get_docs.py",
