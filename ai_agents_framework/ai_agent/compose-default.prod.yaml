@@ -17,16 +17,21 @@ services:
     build:
       context: ../..
       dockerfile: ai_agents_framework/ai_agent/Dockerfile
+      args:
+        LLM_BACKEND: cpu
       secrets:
         - proxy_ca
     environment:
       VECTORDB_HOST: rag-db
       VECTORDB_PORT: 8000
+      AI_AGENT_INFERENCE_CONFIG: /config/inference.cpu.json
       SKIP_API_DEPS_CHECK: ${SKIP_API_DEPS_CHECK:-false}
       TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC: ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC:-30}
       <<: *proxy-vars
     volumes:
+      - ./config:/config:ro
       - api.pmccabe_collector.restapi.org:/api
+      - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:/assets/models
 
   file-uploader:
     extends:
@@ -48,3 +53,4 @@ volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
+  api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:

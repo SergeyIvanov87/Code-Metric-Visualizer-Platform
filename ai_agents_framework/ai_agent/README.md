@@ -42,8 +42,9 @@ checks filesystem APIs.
 
 This service handles document ingestion, chunking, embeddings, deletion, and
 reconciliation. Embeddings use CPU. Its images no longer install llama.cpp,
-LLM orchestration, CUDA build tools, or Vulkan drivers. The legacy NVIDIA and
-Vulkan Compose filenames remain aliases of the CPU RAG production service.
+LLM orchestration, CUDA build tools, or Vulkan drivers. The existing NVIDIA and
+Vulkan Compose profiles retain their proxy settings, build arguments, inference
+configuration mounts, and device access declarations.
 
 Chat sources, inference profiles, and the chat API schema now live under
 `../ai_chat_agent`. Model assets and inference configuration belong there.
