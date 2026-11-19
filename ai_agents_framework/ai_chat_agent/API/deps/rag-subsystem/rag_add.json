@@ -1,0 +1,18 @@
+{
+    "ParallelBySession": true,
+    "Content-Type": "application/json",
+    "Method": "PUT",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1",
+    "Params": {
+        "-URI": "",
+        "-doc_type": "",
+        "-metadata": "",
+        "-timeout": "20",
+        "-preserveOriginal": "1"
+    },
+    "Description": {
+        "header": "Insert a file URI into RAG",
+        "body": "URI is required. doc_type is inferred from the filename when omitted; metadata is optional and is propagated unchanged to the dispatcher. preserveOriginal defaults to 1; any nonzero value copies, and 0 moves the source.",
+        "footer": ""
+    }
+}

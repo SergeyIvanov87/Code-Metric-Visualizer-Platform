@@ -1,27 +1,51 @@
+include:
+  - ../../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
+x-proxy-vars: &proxy-vars
+  HTTP_PROXY: ${HTTP_PROXY}
+  HTTPS_PROXY: ${HTTPS_PROXY}
+  http_proxy: ${http_proxy}
+  https_proxy: ${https_proxy}
+  NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1},localhost,127.0.0.1,0.0.0.0"
+  no_proxy: "${no_proxy:-${NO_PROXY:-localhost,127.0.0.1}},localhost,127.0.0.1,0.0.0.0"
+
 services:
   ai_agent:
+    extends:
+      file: ../../common/proxy_setup_image_helpers/compose-proxy-args.yaml
+      service: proxy-base
     build:
       context: ../..
       dockerfile: ai_agents_framework/ai_agent/Dockerfile
       args:
         LLM_BACKEND: cpu
+      secrets:
+        - proxy_ca
     environment:
       VECTORDB_HOST: rag-db
       VECTORDB_PORT: 8000
       AI_AGENT_INFERENCE_CONFIG: /config/inference.cpu.json
       SKIP_API_DEPS_CHECK: ${SKIP_API_DEPS_CHECK:-false}
       TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC: ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC:-30}
+      <<: *proxy-vars
     volumes:
       - ./config:/config:ro
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:/assets/models
 
   file-uploader:
+    extends:
+      file: ../../common/proxy_setup_image_helpers/compose-proxy-args.yaml
+      service: proxy-base
     build:
       context: ../../utility/file-uploader
       dockerfile: Dockerfile
       additional_contexts:
         common: ../../common
+      secrets:
+        - proxy_ca
+    environment:
+      <<: *proxy-vars
     volumes:
       - api.pmccabe_collector.restapi.org:/api
 

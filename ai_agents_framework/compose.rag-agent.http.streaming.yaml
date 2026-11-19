@@ -1,5 +1,8 @@
 # Agentic RAG and HTTP gateway services connected to the streaming logger.
 # Start the streaming logger subsystem before launching this project.
+include:
+  - ../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
 services:
   rag-agent:
     extends:

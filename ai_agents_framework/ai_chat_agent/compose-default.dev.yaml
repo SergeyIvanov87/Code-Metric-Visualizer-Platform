@@ -1,0 +1,24 @@
+services:
+  ai_chat_agent:
+    build:
+      context: ../..
+      dockerfile: ai_agents_framework/ai_chat_agent/Dockerfile.dev
+    environment:
+      SKIP_API_DEPS_CHECK: ${SKIP_API_DEPS_CHECK:-false}
+      TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC: ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC:-30}
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - api.pmccabe_collector.project.ai-agents-framework.ai-chat-agent.src:/package
+      - api.pmccabe_collector.project.ai-agents-framework.ai-chat-agent.models:/assets/models
+
+volumes:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true
+  api.pmccabe_collector.project.ai-agents-framework.ai-chat-agent.models:
+  api.pmccabe_collector.project.ai-agents-framework.ai-chat-agent.src:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./sources

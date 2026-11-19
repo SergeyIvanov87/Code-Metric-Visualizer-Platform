@@ -12,9 +12,6 @@ import multiprocessing
 import os
 import sys
 
-import llama_cpp
-from inference_config import load_inference_config, model_options
-
 import chromadb
 
 from langchain.agents import create_agent
@@ -24,9 +21,11 @@ from llama_cpp.llama_chat_format import Jinja2ChatFormatter
 import requests
 from tqdm import tqdm
 
+from cli_argument_parser import ArgumentParsingError, RaisingArgumentParser
+
 
 from docs_retriever import DocumentStore
-from embedding_model import get_embedding_model
+from embedding_model_tmp_copy import get_embedding_model
 
 from pydantic import BaseModel, Field
 
@@ -80,18 +79,19 @@ def load_null_safe_qwen_model(
 ) -> ChatLlamaCpp:
     """Load a Qwen GGUF with the standalone null-safe chat template."""
 
-    options = model_options(load_inference_config(), llama_cpp)
     chat_handler = create_null_safe_qwen_chat_handler(chat_template_path)
 
-    backend_options = options.pop("model_kwargs")
     return ChatLlamaCpp(
         model_path=str(model_path.as_posix()),
         temperature=0,
         max_tokens=1024,
         top_p=0.9,
         repeat_penalty=1.1,
-        **options,
-        model_kwargs={**backend_options, "chat_handler": chat_handler},
+        n_ctx=8192,
+        n_batch=512,
+        n_threads=max(1, multiprocessing.cpu_count() - 1),
+        n_gpu_layers=-1,
+        model_kwargs={"chat_handler": chat_handler},
         verbose=True,
     )
 
@@ -120,7 +120,6 @@ def retrieve_by_vector(collection, query_embedder, document_store, query: str, k
         print(
             f"[RETRIEVAL] Adjusted unsafe k={k!r} to {safe_k}",
             flush=True,
-            file=sys.stderr,
         )
 
 
@@ -153,7 +152,6 @@ def retrieve_by_vector(collection, query_embedder, document_store, query: str, k
                 f"[RETRIEVAL] Rejecting id={document_id}: "
                 f"distance={distance:.4f}, acceptable distance={MAX_ACCEPTABLE_DISTANCE:.4f}",
                 flush=True,
-                file=sys.stderr,
             )
             continue
 
@@ -219,7 +217,7 @@ def search_knowledge_base_impl(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="Agentic RAG")
+    parser = RaisingArgumentParser(prog="Agentic RAG")
     parser.add_argument(
         "-system_prompt",
         "--system_prompt",
@@ -244,19 +242,23 @@ if __name__ == "__main__":
         type=int,
         help="the listening port of a Vector DB service",
     )
-
     parser.add_argument(
         "-session_id",
         "--session_id",
         type=str,
         help="Session ID"
     )
+
     parser.add_argument(
         "shared_api_dir", type=Path, help="Root path of the mounted API dir"
     )
     parser.add_argument("main_service_name", type=str, help="the main service name")
     parser.add_argument("assets_models", help="Path to the root directory with models")
-    args = parser.parse_args()
+    try:
+        args = parser.parse_args()
+    except ArgumentParsingError as error:
+        print(json.dumps({"error_code": -1, "error_msg": f"Invalid arguments: {error}"}))
+        sys.exit(2)
 
     chroma_client = chromadb.HttpClient(host=args.db_host, port=args.db_port)
     collection = None
@@ -284,7 +286,7 @@ if __name__ == "__main__":
     model_path = Path(args.assets_models) / model_name
 
     if not os.path.exists(model_path):
-        print(f"Downloading {model_path}...", file=sys.stderr)
+        print(f"Downloading {model_path}...")
         # You may want to replace the model URL by another of your choice
         #model_url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/" + model_name
         #model_url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/" + model_name
@@ -296,7 +298,7 @@ if __name__ == "__main__":
         with open(model_path, 'wb') as f:
             for data in tqdm(response.iter_content(chunk_size=4096), total=total_size//4096):
                 f.write(data)
-        print("Download complete!", file=sys.stderr)
+        print("Download complete!")
 
     '''
     model = ChatLlamaCpp(
@@ -333,7 +335,6 @@ if __name__ == "__main__":
         print(
             f"[TOOL EXECUTED] query={query!r}, k={DEFAULT_RETRIEVAL_RESULTS}",
             flush=True,
-            file=sys.stderr,
         )
 
         return search_knowledge_base_impl(
@@ -343,6 +344,13 @@ if __name__ == "__main__":
             query=query,
             k=DEFAULT_RETRIEVAL_RESULTS,
         )
+
+    print(
+        json.dumps(
+            search_knowledge_base.args_schema.model_json_schema(),
+            indent=2,
+        )
+    )
 
     FORCED_RETRIEVAL_CHOICE = {
         "type": "function",
@@ -366,7 +374,6 @@ if __name__ == "__main__":
                 print(
                     "[MIDDLEWARE] Successful retrieval; allowing final answer",
                     flush=True,
-                    file=sys.stderr,
                 )
                 return handler(request)
 
@@ -383,7 +390,6 @@ if __name__ == "__main__":
             print(
                 f"[MIDDLEWARE] Retrieval failed; error count={error_count}",
                 flush=True,
-                file=sys.stderr,
             )
 
             if error_count >= 2:
@@ -402,7 +408,6 @@ if __name__ == "__main__":
         print(
             "[MIDDLEWARE] Forcing search_knowledge_base",
             flush=True,
-            file=sys.stderr,
         )
 
         return handler(
@@ -411,6 +416,18 @@ if __name__ == "__main__":
             )
         )
 
+
+    # TEST TESt TEST
+    print("Testing retrieval tool directly...", flush=True)
+
+    direct_result = search_knowledge_base.invoke(
+        {
+            "query": "What is Code Metric Visualizer Platform?",
+          #  "k": 5,
+        }
+    )
+
+    print("Direct retrieval result:", direct_result, flush=True)
 
     '''
     #TEst Test Test
@@ -459,15 +476,32 @@ if __name__ == "__main__":
 
     Never invent content or Source IDs.
     """,
-        debug=False,
+        debug=True,
     )
 '''
+
+    """
+    You are a knowledge-base assistant.
+
+    You must not answer knowledge-base questions from memory.
+
+    A successful search_knowledge_base result is the only permitted source of
+    factual information. A ToolMessage with status="error" contains no search
+    results and must never be treated as evidence.
+
+    After successful retrieval:
+    - Answer only from the returned content.
+    - Cite only Source IDs actually present in the returned content.
+    - If no relevant content was returned, say that no relevant information was found.
+
+    Never invent content or Source IDs.
+    """
     null_safe_qwen_agent = create_agent(
         model=null_safe_qwen_model,
         tools=[search_knowledge_base],
         middleware=[force_initial_retrieval],
         system_prompt = args.system_prompt,
-        debug=False,
+        debug=True,
     )
 
     result = null_safe_qwen_agent.invoke(
@@ -481,4 +515,4 @@ if __name__ == "__main__":
         }
     )
 
-    print(json.dumps({"response": result["messages"][-1].content}))
+    print(result["messages"][-1].content)
