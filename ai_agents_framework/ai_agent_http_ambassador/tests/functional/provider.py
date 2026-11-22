@@ -34,7 +34,8 @@ def stop(*_args):
 
 signal.signal(signal.SIGTERM, stop)
 signal.signal(signal.SIGINT, stop)
-for name in ("chat", "rag_add", "rag_bulk_add"):
+#for name in ("chat", "rag_add", "rag_bulk_add"):
+for name in ("rag_add", "rag_bulk_add"):
     schema = json.loads((Path("/schemas") / f"{name}.json").read_text())
     node = Path("/api") / schema["Query"]
     (node / schema["Method"]).mkdir(parents=True, exist_ok=True)

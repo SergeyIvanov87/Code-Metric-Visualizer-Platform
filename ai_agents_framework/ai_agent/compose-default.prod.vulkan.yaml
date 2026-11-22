@@ -27,6 +27,11 @@ services:
     group_add:
       - "${INTEL_RENDER_GID:?Set INTEL_RENDER_GID to the host render device group ID}"
 
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
+
 volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
