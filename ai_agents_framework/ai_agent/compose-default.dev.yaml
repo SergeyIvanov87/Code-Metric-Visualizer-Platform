@@ -21,15 +21,34 @@ services:
       dockerfile: ai_agents_framework/ai_agent/Dockerfile.dev
       secrets:
         - proxy_ca
-      args:
-        VECTORDB_HOST: rag-db
-        VECTORDB_PORT: 8000
-        SKIP_API_DEPS_CHECK: ${SKIP_API_DEPS_CHECK:-false}
-        TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC: ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC:-30}
+    environment:
+      VECTORDB_HOST: rag-db
+      VECTORDB_PORT: 8000
+      SKIP_API_DEPS_CHECK: ${SKIP_API_DEPS_CHECK:-false}
+      TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC: ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC:-30}
+    networks:
+      - api.pmccabe_collector.network
     volumes:
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.project.ai-agents-framework.ai-agent.src:/package
-      - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:/assets/models
+
+  rag-db:
+    extends:
+      file: ../RAG/compose.yaml
+      service: rag-db
+    networks:
+      - api.pmccabe_collector.network
+    volumes:
+      - api.pmccabe_collector.project.ai-agents-framework.rag-vectordb-data:/mnt
+
+  rag-doc-storage-dispatcher:
+    extends:
+      file: ../docs_dispatcher/compose-default.prod.yaml
+      service: docs_dispatcher
+    volumes:
+      - api.pmccabe_collector.restapi.org:/api
+      - api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.config:/etc/dispatcher
+      - api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.persistent-store-data:/mnt/file_storage
 
   file-uploader:
     extends:
@@ -42,16 +61,27 @@ services:
         common: ../../common
       secrets:
         - proxy_ca
-    environment:
-      <<: *proxy-vars
     volumes:
       - api.pmccabe_collector.restapi.org:/api
 
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
+
+secrets:
+   backend_mysql_db_login:
+     file: ../docs_dispatcher/sources/backend/interfaces_impl/access/mysql/default_user.txt
+   backend_mysql_db_password:
+     file: ../docs_dispatcher/sources/backend/interfaces_impl/access/mysql/default_pwd.txt
+
 volumes:
+  api.pmccabe_collector.project.ai-agents-framework.rag-vectordb-data:
+  api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.persistent-store-data:
+  api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.config:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
-  api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.src:
     driver: local
     driver_opts:

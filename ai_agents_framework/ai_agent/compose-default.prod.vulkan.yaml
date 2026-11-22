@@ -21,7 +21,6 @@ services:
       secrets:
         - proxy_ca
     environment:
-      AI_AGENT_INFERENCE_CONFIG: /config/inference.intel.json
       <<: *proxy-vars
     devices:
       - ${INTEL_RENDER_DEVICE:-/dev/dri/renderD128}:/dev/dri/renderD128

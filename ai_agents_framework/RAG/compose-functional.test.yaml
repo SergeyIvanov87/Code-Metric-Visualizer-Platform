@@ -1,8 +1,12 @@
 include:
   - tests/compose-functional.test.yaml
+  - ../../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
 
 services:
   rag:
+    extends:
+      file: ../../common/proxy_setup_image_helpers/compose-proxy-args.yaml
+      service: proxy-base
     build:
       context: ../../
       dockerfile: ./ai_agents_framework/RAG/Dockerfile

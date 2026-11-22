@@ -1,5 +1,11 @@
+include:
+  - ../../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
 services:
   docs_dispatcher:
+    extends:
+      file: ../../common/proxy_setup_image_helpers/compose-proxy-args.yaml
+      service: proxy-base
     build:
       context: ../../
       dockerfile: ./ai_agents_framework/docs_dispatcher/Dockerfile
@@ -10,7 +16,7 @@ services:
        BE_MYSQL_MYSQL_DATABASE: rag_docs_database
     volumes:
       - api.pmccabe_collector.restapi.org:/api
-      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage:/mnt/file_storage
+      - api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.persistent-store-data:/mnt/file_storage
     secrets:
        - backend_mysql_db_login
        - backend_mysql_db_password
@@ -19,7 +25,7 @@ volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
     external: true
-  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage:
+  api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.persistent-store-data:
 
 secrets:
    backend_mysql_db_login:

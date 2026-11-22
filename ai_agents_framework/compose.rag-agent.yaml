@@ -161,7 +161,7 @@ services:
     ports:
       - 8000:8000
     volumes:
-      - api.pmccabe_collector.project.ai-agents-framework.rag.db:/mnt
+      - api.pmccabe_collector.project.ai-agents-framework.rag-vectordb-data:/mnt
     networks:
       - api.pmccabe_collector.network
 
@@ -203,7 +203,7 @@ volumes:
     name: api.pmccabe_collector.restapi.org
     external: true
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:
-  api.pmccabe_collector.project.ai-agents-framework.rag.db:
-  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage:
+  api.pmccabe_collector.project.ai-agents-framework.rag-vectordb-data:
+  api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.persistent-store-data:
   file-uploads:
   http-api-gateway-config:

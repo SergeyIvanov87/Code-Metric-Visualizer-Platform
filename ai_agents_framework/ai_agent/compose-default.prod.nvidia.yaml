@@ -22,7 +22,6 @@ services:
       secrets:
         - proxy_ca
     environment:
-      AI_AGENT_INFERENCE_CONFIG: /config/inference.nvidia.json
       <<: *proxy-vars
     deploy:
       resources:

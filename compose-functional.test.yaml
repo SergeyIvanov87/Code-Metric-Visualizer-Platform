@@ -108,7 +108,7 @@ services:
       timeout: 1s
       retries: 10
     volumes:
-      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/mnt/file_storage
+      - api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.persistent-store-data.test:/mnt/file_storage
     networks:
       - api.pmccabe_collector.network
 
@@ -135,7 +135,7 @@ services:
       VECTORDB_HOST: rag
       VECTORDB_PORT: 8000
     volumes:
-      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.rag-dispatcher.test:/api
       - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models.test:/assets/models
     depends_on:
       docs-dispatcher:
@@ -157,7 +157,7 @@ services:
       file: ai_agents_framework/ai_agent/compose-default.prod.yaml
       service: file-uploader
     volumes:
-      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.rag-dispatcher.test:/api
     depends_on:
       test_aggregator:
         condition: service_healthy
@@ -176,7 +176,7 @@ services:
     environment:
       EXIT_ONCE_DONE: "false"
     volumes:
-      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.rag-dispatcher.test:/api
     depends_on:
       ai_agent:
         condition: service_started
@@ -266,9 +266,9 @@ volumes:
   api.pmccabe_collector.restapi.org.rrd.test:
   api.pmccabe_collector.restapi.org.rest-api.test:
   api.pmccabe_collector.restapi.org.service-broker.test:
-  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:
-  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:
-  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.cfg.test:
+  api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.persistent-store-data.test:
+  api.pmccabe_collector.restapi.org.ai-agents-framework.rag-dispatcher.test:
+  api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.config.test:
   api.pmccabe_collector.project.ai-agents-framework.rag.test:
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.models.test:
 

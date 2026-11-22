@@ -2,9 +2,11 @@
 !ai_agents_framework/
 !ai_agents_framework/ai_agent/
 !ai_agents_framework/ai_agent/API/
-!ai_agents_framework/ai_agent/API/chat.json
 !ai_agents_framework/ai_agent/API/rag_add.json
 !ai_agents_framework/ai_agent/API/rag_bulk_add.json
+!ai_agents_framework/ai_chat_agent/
+!ai_agents_framework/ai_chat_agent/API/
+!ai_agents_framework/ai_chat_agent/API/chat.json
 !ai_agents_framework/ai_agent_http_ambassador/
 !ai_agents_framework/ai_agent_http_ambassador/**
 !common/

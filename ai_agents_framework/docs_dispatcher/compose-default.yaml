@@ -1,5 +1,11 @@
+include:
+  - ../../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
 services:
   docs_dispatcher:
+    extends:
+      file: ../../common/proxy_setup_image_helpers/compose-proxy-args.yaml
+      service: proxy-base
     build:
       context: ../../
       dockerfile: ./ai_agents_framework/docs_dispatcher/Dockerfile
