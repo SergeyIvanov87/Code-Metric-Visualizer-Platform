@@ -1,0 +1,29 @@
+# Reuse the production controller and proxy; no application siblings are
+# declared here because the controller must create them itself.
+include:
+  - ../../compose.yaml
+services:
+  # Build context provider for the existing tester image, not a second test run.
+  test_pseudo_fs:
+    build:
+      context: ../../../..
+      dockerfile: common/images/test_pseudo_fs/Dockerfile
+    entrypoint: ["/bin/true"]
+    network_mode: none
+  ai_agent_rag_functional_tester:
+    build:
+      context: ../../../..
+      dockerfile: ai_agents_framework/ai_agent/test/Dockerfile
+      additional_contexts:
+        test_pseudo_fs: service:test_pseudo_fs
+    environment:
+      EXIT_ONCE_DONE: "true"
+    volumes:
+      - fs-api:/api
+    network_mode: none
+    depends_on:
+      rag:
+        condition: service_healthy
+volumes:
+  fs-api:
+    name: ${FS_API_VOLUME:-persistent-rag-api}
