@@ -11,6 +11,7 @@ import argparse
 from math import log10
 import os
 import pathlib
+import shlex
 import sys
 import stat
 
@@ -42,6 +43,7 @@ from api_fs_bash_utils import generate_unblock_readers_of_result_pipe_array_by_o
 from api_fs_bash_utils import unblock_readers_of_result_pipe_array_by_owner
 
 EMPTY_DEV_SCRIPT_MARK = "<TODO: THE SCRIPT IS EMPTY>"
+FIFO_LOGGER_PATH = pathlib.Path(__file__).resolve().with_name("shell_utils") / "fifo_logger.sh"
 
 def check_script_valid(path, script_name):
     script_generated_name = compose_api_exec_script_name(script_name)
@@ -85,6 +87,17 @@ api_gui_schema = [
     "\t\tesac\n",
     "\tdone\n",
 ]
+
+CLI_REQUEST_BATCH_END = (
+    '    done <<< "$(fifo_logged read "${pipe_request}" "" cat -- "${pipe_request}" '
+    '|| mkfifo -m 622 "${pipe_request}")"\n'
+)
+CLI_WATCHDOG_CALL = (
+    '        ' + exec_watchdog_function()
+    + ' ${WATCH_PID_ARRAY[${SESSION_ID_VALUE}]} "${pipe_result_consumer}" "${SESSION_ID_VALUE}"\n'
+)
+CLI_EXECUTOR_CALL = '            RESULT_OUT=$({0}/{1} {2} '
+
 
 api_cli_schema = [
     *generate_exec_watchdog_function(),
@@ -134,6 +147,7 @@ api_cli_schema = [
     "        fi\n",
     '        echo "`date +%H:%M:%S:%3N`\t${ME}\trequest ${REQUEST_NUM}"\n',
     "        " + extract_attr_value_from_string() + " ${SESSION_ID_ATTR} \"${CMD_READ}\" \"#####\" '=' SESSION_ID_VALUE\n",
+    '        fifo_log read "${pipe_request}" "${SESSION_ID_VALUE}" received 0\n',
     "        " + extract_attr_value_from_string() + " ${API_KEEP_ALIVE_ATTR} \"${CMD_READ}\" \"@@@@@\" '=' API_KEEP_ALIVE_VALUE\n",
     "        if [ -z ${pipe_result_array[${SESSION_ID_VALUE}]} ]; then\n",
     '            pipe_result_consumer="${pipe_result}_${SESSION_ID_VALUE}"\n',
@@ -152,20 +166,20 @@ api_cli_schema = [
     "            rm -f ${pipe_result_consumer}\n",
     "            mkfifo -m 644 ${pipe_result_consumer}\n",
     "        fi\n",
-    '        ' + exec_watchdog_function() + " ${WATCH_PID_ARRAY[${SESSION_ID_VALUE}]} ${pipe_result_consumer}\n",
+    CLI_WATCHDOG_CALL,
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=0\n",
     '        echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tSTART    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}"\treqNum:\t${REQUEST_NUM}\n',
     '        touch "${api_exec_node_directory}/in_progress"\n',
     '        if [ ! -z ${API_KEEP_ALIVE_VALUE} ] && [ ${API_KEEP_ALIVE_VALUE} != "@@@@@" ]; then\n',
     '            RESULT_OUT=$(echo -n "${API_KEEP_ALIVE_VALUE}" | base64)\n',
     '        else\n',
-    '            RESULT_OUT=$({0}/{1} {2} ', '"${CMD_READ}" | base64)\n',
+    CLI_EXECUTOR_CALL, '"${CMD_READ}" | base64)\n',
     '        fi\n',
     '        rm -f ${api_exec_node_directory}/in_progress\n',
-    '        (touch ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tFINISH    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}\treqNum:\t${REQUEST_NUM} " && echo "${RESULT_OUT}" | base64 -d >$pipe_result_consumer && rm -rf ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tCONSUMED [${SESSION_ID_VALUE}]: ${api_exec_node_directory} <--- ${pipe_result_consumer}") &\n',
+    '        (touch ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tFINISH    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}\treqNum:\t${REQUEST_NUM} " && echo "${RESULT_OUT}" | fifo_logged write "${pipe_result_consumer}" "${SESSION_ID_VALUE}" decode_fifo_result "${pipe_result_consumer}" && rm -rf ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tCONSUMED [${SESSION_ID_VALUE}]: ${api_exec_node_directory} <--- ${pipe_result_consumer}") &\n',
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=$!\n",
     "        let REQUEST_NUM=${REQUEST_NUM}+1\n",
-    "    done <<< `cat $pipe_request || if [ $? != 0 ]; then mkfifo -m 622 ${pipe_request}; fi`\n",
+    CLI_REQUEST_BATCH_END,
     "done\n",
     "echo 'Server {0} stopped'\n",
 ]
@@ -244,6 +258,7 @@ def generate_parallel_session_functions(
         "parallel_wait_for_previous_request() {\n",
         '    local previous_state="${1}"\n',
         '    local result_fifo="${2}"\n',
+        '    local session_id="${3}"\n',
         '    local previous_handler_pid=""\n',
         '    local writer_pid=""\n',
         '    local drain_pid=""\n',
@@ -262,7 +277,7 @@ def generate_parallel_session_functions(
         '        if [[ -e "${previous_state}/result_ready" && -r "${previous_state}/result_writer.pid" ]]; then\n',
         '            IFS= read -r writer_pid < "${previous_state}/result_writer.pid"\n',
         '            if [[ -n "${writer_pid}" ]] && kill -0 "${writer_pid}" 2>/dev/null; then\n',
-        "                timeout 2 /bin/bash -c 'cat \"$1\" >/dev/null 2>&1' _ \"${result_fifo}\" &\n",
+        "                fifo_logged read \"${result_fifo}\" \"${session_id}\" timeout 2 /bin/bash -c 'cat \"$1\" >/dev/null 2>&1' _ \"${result_fifo}\" &\n",
         '                drain_pid=$!\n',
         '                attempts=0\n',
         '                while kill -0 "${writer_pid}" 2>/dev/null && (( attempts < 40 )); do\n',
@@ -303,7 +318,7 @@ def generate_parallel_session_functions(
         '    exec {PARALLEL_REQUEST_KEEPALIVE_FD}>&-\n',
         '    exec {PARALLEL_REQUEST_READ_FD}<&-\n',
         '    trap \'touch "${request_state}/done"\' EXIT\n',
-        '    parallel_wait_for_previous_request "${previous_state}" "${result_fifo}"\n',
+        '    parallel_wait_for_previous_request "${previous_state}" "${result_fifo}" "${session_id}"\n',
         '    echo "`date +%H:%M:%S:%3N`\\t${ME}\\t`hostname`\\tSTART    [${session_id}]: ${api_exec_node_directory}\\targs:\\t${command}\\treqNum:\\t${request_num}"\n',
         '    if [[ -n "${keep_alive_value}" && "${keep_alive_value}" != "@@@@@" ]]; then\n',
         '        result_out=$(printf \'%s\' "${keep_alive_value}" | base64)\n',
@@ -311,13 +326,17 @@ def generate_parallel_session_functions(
         '        result_out=$("${parallel_request_executor}" "${parallel_api_request_directory}" "${command}" | base64)\n',
         "    fi\n",
         '    echo "`date +%H:%M:%S:%3N`\\t${ME}\\t`hostname`\\tFINISH    [${session_id}]: ${api_exec_node_directory}\\targs:\\t${command}\\treqNum:\\t${request_num}"\n',
+        # Keep the existing writer PID so the watchdog can kill it directly.
+        '    fifo_log write "${result_fifo}" "${session_id}" started\n',
         '    printf \'%s\\n\' "${result_out}" | base64 -d > "${result_fifo}" &\n',
         '    result_writer_pid=$!\n',
         '    printf \'%s\\n\' "${result_writer_pid}" > "${request_state}/result_writer.pid"\n',
         '    touch "${request_state}/result_ready"\n',
         '    if wait "${result_writer_pid}"; then\n',
+        '        fifo_log write "${result_fifo}" "${session_id}" finished 0\n',
         '        echo "`date +%H:%M:%S:%3N`\\t${ME}\\t`hostname`\\tCONSUMED [${session_id}]: ${api_exec_node_directory} <--- ${result_fifo}"\n',
         "    else\n",
+        '        fifo_log write "${result_fifo}" "${session_id}" finished "$?"\n',
         '        echo "`date +%H:%M:%S:%3N`\\t${ME}\\t`hostname`\\tRESET    [${session_id}]: ${api_exec_node_directory} <--- ${result_fifo}"\n',
         "    fi\n",
         "}\n",
@@ -357,7 +376,7 @@ def generate_cli_server_content(
     else:
         api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(req_exec_script_root_dir,req_executor_name)
 
-    template_schema_row_index += 62
+    template_schema_row_index = api_cli_schema_concrete.index(CLI_EXECUTOR_CALL)
     api_cli_schema_concrete[template_schema_row_index] = api_cli_schema_concrete[template_schema_row_index].format(
         req_exec_script_root_dir,
         req_executor_name,
@@ -384,29 +403,24 @@ def generate_cli_server_content(
             # write descriptor prevents EOF between external FIFO writers.
             # Separate descriptors avoid relying on Linux-specific FIFO O_RDWR
             # behavior.
+            'fifo_log open-read "${pipe_request}" "" started\n',
             'exec {PARALLEL_REQUEST_READ_FD}<"${pipe_request}"\n',
+            'fifo_log open-read "${pipe_request}" "" finished "$?"\n',
+            'fifo_log open-write "${pipe_request}" "" started\n',
             'exec {PARALLEL_REQUEST_KEEPALIVE_FD}>"${pipe_request}"\n',
+            'fifo_log open-write "${pipe_request}" "" finished "$?"\n',
             "REQUEST_NUM=0\n",
-            'while IFS= read -r -u "${PARALLEL_REQUEST_READ_FD}" CMD_READ\n',
+            'while IFS= fifo_logged read "${pipe_request}" "" read -r -u "${PARALLEL_REQUEST_READ_FD}" CMD_READ\n',
         ]
 
-        batch_end_line = (
-            "    done <<< `cat $pipe_request || if [ $? != 0 ]; "
-            "then mkfifo -m 622 ${pipe_request}; fi`\n"
-        )
-        batch_end_index = api_cli_schema_concrete.index(batch_end_line)
+        batch_end_index = api_cli_schema_concrete.index(CLI_REQUEST_BATCH_END)
         api_cli_schema_concrete[batch_end_index:batch_end_index + 2] = [
             "done\n",
             'exec {PARALLEL_REQUEST_KEEPALIVE_FD}>&-\n',
             'exec {PARALLEL_REQUEST_READ_FD}<&-\n',
         ]
 
-        watchdog_line = (
-            "        "
-            + exec_watchdog_function()
-            + " ${WATCH_PID_ARRAY[${SESSION_ID_VALUE}]} ${pipe_result_consumer}\n"
-        )
-        watchdog_index = api_cli_schema_concrete.index(watchdog_line)
+        watchdog_index = api_cli_schema_concrete.index(CLI_WATCHDOG_CALL)
         api_cli_schema_concrete[watchdog_index:watchdog_index] = [
             '        ((PARALLEL_REQUEST_COUNTER += 1))\n',
             '        if (( PARALLEL_REQUEST_COUNTER % 64 == 0 )); then\n',
@@ -423,7 +437,11 @@ def generate_cli_server_content(
             "        continue\n",
         ]
 
-    return api_cli_schema_concrete
+    return [
+        f"source {shlex.quote(str(FIFO_LOGGER_PATH))}\n",
+        'decode_fifo_result() { base64 -d > "$1"; }\n',
+        *api_cli_schema_concrete,
+    ]
 
 def create_gui_server_content_from_schema(req_name, req_schema, req_exec_script_root_dir = "${WORK_DIR}"):
     req_type = req_schema["Method"]

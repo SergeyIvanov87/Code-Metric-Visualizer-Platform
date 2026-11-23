@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source /tests/utils/shell_utils/fifo_logger.sh
+
 test_suite_filename=${0}
 
 oneTimeSetUp() {

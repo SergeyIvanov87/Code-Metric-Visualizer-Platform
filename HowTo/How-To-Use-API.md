@@ -59,6 +59,22 @@ we enforce a processing service to create an additional output PIPE suffixed by 
 This additional PIPE were created to not interfere with other parallel request committed throught single `exec` input PIPE, which would have been overritten every time upon new request were made.
 Please pay attention, that after **SESSION_ID** was manifested as `exec` arguments, there is a short delay before the OUTPUT PIPE would be created first time. It might be important in scripting this `echo` <-> `cat` pair, hence before execution `cat` on the OUTPUT PIPE please be sure that it has been created.
 
+## CLI FIFO logs
+
+Generated CLI services append FIFO events to `$WORK_DIR/fifo.log`. Set
+`FIFO_LOG_FILE` in the service environment to use a different path. Its
+parent directory must be writable by the service user. The logger rotates
+the file at 10 MiB by default and keeps five backups. Set
+`FIFO_LOG_MAX_BYTES` to change the size threshold.
+
+Each record includes a timestamp, process ID, FIFO path, operation, event,
+and status when available. A request read starts with `session_id=unknown`.
+The `received` event records the parsed `SESSION_ID`, also used on the
+corresponding result write. A serial service can receive multiple requests in
+one FIFO read. Keep the service running through a result read to observe the
+`finished` event. Log writes are best-effort and leave service stdout and
+stderr available for the existing output.
+
 ## GUI File Manager
 
 If you prefer to use GUI rather than CLI, then you could just follow a path `api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/view/flamegraph/GET` in your favorite File Manager.

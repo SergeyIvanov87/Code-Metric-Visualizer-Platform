@@ -92,12 +92,41 @@ def test_parallel_by_session_is_opt_in(run_around_tests):
         'read -r -u "${PARALLEL_REQUEST_READ_FD}" CMD_READ'
         in parallel_server
     )
-    assert "cat $pipe_request" not in parallel_server
+    assert 'cat -- "${pipe_request}"' not in parallel_server
     assert "exec {PARALLEL_REQUEST_KEEPALIVE_FD}>&-" in parallel_server
     assert "exec {PARALLEL_REQUEST_READ_FD}<&-" in parallel_server
     assert "parallel_session_request()" not in legacy_server
     assert "declare -A PARALLEL_REQUEST_STATE" not in legacy_server
-    assert "cat $pipe_request" in legacy_server
+    assert 'fifo_logged read "${pipe_request}" "" cat -- "${pipe_request}"' in legacy_server
+
+
+@pytest.mark.parametrize("request_name", ["req_1", "req_2"])
+def test_generated_service_logs_session_fifo_io(run_around_tests, request_name):
+    _install_request_command("true\n")
+    query = _query_for(request_name)
+    session_id = f"fifo-log-{request_name}"
+    payload = "test-payload"
+    _execute(query, session_id, payload)
+    assert payload in _wait_result(query, session_id)
+
+    log = Path(SETTINGS.work_dir) / "generated" / "fifo.log"
+
+    def session_records():
+        if not log.exists():
+            return []
+        return [
+            line for line in log.read_text().splitlines()
+            if f"session_id={session_id} " in line
+        ]
+
+    assert _wait_until(
+        lambda: any("event=finished status=0" in line for line in session_records())
+    )
+    records = session_records()
+    assert any("operation=read " in line and "event=received status=0" in line for line in records)
+    assert any("operation=write " in line and "event=started" in line for line in records)
+    assert any("operation=write " in line and "event=finished status=0" in line for line in records)
+    assert all(payload not in line for line in records)
 
 
 def test_parallel_by_session_requires_a_boolean(run_around_tests):

@@ -2,7 +2,7 @@
 
 test_suite_filename=${0}
 
-source /tests/shell_utils/init_utils.sh
+source /tests/utils/shell_utils/init_utils.sh
 
 assert_process_running() {
     local message=${1}
