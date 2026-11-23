@@ -14,6 +14,49 @@ Each request can be executed as simple ACCESS-operation on a file named `exec` o
 
 # Functionality overview
 
+### Agentic Retrieval-Augmented Generation (RAG)
+
+An agentic RAG system is implemented in [ai_agents_framework](ai_agents_framework).
+It combines a language-model agent with document ingestion, semantic search, and
+persistent document storage. The agent uses a knowledge-base search tool to
+retrieve relevant content before generating an answer, grounding its responses
+in the documents added to the system.
+
+The persistence flow separates source content from its search indexes. During
+ingestion, documents and their chunk records are saved through the document
+dispatcher into persistent file storage. The dispatcher's `mysql` backend acts
+as the accessor and relational index for document identifiers, metadata, and
+chunk locations; despite its name, the supplied default configuration uses
+SQLite rather than a running MySQL server. Chunk embeddings are indexed in a
+separate, volume-backed Chroma vector database. At query time, semantic search
+returns matching chunk identifiers, and the dispatcher reads the corresponding
+content from persistent storage for the agent. Stored content remains the source
+of truth from which the relational and vector indexes can be synchronized.
+See the [dispatcher backend configuration](ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/README.md)
+for storage and database settings.
+
+The RAG subsystem follows a CRUD API model for managing its knowledge base. Its
+main user-facing operations are:
+
+- [chat](ai_agents_framework/ai_agent/API/chat.json): ask questions and receive
+  answers grounded in retrieved knowledge-base content.
+- [rag_add](ai_agents_framework/ai_agent/API/rag_add.json): ingest one document
+  from a file accessible to the agent or from base64-encoded content, split it
+  into chunks, persist it, and index its embeddings for retrieval.
+- [rag_bulk_add](ai_agents_framework/ai_agent/API/rag_bulk_add.json): ingest
+  multiple files through shared staging, process them with configurable workers,
+  and return progress plus per-file successes and failures. The browser interface
+  supports selecting both files and folders.
+
+The complete [agentic stack](ai_agents_framework/compose.rag-agent.yaml) includes
+the agent, document dispatcher, vector database, file uploader, HTTP REST API,
+and an [AI-agent HTTP ambassador](ai_agents_framework/ai_agent_http_ambassador/README.md)
+behind the HTTP API gateway. The REST service exposes the generated filesystem
+APIs over HTTP, while the ambassador substitutes custom chat and upload pages
+for the automatically generated interface on selected routes. This provides a
+better user experience while forwarding requests to the same underlying agent
+APIs; other routes remain available through the generic REST interface.
+
 ### Cyclomatic Complexity (CC) Microservice
 
 This microservice provides functionality for calculating CC and representing CC using various ways either textual or graphical. The textual form uses XML format (not the best choise) for representation (through the API [statistic](cyclomatic_complexity/API/statistic.json)) and encompasses all project modules/packages undergo this analysis.
