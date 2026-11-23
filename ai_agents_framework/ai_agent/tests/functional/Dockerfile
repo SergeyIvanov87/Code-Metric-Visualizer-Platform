@@ -3,8 +3,14 @@ FROM test_pseudo_fs
 COPY ai_agents_framework/ai_agent/API API
 COPY ai_agents_framework/ai_agent/tests/functional/*.py /tests/
 COPY ai_agents_framework/ai_agent/tests/functional/*.sh /tests/
+COPY ai_agents_framework/ai_agent/tests/functional/mock_exec /tests/mock_exec
 
-RUN dos2unix /tests/*
+RUN <<EOF
+dos2unix /tests/*
+dos2unix /tests/mock_exec/*
+chmod +x /tests/*
+chmod +x /tests/mock_exec/*
+EOF
 
 ARG UID=9401
 ENV UID=$UID

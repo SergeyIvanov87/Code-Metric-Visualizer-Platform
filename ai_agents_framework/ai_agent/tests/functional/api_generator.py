@@ -22,13 +22,7 @@ def make_attach_doc_chunk(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        api_fs_bash_utils.extract_attr_value_from_string() + " \"doc_data\" \"${2}\" \"\" '=' DOC_DATA_VALUE", r"",
-        r'document_data="${DOC_DATA_VALUE}"',
-        r'OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/doc_data}" )',
-        r'if [ ! -z "${document_data}" ]; then',
-        r'  OVERRIDEN_CMD_ARGS=( "${OVERRIDEN_CMD_ARGS[@]/$document_data}" )',
-        r'fi',
-        "echo \"${OVERRIDEN_CMD_ARGS[@]}\" | xargs -I% -- sh -c \"echo '${document_data}' | ${WORK_DIR}/attach_doc_chunk.py %\""
+        "echo \"${OVERRIDEN_CMD_ARGS[@]}\" | xargs -I% -- sh -c \"echo '${document_data}' | ${WORK_DIR}/mock_exec/attach_doc_chunk.py %\""
     )
     script.writelines(line + "\n" for line in body)
 
@@ -55,7 +49,7 @@ def make_delete_doc(script, desired_file_ext=""):
         # ID expressions forbid whitespace. Pass arguments unchanged so the
         # backend can reject it; xargs would strip leading/trailing whitespace
         # and could turn an invalid expression such as " 1" into valid "1".
-        r'"${WORK_DIR}/delete_doc.py" "${OVERRIDEN_CMD_ARGS[@]}"'
+        r'"${WORK_DIR}/mock_exec/delete_doc.py" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -71,7 +65,7 @@ def make_put_doc(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_get_result_type(file_extension), "",
         *api_fs_exec_utils.generate_api_node_env_init(), "",
         *api_fs_exec_utils.generate_read_api_fs_args(preserve_empty_named_values=True), "",
-        '"${WORK_DIR}/put_doc.py" "${OVERRIDEN_CMD_ARGS[@]}"',
+        '"${WORK_DIR}/mock_exec/put_doc.py" "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -94,7 +88,7 @@ def make_put_doc_data(script, desired_file_ext=""):
         '    PUT_DOC_ARGS+=("${OVERRIDEN_CMD_ARGS[i]}" "${OVERRIDEN_CMD_ARGS[i+1]}")',
         '  fi',
         'done',
-        'printf "%s" "$document_data" | "${WORK_DIR}/put_doc_data.py" "${PUT_DOC_ARGS[@]}"',
+        'printf "%s" "$document_data" | "${WORK_DIR}/mock_exec/put_doc_data.py" "${PUT_DOC_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -118,7 +112,7 @@ def make_sync(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${WORK_DIR}/sync.py'
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${WORK_DIR}/mock_exec/sync.py'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -140,7 +134,7 @@ def make_get_docs(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${WORK_DIR}/get_docs.py'
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${WORK_DIR}/mock_exec/get_docs.py'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -167,7 +161,7 @@ def make_get_doc_info(script, desired_file_ext=""):
         # ID expressions forbid whitespace. Pass arguments unchanged so the
         # backend can reject it; xargs would strip leading/trailing whitespace
         # and could turn an invalid expression such as " 1" into valid "1".
-        r'"${WORK_DIR}/get_doc_info.py" "${OVERRIDEN_CMD_ARGS[@]}"'
+        r'"${WORK_DIR}/mock_exec/get_doc_info.py" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -194,7 +188,7 @@ def make_read_id(script, desired_file_ext=""):
         # ID expressions forbid whitespace. Pass arguments unchanged so the
         # backend can reject it; xargs would strip leading/trailing whitespace
         # and could turn an invalid expression such as " 1" into valid "1".
-        r'"${WORK_DIR}/read_id.py" "${OVERRIDEN_CMD_ARGS[@]}"'
+        r'"${WORK_DIR}/mock_exec/read_id.py" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -210,8 +204,8 @@ def make_streaming_directory_events():
         *api_fs_exec_utils.generate_get_result_type(extension), "",
         *api_fs_exec_utils.generate_api_node_env_init(), "",
         *api_fs_exec_utils.generate_read_api_fs_args(), "",
-        'exec "${OPT_DIR}/deferred_query_launcher.py" --api-directory "${API_NODE}/POST" '
-        '--processor "${WORK_DIR}/streaming_directory_events_processor.py" -- "${OVERRIDEN_CMD_ARGS[@]}"',
+        'exec "${WORK_DIR}/mock_exec/deferred_query_launcher.py" --api-directory "${API_NODE}/POST" '
+        '--processor "${WORK_DIR}/mock_exec/streaming_directory_events_processor.py" -- "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
