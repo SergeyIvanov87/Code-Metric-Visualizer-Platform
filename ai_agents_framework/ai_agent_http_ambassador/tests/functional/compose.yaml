@@ -9,6 +9,7 @@ services:
       secrets: [proxy_ca]
     volumes:
       - api:/api
+
   ambassador:
     build:
       context: ../../../..
@@ -23,6 +24,7 @@ services:
     volumes:
       - api:/api
     depends_on: [provider]
+
   http-upload-tester:
     build:
       context: ../../../..
