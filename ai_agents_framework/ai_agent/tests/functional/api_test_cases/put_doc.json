@@ -1,0 +1,21 @@
+{
+    "successfull_rag_add": {
+        "query_sent": {
+            "-URI": "/api/api.pmccabe_collector.restapi.org/rag_data/file_0.txt",
+            "-doc_type": "base64,txt",
+            "-metadata": "",
+            "-preserveOriginal": "1"
+        },
+        "query_received": {
+            "-URI": "/api/api.pmccabe_collector.restapi.org/rag_data/file_0.txt",
+            "-doc_type": "base64,txt,document",
+            "-metadata": "",
+            "-preserveOriginal": "1"
+        },
+        "answer": {
+            "error_code": 0,
+            "error_msg": "success",
+            "unique_id": 1
+        }
+    }
+}

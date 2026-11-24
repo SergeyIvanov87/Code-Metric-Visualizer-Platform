@@ -197,7 +197,7 @@ def make_read_id_help():
     return "make_read_id_help"
 
 
-def make_streaming_directory_events():
+def make_streaming_directory_events(script, desired_file_ext=""):
     extension = "." + desired_file_ext if desired_file_ext else ""
     body = (
         *api_fs_exec_utils.generate_exec_header(), "",

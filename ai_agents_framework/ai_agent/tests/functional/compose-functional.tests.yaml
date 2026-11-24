@@ -16,6 +16,8 @@ services:
         test_pseudo_fs: "service:test_pseudo_fs"
     environment:
       - EXIT_ONCE_DONE=false
+      - TEST_RAG_DB_HOST=test-rag-db
+      - TEST_RAG_DB_PORT=18000
     volumes:
       - api.pmccabe_collector.restapi.org.ai-agent.tests:/api
     depends_on:

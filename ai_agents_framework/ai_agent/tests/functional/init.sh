@@ -2,21 +2,29 @@
 
 export WORK_DIR=${1}
 export SHARED_API_DIR=${2}
-export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 
+cat > "env.sh" <<EOF
+export WORK_DIR=${WORK_DIR}
+export SHARED_API_DIR=${SHARED_API_DIR}
+export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 export PYTHONPATH="${WORK_DIR}:${WORK_DIR}/utils:${WORK_DIR}/utils/modules"
-UTILS="${WORK_DIR}/utils"
+export UTILS="${WORK_DIR}/utils"
 export OPT_DIR=${UTILS}
 export MODULES="${WORK_DIR}/utils/modules"
 export TESTED_SERVICE_NAME="ai_agent"
 
+export RAG_DB_HOST=${TEST_RAG_DB_HOST}
+export RAG_DB_PORT=${TEST_RAG_DB_PORT}
+EOF
+
+source "env.sh"
 ${UTILS}/canonize_internal_api.py ${WORK_DIR}/API/deps ${MAIN_SERVICE_NAME}/${TESTED_SERVICE_NAME}
 
 # copy APIs (command & internal) into designated directory /API
 # in order to allow tests_inner_api to test its inner API.
 # Do not push something other into /API!
 mkdir -p -m 777 /API
-cp -r ${WORK_DIR}/API/deps /API/
+cp -r ${WORK_DIR}/API/* /API/
 
 source ${UTILS}/shell_utils/init_utils.sh
 
@@ -71,8 +79,9 @@ fi
 
 echo "Run tests:"
 RET=0
+cp -r ${WORK_DIR}/rag_data /api/api.pmccabe_collector.restapi.org/
 for s in ${WORK_DIR}/test_*.py; do
-    pytest -s ${s}
+    pytest -svv ${s}
     VAL=$?
     if [ $VAL != 0 ]
     then

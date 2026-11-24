@@ -10,8 +10,8 @@ services:
       context: ../../../../../
       dockerfile: ./ai_agents_framework/RAG/Dockerfile
     environment:
-      - CHROMA_PORT=9000
-    hostname: test-rag-db-host
+      - CHROMA_PORT=18000
+    hostname: test-rag-db
     volumes:
       - api.pmccabe_collector.project.ai-agents-framework.rag-vectordb-data.test:/mnt
 
