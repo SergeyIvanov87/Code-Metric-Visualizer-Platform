@@ -1,0 +1,14 @@
+{
+  "successfull_rag_bulk_add": {
+    "query_received": {
+      "WaitInitialQueryTimeoutSec": "10",
+      "WaitQueryUpdateTimeoutSec": "2",
+      "WaitResultConsumptionTimeoutSec": "10",
+      "file_allow_regex": ".*",
+      "file_skip_regex": "(?!)",
+      "dir_allow_regex": ".*",
+      "dir_skip_regex": "(?!)"
+    },
+    "answer": {}
+  }
+}

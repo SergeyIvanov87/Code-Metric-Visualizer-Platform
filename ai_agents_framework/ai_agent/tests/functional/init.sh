@@ -47,11 +47,13 @@ mkdir -p -m 777 ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}
 
 # launch all the dependencies of the tested service to allow the service to find them,
 # so that the service will be able to set up
+API_MANAGEMENT_SCHEMA_DIRS=""
 for deps_service in ${WORK_DIR}/API/deps/*; do
     echo "Mock API from ${deps_service}"
     if [ -d ${deps_service} ];
     then
         echo "Mocking..."
+        API_MANAGEMENT_SCHEMA_DIRS="${API_MANAGEMENT_SCHEMA_DIRS:+${API_MANAGEMENT_SCHEMA_DIRS}|}${deps_service}"
         # Do not use launch_inner_services() as it doesn't suppose sequencial usage in cycle
         ${UTILS}/build_api_executors.py ${deps_service} ${WORK_DIR} -o ${WORK_DIR}
         ${UTILS}/build_api_services.py ${deps_service} ${WORK_DIR} -o ${WORK_DIR}/services
@@ -65,7 +67,7 @@ for s in ${WORK_DIR}/services/*_server.sh; do
     echo "${s} has been started"
 done
 
-${UTILS}/api_management.py "${WORK_DIR}/API/deps/" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
+${UTILS}/api_management.py "${API_MANAGEMENT_SCHEMA_DIRS}" ${MAIN_SERVICE_NAME} ${SHARED_API_DIR} &
 API_MANAGEMENT_PID=$!
 
 # Now the tested service  must have started before we continue with tests

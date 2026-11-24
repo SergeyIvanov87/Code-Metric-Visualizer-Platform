@@ -1,0 +1,36 @@
+{
+  "successfull_rag_add_data": {
+    "query": {
+      "doc_data": "aGVsbG8=",
+      "-doc_type": "txt",
+      "-metadata": "inline",
+      "-timeout": "20",
+      "-filename": "inline.txt"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "doc_id": 101,
+      "chunk_ids": [
+        "102"
+      ]
+    }
+  },
+  "successfull_rag_add_data_unknown_type": {
+    "query": {
+      "doc_data": "aGVsbG8=",
+      "-doc_type": "unrecognized",
+      "-metadata": "inline-unknown",
+      "-timeout": "20",
+      "-filename": "inline.unrecognized"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "doc_id": 201,
+      "chunk_ids": [
+        "202"
+      ]
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "successfull_rag_bulk_add": {
+    "query": {
+      "-metadata": "",
+      "workers": "1",
+      "file_allow_regex": ".*",
+      "file_skip_regex": "(?!)",
+      "dir_allow_regex": ".*",
+      "dir_skip_regex": "(?!)",
+      "WaitInitialQueryTimeoutSec": "10",
+      "WaitQueryUpdateTimeoutSec": "2",
+      "WaitResultConsumptionTimeoutSec": "10",
+      "SESSION_ID": "successfull_rag_bulk_add",
+      "-preserveOriginal": "1"
+    },
+    "answer": {
+      "error_code": "0",
+      "statistics": {
+        "total": 0,
+        "added": 0,
+        "failed": 0
+      },
+      "added": [],
+      "failed": []
+    }
+  }
+}

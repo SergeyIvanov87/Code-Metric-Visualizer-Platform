@@ -1,0 +1,23 @@
+{
+  "successfull_rag_delete": {
+    "query": {
+      "-ids": "7",
+      "-metadata": "cleanup"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "document_ids": "7",
+      "deleted_chunk_ids": [],
+      "dispatcher": {
+        "error_code": 0,
+        "error_msg": "success",
+        "deleted": [
+          7
+        ],
+        "not_found": []
+      },
+      "not_found": []
+    }
+  }
+}

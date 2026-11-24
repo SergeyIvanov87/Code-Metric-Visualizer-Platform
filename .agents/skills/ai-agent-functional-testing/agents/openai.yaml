@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Agent Functional Testing"
+  short_description: "Build contract-driven agent functional tests"
+  default_prompt: "Use $ai-agent-functional-testing to add a positive-flow filesystem API case and its dependency mocks."

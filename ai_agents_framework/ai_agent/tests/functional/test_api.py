@@ -25,48 +25,75 @@ RAG_DB_PORT = os.getenv('RAG_DB_PORT', '')
 executor = FS_API_Executor("/API", global_settings.api_dir, global_settings.domain_name_api_entry)
 testdata = list(get_api_queries("/API", global_settings.domain_name_api_entry).items())
 
-def check_rag_add_api(query, pipes):
-    print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}")
-    test_cases_path = Path(__file__).parent / "api_test_cases" / "rag_add.json"
-    with test_cases_path.open(encoding="utf-8") as test_cases_file:
-        test_cases = json.load(test_cases_file)
+def _load_cases(name):
+    path = Path(__file__).parent / "api_test_cases" / f"{name}.json"
+    return json.loads(path.read_text(encoding="utf-8"))
 
-    for session_id, test_case in test_cases.items():
+
+def _arguments(session_id, query):
+    values = [f"SESSION_ID={session_id}"]
+    values.extend(f"{name}={json.dumps(value)}" for name, value in query.items())
+    return " ".join(values)
+
+
+def _wait(api_query, timeout, session_id):
+    status, result, _ = api_query.wait_result(
+        timeout, session_id, 0.1, max(1, int(timeout / 0.1)), True
+    )
+    assert status, f"result timed out for session {session_id}"
+    return json.loads(result)
+
+
+def _assert_answer(result, expected, session_id):
+    print(f"{get_timestamp()}\tSESSION_ID={session_id}, query result: {result}")
+    assert result == expected, f"unexpected result for SESSION_ID={session_id}"
+
+
+def _check_api(name, query, pipes):
+    print(f"{get_timestamp()}\tinitiate test query: {query['Query']}")
+    for session_id, test_case in _load_cases(name).items():
         timeout = int(test_case["query"].get("-timeout", 20))
-        arguments = " ".join(
-            [f"SESSION_ID={session_id}"]
-            + [
-                f"{name}={json.dumps(value)}"
-                for name, value in test_case["query"].items()
-            ]
-        )
         api_query = APIQueryInterruptible(pipes)
-        status, timeout = api_query.execute(timeout, arguments)
-        assert status, f"query execution timed out for session {session_id}"
-
-        print(f"{get_timestamp()}\tgetting result of query: {query["Query"]}")
-        status, result, _ = api_query.wait_result(
-            timeout, session_id, 0.1, max(1, int(timeout / 0.1)), True
+        status, timeout = api_query.execute(
+            timeout, _arguments(session_id, test_case["query"])
         )
-        assert status, f"result timed out for session {session_id}"
-        print(f"{get_timestamp()}\tinitiate test query: {query["Query"]}, result:\n{result}")
-        assert json.loads(result) == test_case["answer"]
+        assert status, f"query execution timed out for session {session_id}"
+        result = _wait(api_query, timeout, session_id)
+        _assert_answer(result, test_case["answer"], session_id)
+
+
+def check_rag_add_api(query, pipes):
+    _check_api("rag_add", query, pipes)
 
 
 def check_rag_add_data(query, pipes):
-    pass
+    _check_api("rag_add_data", query, pipes)
+
 
 def check_rag_bulk_add_api(query, pipes):
-    pass
+    for session_id, test_case in _load_cases("rag_bulk_add").items():
+        api_query = APIQueryInterruptible(pipes)
+        status, timeout = api_query.execute(
+            20, _arguments(session_id, test_case["query"])
+        )
+        assert status, f"query execution timed out for session {session_id}"
+        report = _wait(api_query, timeout, session_id)
+        with Path(report["result"]).open(encoding="utf-8") as result_file:
+            result = json.load(result_file)
+        result.pop("timestamp", None)
+        _assert_answer(result, test_case["answer"], session_id)
+
 
 def check_rag_delete_api(query, pipes):
-    pass
+    _check_api("rag_delete", query, pipes)
+
 
 def check_rag_get_docs_api(query, pipes):
-    pass
+    _check_api("rag_get_docs", query, pipes)
+
 
 def check_rag_sync_api(query, pipes):
-    pass
+    _check_api("rag_sync", query, pipes)
 
 @pytest.fixture()
 def clear_rag_db():

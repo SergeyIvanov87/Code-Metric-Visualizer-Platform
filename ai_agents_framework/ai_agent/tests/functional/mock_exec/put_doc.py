@@ -5,8 +5,8 @@ import sys
 
 from pathlib import Path
 
-from log_exchange import log_exchange
-from parse_arguments import parse_arguments
+from mock_utils.log_exchange import log_exchange
+from mock_utils.parse_arguments import parse_arguments
 
 
 if __name__ == "__main__":
@@ -28,7 +28,7 @@ if __name__ == "__main__":
         for stub in case if isinstance(case, list) else [case]:
             if received == stub["query_received"]:
                 answer = stub["answer"]
-                log_exchange(received, stub["query_received"], answer)
+                log_exchange(session_id, "put_doc", received, stub["query_received"], answer)
                 print(json.dumps(answer))
                 sys.exit(0)
 
@@ -36,6 +36,6 @@ if __name__ == "__main__":
         "error_code": -1,
         "error_msg": f"no stub data for the query: {received}",
     }
-    log_exchange(received, None, answer)
+    log_exchange(session_id, "put_doc", received, None, answer)
     print(json.dumps(answer))
     sys.exit(1)

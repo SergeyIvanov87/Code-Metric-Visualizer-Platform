@@ -1,0 +1,16 @@
+{
+  "successfull_rag_delete": {
+    "query_received": {
+      "-ids": "7",
+      "-metadata": "cleanup"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "deleted": [
+        7
+      ],
+      "not_found": []
+    }
+  }
+}

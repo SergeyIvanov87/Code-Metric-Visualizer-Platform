@@ -220,7 +220,7 @@ def execute_put_doc_query(
     status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
     if not status:
         raise RuntimeError(
-            f"Cannot put the entire doc by URI: {doc_uri} into the rag_doc_dispater, status: {status}, elapsed timeout: {timeout_elapsed}"
+            f"Cannot put the entire doc by URI: {doc_uri} into the rag_doc_dispatcher, status: {status}, elapsed timeout: {timeout_elapsed}"
         )
 
     # TODO Reconsile timeout_elapsed and wait for pipe creation sleep duration and cycles
@@ -229,13 +229,13 @@ def execute_put_doc_query(
     )
     if not status:
         raise RuntimeError(
-            f"Cannot put the entire doc by URI: {doc_uri} into the rag_doc_dispater: waiting of result failed, status: {status}, result: {result}, elapsed timeout: {timeout_elapsed}"
+            f"Cannot put the entire doc by URI: {doc_uri} into the rag_doc_dispatcher: waiting of result failed, status: {status}, result: {result}, elapsed timeout: {timeout_elapsed}"
         )
 
     put_doc_result = json.loads(result)
     if put_doc_result["error_code"] != 0:
         raise RuntimeError(
-            f"Cannot put the entire doc by URI: {doc_uri} into the rag_doc_dispater, error: {put_doc_result['error_msg']}"
+            f"Cannot put the entire doc by URI: {doc_uri} into the rag_doc_dispatcher, error: {put_doc_result['error_msg']}"
         )
 
     assert (
@@ -279,7 +279,7 @@ def execute_put_doc_data_query(
     status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)
     if not status:
         raise RuntimeError(
-            f"Cannot put the entire doc from document data into the rag_doc_dispater, status: {status}, elapsed timeout: {timeout_elapsed}"
+            f"Cannot put the entire doc from document data into the rag_doc_dispatcher, status: {status}, elapsed timeout: {timeout_elapsed}"
         )
 
     # TODO Reconsile timeout_elapsed and wait for pipe creation sleep duration and cycles
@@ -288,13 +288,13 @@ def execute_put_doc_data_query(
     )
     if not status:
         raise RuntimeError(
-            f"Cannot put the entire doc from document data into the rag_doc_dispater: waiting of result failed, status: {status}, result: {result}, elapsed timeout: {timeout_elapsed}"
+            f"Cannot put the entire doc from document data into the rag_doc_dispatcher: waiting of result failed, status: {status}, result: {result}, elapsed timeout: {timeout_elapsed}"
         )
 
     put_doc_result = json.loads(result)
     if put_doc_result["error_code"] != 0:
         raise RuntimeError(
-            f"Cannot put the entire doc from document data into the rag_doc_dispater, error: {put_doc_result['error_msg']}"
+            f"Cannot put the entire doc from document data into the rag_doc_dispatcher, error: {put_doc_result['error_msg']}"
         )
 
     assert (

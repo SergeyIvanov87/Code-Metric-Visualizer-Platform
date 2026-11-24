@@ -4,14 +4,17 @@ COPY ai_agents_framework/ai_agent/API /tests/API
 COPY ai_agents_framework/ai_agent/tests/functional/*.py /tests/
 COPY ai_agents_framework/ai_agent/tests/functional/*.sh /tests/
 COPY ai_agents_framework/ai_agent/tests/functional/mock_exec /tests/mock_exec
+COPY ai_agents_framework/ai_agent/tests/functional/mock_utils /tests/mock_utils
 COPY ai_agents_framework/ai_agent/tests/functional/api_test_cases /tests/api_test_cases
 COPY ai_agents_framework/ai_agent/tests/functional/data /tests/rag_data
 
 RUN <<EOF
 dos2unix /tests/*
 dos2unix /tests/mock_exec/*
+dos2unix /tests/mock_utils/*
 chmod +x /tests/*
 chmod +x /tests/mock_exec/*
+chmod +x /tests/mock_utils/*
 EOF
 
 ARG UID=9401

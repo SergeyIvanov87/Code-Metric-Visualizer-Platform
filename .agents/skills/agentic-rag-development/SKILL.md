@@ -13,7 +13,7 @@ Use the [RAG source map](../../../HowTo/Agent-Repository-Map.md#agentic-rag) to 
 4. ID selections permit only ASCII digits, commas and hyphens, without whitespace, and use terminated inclusive ranges such as `1-5,7`; pass compact selections through API adapters and expand them only inside backend operations. Missing IDs are returned in `not_found` without failing the batch. Scalar `read_id` responses and `get_docs` pagination retain their existing contracts; see [backend ID selections](../../../ai_agents_framework/docs_dispatcher/sources/backend/dispatcher/README.md#id-selections).
 5. For add/delete behavior, trace `rag_add.py`, `rag_delete.py`, and dispatcher storage operations. Use separate dispatcher `put_doc` (URI) and `put_doc_data` (inline) schemas, mirrored under agent `API/deps`. Preserve wrapper distinctions between inline textual document data and URI input. URI insertion carries `preserveOriginal=1` by default; HTTP ingestion explicitly forces `0`, which bulk workers forward to each single-file query. Verify both document storage and embeddings; deleting one does not prove deletion of the other.
 6. For inference changes, read `ai_agents_framework/ai_chat_agent/sources/inference_config.py`, configuration tests under `ai_chat_agent/test/unit/cases`, and [chat runtime guidance](../../../ai_agents_framework/ai_chat_agent/README.md). CPU, NVIDIA, and Intel Vulkan use different build/runtime requirements. GPU profiles must validate device/backend availability; do not silently fall back to CPU. Each replica loads its own model and cache.
-7. Run focused tests, then the relevant dispatcher, RAG store, or full agent functional scope from [test diagnostics](../container-test-diagnostics/SKILL.md). Mocked reconciliation tests do not establish live database, model, or GPU readiness.
+7. Test public `ai_agent` behavior through [AI agent functional testing](../ai-agent-functional-testing/SKILL.md), then extend coverage with real-service integration tests where needed. Use [test diagnostics](../container-test-diagnostics/SKILL.md) for execution. Mocked dependencies do not establish live downstream database, model, or GPU readiness.
 
 ## Focused checks
 
@@ -24,11 +24,7 @@ legacy wrapper, reconciliation, deletion, or inference checks with the owning
 tester before execution. Use the Compose-provided services rather than creating
 an extra web application for HTTP checks.
 
-RAG deletion, filesystem wrapper, ingestion, reconciliation, and inference cases live in `ai_agent/test/unit/cases`
-and run in the `ai-agent-unit-tester` service through
-`ai_agents_framework/ai_agent/compose-unit.test.yaml`, registered in the agentic
-RAG subsystem CI workflow. This suite uses fake dispatcher/HTTP clients and a
-local Chroma collection; it does not validate a live agent stack.
+Do not write unit tests out of the boundary of functional testing. If a new tests is required then extend the scope of the functional testing. Use the skill [AI agent functional testing](../ai-agent-functional-testing/SKILL.md). Integration testing may extend those cases with real downstream services.
 
 Follow [container test diagnostics](../container-test-diagnostics/SKILL.md) to
 launch the container entrypoint. For an agent-local reproduction, create a
@@ -47,13 +43,6 @@ Verify the described behavior against current backend configuration, storage cod
 ## Completion
 
 State which storage stages changed, how consistency is retained on failure, and which checks used mocks versus running services. Report hardware-dependent checks as unverified if hardware is unavailable.
-
-The registered agent unit tester runs deletion, wrapper, executor, bulk-worker,
-endpoint-selection, reconciliation, and inference-configuration checks without models:
-
-```sh
-docker compose -f ai_agents_framework/ai_agent/compose-unit.test.yaml up --build --abort-on-container-exit --exit-code-from ai-agent-unit-tester
-```
 
 Agent insertion is likewise split into `rag_add`/`rag_add.py` for URI input and
 `rag_add_data`/`rag_add_data.py` for inline data. Keep their processors, CLIs, and generated scripts independent. Share only small helpers such as `document_splitter.split_document`, `rag_chroma.insert_embeddings`, and `rag_chunks.attach_chunks`. Keep bulk query discovery restricted to the URI endpoint. The HTTP ambassador stages single-file uploads and invokes only the URI endpoint. Insertion CLI options retain the `-` prefix; `doc_data` remains a stdin payload. Optional `-filename` on `rag_add_data` is preserved as storage/SQL `file_uri`, or defaults to UTC `YYYY-MM-DD:HH:MM:SS_<doc_type>` when omitted.

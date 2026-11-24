@@ -1,0 +1,40 @@
+{
+  "successfull_rag_add_data": {
+    "query_received": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "inline",
+      "-filename": "inline.txt",
+      "doc_data": "aGVsbG8="
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "unique_id": 101
+    },
+    "query_sent": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "inline",
+      "-filename": "inline.txt",
+      "doc_data": "aGVsbG8="
+    }
+  },
+  "successfull_rag_add_data_unknown_type": {
+    "query_sent": {
+      "-doc_type": "base64,txt,unknown",
+      "-metadata": "inline-unknown",
+      "-filename": "inline.unrecognized",
+      "doc_data": "aGVsbG8="
+    },
+    "query_received": {
+      "-doc_type": "base64,txt,unknown",
+      "-metadata": "inline-unknown",
+      "-filename": "inline.unrecognized",
+      "doc_data": "aGVsbG8="
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "unique_id": 201
+    }
+  }
+}

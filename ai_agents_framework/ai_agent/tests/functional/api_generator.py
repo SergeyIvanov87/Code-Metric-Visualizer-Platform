@@ -22,7 +22,7 @@ def make_attach_doc_chunk(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        "echo \"${OVERRIDEN_CMD_ARGS[@]}\" | xargs -I% -- sh -c \"echo '${document_data}' | ${WORK_DIR}/mock_exec/attach_doc_chunk.py %\""
+        "echo \"${OVERRIDEN_CMD_ARGS[@]}\" | xargs -I% -- sh -c \"echo '${document_data}' | ${WORK_DIR}/mock_exec/attach_doc_chunk.py SESSION_ID '${SESSION_ID_VALUE}' %\""
     )
     script.writelines(line + "\n" for line in body)
 
@@ -49,7 +49,7 @@ def make_delete_doc(script, desired_file_ext=""):
         # ID expressions forbid whitespace. Pass arguments unchanged so the
         # backend can reject it; xargs would strip leading/trailing whitespace
         # and could turn an invalid expression such as " 1" into valid "1".
-        r'"${WORK_DIR}/mock_exec/delete_doc.py" "${OVERRIDEN_CMD_ARGS[@]}"'
+        r'"${WORK_DIR}/mock_exec/delete_doc.py" SESSION_ID "${SESSION_ID_VALUE}" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -64,8 +64,12 @@ def make_put_doc(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_exec_header(), "",
         *api_fs_exec_utils.generate_get_result_type(file_extension), "",
         *api_fs_exec_utils.generate_api_node_env_init(), "",
+        'SESSION_ID_VALUE=""',
+        'for arg in "${IN_SERVER_REQUEST_ARGS[@]}"; do',
+        '  [[ "$arg" == SESSION_ID=* ]] && SESSION_ID_VALUE="${arg#SESSION_ID=}"',
+        'done', "",
         *api_fs_exec_utils.generate_read_api_fs_args(preserve_empty_named_values=True), "",
-        '"${WORK_DIR}/mock_exec/put_doc.py" "${OVERRIDEN_CMD_ARGS[@]}"',
+        '"${WORK_DIR}/mock_exec/put_doc.py" SESSION_ID "${SESSION_ID_VALUE}" "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -76,6 +80,10 @@ def make_put_doc_data(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_exec_header(), "",
         *api_fs_exec_utils.generate_get_result_type(file_extension), "",
         *api_fs_exec_utils.generate_api_node_env_init(), "",
+        'SESSION_ID_VALUE=""',
+        'for arg in "${IN_SERVER_REQUEST_ARGS[@]}"; do',
+        '  [[ "$arg" == SESSION_ID=* ]] && SESSION_ID_VALUE="${arg#SESSION_ID=}"',
+        'done', "",
         *api_fs_exec_utils.generate_read_api_fs_args(preserve_empty_named_values=True), "",
         # doc_data is consumed on stdin; all other standardized arguments are
         # passed through unchanged, including new options declared in the schema.
@@ -88,7 +96,7 @@ def make_put_doc_data(script, desired_file_ext=""):
         '    PUT_DOC_ARGS+=("${OVERRIDEN_CMD_ARGS[i]}" "${OVERRIDEN_CMD_ARGS[i+1]}")',
         '  fi',
         'done',
-        'printf "%s" "$document_data" | "${WORK_DIR}/mock_exec/put_doc_data.py" "${PUT_DOC_ARGS[@]}"',
+        'printf "%s" "$document_data" | "${WORK_DIR}/mock_exec/put_doc_data.py" SESSION_ID "${SESSION_ID_VALUE}" "${PUT_DOC_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 
@@ -112,7 +120,7 @@ def make_sync(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${WORK_DIR}/mock_exec/sync.py'
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${WORK_DIR}/mock_exec/sync.py SESSION_ID "${SESSION_ID_VALUE}"'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -134,7 +142,7 @@ def make_get_docs(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${WORK_DIR}/mock_exec/get_docs.py'
+        r'echo "${OVERRIDEN_CMD_ARGS[@]}" | xargs ${WORK_DIR}/mock_exec/get_docs.py SESSION_ID "${SESSION_ID_VALUE}"'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -161,7 +169,7 @@ def make_get_doc_info(script, desired_file_ext=""):
         # ID expressions forbid whitespace. Pass arguments unchanged so the
         # backend can reject it; xargs would strip leading/trailing whitespace
         # and could turn an invalid expression such as " 1" into valid "1".
-        r'"${WORK_DIR}/mock_exec/get_doc_info.py" "${OVERRIDEN_CMD_ARGS[@]}"'
+        r'"${WORK_DIR}/mock_exec/get_doc_info.py" SESSION_ID "${SESSION_ID_VALUE}" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -188,7 +196,7 @@ def make_read_id(script, desired_file_ext=""):
         # ID expressions forbid whitespace. Pass arguments unchanged so the
         # backend can reject it; xargs would strip leading/trailing whitespace
         # and could turn an invalid expression such as " 1" into valid "1".
-        r'"${WORK_DIR}/mock_exec/read_id.py" "${OVERRIDEN_CMD_ARGS[@]}"'
+        r'"${WORK_DIR}/mock_exec/read_id.py" SESSION_ID "${SESSION_ID_VALUE}" "${OVERRIDEN_CMD_ARGS[@]}"'
     )
     script.writelines(line + "\n" for line in body)
 
@@ -204,8 +212,8 @@ def make_streaming_directory_events(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_get_result_type(extension), "",
         *api_fs_exec_utils.generate_api_node_env_init(), "",
         *api_fs_exec_utils.generate_read_api_fs_args(), "",
-        'exec "${WORK_DIR}/mock_exec/deferred_query_launcher.py" --api-directory "${API_NODE}/POST" '
-        '--processor "${WORK_DIR}/mock_exec/streaming_directory_events_processor.py" -- "${OVERRIDEN_CMD_ARGS[@]}"',
+        'exec "${WORK_DIR}/mock_utils/deferred_query_launcher.py" --api-directory "${API_NODE}/POST" '
+        '--processor "${WORK_DIR}/mock_exec/streaming_directory_events_processor.py" --executor "${WORK_DIR}/mock_utils/deferred_query_executor.py" -- "${OVERRIDEN_CMD_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 

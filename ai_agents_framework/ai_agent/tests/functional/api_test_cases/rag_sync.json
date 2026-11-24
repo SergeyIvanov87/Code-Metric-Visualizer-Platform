@@ -1,0 +1,29 @@
+{
+  "successfull_rag_sync": {
+    "query": {
+      "-batch_size": "1"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "output": {
+        "created": [
+          "301"
+        ],
+        "updated": [],
+        "deleted": [],
+        "not_changed": [],
+        "synchronized_count": 1,
+        "initial_chroma_records": 0,
+        "chroma_size": 1,
+        "filesystem_db_sync": {
+          "error_code": 0,
+          "error_msg": "success",
+          "created": [],
+          "updated": [],
+          "deleted": []
+        }
+      }
+    }
+  }
+}

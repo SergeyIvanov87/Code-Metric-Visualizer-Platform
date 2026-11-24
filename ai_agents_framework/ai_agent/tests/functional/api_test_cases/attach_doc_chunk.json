@@ -1,154 +1,184 @@
 {
-    "successfull_rag_add": [
-        {
-            "query_sent": {
-                "-doc_id": "1",
-                "-metadata": "_0"
-            },
-            "query_received": {
-                "-doc_id": "1",
-                "-metadata": "_0"
-            },
-            "answer": {
-                "error_code": 0,
-                "error_msg": "success",
-                "unique_id": 2
-            }
-        },
-        {
-            "query_sent": {
-                "-doc_id": "1",
-                "-metadata": "_1"
-            },
-            "query_received": {
-                "-doc_id": "1",
-                "-metadata": "_1"
-            },
-            "answer": {
-                "error_code": 0,
-                "error_msg": "success",
-                "unique_id": 3
-            }
-        },
-        {
-            "query_sent": {
-                "-doc_id": "1",
-                "-metadata": "_2"
-            },
-            "query_received": {
-                "-doc_id": "1",
-                "-metadata": "_2"
-            },
-            "answer": {
-                "error_code": 0,
-                "error_msg": "success",
-                "unique_id": 4
-            }
-        },
-        {
-            "query_sent": {
-                "-doc_id": "1",
-                "-metadata": "_3"
-            },
-            "query_received": {
-                "-doc_id": "1",
-                "-metadata": "_3"
-            },
-            "answer": {
-                "error_code": 0,
-                "error_msg": "success",
-                "unique_id": 5
-            }
-        },
-        {
-            "query_sent": {
-                "-doc_id": "1",
-                "-metadata": "_4"
-            },
-            "query_received": {
-                "-doc_id": "1",
-                "-metadata": "_4"
-            },
-            "answer": {
-                "error_code": 0,
-                "error_msg": "success",
-                "unique_id": 6
-            }
-        },
-        {
-            "query_sent": {
-                "-doc_id": "1",
-                "-metadata": "_5"
-            },
-            "query_received": {
-                "-doc_id": "1",
-                "-metadata": "_5"
-            },
-            "answer": {
-                "error_code": 0,
-                "error_msg": "success",
-                "unique_id": 7
-            }
-        },
-        {
-            "query_sent": {
-                "-doc_id": "1",
-                "-metadata": "_6"
-            },
-            "query_received": {
-                "-doc_id": "1",
-                "-metadata": "_6"
-            },
-            "answer": {
-                "error_code": 0,
-                "error_msg": "success",
-                "unique_id": 8
-            }
-        },
-        {
-            "query_sent": {
-                "-doc_id": "1",
-                "-metadata": "_7"
-            },
-            "query_received": {
-                "-doc_id": "1",
-                "-metadata": "_7"
-            },
-            "answer": {
-                "error_code": 0,
-                "error_msg": "success",
-                "unique_id": 9
-            }
-        },
-        {
-            "query_sent": {
-                "-doc_id": "1",
-                "-metadata": "_8"
-            },
-            "query_received": {
-                "-doc_id": "1",
-                "-metadata": "_8"
-            },
-            "answer": {
-                "error_code": 0,
-                "error_msg": "success",
-                "unique_id": 10
-            }
-        },
-        {
-            "query_sent": {
-                "-doc_id": "1",
-                "-metadata": "_9"
-            },
-            "query_received": {
-                "-doc_id": "1",
-                "-metadata": "_9"
-            },
-            "answer": {
-                "error_code": 0,
-                "error_msg": "success",
-                "unique_id": 11
-            }
-        }
-    ]
+  "successfull_rag_add": [
+    {
+      "query_sent": {
+        "-doc_id": "1",
+        "-metadata": "_0"
+      },
+      "query_received": {
+        "-doc_id": "1",
+        "-metadata": "_0"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 2
+      }
+    },
+    {
+      "query_sent": {
+        "-doc_id": "1",
+        "-metadata": "_1"
+      },
+      "query_received": {
+        "-doc_id": "1",
+        "-metadata": "_1"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 3
+      }
+    },
+    {
+      "query_sent": {
+        "-doc_id": "1",
+        "-metadata": "_2"
+      },
+      "query_received": {
+        "-doc_id": "1",
+        "-metadata": "_2"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 4
+      }
+    },
+    {
+      "query_sent": {
+        "-doc_id": "1",
+        "-metadata": "_3"
+      },
+      "query_received": {
+        "-doc_id": "1",
+        "-metadata": "_3"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 5
+      }
+    },
+    {
+      "query_sent": {
+        "-doc_id": "1",
+        "-metadata": "_4"
+      },
+      "query_received": {
+        "-doc_id": "1",
+        "-metadata": "_4"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 6
+      }
+    },
+    {
+      "query_sent": {
+        "-doc_id": "1",
+        "-metadata": "_5"
+      },
+      "query_received": {
+        "-doc_id": "1",
+        "-metadata": "_5"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 7
+      }
+    },
+    {
+      "query_sent": {
+        "-doc_id": "1",
+        "-metadata": "_6"
+      },
+      "query_received": {
+        "-doc_id": "1",
+        "-metadata": "_6"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 8
+      }
+    },
+    {
+      "query_sent": {
+        "-doc_id": "1",
+        "-metadata": "_7"
+      },
+      "query_received": {
+        "-doc_id": "1",
+        "-metadata": "_7"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 9
+      }
+    },
+    {
+      "query_sent": {
+        "-doc_id": "1",
+        "-metadata": "_8"
+      },
+      "query_received": {
+        "-doc_id": "1",
+        "-metadata": "_8"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 10
+      }
+    },
+    {
+      "query_sent": {
+        "-doc_id": "1",
+        "-metadata": "_9"
+      },
+      "query_received": {
+        "-doc_id": "1",
+        "-metadata": "_9"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 11
+      }
+    }
+  ],
+  "successfull_rag_add_data": [
+    {
+      "query_received": {
+        "-doc_id": "101",
+        "-metadata": "inline_0"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 102
+      }
+    }
+  ],
+  "successfull_rag_add_data_unknown_type": [
+    {
+      "query_sent": {
+        "-doc_id": "201",
+        "-metadata": "inline-unknown_0"
+      },
+      "query_received": {
+        "-doc_id": "201",
+        "-metadata": "inline-unknown_0"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 202
+      }
+    }
+  ]
 }
