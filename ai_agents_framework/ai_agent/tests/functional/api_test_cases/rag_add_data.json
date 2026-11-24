@@ -32,5 +32,38 @@
         "202"
       ]
     }
+  },
+  "rag_add_data_filename_and_metadata_characters": {
+    "query": {
+      "doc_data": "aGVsbG8=",
+      "-doc_type": "txt",
+      "-metadata": "team docs \"quoted\" – café",
+      "-timeout": "20",
+      "-filename": "provided \"document\" ü.txt"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "doc_id": 301,
+      "chunk_ids": [
+        "302"
+      ]
+    }
+  },
+  "rag_add_data_omitted_metadata": {
+    "query": {
+      "doc_data": "aGVsbG8=",
+      "-doc_type": "txt",
+      "-timeout": "20",
+      "-filename": "provided document.txt"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "doc_id": 401,
+      "chunk_ids": [
+        "402"
+      ]
+    }
   }
 }

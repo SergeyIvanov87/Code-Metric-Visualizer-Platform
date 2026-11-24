@@ -5,6 +5,6 @@ services:
   ai-chat-agent-unit-tester:
     build:
       context: ../..
-      dockerfile: ai_agents_framework/ai_chat_agent/test/unit/Dockerfile
+      dockerfile: ai_agents_framework/ai_chat_agent/tests/unit/Dockerfile
       secrets:
         - proxy_ca

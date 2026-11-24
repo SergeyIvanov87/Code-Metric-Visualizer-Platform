@@ -22,7 +22,16 @@ def make_attach_doc_chunk(script, desired_file_ext=""):
         *api_fs_exec_utils.generate_api_node_env_init(), r"",
         api_fs_bash_utils.extract_attr_value_from_string() + " \"SESSION_ID\" \"${2}\" \"\" '=' SESSION_ID_VALUE", r"",
         *api_fs_exec_utils.generate_read_api_fs_args(), r"",
-        "echo \"${OVERRIDEN_CMD_ARGS[@]}\" | xargs -I% -- sh -c \"echo '${document_data}' | ${WORK_DIR}/mock_exec/attach_doc_chunk.py SESSION_ID '${SESSION_ID_VALUE}' %\""
+        'declare -a ATTACH_ARGS=()',
+        'document_data=""',
+        'for ((i=0; i<${#OVERRIDEN_CMD_ARGS[@]}; i+=2)); do',
+        '  if [[ "${OVERRIDEN_CMD_ARGS[i]}" == doc_data ]]; then',
+        '    document_data="${OVERRIDEN_CMD_ARGS[i+1]}"',
+        '  else',
+        '    ATTACH_ARGS+=("${OVERRIDEN_CMD_ARGS[i]}" "${OVERRIDEN_CMD_ARGS[i+1]}")',
+        '  fi',
+        'done',
+        'printf "%s" "$document_data" | "${WORK_DIR}/mock_exec/attach_doc_chunk.py" SESSION_ID "${SESSION_ID_VALUE}" "${ATTACH_ARGS[@]}"',
     )
     script.writelines(line + "\n" for line in body)
 

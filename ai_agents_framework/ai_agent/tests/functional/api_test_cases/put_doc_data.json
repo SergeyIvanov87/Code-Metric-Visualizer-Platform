@@ -36,5 +36,43 @@
       "error_msg": "success",
       "unique_id": 201
     }
+  },
+  "rag_add_data_filename_and_metadata_characters": {
+    "query_sent": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "team docs \"quoted\" – café",
+      "-filename": "provided \"document\" ü.txt",
+      "doc_data": "aGVsbG8="
+    },
+    "query_received": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "team docs \"quoted\" – café",
+      "-filename": "provided \"document\" ü.txt",
+      "doc_data": "aGVsbG8="
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "unique_id": 301
+    }
+  },
+  "rag_add_data_omitted_metadata": {
+    "query_sent": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "",
+      "-filename": "provided document.txt",
+      "doc_data": "aGVsbG8="
+    },
+    "query_received": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "",
+      "-filename": "provided document.txt",
+      "doc_data": "aGVsbG8="
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "unique_id": 401
+    }
   }
 }

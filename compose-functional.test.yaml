@@ -131,6 +131,9 @@ services:
     extends:
       file: ai_agents_framework/ai_agent/compose-functional.test.yaml
       service: ai_agent
+    depends_on:             # explicit dependency
+      test_aggregator:
+        condition: service_healthy
     logging:
       driver: syslog
       options:

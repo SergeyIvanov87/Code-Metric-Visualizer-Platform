@@ -322,7 +322,9 @@ def execute_attach_doc_chunks_query(
         ]
         single_chunk_metadata = _metadata_for_chunk(chunks_metadata, chunk_num)
 
-        exec_args_array.append(f"-metadata={single_chunk_metadata}")
+        exec_args_array.append(
+            f"-metadata={json.dumps(single_chunk_metadata, ensure_ascii=False)}"
+        )
         exec_args_array.append(f"doc_data={ch}")
         exec_args = " ".join(exec_args_array)
 
@@ -373,7 +375,7 @@ def execute_delete_doc_query(
         [
             f"SESSION_ID={session_id}",
             f"-ids={doc_id}",
-            f"-metadata={doc_metadata}",
+            f"-metadata={json.dumps(doc_metadata or '', ensure_ascii=False)}",
         ]
     )
     status, timeout_elapsed = query.execute(timeout_elapsed, exec_args)

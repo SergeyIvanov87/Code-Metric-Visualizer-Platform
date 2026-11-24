@@ -180,5 +180,56 @@
         "unique_id": 202
       }
     }
+  ],
+  "rag_add_uri_and_metadata_characters": [
+    {
+      "query_sent": {
+        "-doc_id": "21",
+        "-metadata": "team docs \"quoted\" – café_0"
+      },
+      "query_received": {
+        "-doc_id": "21",
+        "-metadata": "team docs \"quoted\" – café_0"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 22
+      }
+    }
+  ],
+  "rag_add_data_filename_and_metadata_characters": [
+    {
+      "query_sent": {
+        "-doc_id": "301",
+        "-metadata": "team docs \"quoted\" – café_0"
+      },
+      "query_received": {
+        "-doc_id": "301",
+        "-metadata": "team docs \"quoted\" – café_0"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 302
+      }
+    }
+  ],
+  "rag_add_data_omitted_metadata": [
+    {
+      "query_sent": {
+        "-doc_id": "401",
+        "-metadata": "_0"
+      },
+      "query_received": {
+        "-doc_id": "401",
+        "-metadata": "_0"
+      },
+      "answer": {
+        "error_code": 0,
+        "error_msg": "success",
+        "unique_id": 402
+      }
+    }
   ]
 }

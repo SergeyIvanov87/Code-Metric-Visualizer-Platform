@@ -19,5 +19,79 @@
       },
       "not_found": []
     }
+  },
+  "rag_delete_omitted_metadata": {
+    "query": {
+      "-ids": "12,13"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "document_ids": "12,13",
+      "deleted_chunk_ids": [],
+      "dispatcher": {
+        "error_code": 0,
+        "error_msg": "success",
+        "deleted": [
+          12,
+          13
+        ],
+        "not_found": []
+      },
+      "not_found": []
+    }
+  },
+  "rag_delete_quoted_metadata": {
+    "query": {
+      "-ids": "16",
+      "-metadata": "team docs \"quoted\" – café"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "document_ids": "16",
+      "deleted_chunk_ids": [],
+      "dispatcher": {
+        "error_code": 0,
+        "error_msg": "success",
+        "deleted": [
+          16
+        ],
+        "not_found": []
+      },
+      "not_found": []
+    }
+  },
+  "rag_delete_compact_ranges_and_empty_metadata": {
+    "query": {
+      "-ids": "7-10,8,20-21",
+      "-metadata": ""
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "document_ids": "7-10,8,20-21",
+      "deleted_chunk_ids": [],
+      "dispatcher": {
+        "error_code": 0,
+        "error_msg": "success",
+        "deleted": [
+          7,
+          8
+        ],
+        "not_found": [
+          9,
+          10,
+          20,
+          21
+        ]
+      },
+      "not_found": [
+        9,
+        10,
+        20,
+        21
+      ]
+    }
   }
 }

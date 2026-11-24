@@ -32,7 +32,10 @@ def _load_cases(name):
 
 def _arguments(session_id, query):
     values = [f"SESSION_ID={session_id}"]
-    values.extend(f"{name}={json.dumps(value)}" for name, value in query.items())
+    values.extend(
+        f"{name}={json.dumps(value, ensure_ascii=False)}"
+        for name, value in query.items()
+    )
     return " ".join(values)
 
 

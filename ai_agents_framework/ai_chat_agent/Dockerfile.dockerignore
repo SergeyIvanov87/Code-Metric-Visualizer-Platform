@@ -23,16 +23,16 @@ common/**
 !common/deferred_query_executor.py
 !ai_agents_framework/
 ai_agents_framework/**
-!ai_agents_framework/ai_agent/
-ai_agents_framework/ai_agent/**
-!ai_agents_framework/ai_agent/config/
-!ai_agents_framework/ai_agent/config/**
-!ai_agents_framework/ai_agent/API/
-!ai_agents_framework/ai_agent/API/**
-!ai_agents_framework/ai_agent/sources/
-!ai_agents_framework/ai_agent/sources/**
-ai_agents_framework/ai_agent/sources/assets_model/
-ai_agents_framework/ai_agent/sources/.*
+!ai_agents_framework/ai_chat_agent/
+ai_agents_framework/ai_chat_agent/**
+!ai_agents_framework/ai_chat_agent/config/
+!ai_agents_framework/ai_chat_agent/config/**
+!ai_agents_framework/ai_chat_agent/API/
+!ai_agents_framework/ai_chat_agent/API/**
+!ai_agents_framework/ai_chat_agent/sources/
+!ai_agents_framework/ai_chat_agent/sources/**
+ai_agents_framework/ai_chat_agent/sources/assets_model/
+ai_agents_framework/ai_chat_agent/sources/.*
 
 # Exclude local secrets and generated files within allowed directories.
 **/.env
