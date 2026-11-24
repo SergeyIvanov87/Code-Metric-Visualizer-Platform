@@ -32,13 +32,6 @@ services:
     volumes:
       - ./config:/config:ro
       - api.pmccabe_collector.restapi.org.ai-agent.tests:/api
-      - api.pmccabe_collector.project.ai-agents-framework.ai-agent.src:/package
 
 volumes:
   api.pmccabe_collector.restapi.org.ai-agent.tests:
-  api.pmccabe_collector.project.ai-agents-framework.ai-agent.src:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./sources

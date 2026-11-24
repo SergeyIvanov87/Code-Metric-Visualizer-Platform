@@ -49,8 +49,8 @@ configuration mounts, and device access declarations.
 Chat sources, inference profiles, and the chat API schema now live under
 `../ai_chat_agent`. Model assets and inference configuration belong there.
 
-Run RAG unit cases from the repository root:
+Run RAG functional test cases from the repository root:
 
 ```sh
-docker compose -f ai_agents_framework/ai_agent/compose-unit.test.yaml up --build --abort-on-container-exit --exit-code-from ai-agent-unit-tester
+docker compose -f ai_agents_framework/ai_agent/compose-functional.test.yaml up --build --abort-on-container-exit --exit-code-from ai_agent-functional-tester
 ```

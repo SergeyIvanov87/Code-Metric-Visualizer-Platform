@@ -129,21 +129,8 @@ services:
 
   ai_agent:
     extends:
-      file: ai_agents_framework/ai_agent/compose-default.prod.yaml
+      file: ai_agents_framework/ai_agent/compose-functional.test.yaml
       service: ai_agent
-    environment:
-      VECTORDB_HOST: rag
-      VECTORDB_PORT: 8000
-    volumes:
-      - api.pmccabe_collector.restapi.org.ai-agents-framework.rag-dispatcher.test:/api
-      - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models.test:/assets/models
-    depends_on:
-      docs-dispatcher:
-        condition: service_started
-      rag:
-        condition: service_started
-      file-uploader:
-        condition: service_started
     logging:
       driver: syslog
       options:
@@ -169,25 +156,21 @@ services:
     networks:
       - api.pmccabe_collector.network
 
-#  ai_agent_rag_functional_tester:
-#    extends:
-#      file: ai_agents_framework/ai_agent/test/compose-functional.prod.yaml
-#      service: ai_agent_rag_functional_tester
-#    environment:
-#      EXIT_ONCE_DONE: "false"
-#    volumes:
-#      - api.pmccabe_collector.restapi.org.ai-agents-framework.rag-dispatcher.test:/api
-#    depends_on:
-#      ai_agent:
-#        condition: service_started
-#    logging:
-#      driver: syslog
-#      options:
-#        syslog-address: "tcp://localhost:13601"
-#        tag: "{{.Name}}"
-#    networks:
-#      - api.pmccabe_collector.network
-
+  ai_agent-functional-tester:
+    extends:
+      file: ai_agents_framework/ai_agent/tests/functional/compose-functional.tests.yaml
+      service: ai_agent-functional-tester
+    depends_on:
+      ai_agent:
+        condition: service_started
+      test_pseudo_fs:
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
 
   rest-api-functional-api-initializer:
     extends:
@@ -268,6 +251,7 @@ volumes:
   api.pmccabe_collector.restapi.org.service-broker.test:
   api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.persistent-store-data.test:
   api.pmccabe_collector.restapi.org.ai-agents-framework.rag-dispatcher.test:
+  api.pmccabe_collector.restapi.org.ai-agent.tests:
   api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.config.test:
   api.pmccabe_collector.project.ai-agents-framework.rag.test:
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.models.test:
