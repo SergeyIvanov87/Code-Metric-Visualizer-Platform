@@ -61,9 +61,14 @@ Please pay attention, that after **SESSION_ID** was manifested as `exec` argumen
 
 ## CLI FIFO logs
 
-Generated CLI services append FIFO events to `$WORK_DIR/fifo.log`. Set
-`FIFO_LOG_FILE` in the service environment to use a different path. Its
-parent directory must be writable by the service user. The logger rotates
+Generated CLI services append FIFO events to the path exported by their
+entrypoint as `SERVICE_FIFO_LOG_FILEPATH`. Services with their own API
+directory use `${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${SERVICE_NAME}/<hostname>.log`.
+Services that share the API root use
+`${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${SERVICE_NAME}_<hostname>.log`.
+The directory must be writable by the service user. Without a configured
+service path, the logger uses `FIFO_LOG_FILE` if set, then falls back to
+`${WORK_DIR:-$PWD}/fifo.log`. The logger rotates
 the file at 10 MiB by default and keeps five backups. Set
 `FIFO_LOG_MAX_BYTES` to change the size threshold.
 

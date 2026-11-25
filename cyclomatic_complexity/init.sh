@@ -7,13 +7,18 @@ export SHARED_API_DIR=${4}
 export PYTHONPATH="${3}:${3}/modules"
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
+export SERVICE_NAME="cyclomatic_complexity"
+export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${SERVICE_NAME}"
+export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/$(hostname).log"
 
 export INNER_API_SCHEMA_DIR=${WORK_DIR}/API
 
-README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/cyclomatic_complexity/README-API-STATISTIC.md
+README_FILE_PATH=${SERVICE_SHARED_API_PATH}/README-API-STATISTIC.md
 
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
+printf 'export SERVICE_NAME=%q\nexport SERVICE_SHARED_API_PATH=%q\nexport SERVICE_FIFO_LOG_FILEPATH=%q\n' \
+    "${SERVICE_NAME}" "${SERVICE_SHARED_API_PATH}" "${SERVICE_FIFO_LOG_FILEPATH}" >> "${WORK_DIR}/env.sh"
 
 source ${OPT_DIR}/shell_utils/init_utils.sh
 

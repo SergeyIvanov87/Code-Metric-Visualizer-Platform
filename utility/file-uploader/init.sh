@@ -7,6 +7,12 @@ export SHARED_API_DIR="$3"
 export PYTHONPATH="${OPT_DIR}:${OPT_DIR}/modules"
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 export MICROSERVICE_NAME=${MICROSERVICE_NAME:-file-uploader}
+export SERVICE_NAME="${MICROSERVICE_NAME}"
+export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${SERVICE_NAME}"
+export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/$(hostname).log"
+
+printf 'export SERVICE_NAME=%q\nexport SERVICE_SHARED_API_PATH=%q\nexport SERVICE_FIFO_LOG_FILEPATH=%q\n' \
+    "${SERVICE_NAME}" "${SERVICE_SHARED_API_PATH}" "${SERVICE_FIFO_LOG_FILEPATH}" > "${WORK_DIR}/env.sh"
 
 source "${OPT_DIR}/shell_utils/init_utils.sh"
 "${OPT_DIR}/canonize_internal_api.py" "${WORK_DIR}/API" "${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"

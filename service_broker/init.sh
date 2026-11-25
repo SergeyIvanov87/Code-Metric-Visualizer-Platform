@@ -6,12 +6,17 @@ export PYTHONPATH="${2}:${2}/modules"
 
 export SHARED_API_DIR=${3}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
+export SERVICE_NAME="${MICROSERVICE_NAME:-service-broker}"
+export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${SERVICE_NAME}"
+export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/$(hostname).log"
 
 export DEPEND_ON_SERVICES_API_SCHEMA_DIR=${WORK_DIR}/API/deps
 export INNER_API_SCHEMA_DIR=${WORK_DIR}/API
 
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport DEPEND_ON_SERVICES_API_SCHEMA_DIR=${DEPEND_ON_SERVICES_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
+printf 'export SERVICE_NAME=%q\nexport SERVICE_SHARED_API_PATH=%q\nexport SERVICE_FIFO_LOG_FILEPATH=%q\n' \
+    "${SERVICE_NAME}" "${SERVICE_SHARED_API_PATH}" "${SERVICE_FIFO_LOG_FILEPATH}" >> "${WORK_DIR}/env.sh"
 
 # start & activate syslogd
 doas -u root rc-status

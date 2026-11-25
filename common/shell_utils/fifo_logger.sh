@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Source this helper in a Bash service. FIFO_LOG_FILE overrides the default
+# Source this helper in a Bash service. SERVICE_FIFO_LOG_FILEPATH selects the
 # service log path and FIFO_LOG_MAX_BYTES sets the size before rotation.
 fifo_log() {
     local record
@@ -10,7 +10,7 @@ fifo_log() {
     (
         LC_ALL=C
         umask 077
-        local log_file=${FIFO_LOG_FILE:-${WORK_DIR:-$PWD}/fifo.log}
+        local log_file=${SERVICE_FIFO_LOG_FILEPATH:-${FIFO_LOG_FILE:-${WORK_DIR:-$PWD}/fifo.log}}
         local max_bytes=${FIFO_LOG_MAX_BYTES:-10485760}
         local lock_fd size=0 backup
         [[ $max_bytes =~ ^[1-9][0-9]{0,9}$ ]] || max_bytes=10485760

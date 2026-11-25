@@ -5,11 +5,19 @@ source /tests/utils/shell_utils/fifo_logger.sh
 setUp() {
     test_dir=$(mktemp -d)
     FIFO_LOG_FILE="$test_dir/fifo.log"
-    unset FIFO_LOG_MAX_BYTES
+    unset FIFO_LOG_MAX_BYTES SERVICE_FIFO_LOG_FILEPATH
 }
 
 tearDown() {
     rm -rf -- "$test_dir"
+}
+
+test_service_fifo_log_path_takes_precedence() {
+    SERVICE_FIFO_LOG_FILEPATH="$test_dir/service hostname.log"
+    fifo_log read /api/exec session received 0
+
+    assertTrue "service log contains the record" 'grep -q "session_id=session " "$SERVICE_FIFO_LOG_FILEPATH"'
+    assertFalse "legacy log path was unused" '[[ -e "$FIFO_LOG_FILE" ]]'
 }
 
 test_log_record_escapes_session_and_path() {

@@ -7,14 +7,19 @@ export SHARED_API_DIR=${3}
 export RRD_DATA_STORAGE_DIR=${4}/api.pmccabe_collector.restapi.org
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
+export SERVICE_NAME="rrd_analytic"
+export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${SERVICE_NAME}"
+export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/$(hostname).log"
 export DEPEND_ON_SERVICES_API_SCHEMA_DIR=${WORK_DIR}/API/deps
 export INNER_API_SCHEMA_DIR=${WORK_DIR}/API
 
-README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/rrd_analytic/README-API-ANALYTIC.md
+README_FILE_PATH=${SERVICE_SHARED_API_PATH}/README-API-ANALYTIC.md
 
 
 # use source this script as fast way to setup environment for debugging
 echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport RRD_DATA_STORAGE_DIR=${RRD_DATA_STORAGE_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport DEPEND_ON_SERVICES_API_SCHEMA_DIR=${DEPEND_ON_SERVICES_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
+printf 'export SERVICE_NAME=%q\nexport SERVICE_SHARED_API_PATH=%q\nexport SERVICE_FIFO_LOG_FILEPATH=%q\n' \
+    "${SERVICE_NAME}" "${SERVICE_SHARED_API_PATH}" "${SERVICE_FIFO_LOG_FILEPATH}" >> "${WORK_DIR}/env.sh"
 
 source ${OPT_DIR}/shell_utils/color_codes.sh
 if [ -z ${MICROSERVICE_NAME} ]; then
