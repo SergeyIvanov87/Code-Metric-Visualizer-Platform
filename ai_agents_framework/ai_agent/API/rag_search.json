@@ -1,0 +1,18 @@
+{
+    "Content-Type": "application/json",
+    "Method": "GET",
+    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/search/v1",
+    "Params": {
+        "search": "",
+        "score_min": "0.0",
+        "score_max": "1.0",
+        "count": "5",
+        "collection_use_regex": ".*",
+        "collection_avoid_regex": ""
+    },
+    "Description": {
+        "header": "Search RAG collections directly",
+        "body": "Embeds search once and queries matching ChromaDB collections directly, without using the LLM pipeline. score_min and score_max are inclusive Chroma distance bounds: lower scores are more similar. count is the maximum number of results across all selected collections. collection_use_regex selects collection names and collection_avoid_regex excludes matching names; by default all collections are searched and none are excluded.",
+        "footer": "Returns documents ordered by ascending distance. Each result contains collection, id, score, and content."
+    }
+}
