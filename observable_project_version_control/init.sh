@@ -6,16 +6,21 @@ export OPT_DIR=${3}
 export PYTHONPATH="${3}:${3}/modules"
 export SHARED_API_DIR=${4}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
-export SERVICE_NAME="project"
-export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${SERVICE_NAME}"
+export MICROSERVICE_NAME=${MICROSERVICE_NAME:-project}
+export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"
 export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/$(hostname).log"
 
-README_FILE_PATH=${SERVICE_SHARED_API_PATH}/README-API-VCS.md
+README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/project/README-API-VCS.md
 
 # use source this script as fast way to setup environment for debugging
-echo -e "export WORK_DIR=${WORK_DIR}\nexport INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
-printf 'export SERVICE_NAME=%q\nexport SERVICE_SHARED_API_PATH=%q\nexport SERVICE_FIFO_LOG_FILEPATH=%q\n' \
-    "${SERVICE_NAME}" "${SERVICE_SHARED_API_PATH}" "${SERVICE_FIFO_LOG_FILEPATH}" >> "${WORK_DIR}/env.sh"
+echo "export WORK_DIR=${WORK_DIR}
+export INITIAL_PROJECT_LOCATION=${INITIAL_PROJECT_LOCATION}
+export OPT_DIR=${OPT_DIR}
+export SHARED_API_DIR=${SHARED_API_DIR}
+export PYTHONPATH=${PYTHONPATH}
+export MICROSERVICE_NAME=${MICROSERVICE_NAME@Q}
+export SERVICE_SHARED_API_PATH=${SERVICE_SHARED_API_PATH@Q}
+export SERVICE_FIFO_LOG_FILEPATH=${SERVICE_FIFO_LOG_FILEPATH@Q}" > "${WORK_DIR}/env.sh"
 
 source ${OPT_DIR}/shell_utils/init_utils.sh
 
@@ -54,6 +59,7 @@ mkdir -p ${SHARED_API_DIR}
 ${OPT_DIR}/build_api_executors.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}
 ${OPT_DIR}/build_api_services.py ${WORK_DIR}/API ${WORK_DIR} -o ${WORK_DIR}/services
 ${OPT_DIR}/build_api_pseudo_fs.py ${WORK_DIR}/API ${SHARED_API_DIR}
+mkdir -p "${SERVICE_SHARED_API_PATH}"
 ${OPT_DIR}/make_api_readme.py ${WORK_DIR}/API > ${README_FILE_PATH}
 chmod g+rw ${README_FILE_PATH}
 

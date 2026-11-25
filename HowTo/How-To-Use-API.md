@@ -63,9 +63,9 @@ Please pay attention, that after **SESSION_ID** was manifested as `exec` argumen
 
 Generated CLI services append FIFO events to the path exported by their
 entrypoint as `SERVICE_FIFO_LOG_FILEPATH`. Services with their own API
-directory use `${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${SERVICE_NAME}/<hostname>.log`.
+directory use `${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}/<hostname>.log`.
 Services that share the API root use
-`${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${SERVICE_NAME}_<hostname>.log`.
+`${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}_<hostname>.log`.
 The directory must be writable by the service user. Without a configured
 service path, the logger uses `FIFO_LOG_FILE` if set, then falls back to
 `${WORK_DIR:-$PWD}/fifo.log`. The logger rotates

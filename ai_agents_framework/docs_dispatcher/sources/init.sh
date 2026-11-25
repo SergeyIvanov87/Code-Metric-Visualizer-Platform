@@ -7,8 +7,8 @@ export SHARED_API_DIR=${4}
 export PYTHONPATH="${3}:${3}/modules"
 
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
-export SERVICE_NAME="ai_agent_rag_dispatcher"
-export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${SERVICE_NAME}"
+export MICROSERVICE_NAME=${MICROSERVICE_NAME:-ai_agent_rag_dispatcher}
+export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"
 export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/$(hostname).log"
 
 # generate assets in a tmp directory
@@ -17,12 +17,20 @@ mkdir -p ${WORK_DIR_TMP}
 
 export INNER_API_SCHEMA_DIR=${WORK_DIR_TMP}/API
 
-README_FILE_PATH=${SERVICE_SHARED_API_PATH}/README-API-DOCS-DISPATCHER.md
+README_FILE_PATH=${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/ai_agent_rag_dispatcher/README-API-DOCS-DISPATCHER.md
 
 # use source this script as fast way to setup environment for debugging
-echo -e "export WORK_DIR=${WORK_DIR}\nexport WORK_DIR_TMP=${WORK_DIR_TMP}\nexport DISPATCHER_SETTINGS_DIR=${DISPATCHER_SETTINGS_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
-printf 'export SERVICE_NAME=%q\nexport SERVICE_SHARED_API_PATH=%q\nexport SERVICE_FIFO_LOG_FILEPATH=%q\n' \
-    "${SERVICE_NAME}" "${SERVICE_SHARED_API_PATH}" "${SERVICE_FIFO_LOG_FILEPATH}" >> "${WORK_DIR}/env.sh"
+echo "export WORK_DIR=${WORK_DIR}
+export WORK_DIR_TMP=${WORK_DIR_TMP}
+export DISPATCHER_SETTINGS_DIR=${DISPATCHER_SETTINGS_DIR}
+export OPT_DIR=${OPT_DIR}
+export SHARED_API_DIR=${SHARED_API_DIR}
+export MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}
+export INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}
+export PYTHONPATH=${PYTHONPATH}
+export MICROSERVICE_NAME=${MICROSERVICE_NAME@Q}
+export SERVICE_SHARED_API_PATH=${SERVICE_SHARED_API_PATH@Q}
+export SERVICE_FIFO_LOG_FILEPATH=${SERVICE_FIFO_LOG_FILEPATH@Q}" > "${WORK_DIR}/env.sh"
 
 cp -r /API ${WORK_DIR_TMP}
 source ${OPT_DIR}/shell_utils/init_utils.sh
@@ -61,6 +69,7 @@ ${OPT_DIR}/build_api_executors.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR} -o ${WORK_
 ${OPT_DIR}/build_api_services.py ${INNER_API_SCHEMA_DIR} ${WORK_DIR_TMP} -o ${WORK_DIR_TMP}/services
 doas -u root env PYTHONPATH=${PYTHONPATH} SHARED_API_DIR=${SHARED_API_DIR} MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME} ${OPT_DIR}/build_api_pseudo_fs.py ${INNER_API_SCHEMA_DIR} ${SHARED_API_DIR}
 doas -u root chown -R $USER:$GROUPNAME ${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/ai_agent_rag_dispatcher
+mkdir -p "${SERVICE_SHARED_API_PATH}"
 
 launch_fs_api_services SERVICE_WATCH_PIDS "${WORK_DIR_TMP}/services/"
 
