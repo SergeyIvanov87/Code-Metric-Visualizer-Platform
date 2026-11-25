@@ -117,26 +117,26 @@ def test_generated_service_logs_session_fifo_io(run_around_tests, request_name):
             return []
         return [
             line for line in log.read_text().splitlines()
-            if f"session_id={session_id} " in line
+            if f"SESSION_ID={session_id} " in line
         ]
 
     assert _wait_until(
-        lambda: any("event=finished status=0" in line for line in session_records())
+        lambda: any("EVENT=finished STATUS=0" in line for line in session_records())
     )
     records = session_records()
-    assert any("operation=read " in line and "event=received status=0" in line for line in records)
-    assert any("operation=write " in line and "event=started" in line for line in records)
-    assert any("operation=write " in line and "event=finished status=0" in line for line in records)
-    request_record = next(line for line in records if "event=received" in line)
+    assert any("OP=read " in line and "EVENT=received STATUS=0" in line for line in records)
+    assert any("OP=write " in line and "EVENT=started" in line for line in records)
+    assert any("OP=write " in line and "EVENT=finished STATUS=0" in line for line in records)
+    request_record = next(line for line in records if "EVENT=received" in line)
     assert shlex.split(request_record.split(" query=", 1)[1]) == [
         f"SESSION_ID={session_id} param_1={payload}"
     ]
     assert any(
         "result." in line and f"_{session_id} " in line
-        and "event=finished status=0 answer=" in line and payload in line
+        and "EVENT=finished STATUS=0 answer=" in line and payload in line
         for line in records
     )
-    assert all(" answer=" not in line for line in records if "event=started" in line)
+    assert all(" answer=" not in line for line in records if "EVENT=started" in line)
 
 
 def test_parallel_by_session_requires_a_boolean(run_around_tests):

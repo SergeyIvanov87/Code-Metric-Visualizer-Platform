@@ -82,8 +82,8 @@ environment:
 Set `FIFO_LOG_MAX_BACKUPS` to `0` to keep only the active log. Retention
 changes take effect at the next rotation.
 
-Each record includes a timestamp, process ID, FIFO path, operation, event,
-and status when available. A `received` record includes the raw request line
+Each record includes a timestamp and the fields `SESSION_ID`, `PID`, `OP`,
+`FIFO`, `EVENT`, and `STATUS`. A `received` record includes the raw request line
 as `query`, including any `SESSION_ID` parameter. A successful `finished`
 write includes the delivered result as shell-escaped `answer` text, or as
 `answer_base64` when it contains NUL bytes. The write's session ID comes from

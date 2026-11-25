@@ -5,7 +5,7 @@
 fifo_log() {
     local record payload_field session_id=${3:-####}
     [[ $session_id != "#####" ]] || session_id="####"
-    printf -v record '%(%Y-%m-%dT%H:%M:%S%z)T session_id=%q pid=%s operation=%q fifo=%q event=%q status=%q' \
+    printf -v record '%(%Y-%m-%dT%H:%M:%S%z)T SESSION_ID=%q PID=%s OP=%q FIFO=%q EVENT=%q STATUS=%q' \
         -1 "$session_id" "$BASHPID" "$1" "$2" "$4" "${5:--}"
 
     if [[ $# -ge 7 ]]; then
