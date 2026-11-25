@@ -104,10 +104,11 @@ def test_parallel_by_session_is_opt_in(run_around_tests):
 def test_generated_service_logs_session_fifo_io(run_around_tests, request_name):
     _install_request_command("true\n")
     query = _query_for(request_name)
-    session_id = f"fifo-log-{request_name}"
+    session_id = f"fifo_log_{request_name}"
     payload = "test-payload"
     _execute(query, session_id, payload)
-    assert payload in _wait_result(query, session_id)
+    answer = _wait_result(query, session_id)
+    assert payload in answer
 
     log = Path(SETTINGS.work_dir) / "generated" / "fifo.log"
 
@@ -126,7 +127,16 @@ def test_generated_service_logs_session_fifo_io(run_around_tests, request_name):
     assert any("operation=read " in line and "event=received status=0" in line for line in records)
     assert any("operation=write " in line and "event=started" in line for line in records)
     assert any("operation=write " in line and "event=finished status=0" in line for line in records)
-    assert all(payload not in line for line in records)
+    request_record = next(line for line in records if "event=received" in line)
+    assert shlex.split(request_record.split(" query=", 1)[1]) == [
+        f"SESSION_ID={session_id} param_1={payload}"
+    ]
+    assert any(
+        "result." in line and f"_{session_id} " in line
+        and "event=finished status=0 answer=" in line and payload in line
+        for line in records
+    )
+    assert all(" answer=" not in line for line in records if "event=started" in line)
 
 
 def test_parallel_by_session_requires_a_boolean(run_around_tests):

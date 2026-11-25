@@ -86,7 +86,7 @@ test_all_files() {
 test_ignores_markdown_and_fifo_log_extensions() {
     local -a parsed_args=()
 
-    touch "${TEST_API_NODE}"/{README.md,123456789012.log,123456789012.log.lock,123456789012.log.{1..5}}
+    touch "${TEST_API_NODE}"/{README.md,123456789012.log,123456789012.log.lock,123456789012.log.1,123456789012.log.12}
     printf '%s\n' positional > "${TEST_API_NODE}/01.NO_NAME_PARAM.1"
 
     test_function "${TEST_API_NODE}" "bbb"

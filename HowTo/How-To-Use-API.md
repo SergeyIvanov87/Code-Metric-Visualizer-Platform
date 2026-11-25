@@ -69,16 +69,27 @@ Services that share the API root use
 The directory must be writable by the service user. Without a configured
 service path, the logger uses `FIFO_LOG_FILE` if set, then falls back to
 `${WORK_DIR:-$PWD}/fifo.log`. The logger rotates
-the file at 10 MiB by default and keeps five backups. Set
-`FIFO_LOG_MAX_BYTES` to change the size threshold.
+the file at 10 MiB by default and keeps five backups. New log files use
+mode `0664`. Set these variables in a service's Compose `environment` to
+override the defaults:
+
+```yaml
+environment:
+  FIFO_LOG_MAX_BYTES: "20971520"
+  FIFO_LOG_MAX_BACKUPS: "7"
+```
+
+Set `FIFO_LOG_MAX_BACKUPS` to `0` to keep only the active log. Retention
+changes take effect at the next rotation.
 
 Each record includes a timestamp, process ID, FIFO path, operation, event,
-and status when available. A request read starts with `session_id=unknown`.
-The `received` event records the parsed `SESSION_ID`, also used on the
-corresponding result write. A serial service can receive multiple requests in
-one FIFO read. Keep the service running through a result read to observe the
-`finished` event. Log writes are best-effort and leave service stdout and
-stderr available for the existing output.
+and status when available. A `received` record includes the raw request line
+as `query`, including any `SESSION_ID` parameter. A successful `finished`
+write includes the delivered result as shell-escaped `answer` text, or as
+`answer_base64` when it contains NUL bytes. The write's session ID comes from
+the suffix after the result FIFO's base filename. Unsuffixed results and
+requests without a session use `####`. Log writes are best-effort and leave
+service stdout and stderr available for the existing output.
 
 ## GUI File Manager
 

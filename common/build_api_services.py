@@ -147,7 +147,7 @@ api_cli_schema = [
     "        fi\n",
     '        echo "`date +%H:%M:%S:%3N`\t${ME}\trequest ${REQUEST_NUM}"\n',
     "        " + extract_attr_value_from_string() + " ${SESSION_ID_ATTR} \"${CMD_READ}\" \"#####\" '=' SESSION_ID_VALUE\n",
-    '        fifo_log read "${pipe_request}" "${SESSION_ID_VALUE}" received 0\n',
+    '        fifo_log read "${pipe_request}" "${SESSION_ID_VALUE}" received 0 query "${CMD_READ}"\n',
     "        " + extract_attr_value_from_string() + " ${API_KEEP_ALIVE_ATTR} \"${CMD_READ}\" \"@@@@@\" '=' API_KEEP_ALIVE_VALUE\n",
     "        if [ -z ${pipe_result_array[${SESSION_ID_VALUE}]} ]; then\n",
     '            pipe_result_consumer="${pipe_result}_${SESSION_ID_VALUE}"\n',
@@ -176,7 +176,7 @@ api_cli_schema = [
     CLI_EXECUTOR_CALL, '"${CMD_READ}" | base64)\n',
     '        fi\n',
     '        rm -f ${api_exec_node_directory}/in_progress\n',
-    '        (touch ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tFINISH    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}\treqNum:\t${REQUEST_NUM} " && echo "${RESULT_OUT}" | fifo_logged write "${pipe_result_consumer}" "${SESSION_ID_VALUE}" decode_fifo_result "${pipe_result_consumer}" && rm -rf ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tCONSUMED [${SESSION_ID_VALUE}]: ${api_exec_node_directory} <--- ${pipe_result_consumer}") &\n',
+    '        (touch ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tFINISH    [${SESSION_ID_VALUE}]: ${api_exec_node_directory}\targs:\t${CMD_READ}\treqNum:\t${REQUEST_NUM} " && fifo_write_result "${pipe_result_consumer}" "${pipe_result}" "${SESSION_ID_VALUE}" "${RESULT_OUT}" && rm -rf ${api_exec_node_directory}/ready && echo "`date +%H:%M:%S:%3N`\t${ME}\t`hostname`\tCONSUMED [${SESSION_ID_VALUE}]: ${api_exec_node_directory} <--- ${pipe_result_consumer}") &\n',
     "        WATCH_PID_ARRAY[${SESSION_ID_VALUE}]=$!\n",
     "        let REQUEST_NUM=${REQUEST_NUM}+1\n",
     CLI_REQUEST_BATCH_END,
@@ -333,7 +333,7 @@ def generate_parallel_session_functions(
         '    printf \'%s\\n\' "${result_writer_pid}" > "${request_state}/result_writer.pid"\n',
         '    touch "${request_state}/result_ready"\n',
         '    if wait "${result_writer_pid}"; then\n',
-        '        fifo_log write "${result_fifo}" "${session_id}" finished 0\n',
+        '        fifo_log_result "${result_fifo}" "${pipe_result}" "${result_out}"\n',
         '        echo "`date +%H:%M:%S:%3N`\\t${ME}\\t`hostname`\\tCONSUMED [${session_id}]: ${api_exec_node_directory} <--- ${result_fifo}"\n',
         "    else\n",
         '        fifo_log write "${result_fifo}" "${session_id}" finished "$?"\n',
@@ -439,7 +439,6 @@ def generate_cli_server_content(
 
     return [
         f"source {shlex.quote(str(FIFO_LOGGER_PATH))}\n",
-        'decode_fifo_result() { base64 -d > "$1"; }\n',
         *api_cli_schema_concrete,
     ]
 

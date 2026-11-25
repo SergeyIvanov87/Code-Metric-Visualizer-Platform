@@ -5,7 +5,7 @@ source /tests/utils/shell_utils/fifo_logger.sh
 setUp() {
     test_dir=$(mktemp -d)
     FIFO_LOG_FILE="$test_dir/fifo.log"
-    unset FIFO_LOG_MAX_BYTES SERVICE_FIFO_LOG_FILEPATH
+    unset FIFO_LOG_MAX_BYTES FIFO_LOG_MAX_BACKUPS SERVICE_FIFO_LOG_FILEPATH
 }
 
 tearDown() {
@@ -47,7 +47,7 @@ test_read_remains_in_calling_shell() {
     IFS= fifo_logged read /api/exec '' read -r payload <<< '  request\text  '
     assertEquals 0 "$?"
     assertEquals '  request\text  ' "$payload"
-    grep -q 'session_id=unknown .* event=finished status=0$' "$FIFO_LOG_FILE"
+    grep -F 'session_id=\#### ' "$FIFO_LOG_FILE" | grep -q 'event=finished status=0$'
     assertEquals "successful read is logged" 0 "$?"
 }
 
@@ -89,6 +89,26 @@ test_rotation_keeps_five_newest_backups() {
         assertEquals "backup $backup contains the expected event" 0 "$?"
     done
     assertFalse "there is no sixth backup" "[[ -e \"$FIFO_LOG_FILE.6\" ]]"
+}
+
+test_configurable_retention_and_file_modes() {
+    FIFO_LOG_MAX_BYTES=1
+    FIFO_LOG_MAX_BACKUPS=7
+    local session
+    for session in {1..8}; do
+        fifo_log read /api/exec "$session" received 0
+    done
+    assertEquals 664 "$(stat -c %a -- "$FIFO_LOG_FILE")"
+    assertEquals 664 "$(stat -c %a -- "$FIFO_LOG_FILE.7")"
+
+    FIFO_LOG_MAX_BACKUPS=2
+    fifo_log read /api/exec 9 received 0
+    assertEquals 2 "$(find "$test_dir" -name 'fifo.log.[0-9]*' | wc -l)"
+
+    FIFO_LOG_MAX_BACKUPS=0
+    fifo_log read /api/exec 10 received 0
+    assertEquals 0 "$(find "$test_dir" -name 'fifo.log.[0-9]*' | wc -l)"
+    assertEquals 664 "$(stat -c %a -- "$FIFO_LOG_FILE")"
 }
 
 test_concurrent_writers_keep_all_records_during_rotation() {
