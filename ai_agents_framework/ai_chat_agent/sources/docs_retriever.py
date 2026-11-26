@@ -2,7 +2,7 @@
 
 import re
 
-from fs_api_wrappers import (
+from fs_api_wrappers_tmp_copy import (
     create_api_query_interruptible,
     execute_read_ids,
     get_normalized_api_queries,
@@ -24,7 +24,7 @@ class DocumentStore:
             },
         )
         self.session_id = generate_inner_session_id("document_storage", "ask_question")
-        self.put_doc_query = create_api_query_interruptible(
+        self.read_ids_query = create_api_query_interruptible(
             self.shared_api_dir, self.normalized_api_queries["read_ids"], self.session_id
         )
 
@@ -33,4 +33,4 @@ class DocumentStore:
             return []
 
         timeout_elapsed = 10 * len(ids)
-        return execute_read_ids(self.put_doc_query, self.session_id, timeout_elapsed, ids);
+        return execute_read_ids(self.read_ids_query, self.session_id, timeout_elapsed, ids);
