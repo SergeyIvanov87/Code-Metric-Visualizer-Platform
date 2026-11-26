@@ -186,9 +186,18 @@ receive_ka_watchdog_query() {
     return 0
 }
 
+initialize_service_fifo_log() {
+    if [[ -n ${SERVICE_FIFO_LOG_FILEPATH:-} && -z ${service_fifo_log_initialized:-} ]]; then
+        source "${OPT_DIR}/shell_utils/fifo_logger.sh"
+        fifo_log_initialize
+        service_fifo_log_initialized=1
+    fi
+}
+
 launch_fs_api_services() {
     local -n service_pids_arr=${1}
     local SERVICES_SCRIPTS_PATH=${2}
+    initialize_service_fifo_log
     echo -e "${BBlue}Run API services from ${SERVICES_SCRIPTS_PATH}:${Color_Off}"
     for s in ${SERVICES_SCRIPTS_PATH}/*.sh; do
         /bin/bash ${s} &

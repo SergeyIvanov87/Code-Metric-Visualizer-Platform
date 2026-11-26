@@ -61,17 +61,18 @@ Please pay attention, that after **SESSION_ID** was manifested as `exec` argumen
 
 ## CLI FIFO logs
 
-Generated CLI services append FIFO events to the path exported by their
-entrypoint as `SERVICE_FIFO_LOG_FILEPATH`. Services with their own API
-directory use `${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}/<hostname>.log`.
-Services that share the API root use
-`${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}_<hostname>.log`.
-The directory must be writable by the service user. Without a configured
-service path, the logger uses `FIFO_LOG_FILE` if set, then falls back to
-`${WORK_DIR:-$PWD}/fifo.log`. The logger rotates
-the file at 10 MiB by default and keeps five backups. New log files use
-mode `0664`. Set these variables in a service's Compose `environment` to
-override the defaults:
+Generated CLI services write CSV records to `SERVICE_FIFO_LOG_FILEPATH`.
+The default service entrypoints use
+`${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}/fifo_transactions.log`.
+For services that share the API root, the service-specific directory keeps
+their logs separate. Without a configured service path, the logger uses
+`FIFO_LOG_FILE` if set, then falls back to
+`${WORK_DIR:-$PWD}/fifo_transactions.log`. New log files use mode `0664`.
+
+At startup, an existing log is backed up before the new file's CSV header is
+written. Size-based rotation uses the same `fifo_transactions.log.DDMMYY_HHMMSS`
+archive names in UTC. During rapid rotation, the logger advances the archive
+timestamp by a second to keep names unique and preserve their order. The defaults are 10 MiB and five backups.
 
 ```yaml
 environment:
@@ -80,16 +81,15 @@ environment:
 ```
 
 Set `FIFO_LOG_MAX_BACKUPS` to `0` to keep only the active log. Retention
-changes take effect at the next rotation.
+changes take effect at startup or at the next rotation.
 
-Each record includes a timestamp and the fields `SESSION_ID`, `PID`, `OP`,
-`FIFO`, `EVENT`, and `STATUS`. A `received` record includes the raw request line
-as `query`, including any `SESSION_ID` parameter. A successful `finished`
-write includes the delivered result as shell-escaped `answer` text, or as
-`answer_base64` when it contains NUL bytes. The write's session ID comes from
-the suffix after the result FIFO's base filename. Unsuffixed results and
-requests without a session use `####`. Log writes are best-effort and leave
-service stdout and stderr available for the existing output.
+The header is `TIMESTAMP,PID,OP,FIFO,SESSION_ID,EVENT,STATUS,QUERY,ANSWER,ANSWER_BASE64`.
+A received request includes the raw parameter line in `QUERY`. A successful
+write includes the delivered text in `ANSWER`, or the base64-encoded bytes in
+`ANSWER_BASE64` when the result contains NUL bytes. CSV quotes preserve
+commas, quotes, and line breaks in payloads. The write's session ID comes
+from the result FIFO suffix. Requests and results without a session use `####`.
+Log writes are best-effort.
 
 ## GUI File Manager
 

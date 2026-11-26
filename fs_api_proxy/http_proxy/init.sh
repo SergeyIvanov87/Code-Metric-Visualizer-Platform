@@ -7,7 +7,7 @@ export SHARED_API_DIR=${3}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 export MICROSERVICE_NAME=${MICROSERVICE_NAME:-http-proxy}
 export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}"
-export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/${MICROSERVICE_NAME}_$(hostname).log"
+export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/${MICROSERVICE_NAME}/fifo_transactions.log"
 
 # start & activate syslogd
 doas -u root rc-status
@@ -26,6 +26,9 @@ export SERVICE_SHARED_API_PATH=${SERVICE_SHARED_API_PATH@Q}
 export SERVICE_FIFO_LOG_FILEPATH=${SERVICE_FIFO_LOG_FILEPATH@Q}" > "${WORK_DIR}/env.sh"
 
 source ${OPT_DIR}/shell_utils/init_utils.sh
+mkdir -p -m 0777 "${SERVICE_SHARED_API_PATH}"
+mkdir -p "${SERVICE_SHARED_API_PATH}/${MICROSERVICE_NAME}"
+initialize_service_fifo_log
 
 echo -e "${Blue}Proxy UPSTREAM_SERVICE: ${BBlue}${UPSTREAM_SERVICE}${Blue}, DOWNSTREAM_SERVICE: ${BBlue}${DOWNSTREAM_SERVICE}${Blue}, DOWNSTREAM_SERVICE_NETWORK_ADDR: ${BBlue}${DOWNSTREAM_SERVICE_NETWORK_ADDR}${Color_Off}"
 if [ -z "${UPSTREAM_SERVICE}" ]; then

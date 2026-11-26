@@ -9,7 +9,7 @@ export PYTHONPATH="${3}:${3}/modules"
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
 export MICROSERVICE_NAME=${MICROSERVICE_NAME:-cyclomatic_complexity}
 export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"
-export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/$(hostname).log"
+export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/fifo_transactions.log"
 
 export INNER_API_SCHEMA_DIR=${WORK_DIR}/API
 

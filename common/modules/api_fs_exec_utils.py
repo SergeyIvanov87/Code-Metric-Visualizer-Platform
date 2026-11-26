@@ -48,7 +48,7 @@ def generate_read_api_fs_args(preserve_empty_named_values=False):
     ] if preserve_empty_named_values else []
     preserve_empty_value = ' || [[ -z "${a}" ]]' if preserve_empty_named_values else ""
 
-    return [ r"api_arg_ignored_extensions=(md log log.lock 'log.+([0-9])')",
+    return [ r"api_arg_ignored_extensions=(md log log.lock 'log.+([0-9])' 'log.[0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9]')",
              r'for entry in "${API_NODE}"/*.*',
              r"do",
              r'    [[ -f "${entry}" ]] || continue',
