@@ -1,7 +1,7 @@
 {
     "Content-Type": "application/json",
     "Method": "PUT",
-    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/sync/v1",
+    "Query": "api.pmccabe_collector.restapi.org/rag-subsystem/rag/sync/v1",
     "Params": {
         "-batch_size": "100"
     },

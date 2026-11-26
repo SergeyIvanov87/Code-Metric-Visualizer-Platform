@@ -270,7 +270,11 @@ if __name__ == "__main__":
     # This must be the same embedding model/configuration used when the
     # stored Chroma embeddings were generated.
     query_embedder = get_embedding_model()
-    document_store = DocumentStore(args.shared_api_dir, args.main_service_name)
+    document_store = DocumentStore(
+        args.shared_api_dir,
+        args.main_service_name,
+        args.session_id,
+    )
 
     #model_name = "llama-2-7b-chat.Q2_K.gguf"#"llama-2-7b-chat.Q4_K_M.gguf"#"Hermes-2-Pro-Llama-3-8B-GGUF"
     model_name = "Qwen3-4B-Q4_K_M.gguf"

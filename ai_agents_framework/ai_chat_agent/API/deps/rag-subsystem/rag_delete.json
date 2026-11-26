@@ -1,7 +1,7 @@
 {
     "Content-Type" : "application/json",
     "Method" : "POST",
-    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/delete_doc/v1",
+    "Query": "api.pmccabe_collector.restapi.org/rag-subsystem/rag/delete_doc/v1",
     "Params": {
         "-ids": "",
         "-metadata": ""

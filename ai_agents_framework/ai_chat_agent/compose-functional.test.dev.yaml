@@ -1,0 +1,45 @@
+include:
+ - tests/compose-functional.tests.yaml
+ - ../../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
+# use these section of extend the service proxy-base
+# via ../../common/proxy_setup_image_helpers/compose-proxy-args.yaml
+x-proxy-vars: &proxy-vars
+  HTTP_PROXY: ${HTTP_PROXY}
+  HTTPS_PROXY: ${HTTPS_PROXY}
+  http_proxy: ${http_proxy}
+  https_proxy: ${https_proxy}
+  NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1},localhost,127.0.0.1,0.0.0.0"
+  no_proxy: "${no_proxy:-${NO_PROXY:-localhost,127.0.0.1}},localhost,127.0.0.1,0.0.0.0"
+
+services:
+  ai_chat_agent:
+    extends:
+      file: ../../common/proxy_setup_image_helpers/compose-proxy-args.yaml
+      service: proxy-base
+    build:
+      context: ../..
+      dockerfile: ai_agents_framework/ai_chat_agent/Dockerfile.dev
+      args:
+        LLM_BACKEND: cpu
+      secrets:
+        - proxy_ca
+    environment:
+      VECTORDB_HOST: functional-chroma-stub
+      VECTORDB_PORT: 1
+      SKIP_API_DEPS_CHECK: ${SKIP_API_DEPS_CHECK:-false}
+      TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC: ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC:-30}
+    volumes:
+      - ./config:/config:ro
+      - ./tests/functional/chroma_client_stub.py:/opt/sitecustomize.py:ro
+      - api.pmccabe_collector.project.ai-agents-framework.ai-chat-agent.src:/package
+      - api.pmccabe_collector.restapi.org.ai-chat-agent.tests:/api
+
+volumes:
+  api.pmccabe_collector.restapi.org.ai-chat-agent.tests:
+  api.pmccabe_collector.project.ai-agents-framework.ai-chat-agent.src:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./sources

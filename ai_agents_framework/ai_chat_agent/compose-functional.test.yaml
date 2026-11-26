@@ -25,18 +25,14 @@ services:
       secrets:
         - proxy_ca
     environment:
+      VECTORDB_HOST: functional-chroma-stub
+      VECTORDB_PORT: 1
       SKIP_API_DEPS_CHECK: ${SKIP_API_DEPS_CHECK:-false}
       TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC: ${TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC:-30}
     volumes:
       - ./config:/config:ro
-      - api.pmccabe_collector.project.ai-agents-framework.ai-chat-agent.src:/package
+      - ./tests/functional/chroma_client_stub.py:/opt/sitecustomize.py:ro
       - api.pmccabe_collector.restapi.org.ai-chat-agent.tests:/api
 
 volumes:
   api.pmccabe_collector.restapi.org.ai-chat-agent.tests:
-  api.pmccabe_collector.project.ai-agents-framework.ai-chat-agent.src:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./sources

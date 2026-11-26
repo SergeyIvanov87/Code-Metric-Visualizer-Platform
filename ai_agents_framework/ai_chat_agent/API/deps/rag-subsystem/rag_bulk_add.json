@@ -1,7 +1,7 @@
 {
     "Content-Type": "application/json",
     "Method": "POST",
-    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/bulk_add/v1",
+    "Query": "api.pmccabe_collector.restapi.org/rag-subsystem/rag/bulk_add/v1",
     "Params": {
         "-metadata": "",
         "workers": "4",

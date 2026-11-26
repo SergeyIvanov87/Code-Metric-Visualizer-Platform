@@ -10,7 +10,7 @@ from fs_api_wrappers_tmp_copy import (
 )
 
 class DocumentStore:
-    def __init__(self, shared_api_dir, main_service_name):
+    def __init__(self, shared_api_dir, main_service_name, outer_session_id=None):
         self.shared_api_dir = shared_api_dir
         self.main_service_name = main_service_name
 
@@ -23,7 +23,9 @@ class DocumentStore:
                 "read_ids": re.compile(r".*ai_agent_rag_dispatcher.*read_id.*"),
             },
         )
-        self.session_id = generate_inner_session_id("document_storage", "ask_question")
+        self.session_id = generate_inner_session_id(
+            outer_session_id or "document_storage", "read_ids"
+        )
         self.read_ids_query = create_api_query_interruptible(
             self.shared_api_dir, self.normalized_api_queries["read_ids"], self.session_id
         )

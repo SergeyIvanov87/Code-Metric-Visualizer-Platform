@@ -14,6 +14,17 @@ Treat `ai_agents_framework/ai_chat_agent/tests/functional` as the authoritative 
 3. Inspect `tests/functional/api_generator.py` to confirm how generated dependency executors pass arguments, stdin, and deferred-query state to `mock_exec`.
 4. Keep the public test, dependency mocks, and JSON cases aligned with those contracts.
 
+## Maintain the dependency mock inventory
+
+Enumerate JSON API schemas recursively within each subdirectory of `ai_chat_agent/API/deps`. For every such schema, provide both:
+
+- `tests/functional/mock_exec/<schema-stem>.py`
+- a `<schema-stem>` generator entry in `tests/functional/api_generator.py`
+
+Do not generate mocks for JSON files located directly in `ai_chat_agent/API/deps`. This excludes `all_dependencies.json`, `unmet_dependencies.json`, and every future root-level JSON file. Treat these root-level files as dependency-management metadata, not downstream dependency APIs.
+
+Create mock bodies even before a case uses the dependency. Let a missing future `api_test_cases/<schema-stem>.json` fail clearly when invoked; do not create empty case files merely to satisfy the mock inventory.
+
 ## Define public cases
 
 Store each public case in `tests/functional/api_test_cases/<api>.json`. Use one top-level property whose name is the exact outer `SESSION_ID`:

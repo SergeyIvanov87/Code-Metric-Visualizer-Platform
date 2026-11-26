@@ -1,7 +1,7 @@
 {
     "Content-Type" : "application/json",
     "Method" : "GET",
-    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/get_docs/v1",
+    "Query": "api.pmccabe_collector.restapi.org/rag-subsystem/rag/get_docs/v1",
     "Params": {
         "offset": "0",
         "limit":"-1"

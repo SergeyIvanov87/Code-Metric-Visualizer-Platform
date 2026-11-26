@@ -1,7 +1,6 @@
 include:
   - ../../../../common/images/test_pseudo_fs/compose.yaml
   - ../../../../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
-  - test_RAG/compose-functional.tests.yaml
 
 
 services:

@@ -2,7 +2,7 @@
     "ParallelBySession": true,
     "Content-Type": "application/json",
     "Method": "PUT",
-    "Query": "api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1",
+    "Query": "api.pmccabe_collector.restapi.org/rag-subsystem/rag/add_doc/v1",
     "Params": {
         "-URI": "",
         "-doc_type": "",

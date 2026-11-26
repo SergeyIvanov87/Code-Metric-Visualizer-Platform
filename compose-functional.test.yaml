@@ -185,6 +185,37 @@ services:
     networks:
       - api.pmccabe_collector.network
 
+  ai_chat_agent:
+    extends:
+      file: ai_agents_framework/ai_chat_agent/compose-functional.test.yaml
+      service: ai_chat_agent
+    depends_on:             # explicit dependency
+      test_aggregator:
+        condition: service_healthy
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
+  ai-chat-agent-functional-tester:
+    extends:
+      file: ai_agents_framework/ai_chat_agent/tests/functional/compose-functional.tests.yaml
+      service: ai-chat-agent-functional-tester
+    depends_on:
+      ai_chat_agent:
+        condition: service_started
+      test_pseudo_fs:
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "tcp://localhost:13601"
+        tag: "{{.Name}}"
+    networks:
+      - api.pmccabe_collector.network
+
   rest-api-functional-api-initializer:
     extends:
       file: rest_api/tests/functional/api_initializer/compose-functional.test.yaml
@@ -269,6 +300,7 @@ volumes:
   api.pmccabe_collector.project.ai-agents-framework.rag.test:
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.models.test:
   api.pmccabe_collector.project.ai-agents-framework.rag-vectordb-data.test:
+  api.pmccabe_collector.restapi.org.ai-chat-agent.tests:
 
 secrets:
    backend_mysql_db_login:

@@ -21,6 +21,11 @@ WORKDIR /package
 # dependency set installed into /usr/local below.
 ENV PYTHONNOUSERSITE=1
 
+# Development and functional stacks bind-mount /package as source code. Keep
+# downloaded Hugging Face artifacts in the service-owned model volume instead
+# of deriving a cache path from the runtime user's /package home directory.
+ENV HF_HOME=/assets/models/huggingface
+
 RUN <<EOF
     set -e
     pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain-text-splitters tiktoken sentence-transformers
