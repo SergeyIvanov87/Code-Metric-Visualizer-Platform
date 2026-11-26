@@ -142,6 +142,15 @@ services:
     networks:
       - api.pmccabe_collector.network
 
+  test-rag-db:
+    extends:
+      file: ai_agents_framework/ai_agent/tests/functional/test_RAG/compose-functional.tests.yaml
+    environment:
+      - CHROMA_PORT=18000
+    hostname: test-rag-db
+    volumes:
+      - api.pmccabe_collector.project.ai-agents-framework.rag-vectordb-data.test:/mnt
+
   file-uploader:
     extends:
       file: ai_agents_framework/ai_agent/compose-default.prod.yaml
@@ -258,6 +267,7 @@ volumes:
   api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.config.test:
   api.pmccabe_collector.project.ai-agents-framework.rag.test:
   api.pmccabe_collector.project.ai-agents-framework.ai-agent.models.test:
+  api.pmccabe_collector.project.ai-agents-framework.rag-vectordb-data.test:
 
 secrets:
    backend_mysql_db_login:

@@ -56,6 +56,11 @@ Use a list when the same dependency is called repeatedly. Preserve call-specific
 
 Do not create any testing scripts in the manner of unit-testing. All new tests must be added as test cases and public cases, so that each `<api>.json` will be growing.
 
+## Mocks behavioral details
+
+As AI chat agent uses the mocked RAG API, the latter must provide implemented according to specific rules.
+`read_ids` must return the content of the document defined by its ids. The id is the name of the files in `tests/functional/data/*`
+
 ## Implement and verify
 
 Keep helpers minimal and shared only where they make the case contract clearer. The functional container generates executors, services, and pseudo-filesystem nodes from dependency manifests during `init.sh`; do not bypass that path by directly invoking a mock or processor.
