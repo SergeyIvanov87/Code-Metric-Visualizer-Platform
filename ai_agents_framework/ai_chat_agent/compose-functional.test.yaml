@@ -19,7 +19,7 @@ services:
       service: proxy-base
     build:
       context: ../..
-      dockerfile: ai_agents_framework/ai_chat_agent/Dockerfile.dev
+      dockerfile: ai_agents_framework/ai_chat_agent/Dockerfile
       args:
         LLM_BACKEND: cpu
       secrets:
