@@ -59,6 +59,38 @@ we enforce a processing service to create an additional output PIPE suffixed by 
 This additional PIPE were created to not interfere with other parallel request committed throught single `exec` input PIPE, which would have been overritten every time upon new request were made.
 Please pay attention, that after **SESSION_ID** was manifested as `exec` arguments, there is a short delay before the OUTPUT PIPE would be created first time. It might be important in scripting this `echo` <-> `cat` pair, hence before execution `cat` on the OUTPUT PIPE please be sure that it has been created.
 
+## CLI FIFO logs
+
+Generated CLI services write CSV records to `SERVICE_FIFO_LOG_FILEPATH`.
+The default service entrypoints use
+`${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}/fifo_transactions.log`.
+For services that share the API root, the service-specific directory keeps
+their logs separate. Without a configured service path, the logger uses
+`FIFO_LOG_FILE` if set, then falls back to
+`${WORK_DIR:-$PWD}/fifo_transactions.log`. New log files use mode `0664`.
+
+At startup, an existing log is backed up before the new file's CSV header is
+written. Size-based rotation uses the same `fifo_transactions.log.DDMMYY_HHMMSS`
+archive names in UTC. During rapid rotation, the logger advances the archive
+timestamp by a second to keep names unique and preserve their order. The defaults are 10 MiB and five backups.
+
+```yaml
+environment:
+  FIFO_LOG_MAX_BYTES: "20971520"
+  FIFO_LOG_MAX_BACKUPS: "7"
+```
+
+Set `FIFO_LOG_MAX_BACKUPS` to `0` to keep only the active log. Retention
+changes take effect at startup or at the next rotation.
+
+The header is `TIMESTAMP,PID,OP,FIFO,SESSION_ID,EVENT,STATUS,QUERY,ANSWER,ANSWER_BASE64`.
+A received request includes the raw parameter line in `QUERY`. A successful
+write includes the delivered text in `ANSWER`, or the base64-encoded bytes in
+`ANSWER_BASE64` when the result contains NUL bytes. CSV quotes preserve
+commas, quotes, and line breaks in payloads. The write's session ID comes
+from the result FIFO suffix. Requests and results without a session use `####`.
+Log writes are best-effort.
+
 ## GUI File Manager
 
 If you prefer to use GUI rather than CLI, then you could just follow a path `api.pmccabe_collector.restapi.org/cyclomatic_complexity/statistic/view/flamegraph/GET` in your favorite File Manager.

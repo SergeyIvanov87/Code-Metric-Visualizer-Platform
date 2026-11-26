@@ -5,6 +5,9 @@ export OPT_DIR=${2}
 export PYTHONPATH="${2}:${2}/modules"
 export SHARED_API_DIR=${3}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
+export MICROSERVICE_NAME=${MICROSERVICE_NAME:-rest-api}
+export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}"
+export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/${MICROSERVICE_NAME}/fifo_transactions.log"
 
 # start & activate syslogd
 doas -u root rc-status
@@ -13,9 +16,19 @@ doas -u root rc-service syslog start
 doas -u root rc-service syslog status
 
 # use source this script as fast way to setup environment for debugging
-echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
+echo "export WORK_DIR=${WORK_DIR}
+export OPT_DIR=${OPT_DIR}
+export SHARED_API_DIR=${SHARED_API_DIR}
+export MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}
+export PYTHONPATH=${PYTHONPATH}
+export MICROSERVICE_NAME=${MICROSERVICE_NAME@Q}
+export SERVICE_SHARED_API_PATH=${SERVICE_SHARED_API_PATH@Q}
+export SERVICE_FIFO_LOG_FILEPATH=${SERVICE_FIFO_LOG_FILEPATH@Q}" > "${WORK_DIR}/env.sh"
 
 source ${OPT_DIR}/shell_utils/init_utils.sh
+mkdir -p -m 0777 "${SERVICE_SHARED_API_PATH}"
+mkdir -p "${SERVICE_SHARED_API_PATH}/${MICROSERVICE_NAME}"
+initialize_service_fifo_log
 
 HOSTNAME_IP_FILE=/package/hostname_ip
 POPULATED_HOSTNAME_IP_FILE=${SHARED_API_DIR}/rest_api_addr

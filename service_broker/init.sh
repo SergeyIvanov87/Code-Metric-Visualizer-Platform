@@ -6,12 +6,24 @@ export PYTHONPATH="${2}:${2}/modules"
 
 export SHARED_API_DIR=${3}
 export MAIN_SERVICE_NAME=api.pmccabe_collector.restapi.org
+export MICROSERVICE_NAME=${MICROSERVICE_NAME:-service-broker}
+export SERVICE_SHARED_API_PATH="${SHARED_API_DIR}/${MAIN_SERVICE_NAME}/${MICROSERVICE_NAME}"
+export SERVICE_FIFO_LOG_FILEPATH="${SERVICE_SHARED_API_PATH}/fifo_transactions.log"
 
 export DEPEND_ON_SERVICES_API_SCHEMA_DIR=${WORK_DIR}/API/deps
 export INNER_API_SCHEMA_DIR=${WORK_DIR}/API
 
 # use source this script as fast way to setup environment for debugging
-echo -e "export WORK_DIR=${WORK_DIR}\nexport OPT_DIR=${OPT_DIR}\nexport SHARED_API_DIR=${SHARED_API_DIR}\nexport MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}\nexport INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}\nexport DEPEND_ON_SERVICES_API_SCHEMA_DIR=${DEPEND_ON_SERVICES_API_SCHEMA_DIR}\nexport PYTHONPATH=${PYTHONPATH}" > ${WORK_DIR}/env.sh
+echo "export WORK_DIR=${WORK_DIR}
+export OPT_DIR=${OPT_DIR}
+export SHARED_API_DIR=${SHARED_API_DIR}
+export MAIN_SERVICE_NAME=${MAIN_SERVICE_NAME}
+export INNER_API_SCHEMA_DIR=${INNER_API_SCHEMA_DIR}
+export DEPEND_ON_SERVICES_API_SCHEMA_DIR=${DEPEND_ON_SERVICES_API_SCHEMA_DIR}
+export PYTHONPATH=${PYTHONPATH}
+export MICROSERVICE_NAME=${MICROSERVICE_NAME@Q}
+export SERVICE_SHARED_API_PATH=${SERVICE_SHARED_API_PATH@Q}
+export SERVICE_FIFO_LOG_FILEPATH=${SERVICE_FIFO_LOG_FILEPATH@Q}" > "${WORK_DIR}/env.sh"
 
 # start & activate syslogd
 doas -u root rc-status
@@ -21,10 +33,6 @@ doas -u root rc-service syslog status
 
 
 source ${OPT_DIR}/shell_utils/color_codes.sh
-if [ -z ${MICROSERVICE_NAME} ]; then
-    echo -e "{BRed}ERROR: Please specify env/arg MICROSERVICE_NAME. Abort${Color_Off}"
-    exit 255
-fi
 echo -e "${BGreen}Initializing: ${MICROSERVICE_NAME}...${Color_Off}"
 
 source ${OPT_DIR}/shell_utils/init_utils.sh

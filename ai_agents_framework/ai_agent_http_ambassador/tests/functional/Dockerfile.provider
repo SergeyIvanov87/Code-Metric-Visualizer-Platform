@@ -4,6 +4,7 @@ RUN --mount=type=secret,id=proxy_ca,required=false \
     apk add --no-cache python3 bash coreutils inotify-tools
 COPY common/*.py /opt/
 COPY common/modules /opt/modules
+COPY common/shell_utils /opt/shell_utils
 COPY ai_agents_framework/ai_agent/API /schemas
 COPY ai_agents_framework/ai_agent/sources/api_generator.py /agent/api_generator.py
 COPY ai_agents_framework/ai_agent_http_ambassador/tests/functional/provider.py /provider.py

@@ -2,6 +2,7 @@
 
 """Regression tests for opt-in request parallelism grouped by SESSION_ID."""
 
+import csv
 import json
 import os
 import shlex
@@ -92,12 +93,50 @@ def test_parallel_by_session_is_opt_in(run_around_tests):
         'read -r -u "${PARALLEL_REQUEST_READ_FD}" CMD_READ'
         in parallel_server
     )
-    assert "cat $pipe_request" not in parallel_server
+    assert 'cat -- "${pipe_request}"' not in parallel_server
     assert "exec {PARALLEL_REQUEST_KEEPALIVE_FD}>&-" in parallel_server
     assert "exec {PARALLEL_REQUEST_READ_FD}<&-" in parallel_server
     assert "parallel_session_request()" not in legacy_server
     assert "declare -A PARALLEL_REQUEST_STATE" not in legacy_server
-    assert "cat $pipe_request" in legacy_server
+    assert 'fifo_logged read "${pipe_request}" "" cat -- "${pipe_request}"' in legacy_server
+
+
+@pytest.mark.parametrize("request_name", ["req_1", "req_2"])
+def test_generated_service_logs_session_fifo_io(run_around_tests, request_name):
+    _install_request_command("true\n")
+    query = _query_for(request_name)
+    session_id = f"fifo_log_{request_name}"
+    payload = "test-payload"
+    _execute(query, session_id, payload)
+    answer = _wait_result(query, session_id)
+    assert payload in answer
+
+    log = Path(SETTINGS.work_dir) / "generated" / "fifo_transactions.log"
+
+    def session_records():
+        if not log.exists():
+            return []
+        with log.open(newline="") as file:
+            return [
+                row for row in csv.DictReader(file)
+                if row["SESSION_ID"] == session_id
+            ]
+
+    def delivered(row):
+        return row["OP"] == "write" and row["EVENT"] == "finished" and row["STATUS"] == "0"
+
+    assert _wait_until(lambda: any(delivered(row) for row in session_records()))
+    records = session_records()
+    request = next(row for row in records if row["OP"] == "read" and row["EVENT"] == "received")
+    assert request["QUERY"] == f"SESSION_ID={session_id} param_1={payload}"
+    assert any(
+        "result." in row["FIFO"] and row["FIFO"].endswith(f"_{session_id}")
+        and delivered(row) and payload in row["ANSWER"]
+        for row in records
+    )
+    started = [row for row in records if row["OP"] == "write" and row["EVENT"] == "started"]
+    assert started
+    assert all(row["ANSWER"] == "" for row in started)
 
 
 def test_parallel_by_session_requires_a_boolean(run_around_tests):

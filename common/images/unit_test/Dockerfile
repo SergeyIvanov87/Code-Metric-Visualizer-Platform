@@ -26,10 +26,10 @@ COPY common/modules /tests/utils/modules
 
 COPY common/images/unit_test/API /API/
 COPY common/images/unit_test/init.sh /
-COPY common/shell_utils /tests/shell_utils
+COPY common/shell_utils /tests/utils/shell_utils
 
 RUN <<EOF
-dos2unix /tests/shell_utils/*
+dos2unix /tests/utils/shell_utils/*
 dos2unix /tests/utils/*
 dos2unix /tests/utils/modules/*
 EOF

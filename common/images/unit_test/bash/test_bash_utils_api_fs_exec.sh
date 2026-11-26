@@ -13,6 +13,7 @@ print(
       'test_function() {\n',
       *[ l+"\n" for l in generate_api_node_env_init()],
       *[ l+"\n" for l in generate_read_api_fs_args()],
+      '    parsed_args=("\${OVERRIDEN_CMD_ARGS[@]}")',
       '\n}\n',
       *[ l+"\n" for l in generate_bypassed_params_formatting()])
 EOM
@@ -56,7 +57,7 @@ overrided_cmd_args_to_array() {
 
     # nameref for indirection
     local -n out_array=${1}
-    for file in "${OVERRIDEN_CMD_ARGS[@]}";
+    for file in "${parsed_args[@]}";
     do
       if [ -z $prev_file ]; then
         prev_file=${file}
@@ -68,8 +69,10 @@ overrided_cmd_args_to_array() {
 }
 
 test_all_files() {
+    local -a parsed_args=()
 
     test_function "${TEST_API_NODE}" "bbb"
+    assertEquals 6 "${#parsed_args[@]}"
     echo "API_NODE: ${API_NODE}"
     declare -A ARRAY
     overrided_cmd_args_to_array ARRAY
@@ -79,5 +82,17 @@ test_all_files() {
     done
 }
 
+
+test_ignores_markdown_and_fifo_log_extensions() {
+    local -a parsed_args=()
+
+    touch "${TEST_API_NODE}"/{README.md,123456789012.log,123456789012.log.lock,123456789012.log.1,123456789012.log.12,fifo_transactions.log.261126_123456}
+    printf '%s\n' positional > "${TEST_API_NODE}/01.NO_NAME_PARAM.1"
+
+    test_function "${TEST_API_NODE}" "bbb"
+
+    assertEquals 7 "${#parsed_args[@]}"
+    assertEquals positional "${parsed_args[6]}"
+}
 
 . shunit2
