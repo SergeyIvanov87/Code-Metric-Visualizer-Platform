@@ -145,6 +145,7 @@ services:
   test-rag-db:
     extends:
       file: ai_agents_framework/ai_agent/tests/functional/test_RAG/compose-functional.tests.yaml
+      service: test-rag-db
     environment:
       - CHROMA_PORT=18000
     hostname: test-rag-db
