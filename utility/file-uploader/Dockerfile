@@ -23,9 +23,8 @@ RUN <<EOF
 EOF
 
 COPY --chmod=0755 --from=common proxy_setup_image_helpers/with-proxy-ca.sh /usr/local/bin/with-proxy-ca.sh
-#RUN --mount=type=secret,id=proxy_ca,mode=0444 \
-#    /usr/local/bin/with-proxy-ca.sh apk add --no-cache bash coreutils inotify-tools python3 doas
-RUN apk add --no-cache bash coreutils inotify-tools python3 doas
+RUN --mount=type=secret,id=proxy_ca,mode=0444 \
+    /usr/local/bin/with-proxy-ca.sh apk add --no-cache bash coreutils inotify-tools python3 doas
 RUN mkdir -p /opt /uploads
 
 COPY --from=common modules /opt/modules
