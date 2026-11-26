@@ -54,8 +54,8 @@ RUN <<EOF
     dos2unix /opt/modules*
 EOF
 
-#TODO COPY ["ai_agent/*.sh", "ai_agent/*.py", "/package/"]
-COPY ai_agents_framework/ai_agent/config /config
+#TODO COPY ["ai_chat_agent/*.sh", "ai_chat_agent/*.py", "/package/"]
+COPY ai_agents_framework/ai_chat_agent/config /config
 ENV AI_AGENT_INFERENCE_CONFIG=/config/inference.cpu.json
 ENV MAX_WORKERS=32
 
@@ -63,14 +63,14 @@ ARG SKIP_API_DEPS_CHECK=false
 ENV SKIP_API_DEPS_CHECK=$SKIP_API_DEPS_CHECK
 ARG TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30
 ENV TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=$TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC
-COPY ai_agents_framework/ai_agent/API /API
-COPY ai_agents_framework/ai_agent/sources /package
+COPY ai_agents_framework/ai_chat_agent/API /API
+COPY ai_agents_framework/ai_chat_agent/sources /package
 RUN dos2unix /package/*
 
 VOLUME ["/api", "/mnt", "/assets/rag", "/assets/models"]
 
 # user creation
-ARG UID=1501 GID=23456 USER=ai_agent
+ARG UID=1501 GID=23456 USER=ai_chat_agent
 ENV UID=$UID GID=$GID USER=$USER GROUPNAME=pmccabe
 
 

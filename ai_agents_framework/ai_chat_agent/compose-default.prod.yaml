@@ -31,22 +31,6 @@ services:
       - api.pmccabe_collector.restapi.org:/api
       - api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:/assets/models
 
-  file-uploader:
-    extends:
-      file: ../../common/proxy_setup_image_helpers/compose-proxy-args.yaml
-      service: proxy-base
-    build:
-      context: ../../utility/file-uploader
-      dockerfile: Dockerfile
-      additional_contexts:
-        common: ../../common
-      secrets:
-        - proxy_ca
-    environment:
-      <<: *proxy-vars
-    volumes:
-      - api.pmccabe_collector.restapi.org:/api
-
 volumes:
   api.pmccabe_collector.restapi.org:
     name: api.pmccabe_collector.restapi.org
