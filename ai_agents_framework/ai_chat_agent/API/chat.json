@@ -1,7 +1,7 @@
 {
     "Content-Type" : "application/json",
     "Method" : "POST",
-    "Query": "api.pmccabe_collector.restapi.org/ai_agent/chat/v1",
+    "Query": "api.pmccabe_collector.restapi.org/ai_chat_agent/chat/v1",
     "Params": {
         "-system_prompt": ["\"You are a knowledge-base assistant.",
                           "You must not answer knowledge-base questions from memory.",

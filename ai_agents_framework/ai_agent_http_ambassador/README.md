@@ -20,7 +20,7 @@ loaded schemas rather than a second hardcoded API contract.
 
 | Method | Path | Behavior |
 | --- | --- | --- |
-| GET | `/api.pmccabe_collector.restapi.org/ai_agent/chat/v1` | Schema-driven chat page |
+| GET | `/api.pmccabe_collector.restapi.org/ai_chat_agent/chat/v1` | Schema-driven chat page |
 | POST | Same chat path | Forward the JSON object to the filesystem chat query |
 | GET | `/api.pmccabe_collector.restapi.org/ai_agent/rag/add_doc/v1` | Schema-driven file-selection page |
 | PUT | Same upload path | Forward the JSON object to the filesystem `rag_add` query |

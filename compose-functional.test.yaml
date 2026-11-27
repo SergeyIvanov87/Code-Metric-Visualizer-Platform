@@ -177,6 +177,8 @@ services:
       ai_agent:
         condition: service_started
       test_pseudo_fs:
+    environment:
+      - EXIT_ONCE_DONE=false
     logging:
       driver: syslog
       options:
@@ -208,6 +210,8 @@ services:
       ai_chat_agent:
         condition: service_started
       test_pseudo_fs:
+    environment:
+      - EXIT_ONCE_DONE=false
     logging:
       driver: syslog
       options:

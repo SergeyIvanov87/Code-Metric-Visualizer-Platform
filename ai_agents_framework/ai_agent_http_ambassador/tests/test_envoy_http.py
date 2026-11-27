@@ -175,7 +175,7 @@ def test_envoy_routes_bulk_file_and_folder_page(routed_http, filesystem_api):
 
 
 def test_envoy_preserves_generic_paths_methods_queries_and_bodies(routed_http):
-    for path in ("/", "/api.pmccabe_collector.restapi.org", "/api.pmccabe_collector.restapi.org/ai_agent/rag/sync/v1", "/api.pmccabe_collector.restapi.org/ai_agent/chat/v1/other", "/static/existing.css"):
+    for path in ("/", "/api.pmccabe_collector.restapi.org", "/api.pmccabe_collector.restapi.org/ai_agent/rag/sync/v1", "/api.pmccabe_collector.restapi.org/ai_chat_agent/chat/v1/other", "/static/existing.css"):
         status, body = routed_http(path + "?x=1&y=two", "POST", b"original=body", "application/x-www-form-urlencoded")
         assert status == 200
         assert json.loads(body) == {"backend": "generic", "path": path, "method": "POST", "query": "x=1&y=two", "body": "original=body"}
