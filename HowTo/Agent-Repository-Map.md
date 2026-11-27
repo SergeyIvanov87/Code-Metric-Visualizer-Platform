@@ -51,7 +51,7 @@ Start with [wrappers](../ai_agents_framework/ai_agent/sources/fs_api_wrappers.py
 
 [Reconciliation](../ai_agents_framework/ai_agent/sources/rag_sync.py) maps dispatcher chunk records to Chroma IDs and metadata. Keep stale-ID deletion after successful source enumeration, including all pages. Focused tests exercise fake collections; service tests are still needed for live storage integration.
 
-[Inference configuration](../ai_agents_framework/ai_agent/sources/inference_config.py) and [runtime documentation](../ai_agents_framework/ai_agent/README.md) cover CPU, NVIDIA and Intel Vulkan. Agent-only GPU Compose files require an accessible vector store and dispatcher setup. Model downloads, hardware access and per-replica memory budgets are deployment prerequisites, not assumptions for unit tests.
+[Inference configuration](../ai_agents_framework/ai_chat_agent/sources/inference_config.py) and [runtime documentation](../ai_agents_framework/ai_chat_agent/README.md) cover CPU, NVIDIA and Intel Vulkan. Chat production hardware Compose profiles are not yet implemented; the existing RAG NVIDIA/Vulkan Compose profiles retain their deployment settings. Model downloads, hardware access and per-replica memory budgets are deployment prerequisites, not assumptions for unit tests.
 
 ## Test matrix
 
@@ -75,7 +75,7 @@ tester before execution.
 | RRD | `rrd_analytic/compose-functional.test.yaml` | `rrd-functional-tester` |
 | REST | `rest_api/compose-functional.test.yaml` | `rest-api-functional-service-tester` |
 | Broker | `service_broker/compose-functional.test.yaml` | `service-broker-functional-tester` |
-| Agent RAG deletion and API wrappers | `ai_agents_framework/ai_agent/compose-unit.test.yaml` | `ai-agent-unit-tester` |
+| Agent RAG deletion and API wrappers | `ai_agents_framework/ai_agent/compose-functional.test.yaml` | `ai_agent-functional-tester` |
 | Dispatcher interfaces | `ai_agents_framework/docs_dispatcher/compose-unit.test.yaml` | `docs-dispatcher-unit-tester` |
 | Dispatcher | `ai_agents_framework/docs_dispatcher/compose-functional.prod.yaml` | `docs-dispatcher-functional-tester` |
 | Vector store | `ai_agents_framework/RAG/compose-functional.test.yaml` | `rag-functional-tester` |

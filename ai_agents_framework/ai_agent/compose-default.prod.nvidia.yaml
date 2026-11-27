@@ -1,3 +1,14 @@
+include:
+  - ../../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
+x-proxy-vars: &proxy-vars
+  HTTP_PROXY: ${HTTP_PROXY}
+  HTTPS_PROXY: ${HTTPS_PROXY}
+  http_proxy: ${http_proxy}
+  https_proxy: ${https_proxy}
+  NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1},localhost,127.0.0.1,0.0.0.0"
+  no_proxy: "${no_proxy:-${NO_PROXY:-localhost,127.0.0.1}},localhost,127.0.0.1,0.0.0.0"
+
 services:
   ai_agent:
     extends:
@@ -7,8 +18,11 @@ services:
       args:
         LLM_BACKEND: nvidia
         BASE_IMAGE: nvidia/cuda:12.6.3-devel-ubuntu24.04
+        <<: *proxy-vars
+      secrets:
+        - proxy_ca
     environment:
-      AI_AGENT_INFERENCE_CONFIG: /config/inference.nvidia.json
+      <<: *proxy-vars
     deploy:
       resources:
         reservations:
@@ -16,6 +30,11 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
+networks:
+  api.pmccabe_collector.network:
+    name: api.pmccabe_collector.network
+    external: true
 
 volumes:
   api.pmccabe_collector.restapi.org:

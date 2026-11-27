@@ -1,0 +1,16 @@
+{
+  "rrd_microservice_document_found": [
+    {
+      "query_sent": {
+        "-system_prompt": "Use only retrieved knowledge-base content. If relevant content is returned, answer the question and cite its Source ID. If no relevant content is returned, say that no relevant information was found.",
+        "-user_prompt": "What is the RRD microservice?"
+      },
+      "query_received": {
+        "id": "9900"
+      },
+      "answer": {
+        "fixture": "9900.txt"
+      }
+    }
+  ]
+}

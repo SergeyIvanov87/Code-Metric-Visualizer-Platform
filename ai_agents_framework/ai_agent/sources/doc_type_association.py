@@ -24,9 +24,9 @@ TEXT_GROUPS = {
     "document": {"log", "text", "txt"},
 }
 
-def document_type(path):
-    """Return the semantic category and extension for a filename."""
-    extension = Path(path).suffix.lower().lstrip(".")
+def document_type_from_extension(extension):
+    """Return the semantic category for a document extension."""
+    extension = str(extension).lower().lstrip(".")
     if extension in IMAGE_EXTENSIONS:
         return f"image,{extension}"
     if extension in CODE_EXTENSIONS:
@@ -34,4 +34,10 @@ def document_type(path):
     for group, extensions in TEXT_GROUPS.items():
         if extension in extensions:
             return f"txt,{group}"
-    return f"txt,{extension or 'document'}"
+    return f"txt,{'document' if not extension else 'unknown'}"
+
+
+def document_type(path):
+    """Return the semantic category and extension for a filename."""
+    extension = Path(path).suffix.lower().lstrip(".")
+    return document_type_from_extension(extension)

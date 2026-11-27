@@ -5,7 +5,9 @@ RUN --mount=type=secret,id=proxy_ca,required=false \
 COPY common/*.py /opt/
 COPY common/modules /opt/modules
 COPY ai_agents_framework/ai_agent/API /schemas
+COPY ai_agents_framework/ai_chat_agent/API /schemas
 COPY ai_agents_framework/ai_agent/sources/api_generator.py /agent/api_generator.py
+# ? it need perhaps to merge api_generator for ai_agent and ai_chat_agent somehow
 COPY ai_agents_framework/ai_agent_http_ambassador/tests/functional/provider.py /provider.py
 COPY ai_agents_framework/ai_agent_http_ambassador/tests/functional/stub.py /stub.py
 # Use the shared filesystem API group from the production service images.

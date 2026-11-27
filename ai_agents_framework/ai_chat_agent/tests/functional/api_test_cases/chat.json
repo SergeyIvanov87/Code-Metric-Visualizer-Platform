@@ -1,0 +1,47 @@
+{
+  "rrd_microservice_document_found": {
+    "timeout": 900,
+    "query": {
+      "-system_prompt": "Use only retrieved knowledge-base content. If relevant content is returned, answer the question and cite its Source ID. If no relevant content is returned, say that no relevant information was found.",
+      "-user_prompt": "What is the RRD microservice?"
+    },
+    "answer": {
+      "response": {
+        "contains_all": [
+          "metric"
+        ],
+        "contains_any": [
+          "round-robin",
+          "round robin",
+          "database"
+        ]
+      },
+      "source_ids": ["9900"]
+    }
+  },
+  "rrd_microservice_document_not_found": {
+    "timeout": 900,
+    "query": {
+      "-system_prompt": "Use only retrieved knowledge-base content. If relevant content is returned, answer the question and cite its Source ID. If no relevant content is returned, say that no relevant information was found.",
+      "-user_prompt": "What is the RRD microservice?"
+    },
+    "answer": {
+      "response": {
+        "contains_any": [
+          "no relevant",
+          "do not have information",
+          "don't have information",
+          "could not find",
+          "couldn't find",
+          "cannot answer",
+          "unable to find"
+        ],
+        "excludes": [
+          "round-robin",
+          "round robin"
+        ]
+      },
+      "source_ids": []
+    }
+  }
+}

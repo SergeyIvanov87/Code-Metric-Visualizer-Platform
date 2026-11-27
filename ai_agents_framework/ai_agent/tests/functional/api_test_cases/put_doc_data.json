@@ -1,0 +1,78 @@
+{
+  "successfull_rag_add_data": {
+    "query_received": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "inline",
+      "-filename": "inline.txt",
+      "doc_data": "aGVsbG8="
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "unique_id": 101
+    },
+    "query_sent": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "inline",
+      "-filename": "inline.txt",
+      "doc_data": "aGVsbG8="
+    }
+  },
+  "successfull_rag_add_data_unknown_type": {
+    "query_sent": {
+      "-doc_type": "base64,txt,unknown",
+      "-metadata": "inline-unknown",
+      "-filename": "inline.unrecognized",
+      "doc_data": "aGVsbG8="
+    },
+    "query_received": {
+      "-doc_type": "base64,txt,unknown",
+      "-metadata": "inline-unknown",
+      "-filename": "inline.unrecognized",
+      "doc_data": "aGVsbG8="
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "unique_id": 201
+    }
+  },
+  "rag_add_data_filename_and_metadata_characters": {
+    "query_sent": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "team docs \"quoted\" – café",
+      "-filename": "provided \"document\" ü.txt",
+      "doc_data": "aGVsbG8="
+    },
+    "query_received": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "team docs \"quoted\" – café",
+      "-filename": "provided \"document\" ü.txt",
+      "doc_data": "aGVsbG8="
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "unique_id": 301
+    }
+  },
+  "rag_add_data_omitted_metadata": {
+    "query_sent": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "",
+      "-filename": "provided document.txt",
+      "doc_data": "aGVsbG8="
+    },
+    "query_received": {
+      "-doc_type": "base64,txt,document",
+      "-metadata": "",
+      "-filename": "provided document.txt",
+      "doc_data": "aGVsbG8="
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "unique_id": 401
+    }
+  }
+}

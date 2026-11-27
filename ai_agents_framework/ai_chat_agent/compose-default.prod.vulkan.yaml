@@ -1,0 +1,35 @@
+include:
+  - ../../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
+x-proxy-vars: &proxy-vars
+  HTTP_PROXY: ${HTTP_PROXY}
+  HTTPS_PROXY: ${HTTPS_PROXY}
+  http_proxy: ${http_proxy}
+  https_proxy: ${https_proxy}
+  NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1},localhost,127.0.0.1,0.0.0.0"
+  no_proxy: "${no_proxy:-${NO_PROXY:-localhost,127.0.0.1}},localhost,127.0.0.1,0.0.0.0"
+
+services:
+  ai_chat_agent:
+    extends:
+      file: compose-default.prod.yaml
+      service: ai_chat_agent
+    build:
+      args:
+        LLM_BACKEND: intel
+        <<: *proxy-vars
+      secrets:
+        - proxy_ca
+    environment:
+      AI_AGENT_INFERENCE_CONFIG: /config/inference.intel.json
+      <<: *proxy-vars
+    devices:
+      - ${INTEL_RENDER_DEVICE:-/dev/dri/renderD128}:/dev/dri/renderD128
+    group_add:
+      - "${INTEL_RENDER_GID:?Set INTEL_RENDER_GID to the host render device group ID}"
+
+volumes:
+  api.pmccabe_collector.restapi.org:
+    name: api.pmccabe_collector.restapi.org
+    external: true
+  api.pmccabe_collector.project.ai-agents-framework.ai-agent.models:

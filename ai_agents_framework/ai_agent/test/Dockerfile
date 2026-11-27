@@ -10,7 +10,6 @@ ENV UID=$UID GID=$GID USER=$USER GROUPNAME=pmccabe
 COPY ai_agents_framework/ai_agent/API /API
 COPY ai_agents_framework/ai_agent/test/*.py /tests/
 COPY ai_agents_framework/ai_agent/test/init.sh /tests/init.sh
-COPY ai_agents_framework/ai_agent/test/data /tests/data
 
 RUN dos2unix /tests/init.sh /tests/*.py \
  && chmod +x /tests/init.sh \

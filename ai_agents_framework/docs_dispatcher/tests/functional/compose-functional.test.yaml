@@ -18,7 +18,7 @@ services:
       timeout: 1s
       retries: 10
     volumes:
-      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/mnt/file_storage
+      - api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.persistent-store-data.test:/mnt/file_storage
 
   docs-dispatcher-functional-tester:
     build:
@@ -31,8 +31,8 @@ services:
     environment:
       - EXIT_ONCE_DONE=true
     volumes:
-      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.test:/api
-      - api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:/mnt/file_storage
+      - api.pmccabe_collector.restapi.org.ai-agents-framework.rag-dispatcher.test:/api
+      - api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.persistent-store-data.test:/mnt/file_storage
     depends_on:
       docs-dispatcher:
         condition: service_started
@@ -40,4 +40,4 @@ services:
         condition: service_started
 
 volumes:
-  api.pmccabe_collector.restapi.org.ai-agents-framework.docs-dispatcher.persistent.storage.test:
+  api.pmccabe_collector.project.ai-agents-framework.rag-dispatcher.persistent-store-data.test:

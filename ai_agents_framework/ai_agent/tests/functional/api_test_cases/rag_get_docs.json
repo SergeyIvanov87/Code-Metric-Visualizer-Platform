@@ -1,0 +1,25 @@
+{
+  "successfull_rag_get_docs": {
+    "query": {
+      "offset": "0",
+      "limit": "2"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "offset": 0,
+      "limit": 1,
+      "remaining": 0,
+      "docs": [
+        {
+          "id": 7,
+          "file_uri": "doc.txt",
+          "type": "base64,txt,document",
+          "chunks": [
+            301
+          ]
+        }
+      ]
+    }
+  }
+}

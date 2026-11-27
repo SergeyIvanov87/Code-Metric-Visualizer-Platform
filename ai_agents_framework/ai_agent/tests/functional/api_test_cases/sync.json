@@ -1,0 +1,12 @@
+{
+  "successfull_rag_sync": {
+    "query_received": {},
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "created": [],
+      "updated": [],
+      "deleted": []
+    }
+  }
+}

@@ -11,6 +11,7 @@ from pathlib import Path
 from cli_argument_parser import ArgumentParsingError, RaisingArgumentParser
 
 from document_splitter import split_document
+from doc_type_association import document_type_from_extension
 from rag_chroma import insert_embeddings
 from rag_chunks import attach_chunks
 from fs_api_wrappers import (
@@ -35,6 +36,7 @@ def main(
     filename = filename or (
         datetime.now(timezone.utc).strftime("%Y-%m-%d:%H:%M:%S_") + doc_type
     )
+    doc_type = document_type_from_extension(doc_type)
 
     from embedding_model import get_embedding_model
 

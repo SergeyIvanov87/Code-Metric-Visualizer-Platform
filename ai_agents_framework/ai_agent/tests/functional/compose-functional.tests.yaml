@@ -1,0 +1,28 @@
+include:
+  - ../../../../common/images/test_pseudo_fs/compose.yaml
+  - ../../../../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+  - test_RAG/compose-functional.tests.yaml
+
+
+services:
+  ai_agent-functional-tester:
+    extends:
+      file: ../../../../common/proxy_setup_image_helpers/compose-proxy-args.yaml
+      service: proxy-base
+    build:
+      context: ../../../../
+      dockerfile: ai_agents_framework/ai_agent/tests/functional/Dockerfile
+      additional_contexts:
+        test_pseudo_fs: "service:test_pseudo_fs"
+    environment:
+      - EXIT_ONCE_DONE=true
+      - TEST_RAG_DB_HOST=test-rag-db
+      - TEST_RAG_DB_PORT=18000
+    volumes:
+      - api.pmccabe_collector.restapi.org.ai-agent.tests:/api
+    depends_on:
+       - ai_agent
+       - test_pseudo_fs
+
+volumes:
+  api.pmccabe_collector.restapi.org.ai-agent.tests:

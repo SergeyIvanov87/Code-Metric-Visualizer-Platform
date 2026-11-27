@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Chat Agent Functional Testing"
+  short_description: "Build contract-driven chat agent functional tests"
+  default_prompt: "Use $ai-chat-agent-functional-testing to add a positive-flow filesystem API case and its dependency mocks."

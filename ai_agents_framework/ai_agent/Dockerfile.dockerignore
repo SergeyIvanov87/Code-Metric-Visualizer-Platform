@@ -5,6 +5,8 @@
 
 !common/
 common/**
+!common/proxy_setup_image_helpers/
+!common/proxy_setup_image_helpers/with-proxy-ca.sh
 !common/modules/
 !common/modules/**
 !common/shell_utils/

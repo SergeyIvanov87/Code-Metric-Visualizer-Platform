@@ -2,7 +2,29 @@ FROM alpine:3.20.6
 WORKDIR /package
 ENV STAGING_ROOT=/api/.staging
 
-RUN apk add --no-cache bash coreutils inotify-tools python3 doas
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG NO_PROXY
+ARG http_proxy
+ARG https_proxy
+ARG no_proxy
+
+env HTTP_PROXY=${HTTP_PROXY}
+env HTTPS_PROXY=${HTTPS_PROXY}
+env NO_PROXY=${NO_PROXY}
+env http_proxy=${http_proxy}
+env https_proxy=${https_proxy}
+env no_proxy=${no_proxy}
+
+RUN <<EOF
+    echo "-SSSSSS- ${HTTP_PROXY}"
+    echo "-SSSSSS- ${HTTPS_PROXY}"
+    echo "-SSSSSS- ${NO_PROXY}"
+EOF
+
+COPY --chmod=0755 --from=common proxy_setup_image_helpers/with-proxy-ca.sh /usr/local/bin/with-proxy-ca.sh
+RUN --mount=type=secret,id=proxy_ca,mode=0444 \
+    /usr/local/bin/with-proxy-ca.sh apk add --no-cache bash coreutils inotify-tools python3 doas
 RUN mkdir -p /opt /uploads
 
 COPY --from=common modules /opt/modules

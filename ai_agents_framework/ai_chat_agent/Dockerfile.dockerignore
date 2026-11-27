@@ -1,0 +1,46 @@
+# Paths are relative to the repository-root build context.
+# This file takes precedence over the root .dockerignore for this Dockerfile.
+# Allow only local COPY/ADD inputs; update when those instructions change.
+**
+
+!common/
+common/**
+!common/modules/
+!common/modules/**
+!common/shell_utils/
+!common/shell_utils/**
+!common/api_management.py
+!common/build_api_executors.py
+!common/build_api_services.py
+!common/build_api_pseudo_fs.py
+!common/build_common_api_services.py
+!common/canonize_internal_api.py
+!common/check_missing_pseudo_fs_from_schema.py
+!common/get_service_api_deps.py
+!common/make_api_readme.py
+!common/renew_pseudo_fs_pipes.py
+!common/deferred_query_launcher.py
+!common/deferred_query_executor.py
+!ai_agents_framework/
+ai_agents_framework/**
+!ai_agents_framework/ai_chat_agent/
+ai_agents_framework/ai_chat_agent/**
+!ai_agents_framework/ai_chat_agent/config/
+!ai_agents_framework/ai_chat_agent/config/**
+!ai_agents_framework/ai_chat_agent/API/
+!ai_agents_framework/ai_chat_agent/API/**
+!ai_agents_framework/ai_chat_agent/sources/
+!ai_agents_framework/ai_chat_agent/sources/**
+ai_agents_framework/ai_chat_agent/sources/assets_model/
+ai_agents_framework/ai_chat_agent/sources/.*
+
+# Exclude local secrets and generated files within allowed directories.
+**/.env
+**/.env.*
+**/.git
+**/__pycache__
+**/*.pyc
+**/.cache
+**/.config
+**/.chroma
+**/.local

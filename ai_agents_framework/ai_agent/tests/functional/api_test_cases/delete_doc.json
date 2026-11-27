@@ -1,0 +1,65 @@
+{
+  "successfull_rag_delete": {
+    "query_received": {
+      "-ids": "7",
+      "-metadata": "cleanup"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "deleted": [
+        7
+      ],
+      "not_found": []
+    }
+  },
+  "rag_delete_omitted_metadata": {
+    "query_received": {
+      "-ids": "12,13",
+      "-metadata": ""
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "deleted": [
+        12,
+        13
+      ],
+      "not_found": []
+    }
+  },
+  "rag_delete_quoted_metadata": {
+    "query_received": {
+      "-ids": "16",
+      "-metadata": "team docs \"quoted\" – café"
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "deleted": [
+        16
+      ],
+      "not_found": []
+    }
+  },
+  "rag_delete_compact_ranges_and_empty_metadata": {
+    "query_received": {
+      "-ids": "7-10,8,20-21",
+      "-metadata": ""
+    },
+    "answer": {
+      "error_code": 0,
+      "error_msg": "success",
+      "deleted": [
+        7,
+        8
+      ],
+      "not_found": [
+        9,
+        10,
+        20,
+        21
+      ]
+    }
+  }
+}

@@ -1,0 +1,101 @@
+ARG BASE_IMAGE=ubuntu@sha256:c4a8d5503dfb2a3eb8ab5f807da5bc69a85730fb49b5cfca2330194ebcc41c7b
+FROM ${BASE_IMAGE}
+ARG LLM_BACKEND=cpu
+
+SHELL ["/bin/bash", "-c"]
+
+RUN <<EOF
+    set -e
+    apt-get update
+    apt-get install -y --no-install-recommends coreutils python3 python3-pip python-is-python3 dos2unix inotify-tools bash doas cmake libgomp1 gcc g++
+EOF
+
+# Keep CMake, GCC/G++, and libgomp1 for llama-cpp-python source builds, including
+# the GCC host compiler/runtime used by NVIDIA CUDA. Intel's Vulkan dependencies
+# are installed conditionally in the backend selection below.
+
+WORKDIR /package
+
+# /package is also the runtime user's home and is replaced by a source-code
+# volume. Do not let stale packages under /package/.local shadow the coherent
+# dependency set installed into /usr/local below.
+ENV PYTHONNOUSERSITE=1
+
+# Development and functional stacks bind-mount /package as source code. Keep
+# downloaded Hugging Face artifacts in the service-owned model volume instead
+# of deriving a cache path from the runtime user's /package home directory.
+ENV HF_HOME=/assets/models/huggingface
+
+RUN <<EOF
+    set -e
+    pip install --break-system-packages langchain langchain-chroma langchain-community langchain-huggingface langchain-text-splitters tiktoken sentence-transformers
+    case "$LLM_BACKEND" in
+      cpu) export CMAKE_ARGS="-DGGML_CUDA=OFF -DGGML_VULKAN=OFF" ;;
+      nvidia) export CMAKE_ARGS="-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=all-major" ;;
+      intel)
+        apt-get install -y --no-install-recommends libvulkan-dev mesa-vulkan-drivers vulkan-tools glslc
+        export CMAKE_ARGS="-DGGML_VULKAN=ON" ;;
+      *) echo "Unsupported LLM_BACKEND: $LLM_BACKEND" >&2; exit 1 ;;
+    esac
+    # This agent uses text-only inference. In 0.3.16, LLAVA_BUILD also adds
+    # llama-mtmd-cli independently of LLAMA_BUILD_TOOLS.
+    export CMAKE_ARGS="$CMAKE_ARGS -DLLAVA_BUILD=OFF"
+    FORCE_CMAKE=1 pip install --break-system-packages --no-cache-dir --no-binary=llama-cpp-python llama-cpp-python==0.3.16
+    pip install --break-system-packages chromadb pypdf requests pydantic tqdm
+EOF
+
+RUN <<EOF
+    mkdir -p /opt /package
+    mkdir -p /assets/rag
+    mkdir -p /assets/models
+EOF
+
+COPY common/modules /opt/modules
+COPY common/shell_utils /opt/shell_utils
+COPY ["common/api_management.py", "common/build_api_executors.py", "common/build_api_services.py", "common/build_api_pseudo_fs.py", "common/build_common_api_services.py", "common/canonize_internal_api.py", "common/check_missing_pseudo_fs_from_schema.py", "common/get_service_api_deps.py", "common/make_api_readme.py", "common/renew_pseudo_fs_pipes.py", "common/deferred_query_launcher.py", "common/deferred_query_executor.py", "/opt/"]
+
+RUN <<EOF
+    dos2unix /opt/* && \
+    dos2unix /opt/modules*
+EOF
+
+#TODO COPY ["ai_chat_agent/*.sh", "ai_chat_agent/*.py", "/package/"]
+COPY ai_agents_framework/ai_chat_agent/config /config
+ENV AI_AGENT_INFERENCE_CONFIG=/config/inference.cpu.json
+ENV MAX_WORKERS=32
+
+ARG SKIP_API_DEPS_CHECK=false
+ENV SKIP_API_DEPS_CHECK=$SKIP_API_DEPS_CHECK
+ARG TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=30
+ENV TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC=$TIMEOUT_FOR_DEPS_CHECK_BEFORE_TERMINATION_SEC
+COPY ai_agents_framework/ai_chat_agent/API /API
+COPY ai_agents_framework/ai_chat_agent/sources /package
+RUN dos2unix /package/*
+
+VOLUME ["/api", "/mnt", "/assets/rag", "/assets/models"]
+
+# user creation
+ARG UID=1501 GID=23456 USER=ai_chat_agent
+ENV UID=$UID GID=$GID USER=$USER GROUPNAME=pmccabe
+
+
+RUN <<EOF
+    apt-get install adduser
+    groupadd --gid "$GID" "$GROUPNAME"
+    adduser --disabled-password --gecos "" --home "$(pwd)" -u $UID --ingroup "$GROUPNAME" --no-create-home $USER
+    adduser ${USER} sudo
+EOF
+
+
+RUN <<EOF
+echo "permit nopass :${GROUPNAME}" >> /etc/doas.conf
+mkdir -p -m 777 /mnt && mkdir -p -m 777 /api
+chown -R ${USER}:${GROUPNAME} /mnt && chown -R ${USER}:${GROUPNAME} /api && chown -R ${USER}:${GROUPNAME} /assets && chown -R ${USER}:${GROUPNAME} /api
+chown -R ${USER}:${GROUPNAME} /package && chown -R ${USER}:${GROUPNAME} /opt && chown -R ${USER}:${GROUPNAME} /var/log
+chown -R ${USER}:${GROUPNAME} /API
+EOF
+
+
+
+USER ${USER}
+ENTRYPOINT ["/package/init.sh", "/package", "/mnt", "/opt", "/api", "/assets/models"]

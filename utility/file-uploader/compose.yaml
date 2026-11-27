@@ -1,3 +1,6 @@
+include:
+  - ../common/proxy_setup_image_helpers/compose-proxy-trust.yaml
+
 services:
   file-uploader:
     build:
@@ -5,6 +8,15 @@ services:
       dockerfile: Dockerfile
       additional_contexts:
         common: ../../common
+      secrets:
+        - proxy_ca
+    environment:
+      HTTP_PROXY: ${HTTP_PROXY}
+      HTTPS_PROXY: ${HTTPS_PROXY}
+      http_proxy: ${http_proxy}
+      https_proxy: ${https_proxy}
+      NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1},localhost,127.0.0.1,0.0.0.0,file-uploader"
+      no_proxy: "${no_proxy:-${NO_PROXY:-localhost,127.0.0.1}},localhost,127.0.0.1,0.0.0.0,file-uploader"
     volumes:
       - file-uploader-api:/api
       - file-uploads:/uploads
