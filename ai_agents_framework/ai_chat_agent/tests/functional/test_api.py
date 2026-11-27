@@ -46,13 +46,16 @@ def _assert_answer(result, expected, session_id):
         assert result == expected, f"unexpected result for SESSION_ID={session_id}"
         return
 
-    assert set(result) == {"response"}, (
+    assert set(result) == {"response", "source_ids"}, (
         f"unexpected response contract for SESSION_ID={session_id}: {result}"
     )
     assert isinstance(result["response"], str), (
         f"response must be text for SESSION_ID={session_id}: {result}"
     )
     response = result["response"].casefold()
+    assert result["source_ids"] == expected.get("source_ids", []), (
+        f"unexpected source IDs for SESSION_ID={session_id}: {result}"
+    )
     for fragment in expected_response.get("contains_all", []):
         assert fragment.casefold() in response, (
             f"response for SESSION_ID={session_id} does not contain {fragment!r}: "

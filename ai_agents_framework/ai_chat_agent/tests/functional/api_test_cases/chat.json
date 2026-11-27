@@ -8,15 +8,15 @@
     "answer": {
       "response": {
         "contains_all": [
-          "metric",
-          "9900"
+          "metric"
         ],
         "contains_any": [
           "round-robin",
           "round robin",
           "database"
         ]
-      }
+      },
+      "source_ids": ["9900"]
     }
   },
   "rrd_microservice_document_not_found": {
@@ -40,7 +40,8 @@
           "round-robin",
           "round robin"
         ]
-      }
+      },
+      "source_ids": []
     }
   }
 }

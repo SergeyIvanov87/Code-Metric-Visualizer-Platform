@@ -218,6 +218,35 @@ def search_knowledge_base_impl(
     return model_content, artifacts
 
 
+def retrieved_source_ids(messages) -> list[str]:
+    """Collect verified document IDs from successful knowledge-base tools."""
+
+    source_ids = []
+    for message in messages:
+        if (
+            not isinstance(message, ToolMessage)
+            or message.name != "search_knowledge_base"
+            or message.status != "success"
+        ):
+            continue
+
+        artifacts = message.artifact
+        if not isinstance(artifacts, list):
+            continue
+
+        for artifact in artifacts:
+            if not isinstance(artifact, dict):
+                continue
+            document_id = artifact.get("document_id")
+            if document_id is None:
+                continue
+            document_id = str(document_id)
+            if document_id not in source_ids:
+                source_ids.append(document_id)
+
+    return source_ids
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="Agentic RAG")
     parser.add_argument(
@@ -485,4 +514,11 @@ if __name__ == "__main__":
         }
     )
 
-    print(json.dumps({"response": result["messages"][-1].content}))
+    print(
+        json.dumps(
+            {
+                "response": result["messages"][-1].content,
+                "source_ids": retrieved_source_ids(result["messages"]),
+            }
+        )
+    )
